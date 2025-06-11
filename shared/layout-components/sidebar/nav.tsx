@@ -32,11 +32,13 @@ const ChartsIcon = <i className="bx bx-bar-chart-square side-menu__icon"></i>;
 
 const MapsIcon = <i className="bx bx-map side-menu__icon"></i>;
 
-const ClientsIcon = <i className="bx bx-group side-menu__icon"></i>;
+const GroupsIcon = <i className="bx bx-group side-menu__icon"></i>;
 
 const ServicesIcon = <i className="bx bx-store-alt side-menu__icon"></i>;
 
 const ActivitiesIcon = <i className="bx bx-link-alt side-menu__icon"></i>;
+
+const ClientsIcon = <i className="bx bx-user side-menu__icon"></i>;
 
 const badge = (
   <span className="badge !bg-warning/10 !text-warning !py-[0.25rem] !px-[0.45rem] !text-[0.75em] ms-1">
@@ -72,6 +74,16 @@ export const MenuItems: any = [
     selected: false,
     dirchange: false,
     path: "/clients",
+  },
+
+  {
+    icon: GroupsIcon,
+    title: "Groups",
+    type: "link",
+    active: false,
+    selected: false,
+    dirchange: false,
+    path: "/groups",
   },
 
   {

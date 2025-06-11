@@ -5,91 +5,56 @@ import Link from "next/link";
 import { toast, Toaster } from "react-hot-toast";
 import * as XLSX from "xlsx";
 
-interface Service {
+interface Group {
   id: string;
   name: string;
+  numberOfClients: number;
   createdDate: string;
   sortOrder: number;
 }
 
 interface ExcelRow {
   "ID"?: string;
-  "Service Name": string;
+  "Group Name": string;
+  "Number Of Clients": string;
   "Created Date": string;
   "Sort Order"?: string | number;
 }
 
-const ServicesPage = () => {
-  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+const GroupsPage = () => {
+  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [services, setServices] = useState<Service[]>([
+  const [groups, setGroups] = useState<Group[]>([
     {
-    id: "01",
-    name: "Income Tax",
-    createdDate: "19 May 2025",
-    sortOrder: 1,
-  },
-  {
-    id: "02",
-    name: "Tax Audit",
-    createdDate: "19 May 2025",
-    sortOrder: 2,
-  },
-  {
-    id: "03",
-    name: "Corporate Audit",
-    createdDate: "19 May 2025",
-    sortOrder: 3,
-  },
-  {
-    id: "04",
-    name: "Firms/AOP/Trust/HUF",
-    createdDate: "19 May 2025",
-    sortOrder: 4,
-  },
-  {
-    id: "05",
-    name: "TDS Return Filing",
-    createdDate: "19 May 2025",
-    sortOrder: 5,
-  },
-  {
-    id: "06",
-    name: "GST",
-    createdDate: "19 May 2025",
-    sortOrder: 6,
-  },
-  {
-    id: "07",
-    name: "ROC and LLP",
-    createdDate: "19 May 2025",
-    sortOrder: 7,
-  },
-  {
-    id: "08",
-    name: "Scrutiny",
-    createdDate: "19 May 2025",
-    sortOrder: 8,
-  },
-  {
-    id: "09",
-    name: "Special Audit",
-    createdDate: "19 May 2025",
-    sortOrder: 9,
-  },
-  {
-    id: "10",
-    name: "Govt and PSU Audit",
-    createdDate: "19 May 2025",
-    sortOrder: 10,
-  },
+        id: "1",
+        name: "Premium Group",
+        numberOfClients: 4,
+        createdDate: "01 June 2025",
+        sortOrder: 1,
+    },
+
+    {
+        id: "2",
+        name: "Bharat Group",
+        numberOfClients: 3,
+        createdDate: "05 June 2025",
+        sortOrder: 2,
+    },
+
+    {
+        id: "3",
+        name: "Ganesh Group",
+        numberOfClients: 3,
+        createdDate: "08 June 2025",
+        sortOrder: 3,
+    },
   ]);
   const [isLoading, setIsLoading] = useState(false); // Initially set to true when API integrated
   const [error, setError] = useState<string | null>(null);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [totalResults, setTotalResults] = useState(10); // Initially set to 0 when API integrated
+  const [totalResults, setTotalResults] = useState(3); // Initially set to 0 when API integrated
   const [totalPages, setTotalPages] = useState(1);
   const [importProgress, setImportProgress] = useState<number | null>(null);
 
@@ -99,30 +64,30 @@ const ServicesPage = () => {
 
   const handleSelectAll = () => {
     if (selectAll) {
-      setSelectedServices([]);
+      setSelectedGroups([]);
     } else {
-      setSelectedServices(filteredServices.map((service) => service.id));
+      setSelectedGroups(filteredGroups.map((group) => group.id));
     }
     setSelectAll(!selectAll);
   };
 
-  const handleServiceSelect = (serviceId: string) => {
-    if (selectedServices.includes(serviceId)) {
-      setSelectedServices(selectedServices.filter((id) => id !== serviceId));
+  const handleGroupSelect = (groupId: string) => {
+    if (selectedGroups.includes(groupId)) {
+      setSelectedGroups(selectedGroups.filter((id) => id !== groupId));
     } else {
-      setSelectedServices([...selectedServices, serviceId]);
+      setSelectedGroups([...selectedGroups, groupId]);
     }
   };
 
-  // Filter services based on search query
-  const filteredServices = services.filter((service) =>
-    service.name.toLowerCase().includes(searchQuery.toLowerCase())
+  // Filter groups based on search query
+  const filteredGroups = groups.filter((group) =>
+    group.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Calculate current services for the current page
+  // Calculate current groups for the current page
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentServices = filteredServices.slice(startIndex, endIndex);
+  const currentGroups = filteredGroups.slice(startIndex, endIndex);
 
   const handleExport = async () => {
     try {
@@ -130,12 +95,13 @@ const ServicesPage = () => {
       // const response = await fetch(`${API_BASE_URL}/categories?page=1&limit=100000`);
       // if (!response.ok) throw new Error('Failed to fetch all categories for export');
       // const data = await response.json();
-      const exportSource = Array.isArray(services) ? services : [];
-      const exportData = exportSource.map((service: Service) => ({
-        ID: service.id,
-        "Service Name": service.name,
-        "Created Date": service.createdDate,
-        "Sort Order": service.sortOrder,
+      const exportSource = Array.isArray(groups) ? groups : [];
+      const exportData = exportSource.map((group: Group) => ({
+        ID: group.id,
+        "Group Name": group.name,
+        "Number Of Clients": group.numberOfClients,
+        "Created Date": group.createdDate,
+        "Sort Order": group.sortOrder,
       }));
       const ws = XLSX.utils.json_to_sheet(exportData);
       ws["!cols"] = [
@@ -147,13 +113,13 @@ const ServicesPage = () => {
         { wch: 10 },
       ];
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Services");
-      const fileName = `services_${new Date().toISOString().split("T")[0]}.xlsx`;
+      XLSX.utils.book_append_sheet(wb, ws, "Groups");
+      const fileName = `groups_${new Date().toISOString().split("T")[0]}.xlsx`;
       XLSX.writeFile(wb, fileName);
-      toast.success("Services exported successfully");
+      toast.success("Groups exported successfully");
     } catch (error) {
-      console.error("Error exporting services:", error);
-      toast.error("Failed to export services");
+      console.error("Error exporting groups:", error);
+      toast.error("Failed to export groups");
     }
   };
 
@@ -181,23 +147,23 @@ const ServicesPage = () => {
   return (
     <div className="main-content">
       <Toaster position="top-right" />
-      <Seo title="Services" />
+      <Seo title="Groups" />
 
       <div className="grid grid-cols-12 gap-6">
         <div className="col-span-12">
           {/* Page Header */}
           <div className="box !bg-transparent border-0 shadow-none">
             <div className="box-header flex justify-between items-center">
-              <h1 className="box-title text-2xl font-semibold">Services</h1>
+              <h1 className="box-title text-2xl font-semibold">Groups</h1>
               <div className="box-tools flex items-center space-x-2">
-                {selectedServices.length > 0 && (
+                {selectedGroups.length > 0 && (
                   <button
                     type="button"
                     className="ti-btn ti-btn-danger"
                     // onClick={handleDeleteSelected}
                   >
                     <i className="ri-delete-bin-line me-2"></i>
-                    Delete Selected ({selectedServices.length})
+                    Delete Selected ({selectedGroups.length})
                   </button>
                 )}
                 {/* Import/Export Buttons */}
@@ -236,12 +202,12 @@ const ServicesPage = () => {
                   <i className="ri-download-2-line me-2"></i> Export
                 </button>
                 {/* <Link
-                  href="/catalog/services/add"
+                  href="/catalog/groups/add"
                   className="ti-btn ti-btn-primary"
                 > */}
                 {/* Wrapper div temporarily used for styling */}
                 <div className="ti-btn ti-btn-primary">
-                  <i className="ri-add-line me-2"></i> Add New Service
+                  <i className="ri-add-line me-2"></i> Add New Group
                 </div>
                 {/* </Link> */}
               </div>
@@ -276,7 +242,7 @@ const ServicesPage = () => {
                   <input
                     type="text"
                     className="form-control py-3 pr-10"
-                    placeholder="Search by service name..."
+                    placeholder="Search by group name..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
@@ -309,7 +275,10 @@ const ServicesPage = () => {
                           />
                         </th>
                         <th scope="col" className="text-start">
-                          Service Name
+                          Group Name
+                        </th>
+                        <th scope="col" className="text-start">
+                          Number Of Clients
                         </th>
                         <th scope="col" className="text-start">
                           Created Date
@@ -323,10 +292,10 @@ const ServicesPage = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {currentServices.length > 0 ? (
-                        currentServices.map((service: Service, index: number) => (
+                      {currentGroups.length > 0 ? (
+                        currentGroups.map((group: Group, index: number) => (
                           <tr
-                            key={service.id}
+                            key={group.id}
                             className={`border-b border-gray-200 ${
                               index % 2 === 0 ? "bg-gray-50" : ""
                             }`}
@@ -335,17 +304,18 @@ const ServicesPage = () => {
                               <input
                                 type="checkbox"
                                 className="form-check-input"
-                                checked={selectedServices.includes(service.id)}
-                                onChange={() => handleServiceSelect(service.id)}
+                                checked={selectedGroups.includes(group.id)}
+                                onChange={() => handleGroupSelect(group.id)}
                               />
                             </td>
-                            <td>{service.name}</td>
-                            <td>{service.createdDate}</td>
-                            <td>{service.sortOrder}</td>
+                            <td>{group.name}</td>
+                            <td>{group.numberOfClients}</td>
+                            <td>{group.createdDate}</td>
+                            <td>{group.sortOrder}</td>
                             <td>
                               <div className="flex space-x-2">
                                 {/* <Link
-                                  href={`/catalog/services/edit/${service.id}`}
+                                  href={`/catalog/groups/edit/${group.id}`}
                                   className="ti-btn ti-btn-primary ti-btn-sm"
                                 > */}
                                 {/* Wrapper div temporarily used for styling */}
@@ -355,7 +325,7 @@ const ServicesPage = () => {
                                 {/* </Link> */}
                                 <button
                                   className="ti-btn ti-btn-danger ti-btn-sm"
-                                  // onClick={() => handleDelete(service.id)}
+                                  // onClick={() => handleDelete(group.id)}
                                 >
                                   <i className="ri-delete-bin-line"></i>
                                 </button>
@@ -371,19 +341,19 @@ const ServicesPage = () => {
                                 <i className="ri-folder-line text-4xl text-primary"></i>
                               </div>
                               <h3 className="text-xl font-medium mb-2">
-                                No Services Found
+                                No Groups Found
                               </h3>
                               <p className="text-gray-500 text-center mb-6">
-                                Start by adding your first service.
+                                Start by adding your first group.
                               </p>
                               {/* <Link
-                                href="/catalog/services/add"
+                                href="/catalog/groups/add"
                                 className="ti-btn ti-btn-primary"
                               > */}
                               {/* Wrapper div temporarily used for styling */}
                               <div className="ri-add-line me-2">
                                 <i className="ri-add-line me-2"></i> Add First
-                                Service
+                                Group
                               </div>
                               {/* </Link> */}
                             </div>
@@ -475,4 +445,4 @@ const ServicesPage = () => {
   );
 };
 
-export default ServicesPage;
+export default GroupsPage;
