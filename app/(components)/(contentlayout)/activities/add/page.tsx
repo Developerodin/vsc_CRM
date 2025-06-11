@@ -5,27 +5,19 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast, Toaster } from 'react-hot-toast';
 
-interface Client {
+interface Activity {
   id: string;
   name: string;
-  phoneNumber: string;
-  email: string;
-  address: string;
-  group: string;
   createdDate: string;
   sortOrder: number;
 }
 
-const AddClientPage = () => {
+const AddActivityPage = () => {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '',
-    phoneNumber: '',
-    email: '',
-    address: '',
-    group: '',
     sortOrder: '1',
   });
 
@@ -73,7 +65,7 @@ const AddClientPage = () => {
     //   };
 
     //   // Create client
-    //   const response = await fetch(`${API_BASE_URL}/clients`, {
+    //   const response = await fetch(`${API_BASE_URL}/activities`, {
     //     method: 'POST',
     //     headers: {
     //       'Accept': 'application/json',
@@ -88,7 +80,7 @@ const AddClientPage = () => {
     //   }
 
     //   toast.success('Client created successfully');
-    //   router.push('/clients');
+    //   router.push('/activities');
     // } catch (err) {
         //   console.error('Error creating client:', err);
         //   toast.error(err instanceof Error ? err.message : 'Failed to create client');
@@ -101,26 +93,26 @@ const AddClientPage = () => {
   return (
     <div className="main-content">
       <Toaster position="top-right" />
-      <Seo title="Add Client"/>
+      <Seo title="Add Activity"/>
       
       <div className="grid grid-cols-12 gap-6">
         <div className="col-span-12">
           {/* Page Header */}
           <div className="box !bg-transparent border-0 shadow-none">
             <div className="box-header flex justify-between items-center">
-              <h1 className="box-title text-2xl font-semibold">Add New Client</h1>
+              <h1 className="box-title text-2xl font-semibold">Add New Activity</h1>
               <nav className="flex" aria-label="Breadcrumb">
                 <ol className="inline-flex items-center space-x-1 md:space-x-3">
                   <li className="inline-flex items-center">
-                    <Link href="/clients" className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-primary">
+                    <Link href="/activities" className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-primary">
                       <i className="ri-home-line mr-2"></i>
-                      Clients
+                      Activities
                     </Link>
                   </li>
                   <li>
                     <div className="flex items-center">
                       <i className="ri-arrow-right-s-line text-gray-400 mx-2"></i>
-                      <span className="text-sm font-medium text-gray-500">Add New Client</span>
+                      <span className="text-sm font-medium text-gray-500">Add New Activity</span>
                     </div>
                   </li>
                 </ol>
@@ -134,77 +126,18 @@ const AddClientPage = () => {
               <form onSubmit={handleSubmit}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-                  {/* Client Name */}
+                  {/* Activity Name */}
                   <div className="form-group">
-                    <label htmlFor="name" className="form-label">Client Name *</label>
+                    <label htmlFor="name" className="form-label">Activity Name *</label>
                     <input
                       type="text"
                       id="name"
                       name="name"
                       className="form-control"
-                      placeholder="Enter client name"
+                      placeholder="Enter activity name"
                       value={formData.name}
                       onChange={handleInputChange}
                       required
-                    />
-                  </div>
-
-                  {/* Client Phone Number */}
-                  <div className="form-group">
-                    <label htmlFor="phone-number" className="form-label">Client Phone Number *</label>
-                    <input
-                      type="text"
-                      id="phone-number"
-                      name="phoneNumber"
-                      className="form-control"
-                      placeholder="Enter client phone number"
-                      value={formData.phoneNumber}
-                      onChange={handleInputChange}
-                      required
-                    />
-                  </div>
-
-                  {/* Client Email */}
-                  <div className="form-group">
-                    <label htmlFor="email" className="form-label">Client email *</label>
-                    <input
-                      type="text"
-                      id="email"
-                      name="email"
-                      className="form-control"
-                      placeholder="Enter client email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      required
-                    />
-                  </div>
-
-                  {/* Client Address */}
-                  <div className="form-group">
-                    <label htmlFor="address" className="form-label">Client Address *</label>
-                    <input
-                      type="text"
-                      id="address"
-                      name="address"
-                      className="form-control"
-                      placeholder="Enter client address"
-                      value={formData.address}
-                      onChange={handleInputChange}
-                      required
-                    />
-                  </div>
-
-                  {/* Client Group */}
-                  <div className="form-group">
-                    <label htmlFor="group" className="form-label">Client Group</label>
-                    <input
-                      type="text"
-                      id="group"
-                      name="group"
-                      className="form-control"
-                      placeholder="Enter client group"
-                      value={formData.group}
-                      onChange={handleInputChange}
                     />
                   </div>
 
@@ -231,12 +164,12 @@ const AddClientPage = () => {
                       className="ti-btn ti-btn-primary"
                       disabled={isLoading}
                     >
-                      {isLoading ? 'Saving...' : 'Save Client'}
+                      {isLoading ? 'Saving...' : 'Save Activity'}
                     </button>
                     <button
                       type="button"
                       className="ti-btn ti-btn-secondary"
-                      onClick={() => router.push('/clients')}
+                      onClick={() => router.push('/activities')}
                       disabled={isLoading}
                     >
                       Cancel
@@ -252,4 +185,4 @@ const AddClientPage = () => {
   );
 };
 
-export default AddClientPage; 
+export default AddActivityPage; 

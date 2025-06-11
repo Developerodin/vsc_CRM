@@ -34,11 +34,15 @@ const MapsIcon = <i className="bx bx-map side-menu__icon"></i>;
 
 const GroupsIcon = <i className="bx bx-group side-menu__icon"></i>;
 
-const ServicesIcon = <i className="bx bx-store-alt side-menu__icon"></i>;
-
-const ActivitiesIcon = <i className="bx bx-link-alt side-menu__icon"></i>;
+const ActivitiesIcon = <i className="bx bx-store-alt side-menu__icon"></i>;
 
 const ClientsIcon = <i className="bx bx-user side-menu__icon"></i>;
+
+const AnalyticsIcon = <i className="bx bx-network-chart side-menu__icon"></i>;
+
+const BranchesIcon = < i className='bx bx-git-branch side-menu__icon'></i>;
+
+const TeamsIcon = < i className='bx bx-share-alt side-menu__icon'></i>;
 
 const badge = (
   <span className="badge !bg-warning/10 !text-warning !py-[0.25rem] !px-[0.45rem] !text-[0.75em] ms-1">
@@ -67,6 +71,45 @@ export const MenuItems: any = [
   },
 
   {
+    icon: DashboardIcon,
+    title: "Dashboards",
+    type: "sub",
+    active: false,
+    selected: false,
+    children: [
+      {
+        path: "/dashboards/crm",
+        type: "link",
+        active: false,
+        selected: false,
+        dirchange: false,
+        title: "CRM",
+      },
+  
+    ],
+  },
+  
+  {
+    icon: BranchesIcon,
+    title: "Branches",
+    type: "link",
+    active: false,
+    selected: false,
+    dirchange: false,
+    path: "/branches",
+  },
+
+  {
+    icon: ActivitiesIcon,
+    title: "Activities",
+    type: "link",
+    active: false,
+    selected: false,
+    dirchange: false,
+    path: "/activities",
+  },
+
+  {
     icon: ClientsIcon,
     title: "Clients",
     type: "link",
@@ -87,44 +130,25 @@ export const MenuItems: any = [
   },
 
   {
-    icon: ServicesIcon,
-    title: "Services",
+    icon: TeamsIcon,
+    title: "Teams",
     type: "link",
     active: false,
     selected: false,
     dirchange: false,
-    path: "/services",
+    path: "/teams",
   },
 
   {
-    icon: ActivitiesIcon,
-    title: "Activities",
+    icon: AnalyticsIcon,
+    title: "Analytics",
     type: "link",
     active: false,
     selected: false,
     dirchange: false,
-    path: "/activities",
+    path: "/analytics",
   },
 
-  // {
-  //   icon: DashboardIcon,
-  //   badgetxt: badge,
-  //   title: "Dashboards",
-  //   type: "sub",
-  //   active: false,
-  //   selected: false,
-  //   children: [
-  //     {
-  //       path: "/dashboards/crm",
-  //       type: "link",
-  //       active: false,
-  //       selected: false,
-  //       dirchange: false,
-  //       title: "CRM",
-  //     },
-
-  //   ],
-  // },
 
   // {
   //   icon: NestedmenuIcon,
