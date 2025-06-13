@@ -4,11 +4,13 @@ import Seo from "@/shared/layout-components/seo/seo";
 import Link from "next/link";
 import { toast, Toaster } from "react-hot-toast";
 import * as XLSX from "xlsx";
+import axios from "axios";
+import { API_BASE_URL } from "@/shared/data/utilities/api";
 
 interface TeamMember {
   id: string;
   name: string;
-  phoneNumber: string;
+  phone: string;
   email: string;
   address: string;
   branch: string;
@@ -27,29 +29,67 @@ interface ExcelRow {
   "Sort Order"?: string | number;
 }
 
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  });
+};
+
 const TeamsPage = () => {
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [teams, setTeams] = useState<TeamMember[]>([
-    {
-      id: "1",
-      name: "Vinod Sanghal",
-      phoneNumber: "+91-9877543270",
-      email: "vinod.sanghal@example.com",
-      address: "123 Park Street, Jaipur, Rajasthan",
-      branch: "VSC Jaipur",
-      createdDate: "19 March 2025",
-      sortOrder: 1,
-    },
-  ]);
-  const [isLoading, setIsLoading] = useState(false); // Initially set to true when API integrated
+  const [teams, setTeams] = useState<TeamMember[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [totalResults, setTotalResults] = useState(1); // Initially set to 0 when API integrated
+  const [totalResults, setTotalResults] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [importProgress, setImportProgress] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch teams from API
+  const fetchTeams = async (page = 1, limit = itemsPerPage) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await axios.get(`${API_BASE_URL}/team-members?page=${page}&limit=${limit}`);
+      const data = response.data.results;
+      
+      // Transform the API response to match our TeamMember interface
+      const transformedTeams = data.map((teamMember: any) => ({
+        id: teamMember.id,
+        name: teamMember.name,
+        phone: teamMember.phone,
+        email: teamMember.email,
+        address: teamMember.address,
+        branch: teamMember.branch,
+        createdDate: formatDate(teamMember.createdAt),
+        sortOrder: teamMember.sortOrder || 1,
+      }));
+
+      setTeams(transformedTeams);
+      setTotalResults(response.data.totalResults || 0);
+      setTotalPages(response.data.totalPages || 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch teams');
+      setTeams([]);
+      setTotalResults(0);
+      setTotalPages(1);
+      toast.error('Failed to fetch teams');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Call fetchTeams when component mounts
+  useEffect(() => {
+    fetchTeams(currentPage, itemsPerPage);
+  }, [currentPage, itemsPerPage]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -72,6 +112,138 @@ const TeamsPage = () => {
     }
   };
 
+  const handleDelete = async (teamMemberId: string) => {
+    try {
+      await axios.delete(`${API_BASE_URL}/team-members/${teamMemberId}`);
+      toast.success('Team member deleted successfully');
+      setTeams(prevTeams => prevTeams.filter(teamMember => teamMember.id !== teamMemberId));
+      setSelectedTeams(selectedTeams.filter(id => id !== teamMemberId));
+      toast.success('Team member deleted successfully');
+    } catch (err) {
+      toast.error('Failed to delete team member');
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedTeams.length === 0) return;
+    
+    if (window.confirm(`Are you sure you want to delete ${selectedTeams.length} selected team member(s)?`)) {
+      try {
+        let hasError = false;
+        const deletePromises = selectedTeams.map(async (id) => {
+          try {
+            await axios.delete(`${API_BASE_URL}/team-members/${id}`);
+            return id;
+          } catch (err) {
+            hasError = true;
+            console.error(`Error deleting team member ${id}:`, err);
+            return null;
+          }
+        });
+
+        const results = await Promise.all(deletePromises);
+        const successfulDeletes = results.filter((id): id is string => id !== null);
+
+        // Remove successfully deleted team members from the local state
+        setTeams(prevTeams => 
+          prevTeams.filter(team => !successfulDeletes.includes(team.id))
+        );
+        
+        // Clear selected teams
+        setSelectedTeams([]);
+        setSelectAll(false);
+
+        if (hasError) {
+          toast.error('Some team members could not be deleted');
+        } else {
+          toast.success('Selected team members deleted successfully');
+        }
+      } catch (err) {
+        console.error('Error in bulk delete:', err);
+        toast.error('Failed to delete some team members');
+      }
+    }
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportProgress(0);
+    const loadingToast = toast.loading('Importing team members...');
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const data = e.target?.result;
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet) as ExcelRow[];
+          let successCount = 0;
+          let errorCount = 0;
+
+          // Fetch all team members for upsert by name
+          const allResponse = await axios.get(`${API_BASE_URL}/team-members`);
+          const allData = allResponse.data;
+          const allTeamMembers: TeamMember[] = allData.results || [];
+
+          for (let i = 0; i < jsonData.length; i++) {
+            const row = jsonData[i];
+            try {
+              const teamMemberData = {
+                name: row['Team Member Name'],
+                phone: row['Team Member Phone Number'] || '',
+                email: row['Team Member Email'] || '',
+                address: row['Team Member Address'] || '',
+                branch: row['Team Member Branch'] || '',
+                sortOrder: parseInt(row['Sort Order']?.toString() || '1')
+              };
+
+              let teamMemberId = row['ID'];
+              if (!teamMemberId) {
+                // Try to find by email (case-insensitive)
+                const found = allTeamMembers.find(t => 
+                  t.email.trim().toLowerCase() === teamMemberData.email.trim().toLowerCase()
+                );
+                if (found) teamMemberId = found.id;
+              }
+
+              if (teamMemberId) {
+                // Update existing
+                await axios.patch(`${API_BASE_URL}/team-members/${teamMemberId}`, teamMemberData);
+                successCount++;
+              } else {
+                // Create new
+                await axios.post(`${API_BASE_URL}/team-members`, teamMemberData);
+                successCount++;
+              }
+            } catch (error) {
+              errorCount++;
+            }
+            setImportProgress(Math.round(((i + 1) / jsonData.length) * 100));
+          }
+
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          setImportProgress(null);
+          toast.dismiss(loadingToast);
+          
+          if (successCount > 0) toast.success(`Successfully imported/updated ${successCount} team members`);
+          if (errorCount > 0) toast.error(`Failed to import/update ${errorCount} team members`);
+          
+          // Refresh the teams list
+          fetchTeams();
+        } catch (error) {
+          setImportProgress(null);
+          toast.error('Failed to process import file', { id: loadingToast });
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } catch (error) {
+      setImportProgress(null);
+      toast.error('Failed to import team members', { id: loadingToast });
+    }
+  };
+
   // Filter teams based on search query
   const filteredTeams = teams.filter((teamMember) =>
     teamMember.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -85,14 +257,13 @@ const TeamsPage = () => {
   const handleExport = async () => {
     try {
       // Always fetch all categories for export
-      // const response = await fetch(`${API_BASE_URL}/categories?page=1&limit=100000`);
-      // if (!response.ok) throw new Error('Failed to fetch all categories for export');
-      // const data = await response.json();
-      const exportSource = Array.isArray(teams) ? teams : [];
+      const response = await axios.get(`${API_BASE_URL}/team-members`);
+      const data = response.data;
+      const exportSource = Array.isArray(data.results) ? data.results : [];
       const exportData = exportSource.map((teamMember: TeamMember) => ({
         ID: teamMember.id,
         "Team Member Name": teamMember.name,
-        "Team Member Phone Number": teamMember.phoneNumber,
+        "Team Member Phone Number": teamMember.phone,
         "Team Member Email": teamMember.email,
         "Team Member Address": teamMember.address,
         "Team Member Branch": teamMember.branch,
@@ -118,6 +289,8 @@ const TeamsPage = () => {
       toast.error("Failed to export teams");
     }
   };
+
+  
 
   // Condensed pagination helper
   function getPagination(currentPage: number, totalPages: number) {
@@ -156,7 +329,7 @@ const TeamsPage = () => {
                   <button
                     type="button"
                     className="ti-btn ti-btn-danger"
-                    // onClick={handleDeleteSelected}
+                    onClick={handleDeleteSelected}
                   >
                     <i className="ri-delete-bin-line me-2"></i>
                     Delete Selected ({selectedTeams.length})
@@ -166,15 +339,15 @@ const TeamsPage = () => {
                 <div className="relative group">
                   <input
                     type="file"
-                    // ref={fileInputRef}
+                    ref={fileInputRef}
                     className="hidden"
                     accept=".xlsx,.xls"
-                    // onChange={handleImport}
+                    onChange={handleImport}
                   />
                   <button
                     type="button"
                     className="ti-btn ti-btn-success"
-                    // onClick={() => fileInputRef.current?.click()}
+                    onClick={() => fileInputRef.current?.click()}
                   >
                     <i className="ri-upload-2-line me-2"></i> Import
                   </button>
@@ -308,7 +481,7 @@ const TeamsPage = () => {
                               />
                             </td>
                             <td>{teamMember.name}</td>
-                            <td>{teamMember.phoneNumber}</td>
+                            <td>{teamMember.phone}</td>
                             <td>{teamMember.email}</td>
                             <td>{teamMember.address}</td>
                             <td>{teamMember.branch}</td>
@@ -327,7 +500,7 @@ const TeamsPage = () => {
                                 {/* </Link> */}
                                 <button
                                   className="ti-btn ti-btn-danger ti-btn-sm"
-                                  // onClick={() => handleDelete(teamMember.id)}
+                                  onClick={() => handleDelete(teamMember.id)}
                                 >
                                   <i className="ri-delete-bin-line"></i>
                                 </button>
