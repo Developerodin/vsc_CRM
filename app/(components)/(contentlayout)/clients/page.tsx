@@ -4,26 +4,41 @@ import Seo from "@/shared/layout-components/seo/seo";
 import Link from "next/link";
 import { toast, Toaster } from "react-hot-toast";
 import * as XLSX from "xlsx";
+import { Base_url } from "@/app/api/config/BaseUrl";
 
 interface Client {
   id: string;
   name: string;
-  phoneNumber: string;
+  phone: string;
   email: string;
   address: string;
-  group: string;
-  createdDate: string;
+  city: string;
+  state: string;
+  country: string;
+  pinCode: string;
   sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface ApiResponse {
+  results: Client[];
+  page: number;
+  limit: number;
+  totalPages: number;
+  totalResults: number;
 }
 
 interface ExcelRow {
   ID?: string;
   "Client Name": string;
-  "Client Phone Number": string;
+  "Client Phone": string;
   "Client Email": string;
   "Client Address": string;
-  "Client Group": string;
-  "Created Date": string;
+  "Client City": string;
+  "Client State": string;
+  "Client Country": string;
+  "Client Pin Code": string;
   "Sort Order"?: string | number;
 }
 
@@ -32,124 +47,69 @@ const ClientsPage = () => {
   const [selectAll, setSelectAll] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [clients, setClients] = useState<Client[]>([
-    {
-      id: "1",
-      name: "Aarav Sharma",
-      phoneNumber: "+91-9876543210",
-      email: "aarav.sharma@example.com",
-      address: "123 Park Street, Bengaluru, Karnataka",
-      group: "Premium Group",
-      createdDate: "01 June 2025",
-      sortOrder: 1,
-    },
-    {
-      id: "2",
-      name: "Priya Verma",
-      phoneNumber: "+91-9123456789",
-      email: "priya.verma@example.com",
-      address: "456 MG Road, Pune, Maharashtra",
-      group: "Premium Group",
-      createdDate: "02 June 2025",
-      sortOrder: 2,
-    },
-    {
-      id: "3",
-      name: "Rohan Patel",
-      phoneNumber: "+91-9988776655",
-      email: "rohan.patel@example.com",
-      address: "789 Residency Road, Ahmedabad, Gujarat",
-      group: "Premium Group",
-      createdDate: "03 June 2025",
-      sortOrder: 3,
-    },
-    {
-      id: "4",
-      name: "Sneha Iyer",
-      phoneNumber: "+91-9012345678",
-      email: "sneha.iyer@example.com",
-      address: "101 Lake View, Chennai, Tamil Nadu",
-      group: "Premium Group",
-      createdDate: "04 June 2025",
-      sortOrder: 4,
-    },
-    {
-      id: "5",
-      name: "Arjun Reddy",
-      phoneNumber: "+91-9123456781",
-      email: "arjun.reddy@example.com",
-      address: "202 Central Mall, Hyderabad, Telangana",
-      group: "Bharat Group",
-      createdDate: "05 June 2025",
-      sortOrder: 5,
-    },
-    {
-      id: "6",
-      name: "Meera Nambiar",
-      phoneNumber: "+91-9876543211",
-      email: "meera.nambiar@example.com",
-      address: "303 Skyline Towers, Kochi, Kerala",
-      group: "Bharat Group",
-      createdDate: "06 June 2025",
-      sortOrder: 6,
-    },
-    {
-      id: "7",
-      name: "Vikram Joshi",
-      phoneNumber: "+91-9345678901",
-      email: "vikram.joshi@example.com",
-      address: "404 Hill View, Indore, Madhya Pradesh",
-      group: "Bharat Group",
-      createdDate: "07 June 2025",
-      sortOrder: 7,
-    },
-    {
-      id: "8",
-      name: "Anjali Das",
-      phoneNumber: "+91-9567890123",
-      email: "anjali.das@example.com",
-      address: "505 Tech Park, Bhubaneswar, Odisha",
-      group: "Ganesh Group",
-      createdDate: "08 June 2025",
-      sortOrder: 8,
-    },
-    {
-      id: "9",
-      name: "Karan Thakur",
-      phoneNumber: "+91-9234567890",
-      email: "karan.thakur@example.com",
-      address: "606 Green Valley, Shimla, Himachal Pradesh",
-      group: "Ganesh Group",
-      createdDate: "09 June 2025",
-      sortOrder: 9,
-    },
-    {
-      id: "10",
-      name: "Neha Kapoor",
-      phoneNumber: "+91-9988007766",
-      email: "neha.kapoor@example.com",
-      address: "707 Harmony Lane, Jaipur, Rajasthan",
-      group: "Ganesh Group",
-      createdDate: "10 June 2025",
-      sortOrder: 10,
-    },
-  ]);
-  const [isLoading, setIsLoading] = useState(false); // Initially set to true when API integrated
+  const [clients, setClients] = useState<Client[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [totalResults, setTotalResults] = useState(10); // Initially set to 0 when API integrated
+  const [totalResults, setTotalResults] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [importProgress, setImportProgress] = useState<number | null>(null);
+  const [sortBy, setSortBy] = useState<string>("name:asc");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [filters, setFilters] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    city: "",
+    state: "",
+    country: "",
+    pinCode: ""
+  });
+
+  const fetchClients = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const queryParams = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString(),
+        sortBy,
+        ...(searchQuery && { name: searchQuery })
+      });
+
+      const response = await fetch(`${Base_url}clients?${queryParams}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch clients');
+      }
+
+      const data: ApiResponse = await response.json();
+      setClients(data.results);
+      setTotalResults(data.totalResults);
+      setTotalPages(data.totalPages);
+    } catch (err) {
+      console.error('Error fetching clients:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch clients');
+      toast.error('Failed to fetch clients');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery]);
+    fetchClients();
+  }, [currentPage, itemsPerPage, sortBy, searchQuery]);
 
   const handleSelectAll = () => {
     if (selectAll) {
       setSelectedClients([]);
     } else {
-      setSelectedClients(filteredClients.map((client) => client.id));
+      setSelectedClients(clients.map((client) => client.id));
     }
     setSelectAll(!selectAll);
   };
@@ -162,42 +122,81 @@ const ClientsPage = () => {
     }
   };
 
-  // Filter clients based on search query
-  const filteredClients = clients.filter((client) =>
-    client.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleDelete = async (clientId: string) => {
+    if (!confirm('Are you sure you want to delete this client?')) return;
 
-  // Calculate current clients for the current page
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentClients = filteredClients.slice(startIndex, endIndex);
+    try {
+      const response = await fetch(`${Base_url}clients/${clientId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete client');
+      }
+
+      toast.success('Client deleted successfully');
+      fetchClients();
+    } catch (err) {
+      console.error('Error deleting client:', err);
+      toast.error('Failed to delete client');
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (!confirm(`Are you sure you want to delete ${selectedClients.length} clients?`)) return;
+
+    try {
+      const deletePromises = selectedClients.map(clientId =>
+        fetch(`${Base_url}clients/${clientId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        })
+      );
+
+      await Promise.all(deletePromises);
+      toast.success('Selected clients deleted successfully');
+      setSelectedClients([]);
+      fetchClients();
+    } catch (err) {
+      console.error('Error deleting clients:', err);
+      toast.error('Failed to delete selected clients');
+    }
+  };
 
   const handleExport = async () => {
     try {
-      // Always fetch all categories for export
-      // const response = await fetch(`${API_BASE_URL}/categories?page=1&limit=100000`);
-      // if (!response.ok) throw new Error('Failed to fetch all categories for export');
-      // const data = await response.json();
-      const exportSource = Array.isArray(clients) ? clients : [];
-      const exportData = exportSource.map((client: Client) => ({
+      const exportData = clients.map((client: Client) => ({
         ID: client.id,
         "Client Name": client.name,
-        "Client Phone Number": client.phoneNumber,
+        "Client Phone": client.phone,
         "Client Email": client.email,
         "Client Address": client.address,
-        "Client Group": client.group,
-        "Created Date": client.createdDate,
+        "Client City": client.city,
+        "Client State": client.state,
+        "Client Country": client.country,
+        "Client Pin Code": client.pinCode,
         "Sort Order": client.sortOrder,
       }));
+
       const ws = XLSX.utils.json_to_sheet(exportData);
       ws["!cols"] = [
-        { wch: 20 },
-        { wch: 20 },
-        { wch: 30 },
-        { wch: 20 },
-        { wch: 10 },
-        { wch: 10 },
+        { wch: 20 }, // ID
+        { wch: 20 }, // Name
+        { wch: 20 }, // Phone
+        { wch: 30 }, // Email
+        { wch: 30 }, // Address
+        { wch: 20 }, // City
+        { wch: 20 }, // State
+        { wch: 20 }, // Country
+        { wch: 15 }, // Pin Code
+        { wch: 10 }, // Sort Order
       ];
+
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Clients");
       const fileName = `clients_${new Date().toISOString().split("T")[0]}.xlsx`;
@@ -206,6 +205,65 @@ const ClientsPage = () => {
     } catch (error) {
       console.error("Error exporting clients:", error);
       toast.error("Failed to export clients");
+    }
+  };
+
+  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json<ExcelRow>(worksheet);
+
+          setImportProgress(0);
+          const totalRows = jsonData.length;
+
+          for (let i = 0; i < totalRows; i++) {
+            const row = jsonData[i];
+            const clientData = {
+              name: row["Client Name"],
+              phone: row["Client Phone"],
+              email: row["Client Email"],
+              address: row["Client Address"],
+              city: row["Client City"],
+              state: row["Client State"],
+              country: row["Client Country"],
+              pinCode: row["Client Pin Code"],
+              sortOrder: parseInt(row["Sort Order"]?.toString() || "1")
+            };
+
+            await fetch(`${Base_url}clients`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              },
+              body: JSON.stringify(clientData)
+            });
+
+            setImportProgress(Math.round(((i + 1) / totalRows) * 100));
+          }
+
+          toast.success('Clients imported successfully');
+          fetchClients();
+        } catch (err) {
+          console.error('Error importing clients:', err);
+          toast.error('Failed to import clients');
+        } finally {
+          setImportProgress(null);
+        }
+      };
+
+      reader.readAsArrayBuffer(file);
+    } catch (err) {
+      console.error('Error reading file:', err);
+      toast.error('Failed to read file');
     }
   };
 
@@ -246,7 +304,7 @@ const ClientsPage = () => {
                   <button
                     type="button"
                     className="ti-btn ti-btn-danger"
-                    // onClick={handleDeleteSelected}
+                    onClick={handleDeleteSelected}
                   >
                     <i className="ri-delete-bin-line me-2"></i>
                     Delete Selected ({selectedClients.length})
@@ -256,15 +314,15 @@ const ClientsPage = () => {
                 <div className="relative group">
                   <input
                     type="file"
-                    // ref={fileInputRef}
+                    ref={fileInputRef}
                     className="hidden"
                     accept=".xlsx,.xls"
-                    // onChange={handleImport}
+                    onChange={handleImport}
                   />
                   <button
                     type="button"
                     className="ti-btn ti-btn-success"
-                    // onClick={() => fileInputRef.current?.click()}
+                    onClick={() => fileInputRef.current?.click()}
                   >
                     <i className="ri-upload-2-line me-2"></i> Import
                   </button>
@@ -297,12 +355,11 @@ const ClientsPage = () => {
           {/* Content Box */}
           <div className="box">
             <div className="box-body">
-              {/* Search Bar */}
-              <div className="flex flex-wrap justify-between items-center mb-4 gap-2">
-                <div className="flex items-center">
-                  <label className="mr-2 text-sm text-gray-600">
-                    Rows per page:
-                  </label>
+              {/* Search and Sort */}
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
+                {/* Rows per page selector */}
+                <div className="flex items-center w-full lg:w-auto">
+                  <label className="mr-2 text-sm text-gray-600 whitespace-nowrap">Rows per page:</label>
                   <select
                     className="form-select w-auto text-sm"
                     value={itemsPerPage}
@@ -318,16 +375,60 @@ const ClientsPage = () => {
                     <option value={1000}>1000</option>
                   </select>
                 </div>
-                <div className="relative w-full max-w-xs">
-                  <input
-                    type="text"
-                    className="form-control py-3 pr-10"
-                    placeholder="Search by client name..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                  <button className="absolute end-0 top-0 px-4 h-full">
-                    <i className="ri-search-line text-lg"></i>
+
+                {/* Search and filters */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+                  {/* Search bar */}
+                  <div className="relative flex-grow sm:max-w-xs">
+                    <input
+                      type="text"
+                      className="form-control py-2 w-full"
+                      placeholder="Search by name, email, phone..."
+                      value={filters.name}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setFilters(prev => ({
+                          ...prev,
+                          name: value,
+                          email: value,
+                          phone: value
+                        }));
+                      }}
+                    />
+                  </div>
+
+                  {/* Sort dropdown */}
+                  <select
+                    className="form-select py-2 w-full sm:w-auto"
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                  >
+                    <option value="name:asc">Name (A-Z)</option>
+                    <option value="name:desc">Name (Z-A)</option>
+                    <option value="createdAt:desc">Newest First</option>
+                    <option value="createdAt:asc">Oldest First</option>
+                    <option value="sortOrder:asc">Sort Order (Low-High)</option>
+                    <option value="sortOrder:desc">Sort Order (High-Low)</option>
+                  </select>
+
+                  {/* Reset button */}
+                  <button
+                    className="ti-btn ti-btn-secondary py-2 w-full sm:w-auto"
+                    onClick={() => {
+                      setFilters({
+                        name: "",
+                        email: "",
+                        phone: "",
+                        city: "",
+                        state: "",
+                        country: "",
+                        pinCode: ""
+                      });
+                      setSortBy("createdAt:desc");
+                    }}
+                  >
+                    <i className="ri-refresh-line me-2"></i>
+                    Reset
                   </button>
                 </div>
               </div>
@@ -346,43 +447,28 @@ const ClientsPage = () => {
                   <table className="table whitespace-nowrap table-bordered min-w-full">
                     <thead>
                       <tr className="border-b border-gray-200">
-                        <th scope="col" className="!text-start">
+                        <th className="px-4 py-3">
                           <input
                             type="checkbox"
-                            className="form-check-input"
-                            checked={selectAll}
+                            className="form-checkbox"
+                            checked={selectedClients.length === clients.length}
                             onChange={handleSelectAll}
                           />
                         </th>
-                        <th scope="col" className="text-start">
-                          Client Name
-                        </th>
-                        <th scope="col" className="text-start">
-                          Client Phone Number
-                        </th>
-                        <th scope="col" className="text-start">
-                          Client Email
-                        </th>
-                        <th scope="col" className="text-start">
-                          Client Address
-                        </th>
-                        <th scope="col" className="text-start">
-                          Client Group
-                        </th>
-                        <th scope="col" className="text-start">
-                          Created Date
-                        </th>
-                        <th scope="col" className="text-start">
-                          Sort Order
-                        </th>
-                        <th scope="col" className="text-start">
-                          Action
-                        </th>
+                        <th className="px-4 py-3">Name</th>
+                        <th className="px-4 py-3">Email</th>
+                        <th className="px-4 py-3">Phone</th>
+                        <th className="px-4 py-3">City</th>
+                        <th className="px-4 py-3">State</th>
+                        <th className="px-4 py-3">Country</th>
+                        <th className="px-4 py-3">Pin Code</th>
+                        <th className="px-4 py-3">Created At</th>
+                        <th className="px-4 py-3">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {currentClients.length > 0 ? (
-                        currentClients.map((client: Client, index: number) => (
+                      {clients.length > 0 ? (
+                        clients.map((client: Client, index: number) => (
                           <tr
                             key={client.id}
                             className={`border-b border-gray-200 ${
@@ -398,26 +484,24 @@ const ClientsPage = () => {
                               />
                             </td>
                             <td>{client.name}</td>
-                            <td>{client.phoneNumber}</td>
                             <td>{client.email}</td>
-                            <td>{client.address}</td>
-                            <td>{client.group}</td>
-                            <td>{client.createdDate}</td>
-                            <td>{client.sortOrder}</td>
+                            <td>{client.phone}</td>
+                            <td>{client.city}</td>
+                            <td>{client.state}</td>
+                            <td>{client.country}</td>
+                            <td>{client.pinCode}</td>
+                            <td>{client.createdAt}</td>
                             <td>
                               <div className="flex space-x-2">
-                                {/* <Link
-                                  href={`/catalog/clients/edit/${client.id}`}
+                                <Link
+                                  href={`/clients/edit/${client.id}`}
                                   className="ti-btn ti-btn-primary ti-btn-sm"
-                                > */}
-                                {/* Wrapper div temporarily used for styling */}
-                                <div className="ti-btn ti-btn-primary ti-btn-sm">
+                                >
                                   <i className="ri-edit-line"></i>
-                                </div>
-                                {/* </Link> */}
+                                </Link>
                                 <button
                                   className="ti-btn ti-btn-danger ti-btn-sm"
-                                  // onClick={() => handleDelete(client.id)}
+                                  onClick={() => handleDelete(client.id)}
                                 >
                                   <i className="ri-delete-bin-line"></i>
                                 </button>
@@ -427,7 +511,7 @@ const ClientsPage = () => {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={6} className="text-center py-8">
+                          <td colSpan={10} className="text-center py-8">
                             <div className="flex flex-col items-center justify-center">
                               <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
                                 <i className="ri-folder-line text-4xl text-primary"></i>

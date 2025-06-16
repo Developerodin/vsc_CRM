@@ -4,16 +4,21 @@ import Seo from "@/shared/layout-components/seo/seo";
 import Link from "next/link";
 import { toast, Toaster } from "react-hot-toast";
 import * as XLSX from "xlsx";
+import { Base_url } from "@/app/api/config/BaseUrl";
 
 interface Client {
   id: string;
   name: string;
-  phoneNumber: string;
+  phone: string;
   email: string;
   address: string;
-  group: string;
-  createdDate: string;
+  city: string;
+  state: string;
+  country: string;
+  pinCode: string;
   sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface Group {
@@ -21,16 +26,22 @@ interface Group {
   name: string;
   numberOfClients: number;
   clients: Client[];
-  createdDate: string;
   sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface ApiResponse {
+  results: Group[];
+  page: number;
+  limit: number;
+  totalPages: number;
+  totalResults: number;
 }
 
 interface ExcelRow {
-  ID?: string;
   "Group Name": string;
-  "Number Of Clients": string;
-  "Created Date": string;
-  "Sort Order"?: string | number;
+  "Sort Order"?: number;
 }
 
 const GroupsPage = () => {
@@ -38,153 +49,66 @@ const GroupsPage = () => {
   const [selectAll, setSelectAll] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [groups, setGroups] = useState<Group[]>([
-    {
-      id: "1",
-      name: "Premium Group",
-      numberOfClients: 4,
-      clients: [
-        {
-          id: "1",
-          name: "Aarav Sharma",
-          phoneNumber: "+91-9876543210",
-          email: "aarav.sharma@example.com",
-          address: "123 Park Street, Bengaluru, Karnataka",
-          group: "Premium Group",
-          createdDate: "01 June 2025",
-          sortOrder: 1,
-        },
-        {
-          id: "2",
-          name: "Priya Verma",
-          phoneNumber: "+91-9123456789",
-          email: "priya.verma@example.com",
-          address: "456 MG Road, Pune, Maharashtra",
-          group: "Premium Group",
-          createdDate: "02 June 2025",
-          sortOrder: 2,
-        },
-        {
-          id: "3",
-          name: "Rohan Patel",
-          phoneNumber: "+91-9988776655",
-          email: "rohan.patel@example.com",
-          address: "789 Residency Road, Ahmedabad, Gujarat",
-          group: "Premium Group",
-          createdDate: "03 June 2025",
-          sortOrder: 3,
-        },
-        {
-          id: "4",
-          name: "Sneha Iyer",
-          phoneNumber: "+91-9012345678",
-          email: "sneha.iyer@example.com",
-          address: "101 Lake View, Chennai, Tamil Nadu",
-          group: "Premium Group",
-          createdDate: "04 June 2025",
-          sortOrder: 4,
-        },
-      ],
-      createdDate: "01 June 2025",
-      sortOrder: 1,
-    },
-
-    {
-      id: "2",
-      name: "Bharat Group",
-      numberOfClients: 3,
-      clients: [
-        {
-          id: "5",
-          name: "Arjun Reddy",
-          phoneNumber: "+91-9123456781",
-          email: "arjun.reddy@example.com",
-          address: "202 Central Mall, Hyderabad, Telangana",
-          group: "Bharat Group",
-          createdDate: "05 June 2025",
-          sortOrder: 5,
-        },
-        {
-          id: "6",
-          name: "Meera Nambiar",
-          phoneNumber: "+91-9876543211",
-          email: "meera.nambiar@example.com",
-          address: "303 Skyline Towers, Kochi, Kerala",
-          group: "Bharat Group",
-          createdDate: "06 June 2025",
-          sortOrder: 6,
-        },
-        {
-          id: "7",
-          name: "Vikram Joshi",
-          phoneNumber: "+91-9345678901",
-          email: "vikram.joshi@example.com",
-          address: "404 Hill View, Indore, Madhya Pradesh",
-          group: "Bharat Group",
-          createdDate: "07 June 2025",
-          sortOrder: 7,
-        },
-      ],
-      createdDate: "05 June 2025",
-      sortOrder: 2,
-    },
-
-    {
-      id: "3",
-      name: "Ganesh Group",
-      numberOfClients: 3,
-      clients: [
-        {
-          id: "8",
-          name: "Anjali Das",
-          phoneNumber: "+91-9567890123",
-          email: "anjali.das@example.com",
-          address: "505 Tech Park, Bhubaneswar, Odisha",
-          group: "Ganesh Group",
-          createdDate: "08 June 2025",
-          sortOrder: 8,
-        },
-        {
-          id: "9",
-          name: "Karan Thakur",
-          phoneNumber: "+91-9234567890",
-          email: "karan.thakur@example.com",
-          address: "606 Green Valley, Shimla, Himachal Pradesh",
-          group: "Ganesh Group",
-          createdDate: "09 June 2025",
-          sortOrder: 9,
-        },
-        {
-          id: "10",
-          name: "Neha Kapoor",
-          phoneNumber: "+91-9988007766",
-          email: "neha.kapoor@example.com",
-          address: "707 Harmony Lane, Jaipur, Rajasthan",
-          group: "Ganesh Group",
-          createdDate: "10 June 2025",
-          sortOrder: 10,
-        },
-      ],
-      createdDate: "08 June 2025",
-      sortOrder: 3,
-    },
-  ]);
-  const [isLoading, setIsLoading] = useState(false); // Initially set to true when API integrated
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [totalResults, setTotalResults] = useState(3); // Initially set to 0 when API integrated
+  const [totalResults, setTotalResults] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [importProgress, setImportProgress] = useState<number | null>(null);
+  const [sortField, setSortField] = useState("name");
+  const [sortOrder, setSortOrder] = useState("asc");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showClientModal, setShowClientModal] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const [availableClients, setAvailableClients] = useState<Client[]>([]);
+  const [isLoadingClients, setIsLoadingClients] = useState(false);
+  const [clientSearchQuery, setClientSearchQuery] = useState("");
+  const [clientCurrentPage, setClientCurrentPage] = useState(1);
+  const [clientTotalPages, setClientTotalPages] = useState(1);
+  const [clientTotalResults, setClientTotalResults] = useState(0);
+
+  const fetchGroups = async () => {
+    try {
+      setIsLoading(true);
+      const queryParams = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString(),
+        sortBy: `${sortField}:${sortOrder}`,
+        ...(searchQuery && { name: searchQuery })
+      });
+
+      const response = await fetch(`${Base_url}groups?${queryParams}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch groups');
+      }
+
+      const data: ApiResponse = await response.json();
+      setGroups(data.results);
+      setTotalResults(data.totalResults);
+      setTotalPages(data.totalPages);
+    } catch (err) {
+      console.error('Error fetching groups:', err);
+      setError('Failed to fetch groups');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery]);
+    fetchGroups();
+  }, [currentPage, itemsPerPage, searchQuery, sortField, sortOrder]);
 
   const handleSelectAll = () => {
     if (selectAll) {
       setSelectedGroups([]);
     } else {
-      setSelectedGroups(filteredGroups.map((group) => group.id));
+      setSelectedGroups(groups.map((group) => group.id));
     }
     setSelectAll(!selectAll);
   };
@@ -197,37 +121,83 @@ const GroupsPage = () => {
     }
   };
 
-  // Filter groups based on search query
-  const filteredGroups = groups.filter((group) =>
-    group.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleDelete = async (groupId: string) => {
+    if (!confirm('Are you sure you want to delete this group?')) {
+      return;
+    }
 
-  // Calculate current groups for the current page
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentGroups = filteredGroups.slice(startIndex, endIndex);
+    try {
+      const response = await fetch(`${Base_url}groups/${groupId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete group');
+      }
+
+      toast.success('Group deleted successfully');
+      fetchGroups();
+    } catch (err) {
+      console.error('Error deleting group:', err);
+      toast.error('Failed to delete group');
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (!confirm(`Are you sure you want to delete ${selectedGroups.length} groups?`)) {
+      return;
+    }
+
+    try {
+      const deletePromises = selectedGroups.map(groupId =>
+        fetch(`${Base_url}groups/${groupId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        })
+      );
+
+      await Promise.all(deletePromises);
+      toast.success(`${selectedGroups.length} groups deleted successfully`);
+      setSelectedGroups([]);
+      fetchGroups();
+    } catch (err) {
+      console.error('Error deleting groups:', err);
+      toast.error('Failed to delete groups');
+    }
+  };
 
   const handleExport = async () => {
     try {
-      // Always fetch all categories for export
-      // const response = await fetch(`${API_BASE_URL}/categories?page=1&limit=100000`);
-      // if (!response.ok) throw new Error('Failed to fetch all categories for export');
-      // const data = await response.json();
-      const exportSource = Array.isArray(groups) ? groups : [];
-      const exportData = exportSource.map((group: Group) => ({
+      const response = await fetch(`${Base_url}groups?limit=1000`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch groups for export');
+      }
+
+      const data: ApiResponse = await response.json();
+      const exportData = data.results.map((group: Group) => ({
         ID: group.id,
         "Group Name": group.name,
         "Number Of Clients": group.numberOfClients,
-        "Created Date": group.createdDate,
+        "Created Date": new Date(group.createdAt).toLocaleDateString(),
         "Sort Order": group.sortOrder,
       }));
+
       const ws = XLSX.utils.json_to_sheet(exportData);
       ws["!cols"] = [
         { wch: 20 },
         { wch: 20 },
         { wch: 30 },
         { wch: 20 },
-        { wch: 10 },
         { wch: 10 },
       ];
       const wb = XLSX.utils.book_new();
@@ -238,6 +208,188 @@ const GroupsPage = () => {
     } catch (error) {
       console.error("Error exporting groups:", error);
       toast.error("Failed to export groups");
+    }
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json<ExcelRow>(worksheet);
+
+          setImportProgress(0);
+          const total = jsonData.length;
+          let completed = 0;
+
+          for (const row of jsonData) {
+            try {
+              const response = await fetch(`${Base_url}groups`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({
+                  name: row["Group Name"],
+                  sortOrder: row["Sort Order"] || 1,
+                  numberOfClients: 0,
+                  clients: []
+                })
+              });
+
+              if (!response.ok) {
+                throw new Error('Failed to import group');
+              }
+
+              completed++;
+              setImportProgress(Math.round((completed / total) * 100));
+            } catch (err) {
+              console.error('Error importing group:', err);
+              toast.error(`Failed to import group: ${row["Group Name"]}`);
+            }
+          }
+
+          toast.success('Import completed');
+          fetchGroups();
+        } catch (err) {
+          console.error('Error processing file:', err);
+          toast.error('Failed to process file');
+        } finally {
+          setImportProgress(null);
+        }
+      };
+
+      reader.readAsArrayBuffer(file);
+    } catch (err) {
+      console.error('Error reading file:', err);
+      toast.error('Failed to read file');
+    }
+  };
+
+  const fetchAvailableClients = async (groupId: string) => {
+    try {
+      setIsLoadingClients(true);
+      const queryParams = new URLSearchParams({
+        page: clientCurrentPage.toString(),
+        limit: "10",
+        ...(clientSearchQuery && { name: clientSearchQuery })
+      });
+
+      // First get the group details to get the clients
+      const groupResponse = await fetch(`${Base_url}groups/${groupId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!groupResponse.ok) {
+        throw new Error('Failed to fetch group details');
+      }
+
+      const groupData = await groupResponse.json();
+      
+      // If the group has clients array, use it directly
+      if (Array.isArray(groupData.clients)) {
+        setAvailableClients(groupData.clients);
+        setClientTotalResults(groupData.clients.length);
+        setClientTotalPages(Math.ceil(groupData.clients.length / 10));
+      } else {
+        // If no clients array, fetch clients for the group
+        const clientsResponse = await fetch(`${Base_url}groups/${groupId}/clients?${queryParams}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!clientsResponse.ok) {
+          throw new Error('Failed to fetch clients');
+        }
+
+        const clientsData = await clientsResponse.json();
+        setAvailableClients(clientsData.results || []);
+        setClientTotalResults(clientsData.totalResults || 0);
+        setClientTotalPages(clientsData.totalPages || 1);
+      }
+    } catch (err) {
+      console.error('Error fetching clients:', err);
+      toast.error('Failed to fetch clients');
+      setAvailableClients([]);
+      setClientTotalResults(0);
+      setClientTotalPages(1);
+    } finally {
+      setIsLoadingClients(false);
+    }
+  };
+
+  // Update useEffect to refetch clients when search or page changes
+  useEffect(() => {
+    if (showClientModal && selectedGroup) {
+      fetchAvailableClients(selectedGroup.id);
+    }
+  }, [clientSearchQuery, clientCurrentPage, showClientModal, selectedGroup]);
+
+  const handleViewClients = async (group: Group) => {
+    setSelectedGroup(group);
+    setShowClientModal(true);
+    setClientCurrentPage(1);
+    setClientSearchQuery("");
+    await fetchAvailableClients(group.id);
+  };
+
+  const handleAddClient = async (clientId: string) => {
+    if (!selectedGroup) return;
+
+    try {
+      const response = await fetch(`${Base_url}groups/${selectedGroup.id}/clients`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ clientId })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to add client to group');
+      }
+
+      toast.success('Client added to group successfully');
+      fetchAvailableClients(selectedGroup.id);
+      fetchGroups(); // Refresh groups list to update client count
+    } catch (err) {
+      console.error('Error adding client to group:', err);
+      toast.error('Failed to add client to group');
+    }
+  };
+
+  const handleRemoveClient = async (clientId: string) => {
+    if (!selectedGroup) return;
+
+    try {
+      const response = await fetch(`${Base_url}groups/${selectedGroup.id}/clients/${clientId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to remove client from group');
+      }
+
+      toast.success('Client removed from group successfully');
+      fetchAvailableClients(selectedGroup.id);
+      fetchGroups(); // Refresh groups list to update client count
+    } catch (err) {
+      console.error('Error removing client from group:', err);
+      toast.error('Failed to remove client from group');
     }
   };
 
@@ -278,7 +430,7 @@ const GroupsPage = () => {
                   <button
                     type="button"
                     className="ti-btn ti-btn-danger"
-                    // onClick={handleDeleteSelected}
+                    onClick={handleDeleteSelected}
                   >
                     <i className="ri-delete-bin-line me-2"></i>
                     Delete Selected ({selectedGroups.length})
@@ -288,15 +440,15 @@ const GroupsPage = () => {
                 <div className="relative group">
                   <input
                     type="file"
-                    // ref={fileInputRef}
+                    ref={fileInputRef}
                     className="hidden"
                     accept=".xlsx,.xls"
-                    // onChange={handleImport}
+                    onChange={handleImport}
                   />
                   <button
                     type="button"
                     className="ti-btn ti-btn-success"
-                    // onClick={() => fileInputRef.current?.click()}
+                    onClick={() => fileInputRef.current?.click()}
                   >
                     <i className="ri-upload-2-line me-2"></i> Import
                   </button>
@@ -332,12 +484,11 @@ const GroupsPage = () => {
           {/* Content Box */}
           <div className="box">
             <div className="box-body">
-              {/* Search Bar */}
-              <div className="flex flex-wrap justify-between items-center mb-4 gap-2">
-                <div className="flex items-center">
-                  <label className="mr-2 text-sm text-gray-600">
-                    Rows per page:
-                  </label>
+              {/* Search Bar and Filters */}
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
+                {/* Rows per page selector */}
+                <div className="flex items-center w-full lg:w-auto">
+                  <label className="mr-2 text-sm text-gray-600 whitespace-nowrap">Rows per page:</label>
                   <select
                     className="form-select w-auto text-sm"
                     value={itemsPerPage}
@@ -353,16 +504,49 @@ const GroupsPage = () => {
                     <option value={1000}>1000</option>
                   </select>
                 </div>
-                <div className="relative w-full max-w-xs">
-                  <input
-                    type="text"
-                    className="form-control py-3 pr-10"
-                    placeholder="Search by group name..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                  <button className="absolute end-0 top-0 px-4 h-full">
-                    <i className="ri-search-line text-lg"></i>
+
+                {/* Search and filters */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+                  {/* Search bar */}
+                  <div className="relative flex-grow sm:max-w-xs">
+                    <input
+                      type="text"
+                      className="form-control py-2 w-full"
+                      placeholder="Search by group name..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Sort dropdown */}
+                  <select
+                    className="form-select py-2 w-full sm:w-auto"
+                    value={`${sortField}:${sortOrder}`}
+                    onChange={(e) => {
+                      const [field, order] = e.target.value.split(':');
+                      setSortField(field);
+                      setSortOrder(order);
+                    }}
+                  >
+                    <option value="name:asc">Name (A-Z)</option>
+                    <option value="name:desc">Name (Z-A)</option>
+                    <option value="createdAt:desc">Newest First</option>
+                    <option value="createdAt:asc">Oldest First</option>
+                    <option value="sortOrder:asc">Sort Order (Low-High)</option>
+                    <option value="sortOrder:desc">Sort Order (High-Low)</option>
+                  </select>
+
+                  {/* Reset button */}
+                  <button
+                    className="ti-btn ti-btn-secondary py-2 w-full sm:w-auto"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setSortField("name");
+                      setSortOrder("asc");
+                    }}
+                  >
+                    <i className="ri-refresh-line me-2"></i>
+                    Reset
                   </button>
                 </div>
               </div>
@@ -381,34 +565,23 @@ const GroupsPage = () => {
                   <table className="table whitespace-nowrap table-bordered min-w-full">
                     <thead>
                       <tr className="border-b border-gray-200">
-                        <th scope="col" className="!text-start">
+                        <th className="px-4 py-3">
                           <input
                             type="checkbox"
-                            className="form-check-input"
-                            checked={selectAll}
+                            className="form-checkbox"
+                            checked={selectedGroups.length === groups.length}
                             onChange={handleSelectAll}
                           />
                         </th>
-                        <th scope="col" className="text-start">
-                          Group Name
-                        </th>
-                        <th scope="col" className="text-start">
-                          Number Of Clients
-                        </th>
-                        <th scope="col" className="text-start">
-                          Created Date
-                        </th>
-                        <th scope="col" className="text-start">
-                          Sort Order
-                        </th>
-                        <th scope="col" className="text-start">
-                          Action
-                        </th>
+                        <th className="px-4 py-3">Name</th>
+                        <th className="px-4 py-3">Description</th>
+                        <th className="px-4 py-3">Created At</th>
+                        <th className="px-4 py-3">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {currentGroups.length > 0 ? (
-                        currentGroups.map((group: Group, index: number) => (
+                      {groups.length > 0 ? (
+                        groups.map((group: Group, index: number) => (
                           <tr
                             key={group.id}
                             className={`border-b border-gray-200 ${
@@ -425,22 +598,24 @@ const GroupsPage = () => {
                             </td>
                             <td>{group.name}</td>
                             <td>{group.numberOfClients}</td>
-                            <td>{group.createdDate}</td>
-                            <td>{group.sortOrder}</td>
+                            <td>{new Date(group.createdAt).toLocaleDateString()}</td>
                             <td>
                               <div className="flex space-x-2">
-                                {/* <Link
-                                  href={`/catalog/groups/edit/${group.id}`}
+                                <button
+                                  className="ti-btn ti-btn-info ti-btn-sm"
+                                  onClick={() => handleViewClients(group)}
+                                >
+                                  <i className="ri-eye-line"></i>
+                                </button>
+                                <Link
+                                  href={`/groups/edit/${group.id}`}
                                   className="ti-btn ti-btn-primary ti-btn-sm"
-                                > */}
-                                {/* Wrapper div temporarily used for styling */}
-                                <div className="ti-btn ti-btn-primary ti-btn-sm">
+                                >
                                   <i className="ri-edit-line"></i>
-                                </div>
-                                {/* </Link> */}
+                                </Link>
                                 <button
                                   className="ti-btn ti-btn-danger ti-btn-sm"
-                                  // onClick={() => handleDelete(group.id)}
+                                  onClick={() => handleDelete(group.id)}
                                 >
                                   <i className="ri-delete-bin-line"></i>
                                 </button>
@@ -553,6 +728,148 @@ const GroupsPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Client Modal */}
+      {showClientModal && selectedGroup && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4">
+            <div className="fixed inset-0 bg-black opacity-50"></div>
+            <div className="relative bg-white rounded-lg shadow-xl w-full max-w-4xl">
+              <div className="flex items-center justify-between p-4 border-b">
+                <h3 className="text-xl font-semibold">
+                  Clients in {selectedGroup.name}
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowClientModal(false);
+                    setAvailableClients([]);
+                    setClientSearchQuery("");
+                    setClientCurrentPage(1);
+                  }}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <i className="ri-close-line text-2xl"></i>
+                </button>
+              </div>
+
+              <div className="p-4">
+                <div className="mb-4">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      className="form-control py-3 pr-10"
+                      placeholder="Search clients..."
+                      value={clientSearchQuery}
+                      onChange={(e) => setClientSearchQuery(e.target.value)}
+                    />
+                    <button className="absolute end-0 top-0 px-4 h-full">
+                      <i className="ri-search-line text-lg"></i>
+                    </button>
+                  </div>
+                </div>
+
+                {isLoadingClients ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="table whitespace-nowrap table-bordered min-w-full">
+                      <thead>
+                        <tr className="border-b border-gray-200">
+                          <th scope="col" className="text-start">Name</th>
+                          <th scope="col" className="text-start">Email</th>
+                          <th scope="col" className="text-start">Phone</th>
+                          <th scope="col" className="text-start">City</th>
+                          <th scope="col" className="text-start">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Array.isArray(availableClients) && availableClients.length > 0 ? (
+                          availableClients.map((client) => (
+                            <tr key={client.id} className="border-b border-gray-200">
+                              <td>{client.name}</td>
+                              <td>{client.email}</td>
+                              <td>{client.phone}</td>
+                              <td>{client.city}</td>
+                              <td>
+                                <button
+                                  className="ti-btn ti-btn-danger ti-btn-sm"
+                                  onClick={() => handleRemoveClient(client.id)}
+                                >
+                                  <i className="ri-delete-bin-line"></i>
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={5} className="text-center py-8">
+                              No clients found
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Client Pagination */}
+                {!isLoadingClients && clientTotalPages > 1 && (
+                  <div className="flex justify-between items-center mt-4">
+                    <div className="text-sm text-gray-500">
+                      Showing {clientTotalResults === 0 ? 0 : (clientCurrentPage - 1) * 10 + 1} to{" "}
+                      {Math.min(clientCurrentPage * 10, clientTotalResults)} of {clientTotalResults} entries
+                    </div>
+                    <nav aria-label="Page navigation">
+                      <ul className="flex flex-wrap items-center">
+                        <li className={`page-item ${clientCurrentPage === 1 ? "disabled" : ""}`}>
+                          <button
+                            className="page-link py-2 px-3 ml-0 leading-tight text-gray-500 bg-white rounded-l-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
+                            onClick={() => setClientCurrentPage((prev) => Math.max(prev - 1, 1))}
+                            disabled={clientCurrentPage === 1}
+                          >
+                            Previous
+                          </button>
+                        </li>
+                        {getPagination(clientCurrentPage, clientTotalPages).map((page, idx) =>
+                          page === "..." ? (
+                            <li key={"ellipsis-" + idx} className="page-item">
+                              <span className="px-3">...</span>
+                            </li>
+                          ) : (
+                            <li key={page} className="page-item">
+                              <button
+                                className={`page-link py-2 px-3 leading-tight border border-gray-300 ${
+                                  clientCurrentPage === page
+                                    ? "bg-primary text-white hover:bg-primary-dark"
+                                    : "bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                                }`}
+                                onClick={() => setClientCurrentPage(Number(page))}
+                              >
+                                {page}
+                              </button>
+                            </li>
+                          )
+                        )}
+                        <li className={`page-item ${clientCurrentPage === clientTotalPages ? "disabled" : ""}`}>
+                          <button
+                            className="page-link py-2 px-3 leading-tight text-gray-500 bg-white rounded-r-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
+                            onClick={() => setClientCurrentPage((prev) => Math.min(prev + 1, clientTotalPages))}
+                            disabled={clientCurrentPage === clientTotalPages}
+                          >
+                            Next
+                          </button>
+                        </li>
+                      </ul>
+                    </nav>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

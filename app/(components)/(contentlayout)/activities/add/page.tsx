@@ -1,15 +1,17 @@
 "use client"
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Seo from '@/shared/layout-components/seo/seo';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast, Toaster } from 'react-hot-toast';
+import { Base_url } from '@/app/api/config/BaseUrl';
 
 interface Activity {
   id: string;
   name: string;
-  createdDate: string;
   sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const AddActivityPage = () => {
@@ -18,76 +20,49 @@ const AddActivityPage = () => {
   
   const [formData, setFormData] = useState({
     name: '',
-    sortOrder: '1',
+    sortOrder: 1,
   });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: name === 'sortOrder' ? parseInt(value) || 1 : value
     }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // try {
-    //   setIsLoading(true);
+    try {
+      setIsLoading(true);
 
-    //   // First, if there's an image, upload it
-    //   let imageUrl = null;
-    //   if (selectedImage) {
-    //     const formData = new FormData();
-    //     formData.append('image', selectedImage);
+      const response = await fetch(`${Base_url}activities`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          sortOrder: formData.sortOrder
+        })
+      });
 
-    //     const imageResponse = await fetch(`${API_BASE_URL}/upload`, {
-    //       method: 'POST',
-    //       body: formData,
-    //     });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create activity');
+      }
 
-    //     if (!imageResponse.ok) {
-    //       throw new Error('Failed to upload image');
-    //     }
-
-    //     const imageData = await imageResponse.json();
-    //     imageUrl = imageData.url; // Assuming the API returns the image URL
-    //   }
-
-    //   // Prepare client data
-    //   const clientData = {
-    //     name: formData.name,
-    //     parent: formData.parent || undefined,
-    //     description: formData.description || undefined,
-    //     sortOrder: parseInt(formData.sortOrder),
-    //     status: formData.status,
-    //     image: imageUrl || undefined
-    //   };
-
-    //   // Create client
-    //   const response = await fetch(`${API_BASE_URL}/activities`, {
-    //     method: 'POST',
-    //     headers: {
-    //       'Accept': 'application/json',
-    //       'Content-Type': 'application/json',
-    //     },
-    //     body: JSON.stringify(clientData),
-    //   });
-
-    //   if (!response.ok) {
-    //     const errorData = await response.json();
-    //     throw new Error(errorData.message || 'Failed to create client');
-    //   }
-
-    //   toast.success('Client created successfully');
-    //   router.push('/activities');
-    // } catch (err) {
-        //   console.error('Error creating client:', err);
-        //   toast.error(err instanceof Error ? err.message : 'Failed to create client');
-        // } finally {
-            //   setIsLoading(false);
-            // }
-    router.push('/dashboards/crm');
+      const data: Activity = await response.json();
+      toast.success('Activity created successfully');
+      router.push('/activities');
+    } catch (err) {
+      console.error('Error creating activity:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to create activity');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -125,10 +100,9 @@ const AddActivityPage = () => {
             <div className="box-body">
               <form onSubmit={handleSubmit}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
                   {/* Activity Name */}
                   <div className="form-group">
-                    <label htmlFor="name" className="form-label">Activity Name *</label>
+                    <label htmlFor="name" className="form-label">Activity Name <span className="text-red-500">*</span></label>
                     <input
                       type="text"
                       id="name"
@@ -143,7 +117,7 @@ const AddActivityPage = () => {
 
                   {/* Sort Order */}
                   <div className="form-group">
-                    <label htmlFor="sortOrder" className="form-label">Sort Order *</label>
+                    <label htmlFor="sortOrder" className="form-label">Sort Order <span className="text-red-500">*</span></label>
                     <input
                       type="number"
                       id="sortOrder"
@@ -164,7 +138,14 @@ const AddActivityPage = () => {
                       className="ti-btn ti-btn-primary"
                       disabled={isLoading}
                     >
-                      {isLoading ? 'Saving...' : 'Save Activity'}
+                      {isLoading ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Saving...
+                        </>
+                      ) : (
+                        'Save Activity'
+                      )}
                     </button>
                     <button
                       type="button"

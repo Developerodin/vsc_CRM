@@ -1,5 +1,5 @@
 "use client"
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Seo from '@/shared/layout-components/seo/seo';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -21,9 +21,10 @@ interface Client {
   updatedAt: string;
 }
 
-const AddClientPage = () => {
+const EditClientPage = ({ params }: { params: { id: string } }) => {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -36,6 +37,43 @@ const AddClientPage = () => {
     pinCode: '',
     sortOrder: 1,
   });
+
+  useEffect(() => {
+    const fetchClient = async () => {
+      try {
+        const response = await fetch(`${Base_url}clients/${params.id}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch client details');
+        }
+
+        const data: Client = await response.json();
+        setFormData({
+          name: data.name,
+          phone: data.phone,
+          email: data.email,
+          address: data.address,
+          city: data.city,
+          state: data.state,
+          country: data.country,
+          pinCode: data.pinCode,
+          sortOrder: data.sortOrder,
+        });
+      } catch (err) {
+        console.error('Error fetching client:', err);
+        toast.error('Failed to fetch client details');
+        router.push('/clients');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchClient();
+  }, [params.id, router]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -76,10 +114,10 @@ const AddClientPage = () => {
     if (!validateForm()) return;
 
     try {
-      setIsLoading(true);
+      setIsSubmitting(true);
 
-      const response = await fetch(`${Base_url}clients`, {
-        method: 'POST',
+      const response = await fetch(`${Base_url}clients/${params.id}`, {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -89,31 +127,41 @@ const AddClientPage = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create client');
+        throw new Error(errorData.message || 'Failed to update client');
       }
 
       const data: Client = await response.json();
-      toast.success('Client created successfully');
+      toast.success('Client updated successfully');
       router.push('/clients');
     } catch (err) {
-      console.error('Error creating client:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to create client');
+      console.error('Error updating client:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to update client');
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="main-content">
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="main-content">
       <Toaster position="top-right" />
-      <Seo title="Add Client"/>
+      <Seo title="Edit Client"/>
       
       <div className="grid grid-cols-12 gap-6">
         <div className="col-span-12">
           {/* Page Header */}
           <div className="box !bg-transparent border-0 shadow-none">
             <div className="box-header flex justify-between items-center">
-              <h1 className="box-title text-2xl font-semibold">Add New Client</h1>
+              <h1 className="box-title text-2xl font-semibold">Edit Client</h1>
               <nav className="flex" aria-label="Breadcrumb">
                 <ol className="inline-flex items-center space-x-1 md:space-x-3">
                   <li className="inline-flex items-center">
@@ -125,7 +173,7 @@ const AddClientPage = () => {
                   <li>
                     <div className="flex items-center">
                       <i className="ri-arrow-right-s-line text-gray-400 mx-2"></i>
-                      <span className="text-sm font-medium text-gray-500">Add New Client</span>
+                      <span className="text-sm font-medium text-gray-500">Edit Client</span>
                     </div>
                   </li>
                 </ol>
@@ -281,22 +329,22 @@ const AddClientPage = () => {
                     <button
                       type="submit"
                       className="ti-btn ti-btn-primary"
-                      disabled={isLoading}
+                      disabled={isSubmitting}
                     >
-                      {isLoading ? (
+                      {isSubmitting ? (
                         <>
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                           Saving...
                         </>
                       ) : (
-                        'Save Client'
+                        'Save Changes'
                       )}
                     </button>
                     <button
                       type="button"
                       className="ti-btn ti-btn-secondary"
                       onClick={() => router.push('/clients')}
-                      disabled={isLoading}
+                      disabled={isSubmitting}
                     >
                       Cancel
                     </button>
@@ -311,4 +359,4 @@ const AddClientPage = () => {
   );
 };
 
-export default AddClientPage; 
+export default EditClientPage; 

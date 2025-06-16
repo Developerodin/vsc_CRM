@@ -4,24 +4,49 @@ import Seo from "@/shared/layout-components/seo/seo";
 import Link from "next/link";
 import { toast, Toaster } from "react-hot-toast";
 import * as XLSX from "xlsx";
+import { Base_url } from '@/app/api/config/BaseUrl';
 
 interface Branch {
   id: string;
   name: string;
   branchHead: string;
-  contact: string;
+  email: string;
+  phone: string;
   address: string;
-  createdDate: string;
+  city: string;
+  state: string;
+  country: string;
+  pinCode: string;
   sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface ExcelRow {
   ID?: string;
   "Branch Name": string;
   "Branch Head": string;
-  "Branch Contact": string;
-  "Branch Address": string;
+  "Email": string;
+  "Phone": string;
+  "Address": string;
+  "City": string;
+  "State": string;
+  "Country": string;
+  "Pin Code": string;
+  "Sort Order"?: string | number;
   "Created Date": string;
+}
+
+interface ImportRow {
+  "Branch Name": string;
+  "Branch Head": string;
+  "Email": string;
+  "Phone": string;
+  "Address": string;
+  "City": string;
+  "State": string;
+  "Country": string;
+  "Pin Code": string;
   "Sort Order"?: string | number;
 }
 
@@ -30,33 +55,66 @@ const BranchesPage = () => {
   const [selectAll, setSelectAll] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [branches, setBranches] = useState<Branch[]>([
-    {
-        id: '1',
-        name: "VSC Jaipur",
-        branchHead: "Vinod Sanghal",
-        contact: "+91-9876043200",
-        address: "Jaipur",
-        createdDate: "10 January 2025",
-        sortOrder: 1,
-    }
-  ]);
-  const [isLoading, setIsLoading] = useState(false); // Initially set to true when API integrated
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [totalResults, setTotalResults] = useState(1); // Initially set to 0 when API integrated
+  const [totalResults, setTotalResults] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [importProgress, setImportProgress] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [filters, setFilters] = useState({
+    name: "",
+    city: "",
+    state: "",
+    country: "",
+    pinCode: ""
+  });
+  const [sortBy, setSortBy] = useState("createdAt:desc");
+
+  // Fetch branches
+  const fetchBranches = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const queryParams = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString(),
+        ...(searchQuery && { name: searchQuery })
+      });
+
+      const response = await fetch(`${Base_url}branches?${queryParams}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch branches');
+      }
+
+      const data = await response.json();
+      setBranches(data.results);
+      setTotalResults(data.totalResults);
+      setTotalPages(data.totalPages);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch branches');
+      toast.error('Failed to fetch branches');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery]);
+    fetchBranches();
+  }, [currentPage, itemsPerPage, searchQuery]);
 
   const handleSelectAll = () => {
     if (selectAll) {
       setSelectedBranches([]);
     } else {
-      setSelectedBranches(filteredBranches.map((branch) => branch.id));
+      setSelectedBranches(branches.map((branch) => branch.id));
     }
     setSelectAll(!selectAll);
   };
@@ -69,41 +127,83 @@ const BranchesPage = () => {
     }
   };
 
-  // Filter branches based on search query
-  const filteredBranches = branches.filter((branch) =>
-    branch.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleDelete = async (branchId: string) => {
+    if (!confirm('Are you sure you want to delete this branch?')) return;
 
-  // Calculate current branches for the current page
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentBranches = filteredBranches.slice(startIndex, endIndex);
+    try {
+      const response = await fetch(`${Base_url}branches/${branchId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete branch');
+      }
+
+      toast.success('Branch deleted successfully');
+      fetchBranches();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete branch');
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (!confirm(`Are you sure you want to delete ${selectedBranches.length} branches?`)) return;
+
+    try {
+      const deletePromises = selectedBranches.map(branchId =>
+        fetch(`${Base_url}branches/${branchId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        })
+      );
+
+      await Promise.all(deletePromises);
+      toast.success('Selected branches deleted successfully');
+      setSelectedBranches([]);
+      fetchBranches();
+    } catch (err) {
+      toast.error('Failed to delete selected branches');
+    }
+  };
 
   const handleExport = async () => {
     try {
-      // Always fetch all categories for export
-      // const response = await fetch(`${API_BASE_URL}/categories?page=1&limit=100000`);
-      // if (!response.ok) throw new Error('Failed to fetch all categories for export');
-      // const data = await response.json();
-      const exportSource = Array.isArray(branches) ? branches : [];
-      const exportData = exportSource.map((branch: Branch) => ({
+      const exportData = branches.map((branch: Branch) => ({
         ID: branch.id,
         "Branch Name": branch.name,
         "Branch Head": branch.branchHead,
-        "Contact": branch.contact,
-        "Branch Address": branch.address,
-        "Created Date": branch.createdDate,
+        "Email": branch.email,
+        "Phone": branch.phone,
+        "Address": branch.address,
+        "City": branch.city,
+        "State": branch.state,
+        "Country": branch.country,
+        "Pin Code": branch.pinCode,
         "Sort Order": branch.sortOrder,
+        "Created Date": new Date(branch.createdAt).toLocaleDateString()
       }));
+
       const ws = XLSX.utils.json_to_sheet(exportData);
       ws["!cols"] = [
-        { wch: 20 },
-        { wch: 20 },
-        { wch: 30 },
-        { wch: 20 },
-        { wch: 10 },
-        { wch: 10 },
+        { wch: 20 }, // ID
+        { wch: 20 }, // Branch Name
+        { wch: 20 }, // Branch Head
+        { wch: 30 }, // Email
+        { wch: 15 }, // Phone
+        { wch: 30 }, // Address
+        { wch: 15 }, // City
+        { wch: 15 }, // State
+        { wch: 15 }, // Country
+        { wch: 10 }, // Pin Code
+        { wch: 10 }, // Sort Order
+        { wch: 15 }, // Created Date
       ];
+
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Branches");
       const fileName = `branches_${new Date().toISOString().split("T")[0]}.xlsx`;
@@ -112,6 +212,65 @@ const BranchesPage = () => {
     } catch (error) {
       console.error("Error exporting branches:", error);
       toast.error("Failed to export branches");
+    }
+  };
+
+  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json<ImportRow>(worksheet);
+
+          setImportProgress(0);
+          const totalItems = jsonData.length;
+          let processedItems = 0;
+
+          for (const row of jsonData) {
+            const branchData = {
+              name: row["Branch Name"],
+              branchHead: row["Branch Head"],
+              email: row["Email"],
+              phone: row["Phone"],
+              address: row["Address"],
+              city: row["City"],
+              state: row["State"],
+              country: row["Country"],
+              pinCode: row["Pin Code"],
+              sortOrder: parseInt(row["Sort Order"]?.toString() || "1")
+            };
+
+            await fetch(`${Base_url}branches`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              },
+              body: JSON.stringify(branchData)
+            });
+
+            processedItems++;
+            setImportProgress(Math.round((processedItems / totalItems) * 100));
+          }
+
+          toast.success('Branches imported successfully');
+          fetchBranches();
+        } catch (err) {
+          toast.error('Failed to import branches');
+        } finally {
+          setImportProgress(null);
+        }
+      };
+
+      reader.readAsArrayBuffer(file);
+    } catch (err) {
+      toast.error('Failed to read file');
     }
   };
 
@@ -152,7 +311,7 @@ const BranchesPage = () => {
                   <button
                     type="button"
                     className="ti-btn ti-btn-danger"
-                    // onClick={handleDeleteSelected}
+                    onClick={handleDeleteSelected}
                   >
                     <i className="ri-delete-bin-line me-2"></i>
                     Delete Selected ({selectedBranches.length})
@@ -162,15 +321,15 @@ const BranchesPage = () => {
                 <div className="relative group">
                   <input
                     type="file"
-                    // ref={fileInputRef}
+                    ref={fileInputRef}
                     className="hidden"
                     accept=".xlsx,.xls"
-                    // onChange={handleImport}
+                    onChange={handleImport}
                   />
                   <button
                     type="button"
                     className="ti-btn ti-btn-success"
-                    // onClick={() => fileInputRef.current?.click()}
+                    onClick={() => fileInputRef.current?.click()}
                   >
                     <i className="ri-upload-2-line me-2"></i> Import
                   </button>
@@ -203,12 +362,11 @@ const BranchesPage = () => {
           {/* Content Box */}
           <div className="box">
             <div className="box-body">
-              {/* Search Bar */}
-              <div className="flex flex-wrap justify-between items-center mb-4 gap-2">
-                <div className="flex items-center">
-                  <label className="mr-2 text-sm text-gray-600">
-                    Rows per page:
-                  </label>
+              {/* Search and Sort */}
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
+                {/* Rows per page selector */}
+                <div className="flex items-center w-full lg:w-auto">
+                  <label className="mr-2 text-sm text-gray-600 whitespace-nowrap">Rows per page:</label>
                   <select
                     className="form-select w-auto text-sm"
                     value={itemsPerPage}
@@ -224,16 +382,58 @@ const BranchesPage = () => {
                     <option value={1000}>1000</option>
                   </select>
                 </div>
-                <div className="relative w-full max-w-xs">
-                  <input
-                    type="text"
-                    className="form-control py-3 pr-10"
-                    placeholder="Search by branch name..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                  <button className="absolute end-0 top-0 px-4 h-full">
-                    <i className="ri-search-line text-lg"></i>
+
+                {/* Search and filters */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+                  {/* Search bar */}
+                  <div className="relative flex-grow sm:max-w-xs">
+                    <input
+                      type="text"
+                      className="form-control py-2 w-full"
+                      placeholder="Search by name, city, state..."
+                      value={filters.name}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setFilters(prev => ({
+                          ...prev,
+                          name: value,
+                          city: value,
+                          state: value
+                        }));
+                      }}
+                    />
+                  </div>
+
+                  {/* Sort dropdown */}
+                  <select
+                    className="form-select py-2 w-full sm:w-auto"
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                  >
+                    <option value="name:asc">Name (A-Z)</option>
+                    <option value="name:desc">Name (Z-A)</option>
+                    <option value="createdAt:desc">Newest First</option>
+                    <option value="createdAt:asc">Oldest First</option>
+                    <option value="sortOrder:asc">Sort Order (Low-High)</option>
+                    <option value="sortOrder:desc">Sort Order (High-Low)</option>
+                  </select>
+
+                  {/* Reset button */}
+                  <button
+                    className="ti-btn ti-btn-secondary py-2 w-full sm:w-auto"
+                    onClick={() => {
+                      setFilters({
+                        name: "",
+                        city: "",
+                        state: "",
+                        country: "",
+                        pinCode: ""
+                      });
+                      setSortBy("createdAt:desc");
+                    }}
+                  >
+                    <i className="ri-refresh-line me-2"></i>
+                    Reset
                   </button>
                 </div>
               </div>
@@ -252,40 +452,26 @@ const BranchesPage = () => {
                   <table className="table whitespace-nowrap table-bordered min-w-full">
                     <thead>
                       <tr className="border-b border-gray-200">
-                        <th scope="col" className="!text-start">
+                        <th className="px-4 py-3">
                           <input
                             type="checkbox"
-                            className="form-check-input"
-                            checked={selectAll}
+                            className="form-checkbox"
+                            checked={selectedBranches.length === branches.length}
                             onChange={handleSelectAll}
                           />
                         </th>
-                        <th scope="col" className="text-start">
-                          Branch Name
-                        </th>
-                        <th scope="col" className="text-start">
-                          Branch Head
-                        </th>
-                        <th scope="col" className="text-start">
-                          Branch Contact
-                        </th>
-                        <th scope="col" className="text-start">
-                          Branch Address
-                        </th>
-                        <th scope="col" className="text-start">
-                          Created Date
-                        </th>
-                        <th scope="col" className="text-start">
-                          Sort Order
-                        </th>
-                        <th scope="col" className="text-start">
-                          Action
-                        </th>
+                        <th className="px-4 py-3">Name</th>
+                        <th className="px-4 py-3">City</th>
+                        <th className="px-4 py-3">State</th>
+                        <th className="px-4 py-3">Country</th>
+                        <th className="px-4 py-3">Pin Code</th>
+                        <th className="px-4 py-3">Created At</th>
+                        <th className="px-4 py-3">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {currentBranches.length > 0 ? (
-                        currentBranches.map((branch: Branch, index: number) => (
+                      {branches.length > 0 ? (
+                        branches.map((branch: Branch, index: number) => (
                           <tr
                             key={branch.id}
                             className={`border-b border-gray-200 ${
@@ -301,25 +487,22 @@ const BranchesPage = () => {
                               />
                             </td>
                             <td>{branch.name}</td>
-                            <td>{branch.branchHead}</td>
-                            <td>{branch.contact}</td>
-                            <td>{branch.address}</td>
-                            <td>{branch.createdDate}</td>
-                            <td>{branch.sortOrder}</td>
+                            <td>{branch.city}</td>
+                            <td>{branch.state}</td>
+                            <td>{branch.country}</td>
+                            <td>{branch.pinCode}</td>
+                            <td>{new Date(branch.createdAt).toLocaleDateString()}</td>
                             <td>
                               <div className="flex space-x-2">
-                                {/* <Link
-                                  href={`/catalog/branches/edit/${branch.id}`}
+                                <Link
+                                  href={`/branches/edit/${branch.id}`}
                                   className="ti-btn ti-btn-primary ti-btn-sm"
-                                > */}
-                                {/* Wrapper div temporarily used for styling */}
-                                <div className="ti-btn ti-btn-primary ti-btn-sm">
+                                >
                                   <i className="ri-edit-line"></i>
-                                </div>
-                                {/* </Link> */}
+                                </Link>
                                 <button
                                   className="ti-btn ti-btn-danger ti-btn-sm"
-                                  // onClick={() => handleDelete(branch.id)}
+                                  onClick={() => handleDelete(branch.id)}
                                 >
                                   <i className="ri-delete-bin-line"></i>
                                 </button>
@@ -329,7 +512,7 @@ const BranchesPage = () => {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={6} className="text-center py-8">
+                          <td colSpan={13} className="text-center py-8">
                             <div className="flex flex-col items-center justify-center">
                               <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
                                 <i className="ri-folder-line text-4xl text-primary"></i>

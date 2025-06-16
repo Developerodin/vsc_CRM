@@ -31,13 +31,14 @@ interface Group {
   updatedAt: string;
 }
 
-const AddGroupPage = () => {
+const EditGroupPage = ({ params }: { params: { id: string } }) => {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [isLoadingClients, setIsLoadingClients] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [selectedClients, setSelectedClients] = useState<Client[]>([]);
+  const [availableClients, setAvailableClients] = useState<Client[]>([]);
+  const [isLoadingClients, setIsLoadingClients] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
@@ -46,11 +47,41 @@ const AddGroupPage = () => {
 
   const [formData, setFormData] = useState({
     name: "",
-    clients: [] as string[],
     sortOrder: 1,
   });
 
-  const fetchClients = async (page: number = 1) => {
+  useEffect(() => {
+    const fetchGroup = async () => {
+      try {
+        const response = await fetch(`${Base_url}groups/${params.id}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch group');
+        }
+
+        const data = await response.json();
+        setFormData({
+          name: data.name,
+          sortOrder: data.sortOrder,
+        });
+        setSelectedClients(data.clients);
+      } catch (err) {
+        console.error('Error fetching group:', err);
+        toast.error('Failed to fetch group details');
+        router.push('/groups');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchGroup();
+  }, [params.id, router]);
+
+  const fetchAvailableClients = async (page: number = 1) => {
     try {
       setIsLoadingClients(true);
       const queryParams = new URLSearchParams({
@@ -71,7 +102,7 @@ const AddGroupPage = () => {
       }
 
       const data = await response.json();
-      setClients(data.results);
+      setAvailableClients(data.results);
       setTotalPages(Math.ceil(data.total / 10));
       setCurrentPage(page);
     } catch (err) {
@@ -84,7 +115,7 @@ const AddGroupPage = () => {
 
   useEffect(() => {
     if (showModal) {
-      fetchClients();
+      fetchAvailableClients();
     }
   }, [showModal, sortField, sortOrder, searchQuery]);
 
@@ -110,10 +141,6 @@ const AddGroupPage = () => {
   };
 
   const handleModalSubmit = () => {
-    setFormData(prev => ({
-      ...prev,
-      clients: selectedClients.map(client => client.id)
-    }));
     setShowModal(false);
   };
 
@@ -121,17 +148,17 @@ const AddGroupPage = () => {
     e.preventDefault();
 
     try {
-      setIsLoading(true);
+      setIsSaving(true);
 
       const groupData = {
         name: formData.name,
-        numberOfClients: formData.clients.length,
-        clients: formData.clients,
+        numberOfClients: selectedClients.length,
+        clients: selectedClients.map(client => client.id),
         sortOrder: formData.sortOrder
       };
 
-      const response = await fetch(`${Base_url}groups`, {
-        method: 'POST',
+      const response = await fetch(`${Base_url}groups/${params.id}`, {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -141,23 +168,33 @@ const AddGroupPage = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create group');
+        throw new Error(errorData.message || 'Failed to update group');
       }
 
-      toast.success('Group created successfully');
+      toast.success('Group updated successfully');
       router.push('/groups');
     } catch (err) {
-      console.error('Error creating group:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to create group');
+      console.error('Error updating group:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to update group');
     } finally {
-      setIsLoading(false);
+      setIsSaving(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="main-content">
+        <div className="flex items-center justify-center h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="main-content">
       <Toaster position="top-right" />
-      <Seo title="Add Group" />
+      <Seo title="Edit Group" />
 
       <div className="grid grid-cols-12 gap-6">
         <div className="col-span-12">
@@ -165,7 +202,7 @@ const AddGroupPage = () => {
           <div className="box !bg-transparent border-0 shadow-none">
             <div className="box-header flex justify-between items-center">
               <h1 className="box-title text-2xl font-semibold">
-                Add New Group
+                Edit Group
               </h1>
               <nav className="flex" aria-label="Breadcrumb">
                 <ol className="inline-flex items-center space-x-1 md:space-x-3">
@@ -182,7 +219,7 @@ const AddGroupPage = () => {
                     <div className="flex items-center">
                       <i className="ri-arrow-right-s-line text-gray-400 mx-2"></i>
                       <span className="text-sm font-medium text-gray-500">
-                        Add New Group
+                        Edit Group
                       </span>
                     </div>
                   </li>
@@ -242,11 +279,11 @@ const AddGroupPage = () => {
                         className="ti-btn ti-btn-primary"
                         onClick={() => setShowModal(true)}
                       >
-                        Select Clients ({formData.clients.length} selected)
+                        Select Clients ({selectedClients.length} selected)
                       </button>
-                      {formData.clients.length > 0 && (
+                      {selectedClients.length > 0 && (
                         <span className="text-sm text-gray-500">
-                          {formData.clients.length} clients selected
+                          {selectedClients.length} clients selected
                         </span>
                       )}
                     </div>
@@ -257,22 +294,22 @@ const AddGroupPage = () => {
                     <button
                       type="submit"
                       className="ti-btn ti-btn-primary"
-                      disabled={isLoading}
+                      disabled={isSaving}
                     >
-                      {isLoading ? (
+                      {isSaving ? (
                         <>
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                           Saving...
                         </>
                       ) : (
-                        'Save Group'
+                        'Save Changes'
                       )}
                     </button>
                     <button
                       type="button"
                       className="ti-btn ti-btn-secondary"
                       onClick={() => router.push("/groups")}
-                      disabled={isLoading}
+                      disabled={isSaving}
                     >
                       Cancel
                     </button>
@@ -352,7 +389,7 @@ const AddGroupPage = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {clients.map((client) => (
+                      {availableClients.map((client) => (
                         <tr key={client.id} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <input
@@ -424,4 +461,4 @@ const AddGroupPage = () => {
   );
 };
 
-export default AddGroupPage;
+export default EditGroupPage; 

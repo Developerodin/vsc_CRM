@@ -4,14 +4,19 @@ import Seo from '@/shared/layout-components/seo/seo';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast, Toaster } from 'react-hot-toast';
+import { Base_url } from '@/app/api/config/BaseUrl';
 
 interface Branch {
   id: string;
   name: string;
   branchHead: string;
-  contact: string;
+  email: string;
+  phone: string;
   address: string;
-  createdDate: string;
+  city: string;
+  state: string;
+  country: string;
+  pinCode: string;
   sortOrder: number;
 }
 
@@ -22,8 +27,13 @@ const AddBranchPage = () => {
   const [formData, setFormData] = useState({
     name: '',
     branchHead: '',
-    contact: '',
+    email: '',
+    phone: '',
     address: '',
+    city: '',
+    state: '',
+    country: '',
+    pinCode: '',
     sortOrder: '1',
   });
 
@@ -38,62 +48,45 @@ const AddBranchPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // try {
-    //   setIsLoading(true);
+    try {
+      setIsLoading(true);
 
-    //   // First, if there's an image, upload it
-    //   let imageUrl = null;
-    //   if (selectedImage) {
-    //     const formData = new FormData();
-    //     formData.append('image', selectedImage);
+      const branchData = {
+        name: formData.name,
+        branchHead: formData.branchHead || undefined,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        city: formData.city,
+        state: formData.state,
+        country: formData.country,
+        pinCode: formData.pinCode,
+        sortOrder: parseInt(formData.sortOrder)
+      };
 
-    //     const imageResponse = await fetch(`${API_BASE_URL}/upload`, {
-    //       method: 'POST',
-    //       body: formData,
-    //     });
+      const response = await fetch(`${Base_url}branches`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(branchData),
+      });
 
-    //     if (!imageResponse.ok) {
-    //       throw new Error('Failed to upload image');
-    //     }
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create branch');
+      }
 
-    //     const imageData = await imageResponse.json();
-    //     imageUrl = imageData.url; // Assuming the API returns the image URL
-    //   }
-
-    //   // Prepare branch data
-    //   const branchData = {
-    //     name: formData.name,
-    //     parent: formData.parent || undefined,
-    //     description: formData.description || undefined,
-    //     sortOrder: parseInt(formData.sortOrder),
-    //     status: formData.status,
-    //     image: imageUrl || undefined
-    //   };
-
-    //   // Create branch
-    //   const response = await fetch(`${API_BASE_URL}/branchs`, {
-    //     method: 'POST',
-    //     headers: {
-    //       'Accept': 'application/json',
-    //       'Content-Type': 'application/json',
-    //     },
-    //     body: JSON.stringify(clientData),
-    //   });
-
-    //   if (!response.ok) {
-    //     const errorData = await response.json();
-    //     throw new Error(errorData.message || 'Failed to create client');
-    //   }
-
-    //   toast.success('Client created successfully');
-    //   router.push('/branchs');
-    // } catch (err) {
-        //   console.error('Error creating client:', err);
-        //   toast.error(err instanceof Error ? err.message : 'Failed to create client');
-        // } finally {
-            //   setIsLoading(false);
-            // }
-    router.push('/dashboards/crm');
+      toast.success('Branch created successfully');
+      router.push('/branches');
+    } catch (err) {
+      console.error('Error creating branch:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to create branch');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -149,44 +142,118 @@ const AddBranchPage = () => {
 
                   {/* Branch Head */}
                   <div className="form-group">
-                    <label htmlFor="branch-head" className="form-label">Branch Head *</label>
+                    <label htmlFor="branchHead" className="form-label">Branch Head</label>
                     <input
                       type="text"
-                      id="branch-head"
+                      id="branchHead"
                       name="branchHead"
                       className="form-control"
-                      placeholder="Enter branch head"
+                      placeholder="Enter branch head ID"
                       value={formData.branchHead}
                       onChange={handleInputChange}
-                      required
                     />
                   </div>
 
-                  {/* Branch Contact */}
+                  {/* Email */}
                   <div className="form-group">
-                    <label htmlFor="contact" className="form-label">Branch Contact *</label>
+                    <label htmlFor="email" className="form-label">Email *</label>
                     <input
-                      type="text"
-                      id="contact"
-                      name="contact"
+                      type="email"
+                      id="email"
+                      name="email"
                       className="form-control"
-                      placeholder="Enter contact"
-                      value={formData.contact}
+                      placeholder="Enter email"
+                      value={formData.email}
                       onChange={handleInputChange}
                       required
                     />
                   </div>
 
-                  {/* Branch Address */}
+                  {/* Phone */}
                   <div className="form-group">
-                    <label htmlFor="address" className="form-label">Branch Address *</label>
+                    <label htmlFor="phone" className="form-label">Phone *</label>
+                    <input
+                      type="tel"
+                      id="phone"
+                      name="phone"
+                      className="form-control"
+                      placeholder="Enter phone number"
+                      value={formData.phone}
+                      onChange={handleInputChange}
+                      required
+                    />
+                  </div>
+
+                  {/* Address */}
+                  <div className="form-group">
+                    <label htmlFor="address" className="form-label">Address *</label>
                     <input
                       type="text"
                       id="address"
                       name="address"
                       className="form-control"
-                      placeholder="Enter branch address"
+                      placeholder="Enter address"
                       value={formData.address}
+                      onChange={handleInputChange}
+                      required
+                    />
+                  </div>
+
+                  {/* City */}
+                  <div className="form-group">
+                    <label htmlFor="city" className="form-label">City *</label>
+                    <input
+                      type="text"
+                      id="city"
+                      name="city"
+                      className="form-control"
+                      placeholder="Enter city"
+                      value={formData.city}
+                      onChange={handleInputChange}
+                      required
+                    />
+                  </div>
+
+                  {/* State */}
+                  <div className="form-group">
+                    <label htmlFor="state" className="form-label">State *</label>
+                    <input
+                      type="text"
+                      id="state"
+                      name="state"
+                      className="form-control"
+                      placeholder="Enter state"
+                      value={formData.state}
+                      onChange={handleInputChange}
+                      required
+                    />
+                  </div>
+
+                  {/* Country */}
+                  <div className="form-group">
+                    <label htmlFor="country" className="form-label">Country *</label>
+                    <input
+                      type="text"
+                      id="country"
+                      name="country"
+                      className="form-control"
+                      placeholder="Enter country"
+                      value={formData.country}
+                      onChange={handleInputChange}
+                      required
+                    />
+                  </div>
+
+                  {/* Pin Code */}
+                  <div className="form-group">
+                    <label htmlFor="pinCode" className="form-label">Pin Code *</label>
+                    <input
+                      type="text"
+                      id="pinCode"
+                      name="pinCode"
+                      className="form-control"
+                      placeholder="Enter pin code"
+                      value={formData.pinCode}
                       onChange={handleInputChange}
                       required
                     />
@@ -210,23 +277,23 @@ const AddBranchPage = () => {
 
                   {/* Form Actions */}
                   <div className='self-end justify-self-end'>
-                      <div className="flex items-center space-x-3 col-span-1 md:col-span-2">
-                        <button
-                          type="submit"
-                          className="ti-btn ti-btn-primary"
-                          disabled={isLoading}
-                        >
-                          {isLoading ? 'Saving...' : 'Save Branch'}
-                        </button>
-                        <button
-                          type="button"
-                          className="ti-btn ti-btn-secondary"
-                          onClick={() => router.push('/branches')}
-                          disabled={isLoading}
-                        >
-                          Cancel
-                        </button>
-                      </div>
+                    <div className="flex items-center space-x-3 col-span-1 md:col-span-2">
+                      <button
+                        type="submit"
+                        className="ti-btn ti-btn-primary"
+                        disabled={isLoading}
+                      >
+                        {isLoading ? 'Saving...' : 'Save Branch'}
+                      </button>
+                      <button
+                        type="button"
+                        className="ti-btn ti-btn-secondary"
+                        onClick={() => router.push('/branches')}
+                        disabled={isLoading}
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 </div>
               </form>

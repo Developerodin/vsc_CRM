@@ -5,28 +5,54 @@ import Link from "next/link";
 import { toast, Toaster } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import axios from "axios";
-import { API_BASE_URL } from "@/shared/data/utilities/api";
+import { Base_url } from "@/app/api/config/BaseUrl";
+
+interface Branch {
+  id: string;
+  name: string;
+}
+
+interface Activity {
+  id: string;
+  name: string;
+}
 
 interface TeamMember {
   id: string;
   name: string;
-  phone: string;
   email: string;
+  phone: string;
   address: string;
-  branch: string;
-  createdDate: string;
+  city: string;
+  state: string;
+  country: string;
+  pinCode: string;
+  branch: Branch;
   sortOrder: number;
+  skills: Activity[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface ExcelRow {
-  ID?: string;
-  "Team Member Name": string;
-  "Team Member Phone Number": string;
-  "Team Member Email": string;
-  "Team Member Address": string;
-  "Team Member Branch": string;
-  "Created Date": string;
-  "Sort Order"?: string | number;
+  "Name": string;
+  "Email": string;
+  "Phone": string;
+  "Branch": string;
+  "City": string;
+  "State": string;
+  "Country": string;
+  "Pin Code": string;
+  "Skills": string;
+  "Created At": string;
+}
+
+interface ApiResponse {
+  results: TeamMember[];
+  page: number;
+  limit: number;
+  totalPages: number;
+  totalResults: number;
 }
 
 const formatDate = (dateString: string) => {
@@ -50,33 +76,51 @@ const TeamsPage = () => {
   const [totalResults, setTotalResults] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [importProgress, setImportProgress] = useState<number | null>(null);
+  const [filters, setFilters] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    branch: "",
+    city: "",
+    state: "",
+    country: "",
+    pinCode: "",
+    skills: [] as string[],
+  });
+  const [sortBy, setSortBy] = useState("createdAt:desc");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showSkillsModal, setShowSkillsModal] = useState(false);
+  const [selectedMemberSkills, setSelectedMemberSkills] = useState<Activity[]>([]);
 
   // Fetch teams from API
   const fetchTeams = async (page = 1, limit = itemsPerPage) => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await axios.get(
-        `${API_BASE_URL}/team-members?page=${page}&limit=${limit}`
+
+      // Build query parameters
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        sortBy,
+        ...(filters.name && { name: filters.name }),
+        ...(filters.email && { email: filters.email }),
+        ...(filters.phone && { phone: filters.phone }),
+        ...(filters.branch && { branch: filters.branch }),
+        ...(filters.city && { city: filters.city }),
+        ...(filters.state && { state: filters.state }),
+        ...(filters.country && { country: filters.country }),
+        ...(filters.pinCode && { pinCode: filters.pinCode }),
+        ...(filters.skills.length > 0 && { skills: filters.skills.join(",") }),
+      });
+
+      const response = await axios.get<ApiResponse>(
+        `${Base_url}team-members?${queryParams.toString()}`
       );
-      const data = response.data.results;
 
-      // Transform the API response to match our TeamMember interface
-      const transformedTeams = data.map((teamMember: any) => ({
-        id: teamMember.id,
-        name: teamMember.name,
-        phone: teamMember.phone,
-        email: teamMember.email,
-        address: teamMember.address,
-        branch: teamMember.branch,
-        createdDate: formatDate(teamMember.createdAt),
-        sortOrder: teamMember.sortOrder || 1,
-      }));
-
-      setTeams(transformedTeams);
-      setTotalResults(response.data.totalResults || 0);
-      setTotalPages(response.data.totalPages || 1);
+      setTeams(response.data.results);
+      setTotalResults(response.data.totalResults);
+      setTotalPages(response.data.totalPages);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch teams");
       setTeams([]);
@@ -88,10 +132,10 @@ const TeamsPage = () => {
     }
   };
 
-  // Call fetchTeams when component mounts
+  // Call fetchTeams when component mounts or when filters/sort changes
   useEffect(() => {
     fetchTeams(currentPage, itemsPerPage);
-  }, [currentPage, itemsPerPage]);
+  }, [currentPage, itemsPerPage, filters, sortBy]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -101,7 +145,7 @@ const TeamsPage = () => {
     if (selectAll) {
       setSelectedTeams([]);
     } else {
-      setSelectedTeams(filteredTeams.map((teamMember) => teamMember.id));
+      setSelectedTeams(teams.map((teamMember) => teamMember.id));
     }
     setSelectAll(!selectAll);
   };
@@ -116,7 +160,7 @@ const TeamsPage = () => {
 
   const handleDelete = async (teamMemberId: string) => {
     try {
-      await axios.delete(`${API_BASE_URL}/team-members/${teamMemberId}`);
+      await axios.delete(`${Base_url}team-members/${teamMemberId}`);
       toast.success("Team member deleted successfully");
       setTeams((prevTeams) =>
         prevTeams.filter((teamMember) => teamMember.id !== teamMemberId)
@@ -140,7 +184,7 @@ const TeamsPage = () => {
         let hasError = false;
         const deletePromises = selectedTeams.map(async (id) => {
           try {
-            await axios.delete(`${API_BASE_URL}/team-members/${id}`);
+            await axios.delete(`${Base_url}team-members/${id}`);
             return id;
           } catch (err) {
             hasError = true;
@@ -206,7 +250,7 @@ const TeamsPage = () => {
           let errorCount = 0;
 
           // Fetch all team members for upsert by name
-          const allResponse = await axios.get(`${API_BASE_URL}/team-members`);
+          const allResponse = await axios.get(`${Base_url}team-members`);
           const allData = allResponse.data;
           const allTeamMembers: TeamMember[] = allData.results || [];
 
@@ -236,14 +280,14 @@ const TeamsPage = () => {
               if (allTeamMembers.find((t) => t.id === teamMemberId)) {
                 // Update existing
                 await axios.patch(
-                  `${API_BASE_URL}/team-members/${teamMemberId}`,
+                  `${Base_url}team-members/${teamMemberId}`,
                   teamMemberData
                 );
                 successCount++;
               } else {
                 // Create new
                 await axios.post(
-                  `${API_BASE_URL}/team-members`,
+                  `${Base_url}team-members`,
                   teamMemberData
                 );
                 successCount++;
@@ -291,18 +335,22 @@ const TeamsPage = () => {
 
   const handleExport = async () => {
     try {
-      // Always fetch all categories for export
-      const response = await axios.get(`${API_BASE_URL}/team-members`);
+      const response = await axios.get(`${Base_url}team-members`);
       const data = response.data;
       const exportSource = Array.isArray(data.results) ? data.results : [];
       const exportData = exportSource.map((teamMember: TeamMember) => ({
         ID: teamMember.id,
-        "Team Member Name": teamMember.name,
-        "Team Member Phone Number": teamMember.phone,
-        "Team Member Email": teamMember.email,
-        "Team Member Address": teamMember.address,
-        "Team Member Branch": teamMember.branch,
-        "Created Date": teamMember.createdDate,
+        Name: teamMember.name,
+        Phone: teamMember.phone,
+        Email: teamMember.email,
+        Address: teamMember.address,
+        City: teamMember.city,
+        State: teamMember.state,
+        Country: teamMember.country,
+        "Pin Code": teamMember.pinCode,
+        Branch: teamMember.branch.name,
+        Skills: teamMember.skills.map(skill => skill.name).join(", "),
+        "Created Date": formatDate(teamMember.createdAt),
         "Sort Order": teamMember.sortOrder,
       }));
       const ws = XLSX.utils.json_to_sheet(exportData);
@@ -345,6 +393,11 @@ const TeamsPage = () => {
     }
     return pages;
   }
+
+  const handleViewSkills = (skills: Activity[]) => {
+    setSelectedMemberSkills(skills);
+    setShowSkillsModal(true);
+  };
 
   return (
     <div className="main-content">
@@ -413,12 +466,11 @@ const TeamsPage = () => {
           {/* Content Box */}
           <div className="box">
             <div className="box-body">
-              {/* Search Bar */}
-              <div className="flex flex-wrap justify-between items-center mb-4 gap-2">
-                <div className="flex items-center">
-                  <label className="mr-2 text-sm text-gray-600">
-                    Rows per page:
-                  </label>
+              {/* Search Bar and Filters */}
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
+                {/* Rows per page selector */}
+                <div className="flex items-center w-full lg:w-auto">
+                  <label className="mr-2 text-sm text-gray-600 whitespace-nowrap">Rows per page:</label>
                   <select
                     className="form-select w-auto text-sm"
                     value={itemsPerPage}
@@ -434,16 +486,62 @@ const TeamsPage = () => {
                     <option value={1000}>1000</option>
                   </select>
                 </div>
-                <div className="relative w-full max-w-xs">
-                  <input
-                    type="text"
-                    className="form-control py-3 pr-10"
-                    placeholder="Search by team member name..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                  <button className="absolute end-0 top-0 px-4 h-full">
-                    <i className="ri-search-line text-lg"></i>
+
+                {/* Search and filters */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+                  {/* Search bar */}
+                  <div className="relative flex-grow sm:max-w-xs">
+                    <input
+                      type="text"
+                      className="form-control py-2 w-full"
+                      placeholder="Search by name, email, phone..."
+                      value={filters.name}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setFilters(prev => ({
+                          ...prev,
+                          name: value,
+                          email: value,
+                          phone: value
+                        }));
+                      }}
+                    />
+                  </div>
+
+                  {/* Sort dropdown */}
+                  <select
+                    className="form-select py-2 w-full sm:w-auto"
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                  >
+                    <option value="createdAt:desc">Newest First</option>
+                    <option value="createdAt:asc">Oldest First</option>
+                    <option value="name:asc">Name (A-Z)</option>
+                    <option value="name:desc">Name (Z-A)</option>
+                    <option value="sortOrder:asc">Sort Order (Low-High)</option>
+                    <option value="sortOrder:desc">Sort Order (High-Low)</option>
+                  </select>
+
+                  {/* Reset button */}
+                  <button
+                    className="ti-btn ti-btn-secondary py-2 w-full sm:w-auto"
+                    onClick={() => {
+                      setFilters({
+                        name: "",
+                        email: "",
+                        phone: "",
+                        branch: "",
+                        city: "",
+                        state: "",
+                        country: "",
+                        pinCode: "",
+                        skills: [],
+                      });
+                      setSortBy("createdAt:desc");
+                    }}
+                  >
+                    <i className="ri-refresh-line me-2"></i>
+                    Reset
                   </button>
                 </div>
               </div>
@@ -470,80 +568,74 @@ const TeamsPage = () => {
                             onChange={handleSelectAll}
                           />
                         </th>
-                        <th scope="col" className="text-start">
-                          Team Member Name
-                        </th>
-                        <th scope="col" className="text-start">
-                          Team Member Phone Number
-                        </th>
-                        <th scope="col" className="text-start">
-                          Team Member Email
-                        </th>
-                        <th scope="col" className="text-start">
-                          Team Member Address
-                        </th>
-                        <th scope="col" className="text-start">
-                          Team Member Branch
-                        </th>
-                        <th scope="col" className="text-start">
-                          Created Date
-                        </th>
-                        <th scope="col" className="text-start">
-                          Sort Order
-                        </th>
-                        <th scope="col" className="text-start">
-                          Action
-                        </th>
+                        <th scope="col" className="text-start">Name</th>
+                        <th scope="col" className="text-start">Email</th>
+                        <th scope="col" className="text-start">Phone</th>
+                        <th scope="col" className="text-start">Branch</th>
+                        <th scope="col" className="text-start">City</th>
+                        <th scope="col" className="text-start">State</th>
+                        <th scope="col" className="text-start">Country</th>
+                        <th scope="col" className="text-start">Pin Code</th>
+                        <th scope="col" className="text-start">Skills</th>
+                        <th scope="col" className="text-start">Created Date</th>
+                        <th scope="col" className="text-start">Sort Order</th>
+                        <th scope="col" className="text-start">Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {currentTeams.length > 0 ? (
-                        currentTeams.map(
-                          (teamMember: TeamMember, index: number) => (
-                            <tr
-                              key={teamMember.id}
-                              className={`border-b border-gray-200 ${
-                                index % 2 === 0 ? "bg-gray-50" : ""
-                              }`}
-                            >
-                              <td>
-                                <input
-                                  type="checkbox"
-                                  className="form-check-input"
-                                  checked={selectedTeams.includes(
-                                    teamMember.id
-                                  )}
-                                  onChange={() =>
-                                    handleTeamSelect(teamMember.id)
-                                  }
-                                />
-                              </td>
-                              <td>{teamMember.name}</td>
-                              <td>{teamMember.phone}</td>
-                              <td>{teamMember.email}</td>
-                              <td>{teamMember.address}</td>
-                              <td>{teamMember.branch}</td>
-                              <td>{teamMember.createdDate}</td>
-                              <td>{teamMember.sortOrder}</td>
-                              <td>
-                                <div className="flex space-x-2">
-                                  <Link
-                                    href={`/teams/edit/${teamMember.id}`}
-                                    className="ti-btn ti-btn-primary ti-btn-sm"
-                                  >
-                                    <i className="ri-edit-line"></i>
-                                  </Link>
-                                  <button
-                                    className="ti-btn ti-btn-danger ti-btn-sm"
-                                    onClick={() => handleDelete(teamMember.id)}
-                                  >
-                                    <i className="ri-delete-bin-line"></i>
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          )
-                        )
+                        currentTeams.map((teamMember: TeamMember, index: number) => (
+                          <tr
+                            key={teamMember.id}
+                            className={`border-b border-gray-200 ${
+                              index % 2 === 0 ? "bg-gray-50" : ""
+                            }`}
+                          >
+                            <td>
+                              <input
+                                type="checkbox"
+                                className="form-check-input"
+                                checked={selectedTeams.includes(teamMember.id)}
+                                onChange={() => handleTeamSelect(teamMember.id)}
+                              />
+                            </td>
+                            <td>{teamMember.name}</td>
+                            <td>{teamMember.email}</td>
+                            <td>{teamMember.phone}</td>
+                            <td>{teamMember.branch.name}</td>
+                            <td>{teamMember.city}</td>
+                            <td>{teamMember.state}</td>
+                            <td>{teamMember.country}</td>
+                            <td>{teamMember.pinCode}</td>
+                            <td>
+                              <button
+                                onClick={() => handleViewSkills(teamMember.skills)}
+                                className="ti-btn ti-btn-primary ti-btn-sm"
+                                title="View Skills"
+                              >
+                                <i className="ri-eye-line"></i>
+                              </button>
+                            </td>
+                            <td>{formatDate(teamMember.createdAt)}</td>
+                            <td>{teamMember.sortOrder}</td>
+                            <td>
+                              <div className="flex space-x-2">
+                                <Link
+                                  href={`/teams/edit/${teamMember.id}`}
+                                  className="ti-btn ti-btn-primary ti-btn-sm"
+                                >
+                                  <i className="ri-edit-line"></i>
+                                </Link>
+                                <button
+                                  className="ti-btn ti-btn-danger ti-btn-sm"
+                                  onClick={() => handleDelete(teamMember.id)}
+                                >
+                                  <i className="ri-delete-bin-line"></i>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
                       ) : (
                         <tr>
                           <td colSpan={6} className="text-center py-8">
@@ -649,6 +741,39 @@ const TeamsPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Add Skills Modal */}
+      {showSkillsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-lg w-full">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Skills</h3>
+              <button
+                onClick={() => setShowSkillsModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <i className="ri-close-line text-xl"></i>
+              </button>
+            </div>
+            <div className="space-y-2">
+              {selectedMemberSkills.map((skill) => (
+                <div key={skill.id} className="flex items-center p-2 bg-gray-50 rounded">
+                  <i className="ri-check-line text-primary mr-2"></i>
+                  <span>{skill.name}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setShowSkillsModal(false)}
+                className="ti-btn ti-btn-secondary"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -77,7 +77,7 @@ export const MenuItems: any = [
     active: false,
     selected: false,
     dirchange: false,
-    path: "/dashboard/crm",
+    path: "/dashboard",
   },
   
   {
