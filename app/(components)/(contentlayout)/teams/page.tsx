@@ -31,10 +31,10 @@ interface ExcelRow {
 
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);
-  return date.toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
+  return date.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
   });
 };
 
@@ -57,9 +57,11 @@ const TeamsPage = () => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await axios.get(`${API_BASE_URL}/team-members?page=${page}&limit=${limit}`);
+      const response = await axios.get(
+        `${API_BASE_URL}/team-members?page=${page}&limit=${limit}`
+      );
       const data = response.data.results;
-      
+
       // Transform the API response to match our TeamMember interface
       const transformedTeams = data.map((teamMember: any) => ({
         id: teamMember.id,
@@ -76,11 +78,11 @@ const TeamsPage = () => {
       setTotalResults(response.data.totalResults || 0);
       setTotalPages(response.data.totalPages || 1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch teams');
+      setError(err instanceof Error ? err.message : "Failed to fetch teams");
       setTeams([]);
       setTotalResults(0);
       setTotalPages(1);
-      toast.error('Failed to fetch teams');
+      toast.error("Failed to fetch teams");
     } finally {
       setIsLoading(false);
     }
@@ -115,19 +117,25 @@ const TeamsPage = () => {
   const handleDelete = async (teamMemberId: string) => {
     try {
       await axios.delete(`${API_BASE_URL}/team-members/${teamMemberId}`);
-      toast.success('Team member deleted successfully');
-      setTeams(prevTeams => prevTeams.filter(teamMember => teamMember.id !== teamMemberId));
-      setSelectedTeams(selectedTeams.filter(id => id !== teamMemberId));
-      toast.success('Team member deleted successfully');
+      toast.success("Team member deleted successfully");
+      setTeams((prevTeams) =>
+        prevTeams.filter((teamMember) => teamMember.id !== teamMemberId)
+      );
+      setSelectedTeams(selectedTeams.filter((id) => id !== teamMemberId));
+      toast.success("Team member deleted successfully");
     } catch (err) {
-      toast.error('Failed to delete team member');
+      toast.error("Failed to delete team member");
     }
   };
 
   const handleDeleteSelected = async () => {
     if (selectedTeams.length === 0) return;
-    
-    if (window.confirm(`Are you sure you want to delete ${selectedTeams.length} selected team member(s)?`)) {
+
+    if (
+      window.confirm(
+        `Are you sure you want to delete ${selectedTeams.length} selected team member(s)?`
+      )
+    ) {
       try {
         let hasError = false;
         const deletePromises = selectedTeams.map(async (id) => {
@@ -142,25 +150,27 @@ const TeamsPage = () => {
         });
 
         const results = await Promise.all(deletePromises);
-        const successfulDeletes = results.filter((id): id is string => id !== null);
+        const successfulDeletes = results.filter(
+          (id): id is string => id !== null
+        );
 
         // Remove successfully deleted team members from the local state
-        setTeams(prevTeams => 
-          prevTeams.filter(team => !successfulDeletes.includes(team.id))
+        setTeams((prevTeams) =>
+          prevTeams.filter((team) => !successfulDeletes.includes(team.id))
         );
-        
+
         // Clear selected teams
         setSelectedTeams([]);
         setSelectAll(false);
 
         if (hasError) {
-          toast.error('Some team members could not be deleted');
+          toast.error("Some team members could not be deleted");
         } else {
-          toast.success('Selected team members deleted successfully');
+          toast.success("Selected team members deleted successfully");
         }
       } catch (err) {
-        console.error('Error in bulk delete:', err);
-        toast.error('Failed to delete some team members');
+        console.error("Error in bulk delete:", err);
+        toast.error("Failed to delete some team members");
       }
     }
   };
@@ -169,16 +179,29 @@ const TeamsPage = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     setImportProgress(0);
-    const loadingToast = toast.loading('Importing team members...');
+    const loadingToast = toast.loading("Importing team members...");
     try {
       const reader = new FileReader();
       reader.onload = async (e) => {
         try {
           const data = e.target?.result;
-          const workbook = XLSX.read(data, { type: 'array' });
+          if (!data) {
+            throw new Error("No data read from file");
+          }
+
+          const workbook = XLSX.read(data, { type: "array" });
+          if (!workbook.SheetNames.length) {
+            throw new Error("No sheets found in the Excel file");
+          }
+
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
           const jsonData = XLSX.utils.sheet_to_json(worksheet) as ExcelRow[];
+          
+          if (!jsonData.length) {
+            throw new Error("No data found in the Excel sheet");
+          }
+
           let successCount = 0;
           let errorCount = 0;
 
@@ -191,30 +214,38 @@ const TeamsPage = () => {
             const row = jsonData[i];
             try {
               const teamMemberData = {
-                name: row['Team Member Name'],
-                phone: row['Team Member Phone Number'] || '',
-                email: row['Team Member Email'] || '',
-                address: row['Team Member Address'] || '',
-                branch: row['Team Member Branch'] || '',
-                sortOrder: parseInt(row['Sort Order']?.toString() || '1')
+                name: row["Team Member Name"].toString().trim(),
+                phone: (row["Team Member Phone Number"]).toString().trim(),
+                email: row["Team Member Email"].toString().trim(),
+                address: (row["Team Member Address"]).toString().trim(),
+                branch: (row["Team Member Branch"]).toString().trim(),
+                sortOrder: parseInt(row["Sort Order"]?.toString() || "1"),
               };
 
-              let teamMemberId = row['ID'];
+              let teamMemberId = row["ID"];
               if (!teamMemberId) {
                 // Try to find by email (case-insensitive)
-                const found = allTeamMembers.find(t => 
-                  t.email.trim().toLowerCase() === teamMemberData.email.trim().toLowerCase()
+                const found = allTeamMembers.find(
+                  (t) =>
+                    t.email.trim().toLowerCase() ===
+                    teamMemberData.email.trim().toLowerCase()
                 );
                 if (found) teamMemberId = found.id;
               }
 
-              if (teamMemberId) {
+              if (allTeamMembers.find((t) => t.id === teamMemberId)) {
                 // Update existing
-                await axios.patch(`${API_BASE_URL}/team-members/${teamMemberId}`, teamMemberData);
+                await axios.patch(
+                  `${API_BASE_URL}/team-members/${teamMemberId}`,
+                  teamMemberData
+                );
                 successCount++;
               } else {
                 // Create new
-                await axios.post(`${API_BASE_URL}/team-members`, teamMemberData);
+                await axios.post(
+                  `${API_BASE_URL}/team-members`,
+                  teamMemberData
+                );
                 successCount++;
               }
             } catch (error) {
@@ -223,24 +254,28 @@ const TeamsPage = () => {
             setImportProgress(Math.round(((i + 1) / jsonData.length) * 100));
           }
 
-          if (fileInputRef.current) fileInputRef.current.value = '';
+          if (fileInputRef.current) fileInputRef.current.value = "";
           setImportProgress(null);
           toast.dismiss(loadingToast);
-          
-          if (successCount > 0) toast.success(`Successfully imported/updated ${successCount} team members`);
-          if (errorCount > 0) toast.error(`Failed to import/update ${errorCount} team members`);
-          
+
+          if (successCount > 0)
+            toast.success(
+              `Successfully imported/updated ${successCount} team members`
+            );
+          if (errorCount > 0)
+            toast.error(`Failed to import/update ${errorCount} team members`);
+
           // Refresh the teams list
           fetchTeams();
         } catch (error) {
           setImportProgress(null);
-          toast.error('Failed to process import file', { id: loadingToast });
+          toast.error("Failed to process import file", { id: loadingToast });
         }
       };
       reader.readAsArrayBuffer(file);
     } catch (error) {
       setImportProgress(null);
-      toast.error('Failed to import team members', { id: loadingToast });
+      toast.error("Failed to import team members", { id: loadingToast });
     }
   };
 
@@ -289,8 +324,6 @@ const TeamsPage = () => {
       toast.error("Failed to export teams");
     }
   };
-
-  
 
   // Condensed pagination helper
   function getPagination(currentPage: number, totalPages: number) {
@@ -465,49 +498,52 @@ const TeamsPage = () => {
                     </thead>
                     <tbody>
                       {currentTeams.length > 0 ? (
-                        currentTeams.map((teamMember: TeamMember, index: number) => (
-                          <tr
-                            key={teamMember.id}
-                            className={`border-b border-gray-200 ${
-                              index % 2 === 0 ? "bg-gray-50" : ""
-                            }`}
-                          >
-                            <td>
-                              <input
-                                type="checkbox"
-                                className="form-check-input"
-                                checked={selectedTeams.includes(teamMember.id)}
-                                onChange={() => handleTeamSelect(teamMember.id)}
-                              />
-                            </td>
-                            <td>{teamMember.name}</td>
-                            <td>{teamMember.phone}</td>
-                            <td>{teamMember.email}</td>
-                            <td>{teamMember.address}</td>
-                            <td>{teamMember.branch}</td>
-                            <td>{teamMember.createdDate}</td>
-                            <td>{teamMember.sortOrder}</td>
-                            <td>
-                              <div className="flex space-x-2">
-                                {/* <Link
-                                  href={`/catalog/teams/edit/${teamMember.id}`}
-                                  className="ti-btn ti-btn-primary ti-btn-sm"
-                                > */}
-                                {/* Wrapper div temporarily used for styling */}
-                                <div className="ti-btn ti-btn-primary ti-btn-sm">
-                                  <i className="ri-edit-line"></i>
+                        currentTeams.map(
+                          (teamMember: TeamMember, index: number) => (
+                            <tr
+                              key={teamMember.id}
+                              className={`border-b border-gray-200 ${
+                                index % 2 === 0 ? "bg-gray-50" : ""
+                              }`}
+                            >
+                              <td>
+                                <input
+                                  type="checkbox"
+                                  className="form-check-input"
+                                  checked={selectedTeams.includes(
+                                    teamMember.id
+                                  )}
+                                  onChange={() =>
+                                    handleTeamSelect(teamMember.id)
+                                  }
+                                />
+                              </td>
+                              <td>{teamMember.name}</td>
+                              <td>{teamMember.phone}</td>
+                              <td>{teamMember.email}</td>
+                              <td>{teamMember.address}</td>
+                              <td>{teamMember.branch}</td>
+                              <td>{teamMember.createdDate}</td>
+                              <td>{teamMember.sortOrder}</td>
+                              <td>
+                                <div className="flex space-x-2">
+                                  <Link
+                                    href={`/teams/edit/${teamMember.id}`}
+                                    className="ti-btn ti-btn-primary ti-btn-sm"
+                                  >
+                                    <i className="ri-edit-line"></i>
+                                  </Link>
+                                  <button
+                                    className="ti-btn ti-btn-danger ti-btn-sm"
+                                    onClick={() => handleDelete(teamMember.id)}
+                                  >
+                                    <i className="ri-delete-bin-line"></i>
+                                  </button>
                                 </div>
-                                {/* </Link> */}
-                                <button
-                                  className="ti-btn ti-btn-danger ti-btn-sm"
-                                  onClick={() => handleDelete(teamMember.id)}
-                                >
-                                  <i className="ri-delete-bin-line"></i>
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
+                              </td>
+                            </tr>
+                          )
+                        )
                       ) : (
                         <tr>
                           <td colSpan={6} className="text-center py-8">

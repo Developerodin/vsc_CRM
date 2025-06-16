@@ -72,21 +72,12 @@ export const MenuItems: any = [
 
   {
     icon: DashboardIcon,
-    title: "Dashboards",
-    type: "sub",
+    title: "Dashboard",
+    type: "link",
     active: false,
     selected: false,
-    children: [
-      {
-        path: "/dashboards/crm",
-        type: "link",
-        active: false,
-        selected: false,
-        dirchange: false,
-        title: "CRM",
-      },
-  
-    ],
+    dirchange: false,
+    path: "/dashboard/crm",
   },
   
   {
