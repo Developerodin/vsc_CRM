@@ -591,7 +591,7 @@ const TeamsPage = () => {
                         pinCode: "",
                         skills: [],
                       });
-                      setSortBy("createdAt:desc");
+                      setSortBy("name:asc");
                     }}
                   >
                     <i className="ri-refresh-line me-2"></i>
