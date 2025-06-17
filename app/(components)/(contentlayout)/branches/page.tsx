@@ -107,13 +107,8 @@ const BranchesPage = () => {
   };
 
   useEffect(() => {
-    fetchBranches();
-  }, [currentPage, sortBy]);
-
-  useEffect(() => {
     fetchBranches(currentPage, itemsPerPage);
-    setCurrentPage(1);
-  }, [filters, itemsPerPage]);
+  }, [currentPage, sortBy, filters, itemsPerPage]);
 
   const handleSelectAll = () => {
     if (!selectAll) {
@@ -403,6 +398,7 @@ const BranchesPage = () => {
                           ...prev,
                           name: value,
                         }));
+                        setCurrentPage(1);
                       }}
                     />
                   </div>
