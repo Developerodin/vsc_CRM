@@ -336,7 +336,7 @@ const BranchesPage = () => {
                     className="ti-btn ti-btn-success"
                     onClick={() => fileInputRef.current?.click()}
                   >
-                    <i className="ri-upload-2-line me-2"></i> Import
+                    <i className="ri-download-2-line me-2"></i> Import
                   </button>
                 </div>
                 {importProgress !== null && (
@@ -355,7 +355,7 @@ const BranchesPage = () => {
                   className="ti-btn ti-btn-primary"
                   onClick={handleExport}
                 >
-                  <i className="ri-download-2-line me-2"></i> Export
+                  <i className="ri-upload-2-line me-2"></i> Export
                 </button>
                 <Link href="/branches/add" className="ti-btn ti-btn-primary">
                   <i className="ri-add-line me-2"></i> Add New Branch

@@ -49,8 +49,8 @@ const ActivitiesPage = () => {
     setError(null);
     try {
       const queryParams = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: itemsPerPage.toString(),
+        page: page.toString(),
+        limit: limit.toString(),
         ...filters,
         ...(sortBy && { sortBy })
       });

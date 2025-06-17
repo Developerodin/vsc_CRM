@@ -66,16 +66,16 @@ const ClientsPage = () => {
     pinCode: ""
   });
 
-  const fetchClients = async () => {
+  const fetchClients = async (page = 1, limit = itemsPerPage) => {
     try {
       setIsLoading(true);
       setError(null);
 
       const queryParams = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: itemsPerPage.toString(),
+        page: page.toString(),
+        limit: limit.toString(),
         sortBy,
-        ...(searchQuery && { name: searchQuery })
+        ...(filters.name && { name: filters.name }),
       });
 
       const response = await fetch(`${Base_url}clients?${queryParams}`, {
@@ -103,7 +103,12 @@ const ClientsPage = () => {
 
   useEffect(() => {
     fetchClients();
-  }, [currentPage, itemsPerPage, sortBy, searchQuery]);
+  }, [currentPage, sortBy]);
+
+  useEffect(() => {
+    fetchClients(currentPage, itemsPerPage);
+    setCurrentPage(1);
+  }, [filters, itemsPerPage]);
 
   const handleSelectAll = () => {
     if (selectAll) {
