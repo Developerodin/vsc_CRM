@@ -128,7 +128,7 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
       toast.error("Phone number is required");
       return false;
     }
-    if (!/^\d{10}$/.test(formData.phone.replace(/\D/g, ""))) {
+    if (!/^\+?[\d\s-]{10,}$/.test(formData.phone.replace(/\D/g, ""))) {
       toast.error("Please enter a valid 10-digit phone number");
       return false;
     }

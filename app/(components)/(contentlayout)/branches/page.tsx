@@ -53,7 +53,6 @@ interface ImportRow {
 const BranchesPage = () => {
   const [selectedBranches, setSelectedBranches] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -73,15 +72,15 @@ const BranchesPage = () => {
   const [sortBy, setSortBy] = useState("createdAt:desc");
 
   // Fetch branches
-  const fetchBranches = async () => {
+  const fetchBranches = async (page = 1, limit = itemsPerPage) => {
     try {
       setIsLoading(true);
       setError(null);
       
       const queryParams = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: itemsPerPage.toString(),
-        ...(searchQuery && { name: searchQuery })
+        page: page.toString(),
+        limit: limit.toString(),
+        ...(filters.name && { name: filters.name })
       });
 
       const response = await fetch(`${Base_url}branches?${queryParams}`, {
@@ -108,7 +107,12 @@ const BranchesPage = () => {
 
   useEffect(() => {
     fetchBranches();
-  }, [currentPage, itemsPerPage, searchQuery]);
+  }, [currentPage, sortBy]);
+
+  useEffect(() => {
+    fetchBranches(currentPage, itemsPerPage);
+    setCurrentPage(1);
+  }, [filters, itemsPerPage]);
 
   const handleSelectAll = () => {
     if (selectAll) {
@@ -390,15 +394,13 @@ const BranchesPage = () => {
                     <input
                       type="text"
                       className="form-control py-2 w-full"
-                      placeholder="Search by name, city, state..."
+                      placeholder="Search by name"
                       value={filters.name}
                       onChange={(e) => {
                         const value = e.target.value;
                         setFilters(prev => ({
                           ...prev,
                           name: value,
-                          city: value,
-                          state: value
                         }));
                       }}
                     />
