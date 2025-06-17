@@ -35,16 +35,18 @@ interface TeamMember {
 }
 
 interface ExcelRow {
+  ID?: string;
   "Name": string;
   "Email": string;
   "Phone": string;
+  "Address": string;
   "Branch": string;
   "City": string;
   "State": string;
   "Country": string;
   "Pin Code": string;
   "Skills": string;
-  "Created At": string;
+  "Sort Order": number;
 }
 
 interface ApiResponse {
@@ -223,8 +225,10 @@ const TeamsPage = () => {
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     setImportProgress(0);
     const loadingToast = toast.loading("Importing team members...");
+
     try {
       const reader = new FileReader();
       reader.onload = async (e) => {
@@ -242,7 +246,7 @@ const TeamsPage = () => {
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
           const jsonData = XLSX.utils.sheet_to_json(worksheet) as ExcelRow[];
-          
+
           if (!jsonData.length) {
             throw new Error("No data found in the Excel sheet");
           }
@@ -250,50 +254,70 @@ const TeamsPage = () => {
           let successCount = 0;
           let errorCount = 0;
 
-          // Fetch all team members for upsert by name
-          const allResponse = await axios.get(`${Base_url}team-members`);
-          const allData = allResponse.data;
-          const allTeamMembers: TeamMember[] = allData.results || [];
+          // Fetch all branches and activities for reference
+          const [branchesResponse, activitiesResponse] = await Promise.all([
+            axios.get(`${Base_url}branches`),
+            axios.get(`${Base_url}activities`)
+          ]);
+
+          const branches = branchesResponse.data.results;
+          const activities = activitiesResponse.data.results;
 
           for (let i = 0; i < jsonData.length; i++) {
             const row = jsonData[i];
             try {
-              const teamMemberData = {
-                name: row["Team Member Name"].toString().trim(),
-                phone: (row["Team Member Phone Number"]).toString().trim(),
-                email: row["Team Member Email"].toString().trim(),
-                address: (row["Team Member Address"]).toString().trim(),
-                branch: (row["Team Member Branch"]).toString().trim(),
-                sortOrder: parseInt(row["Sort Order"]?.toString() || "1"),
-              };
+              // Find branch ID by name
+              const branch = branches.find((b: Branch) => 
+                b.name.toLowerCase() === row["Branch"].toLowerCase()
+              );
 
-              let teamMemberId = row["ID"];
-              if (!teamMemberId) {
-                // Try to find by email (case-insensitive)
-                const found = allTeamMembers.find(
-                  (t) =>
-                    t.email.trim().toLowerCase() ===
-                    teamMemberData.email.trim().toLowerCase()
-                );
-                if (found) teamMemberId = found.id;
+              if (!branch) {
+                throw new Error(`Branch not found: ${row["Branch"]}`);
               }
 
-              if (allTeamMembers.find((t) => t.id === teamMemberId)) {
-                // Update existing
+              // Find skill IDs by names
+              const skillNames = row["Skills"].split(',').map((s: string) => s.trim());
+              const skillIds = activities
+                .filter((a: Activity) => skillNames.includes(a.name))
+                .map((a: Activity) => a.id);
+
+              if (skillIds.length === 0) {
+                throw new Error(`No valid skills found for: ${row["Name"]}`);
+              }
+
+              // Ensure phone is a string and handle potential number format
+              const phoneNumber = row["Phone"] ? String(row["Phone"]).replace(/[^0-9+]/g, '') : '';
+
+              const teamMemberData = {
+                name: row["Name"],
+                email: row["Email"],
+                phone: phoneNumber,
+                address: row["Address"],
+                city: row["City"],
+                state: row["State"],
+                country: row["Country"],
+                pinCode: row["Pin Code"],
+                branch: branch.id,
+                sortOrder: row["Sort Order"] || 1,
+                skills: skillIds
+              };
+
+              if (row["ID"]) {
+                // Update existing team member
                 await axios.patch(
-                  `${Base_url}team-members/${teamMemberId}`,
+                  `${Base_url}team-members/${row["ID"]}`,
                   teamMemberData
                 );
-                successCount++;
               } else {
-                // Create new
+                // Add new team member
                 await axios.post(
                   `${Base_url}team-members`,
                   teamMemberData
                 );
-                successCount++;
               }
+              successCount++;
             } catch (error) {
+              console.error('Error processing row:', error);
               errorCount++;
             }
             setImportProgress(Math.round(((i + 1) / jsonData.length) * 100));
@@ -303,12 +327,12 @@ const TeamsPage = () => {
           setImportProgress(null);
           toast.dismiss(loadingToast);
 
-          if (successCount > 0)
-            toast.success(
-              `Successfully imported/updated ${successCount} team members`
-            );
-          if (errorCount > 0)
+          if (successCount > 0) {
+            toast.success(`Successfully imported/updated ${successCount} team members`);
+          }
+          if (errorCount > 0) {
             toast.error(`Failed to import/update ${errorCount} team members`);
+          }
 
           // Refresh the teams list
           fetchTeams();
@@ -317,6 +341,7 @@ const TeamsPage = () => {
           toast.error("Failed to process import file", { id: loadingToast });
         }
       };
+
       reader.readAsArrayBuffer(file);
     } catch (error) {
       setImportProgress(null);
@@ -336,41 +361,75 @@ const TeamsPage = () => {
 
   const handleExport = async () => {
     try {
-      const response = await axios.get(`${Base_url}team-members`);
-      const data = response.data;
-      const exportSource = Array.isArray(data.results) ? data.results : [];
-      const exportData = exportSource.map((teamMember: TeamMember) => ({
-        ID: teamMember.id,
-        Name: teamMember.name,
-        Phone: teamMember.phone,
-        Email: teamMember.email,
-        Address: teamMember.address,
-        City: teamMember.city,
-        State: teamMember.state,
-        Country: teamMember.country,
-        "Pin Code": teamMember.pinCode,
-        Branch: teamMember.branch.name,
-        Skills: teamMember.skills.map(skill => skill.name).join(", "),
-        "Created Date": formatDate(teamMember.createdAt),
-        "Sort Order": teamMember.sortOrder,
-      }));
+      let exportData;
+      let successMessage;
+
+      // Only export selected teams if any are selected
+      if (selectedTeams.length > 0) {
+        exportData = teams
+          .filter(team => selectedTeams.includes(team.id))
+          .map((team: TeamMember) => ({
+            ID: team.id,
+            "Name": team.name,
+            "Email": team.email,
+            "Phone": team.phone,
+            "Address": team.address,
+            "Branch": team.branch.name,
+            "City": team.city,
+            "State": team.state,
+            "Country": team.country,
+            "Pin Code": team.pinCode,
+            "Skills": team.skills.map(skill => skill.name).join(', '),
+            "Sort Order": team.sortOrder
+          }));
+        successMessage = "Selected team members exported successfully";
+      } else {
+        // Export all teams if none are selected
+        const response = await axios.get(`${Base_url}team-members?limit=1000`);
+        const apiData: ApiResponse = response.data;
+        exportData = apiData.results.map((team: TeamMember) => ({
+          ID: team.id,
+          "Name": team.name,
+          "Email": team.email,
+          "Phone": team.phone,
+          "Address": team.address,
+          "Branch": team.branch.name,
+          "City": team.city,
+          "State": team.state,
+          "Country": team.country,
+          "Pin Code": team.pinCode,
+          "Skills": team.skills.map(skill => skill.name).join(', '),
+          "Sort Order": team.sortOrder
+        }));
+        successMessage = "All team members exported successfully";
+      }
+
       const ws = XLSX.utils.json_to_sheet(exportData);
+      
+      // Set column widths
       ws["!cols"] = [
-        { wch: 20 },
-        { wch: 20 },
-        { wch: 30 },
-        { wch: 20 },
-        { wch: 10 },
-        { wch: 10 },
+        { wch: 20 }, // ID
+        { wch: 30 }, // Name
+        { wch: 30 }, // Email
+        { wch: 20 }, // Phone
+        { wch: 40 }, // Address
+        { wch: 20 }, // Branch
+        { wch: 20 }, // City
+        { wch: 20 }, // State
+        { wch: 20 }, // Country
+        { wch: 15 }, // Pin Code
+        { wch: 40 }, // Skills
+        { wch: 15 }, // Sort Order
       ];
+
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Teams");
-      const fileName = `teams_${new Date().toISOString().split("T")[0]}.xlsx`;
+      XLSX.utils.book_append_sheet(wb, ws, "Team Members");
+      const fileName = `team_members_${new Date().toISOString().split("T")[0]}.xlsx`;
       XLSX.writeFile(wb, fileName);
-      toast.success("Teams exported successfully");
+      toast.success(successMessage);
     } catch (error) {
-      console.error("Error exporting teams:", error);
-      toast.error("Failed to export teams");
+      console.error("Error exporting team members:", error);
+      toast.error("Failed to export team members");
     }
   };
 
