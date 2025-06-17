@@ -87,7 +87,7 @@ const TeamsPage = () => {
     pinCode: "",
     skills: [] as string[],
   });
-  const [sortBy, setSortBy] = useState("createdAt:desc");
+  const [sortBy, setSortBy] = useState("name:asc");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showSkillsModal, setShowSkillsModal] = useState(false);
   const [selectedMemberSkills, setSelectedMemberSkills] = useState<Activity[]>([]);
@@ -495,7 +495,7 @@ const TeamsPage = () => {
                     <input
                       type="text"
                       className="form-control py-2 w-full"
-                      placeholder="Search by name"
+                      placeholder="Search by name..."
                       value={filters.name}
                       onChange={(e) => {
                         const value = e.target.value;
@@ -513,10 +513,10 @@ const TeamsPage = () => {
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
                   >
-                    <option value="createdAt:desc">Newest First</option>
-                    <option value="createdAt:asc">Oldest First</option>
                     <option value="name:asc">Name (A-Z)</option>
                     <option value="name:desc">Name (Z-A)</option>
+                    <option value="createdAt:desc">Newest First</option>
+                    <option value="createdAt:asc">Oldest First</option>
                     <option value="sortOrder:asc">Sort Order (Low-High)</option>
                     <option value="sortOrder:desc">Sort Order (High-Low)</option>
                   </select>
@@ -601,7 +601,7 @@ const TeamsPage = () => {
                             <td>{teamMember.name}</td>
                             <td>{teamMember.email}</td>
                             <td>{teamMember.phone}</td>
-                            <td>{teamMember.branch.name}</td>
+                            <td>{teamMember?.branch?.name || '-'}</td>
                             <td>{teamMember.city}</td>
                             <td>{teamMember.state}</td>
                             <td>{teamMember.country}</td>
@@ -637,7 +637,7 @@ const TeamsPage = () => {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={6} className="text-center py-8">
+                          <td colSpan={13} className="text-center py-8">
                             <div className="flex flex-col items-center justify-center">
                               <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
                                 <i className="ri-folder-line text-4xl text-primary"></i>

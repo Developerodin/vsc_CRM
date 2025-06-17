@@ -69,7 +69,7 @@ const BranchesPage = () => {
     country: "",
     pinCode: ""
   });
-  const [sortBy, setSortBy] = useState("createdAt:desc");
+  const [sortBy, setSortBy] = useState("name:asc");
 
   // Fetch branches
   const fetchBranches = async (page = 1, limit = itemsPerPage) => {
@@ -80,6 +80,7 @@ const BranchesPage = () => {
       const queryParams = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),
+        sortBy,
         ...(filters.name && { name: filters.name })
       });
 
@@ -115,7 +116,7 @@ const BranchesPage = () => {
   }, [filters, itemsPerPage]);
 
   const handleSelectAll = () => {
-    if (selectAll) {
+    if (!selectAll) {
       setSelectedBranches([]);
     } else {
       setSelectedBranches(branches.map((branch) => branch.id));
@@ -394,7 +395,7 @@ const BranchesPage = () => {
                     <input
                       type="text"
                       className="form-control py-2 w-full"
-                      placeholder="Search by name"
+                      placeholder="Search by name..."
                       value={filters.name}
                       onChange={(e) => {
                         const value = e.target.value;
@@ -463,11 +464,15 @@ const BranchesPage = () => {
                           />
                         </th>
                         <th className="px-4 py-3">Name</th>
+                        <th className="px-4 py-3">Branch Head</th>
+                        <th className="px-4 py-3">Email</th>
+                        <th className="px-4 py-3">Phone</th>
                         <th className="px-4 py-3">City</th>
                         <th className="px-4 py-3">State</th>
                         <th className="px-4 py-3">Country</th>
                         <th className="px-4 py-3">Pin Code</th>
                         <th className="px-4 py-3">Created At</th>
+                        <th className="px-4 py-3">Sort Order</th>
                         <th className="px-4 py-3">Actions</th>
                       </tr>
                     </thead>
@@ -489,11 +494,15 @@ const BranchesPage = () => {
                               />
                             </td>
                             <td>{branch.name}</td>
+                            <td>{branch.branchHead || '-'}</td>
+                            <td>{branch.email}</td>
+                            <td>{branch.phone}</td>
                             <td>{branch.city}</td>
                             <td>{branch.state}</td>
                             <td>{branch.country}</td>
                             <td>{branch.pinCode}</td>
                             <td>{new Date(branch.createdAt).toLocaleDateString()}</td>
+                            <td>{branch.sortOrder}</td>
                             <td>
                               <div className="flex space-x-2">
                                 <Link
@@ -521,7 +530,7 @@ const BranchesPage = () => {
                               </div>
                               <h3 className="text-xl font-medium mb-2">
                                 No Branches Found
-                              </h3>
+                              </h3>Add First
                               <p className="text-gray-500 text-center mb-6">
                                 Start by adding your first branch.
                               </p>

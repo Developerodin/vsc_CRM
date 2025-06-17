@@ -30,7 +30,6 @@ interface ExcelRow {
 
 const ActivitiesPage = () => {
   const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,7 +44,7 @@ const ActivitiesPage = () => {
     name: ""
   });
 
-  const fetchActivities = async () => {
+  const fetchActivities = async (page = 1, limit = itemsPerPage) => {
     setIsLoading(true);
     setError(null);
     try {
@@ -80,7 +79,12 @@ const ActivitiesPage = () => {
 
   useEffect(() => {
     fetchActivities();
-  }, [currentPage, itemsPerPage, filters, sortBy]);
+  }, [currentPage, sortBy]);
+
+  useEffect(() => {
+    fetchActivities(currentPage, itemsPerPage);
+    setCurrentPage(1);
+  }, [filters, itemsPerPage]);
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
@@ -283,6 +287,27 @@ const ActivitiesPage = () => {
     }
   };
 
+  // Condensed pagination helper
+  function getPagination(currentPage: number, totalPages: number) {
+    const pages = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (currentPage > 4) pages.push("...");
+      for (
+        let i = Math.max(2, currentPage - 2);
+        i <= Math.min(totalPages - 1, currentPage + 2);
+        i++
+      ) {
+        pages.push(i);
+      }
+      if (currentPage < totalPages - 3) pages.push("...");
+      pages.push(totalPages);
+    }
+    return pages;
+  }
+
   return (
     <div className="main-content">
       <Toaster position="top-right" />
@@ -294,45 +319,20 @@ const ActivitiesPage = () => {
           <div className="box !bg-transparent border-0 shadow-none">
             <div className="box-header flex justify-between items-center">
               <h1 className="box-title text-2xl font-semibold">Activities</h1>
-              <div className="box-tools flex items-center space-x-2">
-                {selectedActivities.length > 0 && (
-                  <button
-                    type="button"
-                    className="ti-btn ti-btn-danger"
-                    onClick={handleDeleteSelected}
-                  >
-                    <i className="ri-delete-bin-line me-2"></i>
-                    Delete Selected ({selectedActivities.length})
-                  </button>
-                )}
-                {/* Import/Export Buttons */}
-                <div className="relative group">
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    className="hidden"
-                    accept=".xlsx,.xls"
-                    onChange={handleImport}
-                  />
-                  <button
-                    type="button"
-                    className="ti-btn ti-btn-success"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <i className="ri-upload-2-line me-2"></i> Import
-                  </button>
-                </div>
-                {importProgress !== null && (
-                  <div className="w-40 h-3 bg-gray-200 rounded-full overflow-hidden flex items-center ml-2">
-                    <div
-                      className="bg-primary h-full transition-all duration-200"
-                      style={{ width: `${importProgress}%` }}
-                    ></div>
-                    <span className="ml-2 text-xs text-gray-700">
-                      {importProgress}%
-                    </span>
-                  </div>
-                )}
+              <div className="flex space-x-2">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleImport}
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="ti-btn ti-btn-primary"
+                >
+                  Import
+                </button>
                 <button
                   type="button"
                   className="ti-btn ti-btn-primary"
@@ -344,7 +344,7 @@ const ActivitiesPage = () => {
                   href="/activities/add"
                   className="ti-btn ti-btn-primary"
                 >
-                  <i className="ri-add-line me-2"></i> Add New Activity
+                  Add Activity
                 </Link>
               </div>
             </div>
@@ -517,30 +517,77 @@ const ActivitiesPage = () => {
               </div>
 
               {/* Pagination */}
-              <div className="flex justify-between items-center mt-4">
-                <div>
-                  Showing {activities.length} of {totalResults} activities
+              {!isLoading && !error && (
+                <div className="flex justify-between items-center mt-4">
+                  <div className="text-sm text-gray-500">
+                    Showing{" "}
+                    {totalResults === 0
+                      ? 0
+                      : (currentPage - 1) * itemsPerPage + 1}{" "}
+                    to{" "}
+                    {totalResults === 0
+                      ? 0
+                      : Math.min(currentPage * itemsPerPage, totalResults)}{" "}
+                    of {totalResults} entries
+                  </div>
+                  <nav aria-label="Page navigation" className="">
+                    <ul className="flex flex-wrap items-center">
+                      <li
+                        className={`page-item ${
+                          currentPage === 1 ? "disabled" : ""
+                        }`}
+                      >
+                        <button
+                          className="page-link py-2 px-3 ml-0 leading-tight text-gray-500 bg-white rounded-l-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
+                          onClick={() =>
+                            setCurrentPage((prev) => Math.max(prev - 1, 1))
+                          }
+                          disabled={currentPage === 1}
+                        >
+                          Previous
+                        </button>
+                      </li>
+                      {getPagination(currentPage, totalPages).map((page, idx) =>
+                        page === "..." ? (
+                          <li key={"ellipsis-" + idx} className="page-item">
+                            <span className="px-3">...</span>
+                          </li>
+                        ) : (
+                          <li key={page} className="page-item">
+                            <button
+                              className={`page-link py-2 px-3 leading-tight border border-gray-300 ${
+                                currentPage === page
+                                  ? "bg-primary text-white hover:bg-primary-dark"
+                                  : "bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                              }`}
+                              onClick={() => setCurrentPage(Number(page))}
+                            >
+                              {page}
+                            </button>
+                          </li>
+                        )
+                      )}
+                      <li
+                        className={`page-item ${
+                          currentPage === totalPages ? "disabled" : ""
+                        }`}
+                      >
+                        <button
+                          className="page-link py-2 px-3 leading-tight text-gray-500 bg-white rounded-r-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
+                          onClick={() =>
+                            setCurrentPage((prev) =>
+                              Math.min(prev + 1, totalPages)
+                            )
+                          }
+                          disabled={currentPage === totalPages}
+                        >
+                          Next
+                        </button>
+                      </li>
+                    </ul>
+                  </nav>
                 </div>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    className="ti-btn ti-btn-primary"
-                  >
-                    Previous
-                  </button>
-                  <span className="flex items-center">
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages}
-                    className="ti-btn ti-btn-primary"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

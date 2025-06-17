@@ -153,7 +153,7 @@ const EditBranchPage = ({ params }: { params: { id: string } }) => {
 
                   {/* Branch Head */}
                   <div>
-                    <label className="form-label">Branch Head <span className="text-red-500">*</span></label>
+                    <label className="form-label">Branch Head</label>
                     <input
                       type="text"
                       name="branchHead"
@@ -161,7 +161,6 @@ const EditBranchPage = ({ params }: { params: { id: string } }) => {
                       onChange={handleChange}
                       className="form-control"
                       placeholder="Enter branch head name"
-                      required
                     />
                   </div>
 

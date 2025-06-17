@@ -148,7 +148,7 @@ const AddBranchPage = () => {
                       id="branchHead"
                       name="branchHead"
                       className="form-control"
-                      placeholder="Enter branch head ID"
+                      placeholder="Enter branch head name"
                       value={formData.branchHead}
                       onChange={handleInputChange}
                     />
