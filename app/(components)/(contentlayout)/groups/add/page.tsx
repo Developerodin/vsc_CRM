@@ -84,9 +84,9 @@ const AddGroupPage = () => {
 
   useEffect(() => {
     if (showModal) {
-      fetchClients();
+      fetchClients(currentPage);
     }
-  }, [showModal, sortField, sortOrder, searchQuery]);
+  }, [showModal, sortField, sortOrder, searchQuery, currentPage]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -152,6 +152,11 @@ const AddGroupPage = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+    fetchClients(newPage);
   };
 
   return (
@@ -385,18 +390,22 @@ const AddGroupPage = () => {
             <div className="p-4 border-t flex justify-between items-center">
               <div className="flex items-center space-x-2">
                 <button
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  onClick={() => handlePageChange(Math.max(currentPage - 1, 1))}
                   disabled={currentPage === 1}
                   className="ti-btn ti-btn-secondary"
                 >
                   Previous
                 </button>
                 <span className="text-sm text-gray-500">
-                  Page {currentPage} of {totalPages}
+                  {totalPages > 0 ? (
+                    `Page ${currentPage} of ${totalPages}`
+                  ) : (
+                    "No pages"
+                  )}
                 </span>
                 <button
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages}
+                  onClick={() => handlePageChange(Math.min(currentPage + 1, totalPages))}
+                  disabled={currentPage === totalPages || totalPages === 0}
                   className="ti-btn ti-btn-secondary"
                 >
                   Next

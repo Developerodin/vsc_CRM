@@ -103,7 +103,9 @@ const EditGroupPage = ({ params }: { params: { id: string } }) => {
 
       const data = await response.json();
       setAvailableClients(data.results);
-      setTotalPages(Math.ceil(data.total / 10));
+      const totalResults = data.totalResults || data.total || 0;
+      const limit = 10;
+      setTotalPages(Math.max(1, Math.ceil(totalResults / limit)));
       setCurrentPage(page);
     } catch (err) {
       console.error('Error fetching clients:', err);
@@ -115,9 +117,9 @@ const EditGroupPage = ({ params }: { params: { id: string } }) => {
 
   useEffect(() => {
     if (showModal) {
-      fetchAvailableClients();
+      fetchAvailableClients(currentPage);
     }
-  }, [showModal, sortField, sortOrder, searchQuery]);
+  }, [showModal, sortField, sortOrder, searchQuery, currentPage]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -179,6 +181,11 @@ const EditGroupPage = ({ params }: { params: { id: string } }) => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+    fetchAvailableClients(newPage);
   };
 
   if (isLoading) {
@@ -422,18 +429,22 @@ const EditGroupPage = ({ params }: { params: { id: string } }) => {
             <div className="p-4 border-t flex justify-between items-center">
               <div className="flex items-center space-x-2">
                 <button
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  onClick={() => handlePageChange(Math.max(currentPage - 1, 1))}
                   disabled={currentPage === 1}
                   className="ti-btn ti-btn-secondary"
                 >
                   Previous
                 </button>
                 <span className="text-sm text-gray-500">
-                  Page {currentPage} of {totalPages}
+                  {totalPages > 0 ? (
+                    `Page ${currentPage} of ${totalPages}`
+                  ) : (
+                    "No pages"
+                  )}
                 </span>
                 <button
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages}
+                  onClick={() => handlePageChange(Math.min(currentPage + 1, totalPages))}
+                  disabled={currentPage === totalPages || totalPages === 0}
                   className="ti-btn ti-btn-secondary"
                 >
                   Next
