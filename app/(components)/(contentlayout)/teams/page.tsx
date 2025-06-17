@@ -137,12 +137,7 @@ const TeamsPage = () => {
   // Call fetchTeams when component mounts or when filters/sort changes
   useEffect(() => {
     fetchTeams(currentPage, itemsPerPage);
-  }, [currentPage, sortBy]);
-
-  useEffect(() => {
-    fetchTeams(currentPage, itemsPerPage);
-    setCurrentPage(1);
-  }, [filters, itemsPerPage]);
+  }, [currentPage, sortBy, filters, itemsPerPage]);
 
   const handleSelectAll = () => {
     if (selectAll) {
@@ -495,7 +490,7 @@ const TeamsPage = () => {
                     className="ti-btn ti-btn-success"
                     onClick={() => fileInputRef.current?.click()}
                   >
-                    <i className="ri-upload-2-line me-2"></i> Import
+                    <i className="ri-download-2-line me-2"></i> Import
                   </button>
                 </div>
                 {importProgress !== null && (
@@ -514,7 +509,7 @@ const TeamsPage = () => {
                   className="ti-btn ti-btn-primary"
                   onClick={handleExport}
                 >
-                  <i className="ri-download-2-line me-2"></i> Export
+                  <i className="ri-upload-2-line me-2"></i> Export
                 </button>
                 <Link href="/teams/add" className="ti-btn ti-btn-primary">
                   <i className="ri-add-line me-2"></i> Add New Team Member
@@ -562,6 +557,7 @@ const TeamsPage = () => {
                           ...prev,
                           name: value,
                         }));
+                        setCurrentPage(1);
                       }}
                     />
                   </div>

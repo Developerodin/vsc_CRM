@@ -45,7 +45,6 @@ interface ExcelRow {
 const ClientsPage = () => {
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [clients, setClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -102,13 +101,8 @@ const ClientsPage = () => {
   };
 
   useEffect(() => {
-    fetchClients();
-  }, [currentPage, sortBy]);
-
-  useEffect(() => {
     fetchClients(currentPage, itemsPerPage);
-    setCurrentPage(1);
-  }, [filters, itemsPerPage]);
+  }, [currentPage, sortBy, filters, itemsPerPage]);
 
   const handleSelectAll = () => {
     if (selectAll) {
@@ -329,7 +323,7 @@ const ClientsPage = () => {
                     className="ti-btn ti-btn-success"
                     onClick={() => fileInputRef.current?.click()}
                   >
-                    <i className="ri-upload-2-line me-2"></i> Import
+                    <i className="ri-download-2-line me-2"></i> Import
                   </button>
                 </div>
                 {importProgress !== null && (
@@ -348,7 +342,7 @@ const ClientsPage = () => {
                   className="ti-btn ti-btn-primary"
                   onClick={handleExport}
                 >
-                  <i className="ri-download-2-line me-2"></i> Export
+                  <i className="ri-upload-2-line me-2"></i> Export
                 </button>
                 <Link href="/clients/add" className="ti-btn ti-btn-primary">
                   <i className="ri-add-line me-2"></i> Add New Client
@@ -388,16 +382,15 @@ const ClientsPage = () => {
                     <input
                       type="text"
                       className="form-control py-2 w-full"
-                      placeholder="Search by name, email, phone..."
+                      placeholder="Search by name..."
                       value={filters.name}
                       onChange={(e) => {
                         const value = e.target.value;
                         setFilters(prev => ({
                           ...prev,
                           name: value,
-                          email: value,
-                          phone: value
                         }));
+                        setCurrentPage(1);
                       }}
                     />
                   </div>
@@ -468,6 +461,7 @@ const ClientsPage = () => {
                         <th className="px-4 py-3">Country</th>
                         <th className="px-4 py-3">Pin Code</th>
                         <th className="px-4 py-3">Created At</th>
+                        <th className="px-4 py-3">Sort Order</th>
                         <th className="px-4 py-3">Actions</th>
                       </tr>
                     </thead>
@@ -496,6 +490,7 @@ const ClientsPage = () => {
                             <td>{client.country}</td>
                             <td>{client.pinCode}</td>
                             <td>{client.createdAt}</td>
+                            <td>{client.sortOrder}</td>
                             <td>
                               <div className="flex space-x-2">
                                 <Link
