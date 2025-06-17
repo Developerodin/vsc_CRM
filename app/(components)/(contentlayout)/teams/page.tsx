@@ -67,7 +67,7 @@ const formatDate = (dateString: string) => {
 const TeamsPage = () => {
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  // const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [teams, setTeams] = useState<TeamMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -135,11 +135,12 @@ const TeamsPage = () => {
   // Call fetchTeams when component mounts or when filters/sort changes
   useEffect(() => {
     fetchTeams(currentPage, itemsPerPage);
-  }, [currentPage, itemsPerPage, filters, sortBy]);
+  }, [currentPage, sortBy]);
 
   useEffect(() => {
+    fetchTeams(currentPage, itemsPerPage);
     setCurrentPage(1);
-  }, [searchQuery]);
+  }, [filters, itemsPerPage]);
 
   const handleSelectAll = () => {
     if (selectAll) {
@@ -324,14 +325,14 @@ const TeamsPage = () => {
   };
 
   // Filter teams based on search query
-  const filteredTeams = teams.filter((teamMember) =>
-    teamMember.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // const filteredTeams = teams.filter((teamMember) =>
+  //   teamMember.name.toLowerCase().includes(searchQuery.toLowerCase())
+  // );
 
   // Calculate current teams for the current page
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentTeams = filteredTeams.slice(startIndex, endIndex);
+  const currentTeams = teams.slice(startIndex, endIndex);
 
   const handleExport = async () => {
     try {
@@ -494,15 +495,13 @@ const TeamsPage = () => {
                     <input
                       type="text"
                       className="form-control py-2 w-full"
-                      placeholder="Search by name, email, phone..."
+                      placeholder="Search by name"
                       value={filters.name}
                       onChange={(e) => {
                         const value = e.target.value;
                         setFilters(prev => ({
                           ...prev,
                           name: value,
-                          email: value,
-                          phone: value
                         }));
                       }}
                     />
