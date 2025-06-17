@@ -40,6 +40,7 @@ interface ExcelRow {
   "Client Country": string;
   "Client Pin Code": string;
   "Sort Order"?: string | number;
+  "Created At"?: string;
 }
 
 const ClientsPage = () => {
@@ -169,26 +170,52 @@ const ClientsPage = () => {
 
   const handleExport = async () => {
     try {
-      const exportData = clients.map((client: Client) => ({
-        ID: client.id,
-        "Client Name": client.name,
-        "Client Phone": client.phone,
-        "Client Email": client.email,
-        "Client Address": client.address,
-        "Client City": client.city,
-        "Client State": client.state,
-        "Client Country": client.country,
-        "Client Pin Code": client.pinCode,
-        "Sort Order": client.sortOrder,
-      }));
+      let exportData;
+      if (selectedClients.length > 0) {
+        // Export selected clients
+        exportData = clients
+          .filter((client) => selectedClients.includes(client.id))
+          .map((client) => ({
+            ID: client.id,
+            "Client Name": client.name,
+            "Client Phone": client.phone,
+            "Client Email": client.email,
+            "Client Address": client.address,
+            "Client City": client.city,
+            "Client State": client.state,
+            "Client Country": client.country,
+            "Client Pin Code": client.pinCode,
+            "Sort Order": client.sortOrder,
+          }));
+      } else {
+        // Export all clients
+        const response = await fetch(`${Base_url}clients?limit=1000`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        const data = await response.json();
+        exportData = data.results.map((client: Client) => ({
+          ID: client.id,
+          "Client Name": client.name,
+          "Client Phone": client.phone,
+          "Client Email": client.email,
+          "Client Address": client.address,
+          "Client City": client.city,
+          "Client State": client.state,
+          "Client Country": client.country,
+          "Client Pin Code": client.pinCode,
+          "Sort Order": client.sortOrder
+        }));
+      }
 
       const ws = XLSX.utils.json_to_sheet(exportData);
       ws["!cols"] = [
         { wch: 20 }, // ID
-        { wch: 20 }, // Name
+        { wch: 30 }, // Name
         { wch: 20 }, // Phone
         { wch: 30 }, // Email
-        { wch: 30 }, // Address
+        { wch: 40 }, // Address
         { wch: 20 }, // City
         { wch: 20 }, // State
         { wch: 20 }, // Country
@@ -200,7 +227,7 @@ const ClientsPage = () => {
       XLSX.utils.book_append_sheet(wb, ws, "Clients");
       const fileName = `clients_${new Date().toISOString().split("T")[0]}.xlsx`;
       XLSX.writeFile(wb, fileName);
-      toast.success("Clients exported successfully");
+      toast.success(selectedClients.length > 0 ? "Selected clients exported successfully" : "All clients exported successfully");
     } catch (error) {
       console.error("Error exporting clients:", error);
       toast.error("Failed to export clients");
@@ -211,58 +238,122 @@ const ClientsPage = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    setImportProgress(0);
+    const loadingToast = toast.loading("Importing clients...");
+
     try {
       const reader = new FileReader();
       reader.onload = async (e) => {
         try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json<ExcelRow>(worksheet);
-
-          setImportProgress(0);
-          const totalRows = jsonData.length;
-
-          for (let i = 0; i < totalRows; i++) {
-            const row = jsonData[i];
-            const clientData = {
-              name: row["Client Name"],
-              phone: row["Client Phone"],
-              email: row["Client Email"],
-              address: row["Client Address"],
-              city: row["Client City"],
-              state: row["Client State"],
-              country: row["Client Country"],
-              pinCode: row["Client Pin Code"],
-              sortOrder: parseInt(row["Sort Order"]?.toString() || "1")
-            };
-
-            await fetch(`${Base_url}clients`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-              },
-              body: JSON.stringify(clientData)
-            });
-
-            setImportProgress(Math.round(((i + 1) / totalRows) * 100));
+          const data = e.target?.result;
+          if (!data) {
+            throw new Error("No data read from file");
           }
 
-          toast.success('Clients imported successfully');
-          fetchClients();
-        } catch (err) {
-          console.error('Error importing clients:', err);
-          toast.error('Failed to import clients');
-        } finally {
+          const workbook = XLSX.read(data, { type: "array" });
+          if (!workbook.SheetNames.length) {
+            throw new Error("No sheets found in the Excel file");
+          }
+
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet) as ExcelRow[];
+
+          if (!jsonData.length) {
+            throw new Error("No data found in the Excel sheet");
+          }
+
+          let successCount = 0;
+          let errorCount = 0;
+
+          // Fetch all clients for upsert by name
+          const allResponse = await fetch(`${Base_url}clients?limit=1000`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+          const allData = await allResponse.json();
+          const allClients: Client[] = allData.results || [];
+
+          for (let i = 0; i < jsonData.length; i++) {
+            const row = jsonData[i];
+            try {
+              const clientData = {
+                name: row["Client Name"].toString().trim(),
+                phone: String(row["Client Phone"]).replace(/[^0-9+]/g, ''),
+                email: row["Client Email"].toString().trim(),
+                address: row["Client Address"].toString().trim(),
+                city: row["Client City"].toString().trim(),
+                state: row["Client State"].toString().trim(),
+                country: row["Client Country"].toString().trim(),
+                pinCode: row["Client Pin Code"].toString().trim(),
+                sortOrder: parseInt(row["Sort Order"]?.toString() || "1")
+              };
+
+              let clientId = row["ID"];
+              if (!clientId) {
+                // Try to find by name (case-insensitive)
+                const found = allClients.find(
+                  (c) =>
+                    c.name.trim().toLowerCase() ===
+                    clientData.name.trim().toLowerCase()
+                );
+                if (found) clientId = found.id;
+              }
+
+              if (allClients.find((c) => c.id === clientId)) {
+                // Update existing
+                await fetch(`${Base_url}clients/${clientId}`, {
+                  method: 'PATCH',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                  },
+                  body: JSON.stringify(clientData)
+                });
+                successCount++;
+              } else {
+                // Create new
+                await fetch(`${Base_url}clients`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                  },
+                  body: JSON.stringify(clientData)
+                });
+                successCount++;
+              }
+            } catch (error) {
+              console.error('Error processing row:', error);
+              errorCount++;
+            }
+            setImportProgress(Math.round(((i + 1) / jsonData.length) * 100));
+          }
+
+          if (fileInputRef.current) fileInputRef.current.value = "";
           setImportProgress(null);
+          toast.dismiss(loadingToast);
+
+          if (successCount > 0) {
+            toast.success(`Successfully imported/updated ${successCount} clients`);
+          }
+          if (errorCount > 0) {
+            toast.error(`Failed to import/update ${errorCount} clients`);
+          }
+
+          // Refresh the clients list
+          fetchClients();
+        } catch (error) {
+          setImportProgress(null);
+          toast.error("Failed to process import file", { id: loadingToast });
         }
       };
 
       reader.readAsArrayBuffer(file);
-    } catch (err) {
-      console.error('Error reading file:', err);
-      toast.error('Failed to read file');
+    } catch (error) {
+      setImportProgress(null);
+      toast.error("Failed to import clients", { id: loadingToast });
     }
   };
 
