@@ -319,7 +319,17 @@ const ActivitiesPage = () => {
           <div className="box !bg-transparent border-0 shadow-none">
             <div className="box-header flex justify-between items-center">
               <h1 className="box-title text-2xl font-semibold">Activities</h1>
-              <div className="flex space-x-2">
+              <div className="box-tools flex items-center space-x-2">
+              {selectedActivities.length > 0 && (
+                  <button
+                    type="button"
+                    className="ti-btn ti-btn-danger"
+                    onClick={handleDeleteSelected}
+                  >
+                    <i className="ri-delete-bin-line me-2"></i>
+                    Delete Selected ({selectedActivities.length})
+                  </button>
+                )}
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -329,16 +339,28 @@ const ActivitiesPage = () => {
                 />
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="ti-btn ti-btn-primary"
+                  className="ti-btn ti-btn-success"
                 >
+                  <i className="ri-download-2-line me-2"></i>
                   Import
                 </button>
+                {importProgress !== null && (
+                  <div className="w-40 h-3 bg-gray-200 rounded-full overflow-hidden flex items-center ml-2">
+                    <div
+                      className="bg-primary h-full transition-all duration-200"
+                      style={{ width: `${importProgress}%` }}
+                    ></div>
+                    <span className="ml-2 text-xs text-gray-700">
+                      {importProgress}%
+                    </span>
+                  </div>
+                )}
                 <button
                   type="button"
                   className="ti-btn ti-btn-primary"
                   onClick={handleExport}
                 >
-                  <i className="ri-download-2-line me-2"></i> Export
+                  <i className="ri-upload-2-line me-2"></i> Export
                 </button>
                 <Link
                   href="/activities/add"
