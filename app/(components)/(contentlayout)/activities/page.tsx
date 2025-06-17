@@ -23,6 +23,7 @@ interface ApiResponse {
 }
 
 interface ExcelRow {
+  ID?: string;
   "Activity Name": string;
   "Sort Order": number;
 }
@@ -37,7 +38,7 @@ const ActivitiesPage = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalResults, setTotalResults] = useState(0);
   const [sortBy, setSortBy] = useState<string>("name:asc");
-  const [importProgress, setImportProgress] = useState(0);
+  const [importProgress, setImportProgress] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [filters, setFilters] = useState({
@@ -142,67 +143,144 @@ const ActivitiesPage = () => {
     }
   };
 
-  const handleExport = () => {
-    const exportData = activities.map(activity => ({
-      "Activity Name": activity.name,
-      "Sort Order": activity.sortOrder
-    }));
+  const handleExport = async () => {
+    try {
+      let exportData;
+      let successMessage;
 
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Activities");
-    XLSX.writeFile(wb, "activities.xlsx");
+      if (selectedActivities.length > 0) {
+        exportData = activities
+          .filter(activity => selectedActivities.includes(activity.id))
+          .map((activity: Activity) => ({
+            ID: activity.id,
+            "Activity Name": activity.name,
+            "Sort Order": activity.sortOrder
+          }));
+        successMessage = "Selected activities exported successfully";
+      } else {
+        const response = await fetch(`${Base_url}activities?limit=1000`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch activities for export');
+        }
+
+        const apiData: ApiResponse = await response.json();
+        exportData = apiData.results.map((activity: Activity) => ({
+          ID: activity.id,
+          "Activity Name": activity.name,
+          "Sort Order": activity.sortOrder
+        }));
+        successMessage = "All activities exported successfully";
+      }
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      ws["!cols"] = [
+        { wch: 20 }, // ID
+        { wch: 30 }, // Activity Name
+        { wch: 15 }, // Sort Order
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Activities");
+      const fileName = `activities_${new Date().toISOString().split("T")[0]}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      toast.success(successMessage);
+    } catch (error) {
+      console.error("Error exporting activities:", error);
+      toast.error("Failed to export activities");
+    }
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const data = event.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json<ExcelRow>(worksheet);
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json<ExcelRow>(worksheet);
 
-        setImportProgress(0);
-        const total = jsonData.length;
+          if (jsonData.length === 0) {
+            toast.error('No data found in the file');
+            return;
+          }
 
-        for (let i = 0; i < jsonData.length; i++) {
-          const row = jsonData[i];
-          try {
-            const response = await fetch(`${Base_url}activities`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-              },
-              body: JSON.stringify({
+          setImportProgress(0);
+          const total = jsonData.length;
+          let completed = 0;
+          let updated = 0;
+          let added = 0;
+
+          for (const row of jsonData) {
+            try {
+              const activityData = {
                 name: row["Activity Name"],
                 sortOrder: row["Sort Order"] || 1
-              })
-            });
+              };
 
-            if (!response.ok) {
-              throw new Error(`Failed to import row ${i + 1}`);
+              if (row["ID"]) {
+                // Update existing activity
+                const response = await fetch(`${Base_url}activities/${row["ID"]}`, {
+                  method: 'PATCH',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                  },
+                  body: JSON.stringify(activityData)
+                });
+
+                if (!response.ok) {
+                  throw new Error(`Failed to update activity: ${row["Activity Name"]}`);
+                }
+                updated++;
+              } else {
+                // Add new activity
+                const response = await fetch(`${Base_url}activities`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                  },
+                  body: JSON.stringify(activityData)
+                });
+
+                if (!response.ok) {
+                  throw new Error(`Failed to add activity: ${row["Activity Name"]}`);
+                }
+                added++;
+              }
+
+              completed++;
+              setImportProgress(Math.round((completed / total) * 100));
+            } catch (err) {
+              console.error('Error processing row:', err);
+              toast.error(`Failed to process: ${row["Activity Name"]}`);
             }
-
-            setImportProgress(((i + 1) / total) * 100);
-          } catch (err) {
-            console.error(`Error importing row ${i + 1}:`, err);
           }
+
+          toast.success(`Import completed: ${added} added, ${updated} updated`);
+          fetchActivities();
+        } catch (err) {
+          console.error('Error processing file:', err);
+          toast.error('Failed to process file');
+        } finally {
+          setImportProgress(null);
         }
+      };
 
-        toast.success('Import completed');
-        fetchActivities();
-      } catch (err) {
-        toast.error('Failed to import activities');
-      }
-    };
-
-    reader.readAsBinaryString(file);
+      reader.readAsArrayBuffer(file);
+    } catch (err) {
+      console.error('Error reading file:', err);
+      toast.error('Failed to read file');
+    }
   };
 
   return (
@@ -216,31 +294,57 @@ const ActivitiesPage = () => {
           <div className="box !bg-transparent border-0 shadow-none">
             <div className="box-header flex justify-between items-center">
               <h1 className="box-title text-2xl font-semibold">Activities</h1>
-              <div className="flex space-x-2">
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleImport}
-                  accept=".xlsx,.xls"
-                  className="hidden"
-                />
+              <div className="box-tools flex items-center space-x-2">
+                {selectedActivities.length > 0 && (
+                  <button
+                    type="button"
+                    className="ti-btn ti-btn-danger"
+                    onClick={handleDeleteSelected}
+                  >
+                    <i className="ri-delete-bin-line me-2"></i>
+                    Delete Selected ({selectedActivities.length})
+                  </button>
+                )}
+                {/* Import/Export Buttons */}
+                <div className="relative group">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept=".xlsx,.xls"
+                    onChange={handleImport}
+                  />
+                  <button
+                    type="button"
+                    className="ti-btn ti-btn-success"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <i className="ri-upload-2-line me-2"></i> Import
+                  </button>
+                </div>
+                {importProgress !== null && (
+                  <div className="w-40 h-3 bg-gray-200 rounded-full overflow-hidden flex items-center ml-2">
+                    <div
+                      className="bg-primary h-full transition-all duration-200"
+                      style={{ width: `${importProgress}%` }}
+                    ></div>
+                    <span className="ml-2 text-xs text-gray-700">
+                      {importProgress}%
+                    </span>
+                  </div>
+                )}
                 <button
-                  onClick={() => fileInputRef.current?.click()}
+                  type="button"
                   className="ti-btn ti-btn-primary"
-                >
-                  Import
-                </button>
-                <button
                   onClick={handleExport}
-                  className="ti-btn ti-btn-primary"
                 >
-                  Export
+                  <i className="ri-download-2-line me-2"></i> Export
                 </button>
                 <Link
                   href="/activities/add"
                   className="ti-btn ti-btn-primary"
                 >
-                  Add Activity
+                  <i className="ri-add-line me-2"></i> Add New Activity
                 </Link>
               </div>
             </div>
@@ -320,7 +424,7 @@ const ActivitiesPage = () => {
               </div>
 
               {/* Import Progress */}
-              {importProgress > 0 && importProgress < 100 && (
+              {/* {importProgress > 0 && importProgress < 100 && (
                 <div className="mb-4">
                   <div className="flex justify-between mb-1">
                     <span>Importing...</span>
@@ -333,7 +437,7 @@ const ActivitiesPage = () => {
                     ></div>
                   </div>
                 </div>
-              )}
+              )} */}
 
               {/* Activities Table */}
               <div className="table-responsive">
