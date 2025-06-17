@@ -42,6 +42,7 @@ interface ApiResponse {
 interface ExcelRow {
   "Group Name": string;
   "Sort Order"?: number;
+  "ID"?: string;
 }
 
 const GroupsPage = () => {
@@ -173,38 +174,63 @@ const GroupsPage = () => {
 
   const handleExport = async () => {
     try {
-      const response = await fetch(`${Base_url}groups?limit=1000`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      let exportData;
+      let successMessage;
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch groups for export');
+      // Only export selected groups if any are selected
+      if (selectedGroups.length > 0) {
+        exportData = groups
+          .filter(group => selectedGroups.includes(group.id))
+          .map((group: Group) => ({
+            ID: group.id,
+            "Group Name": group.name,
+            "Number Of Clients": group.numberOfClients,
+            "Created Date": new Date(group.createdAt).toLocaleDateString(),
+            "Sort Order": group.sortOrder,
+            "Client IDs": group.clients?.map(client => client.id).join(',') || ''
+          }));
+        successMessage = "Selected groups exported successfully";
+      } else {
+        // Export all groups if none are selected
+        const response = await fetch(`${Base_url}groups?limit=1000`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch groups for export');
+        }
+
+        const apiData: ApiResponse = await response.json();
+        exportData = apiData.results.map((group: Group) => ({
+          ID: group.id,
+          "Group Name": group.name,
+          "Number Of Clients": group.numberOfClients,
+          "Created Date": new Date(group.createdAt).toLocaleDateString(),
+          "Sort Order": group.sortOrder,
+          "Client IDs": group.clients?.map(client => client.id).join(',') || ''
+        }));
+        successMessage = "All groups exported successfully";
       }
 
-      const data: ApiResponse = await response.json();
-      const exportData = data.results.map((group: Group) => ({
-        ID: group.id,
-        "Group Name": group.name,
-        "Number Of Clients": group.numberOfClients,
-        "Created Date": new Date(group.createdAt).toLocaleDateString(),
-        "Sort Order": group.sortOrder,
-      }));
-
       const ws = XLSX.utils.json_to_sheet(exportData);
+      
+      // Set column widths
       ws["!cols"] = [
-        { wch: 20 },
-        { wch: 20 },
-        { wch: 30 },
-        { wch: 20 },
-        { wch: 10 },
+        { wch: 20 }, // ID
+        { wch: 20 }, // Group Name
+        { wch: 30 }, // Number Of Clients
+        { wch: 20 }, // Created Date
+        { wch: 10 }, // Sort Order
+        { wch: 50 }, // Client IDs
       ];
+
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Groups");
       const fileName = `groups_${new Date().toISOString().split("T")[0]}.xlsx`;
       XLSX.writeFile(wb, fileName);
-      toast.success("Groups exported successfully");
+      toast.success(successMessage);
     } catch (error) {
       console.error("Error exporting groups:", error);
       toast.error("Failed to export groups");
@@ -224,39 +250,80 @@ const GroupsPage = () => {
           const worksheet = workbook.Sheets[workbook.SheetNames[0]];
           const jsonData = XLSX.utils.sheet_to_json<ExcelRow>(worksheet);
 
+          if (jsonData.length === 0) {
+            toast.error('No data found in the file');
+            return;
+          }
+
           setImportProgress(0);
           const total = jsonData.length;
           let completed = 0;
+          let updated = 0;
+          let added = 0;
 
           for (const row of jsonData) {
             try {
-              const response = await fetch(`${Base_url}groups`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${localStorage.getItem('token')}`
-                },
-                body: JSON.stringify({
-                  name: row["Group Name"],
-                  sortOrder: row["Sort Order"] || 1,
-                  numberOfClients: 0,
-                  clients: []
-                })
-              });
+              // Get existing group data if updating
+              let existingGroup = null;
+              if (row["ID"]) {
+                const groupResponse = await fetch(`${Base_url}groups/${row["ID"]}`, {
+                  headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                  }
+                });
+                if (groupResponse.ok) {
+                  existingGroup = await groupResponse.json();
+                }
+              }
 
-              if (!response.ok) {
-                throw new Error('Failed to import group');
+              const groupData = {
+                name: row["Group Name"],
+                sortOrder: row["Sort Order"] || 1,
+                numberOfClients: existingGroup?.clients?.length || 0,
+                clients: existingGroup?.clients?.map((client: Client) => client.id) || []
+              };
+
+              if (row["ID"]) {
+                // Update existing group
+                const response = await fetch(`${Base_url}groups/${row["ID"]}`, {
+                  method: 'PATCH',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                  },
+                  body: JSON.stringify(groupData)
+                });
+
+                if (!response.ok) {
+                  throw new Error(`Failed to update group: ${row["Group Name"]}`);
+                }
+                updated++;
+              } else {
+                // Add new group
+                const response = await fetch(`${Base_url}groups`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                  },
+                  body: JSON.stringify(groupData)
+                });
+
+                if (!response.ok) {
+                  throw new Error(`Failed to add group: ${row["Group Name"]}`);
+                }
+                added++;
               }
 
               completed++;
               setImportProgress(Math.round((completed / total) * 100));
             } catch (err) {
-              console.error('Error importing group:', err);
-              toast.error(`Failed to import group: ${row["Group Name"]}`);
+              console.error('Error processing row:', err);
+              toast.error(`Failed to process: ${row["Group Name"]}`);
             }
           }
 
-          toast.success('Import completed');
+          toast.success(`Import completed: ${added} added, ${updated} updated`);
           fetchGroups();
         } catch (err) {
           console.error('Error processing file:', err);
@@ -574,7 +641,7 @@ const GroupsPage = () => {
                           />
                         </th>
                         <th className="px-4 py-3">Name</th>
-                        <th className="px-4 py-3">Description</th>
+                        <th className="px-4 py-3">Number of Clients</th>
                         <th className="px-4 py-3">Created At</th>
                         <th className="px-4 py-3">Actions</th>
                       </tr>
