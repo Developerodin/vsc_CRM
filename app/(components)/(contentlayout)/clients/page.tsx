@@ -422,7 +422,7 @@ const ClientsPage = () => {
                         country: "",
                         pinCode: ""
                       });
-                      setSortBy("createdAt:desc");
+                      setSortBy("name:asc");
                     }}
                   >
                     <i className="ri-refresh-line me-2"></i>

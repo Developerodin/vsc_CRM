@@ -78,13 +78,8 @@ const ActivitiesPage = () => {
   };
 
   useEffect(() => {
-    fetchActivities();
-  }, [currentPage, sortBy]);
-
-  useEffect(() => {
     fetchActivities(currentPage, itemsPerPage);
-    setCurrentPage(1);
-  }, [filters, itemsPerPage]);
+  }, [currentPage, sortBy, filters, itemsPerPage]);
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
@@ -366,7 +361,8 @@ const ActivitiesPage = () => {
                   href="/activities/add"
                   className="ti-btn ti-btn-primary"
                 >
-                  Add Activity
+                  <i className="ri-add-line me-2"></i>
+                  Add New Activity
                 </Link>
               </div>
             </div>
@@ -411,6 +407,7 @@ const ActivitiesPage = () => {
                           ...prev,
                           name: value
                         }));
+                        setCurrentPage(1);
                       }}
                     />
                   </div>
@@ -436,7 +433,7 @@ const ActivitiesPage = () => {
                       setFilters({
                         name: ""
                       });
-                      setSortBy("createdAt:desc");
+                      setSortBy("name:asc");
                     }}
                   >
                     <i className="ri-refresh-line me-2"></i>

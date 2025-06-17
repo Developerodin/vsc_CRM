@@ -48,7 +48,9 @@ interface ExcelRow {
 const GroupsPage = () => {
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [filters, setFilters] = useState({
+    name: "",
+  });
   const [currentPage, setCurrentPage] = useState(1);
   const [groups, setGroups] = useState<Group[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -57,8 +59,7 @@ const GroupsPage = () => {
   const [totalResults, setTotalResults] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [importProgress, setImportProgress] = useState<number | null>(null);
-  const [sortField, setSortField] = useState("name");
-  const [sortOrder, setSortOrder] = useState("asc");
+  const [sortBy, setSortBy] = useState<string>("name:asc");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showClientModal, setShowClientModal] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
@@ -69,14 +70,14 @@ const GroupsPage = () => {
   const [clientTotalPages, setClientTotalPages] = useState(1);
   const [clientTotalResults, setClientTotalResults] = useState(0);
 
-  const fetchGroups = async () => {
+  const fetchGroups = async (page = 1, limit = itemsPerPage) => {
     try {
       setIsLoading(true);
       const queryParams = new URLSearchParams({
         page: currentPage.toString(),
         limit: itemsPerPage.toString(),
-        sortBy: `${sortField}:${sortOrder}`,
-        ...(searchQuery && { name: searchQuery })
+        sortBy,
+        ...(filters.name && { name: filters.name }),
       });
 
       const response = await fetch(`${Base_url}groups?${queryParams}`, {
@@ -102,8 +103,8 @@ const GroupsPage = () => {
   };
 
   useEffect(() => {
-    fetchGroups();
-  }, [currentPage, itemsPerPage, searchQuery, sortField, sortOrder]);
+    fetchGroups(currentPage, itemsPerPage);
+  }, [currentPage, itemsPerPage, filters, sortBy]);
 
   const handleSelectAll = () => {
     if (selectAll) {
@@ -517,7 +518,7 @@ const GroupsPage = () => {
                     className="ti-btn ti-btn-success"
                     onClick={() => fileInputRef.current?.click()}
                   >
-                    <i className="ri-upload-2-line me-2"></i> Import
+                    <i className="ri-download-2-line me-2"></i> Import
                   </button>
                 </div>
                 {importProgress !== null && (
@@ -536,7 +537,7 @@ const GroupsPage = () => {
                   className="ti-btn ti-btn-primary"
                   onClick={handleExport}
                 >
-                  <i className="ri-download-2-line me-2"></i> Export
+                  <i className="ri-upload-2-line me-2"></i> Export
                 </button>
                 <Link
                   href="/groups/add"
@@ -580,19 +581,24 @@ const GroupsPage = () => {
                       type="text"
                       className="form-control py-2 w-full"
                       placeholder="Search by group name..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                      value={filters.name}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setFilters(prev => ({
+                          ...prev,
+                          name: value,
+                        }));
+                        setCurrentPage(1);
+                      }}
                     />
                   </div>
 
                   {/* Sort dropdown */}
                   <select
                     className="form-select py-2 w-full sm:w-auto"
-                    value={`${sortField}:${sortOrder}`}
+                    value={sortBy}
                     onChange={(e) => {
-                      const [field, order] = e.target.value.split(':');
-                      setSortField(field);
-                      setSortOrder(order);
+                      setSortBy(e.target.value);
                     }}
                   >
                     <option value="name:asc">Name (A-Z)</option>
@@ -607,9 +613,10 @@ const GroupsPage = () => {
                   <button
                     className="ti-btn ti-btn-secondary py-2 w-full sm:w-auto"
                     onClick={() => {
-                      setSearchQuery("");
-                      setSortField("name");
-                      setSortOrder("asc");
+                      setFilters({
+                        name: ""
+                      });
+                      setSortBy("name:asc");
                     }}
                   >
                     <i className="ri-refresh-line me-2"></i>
