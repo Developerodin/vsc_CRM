@@ -5,6 +5,7 @@ import Link from "next/link";
 import { toast, Toaster } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { Base_url } from '@/app/api/config/BaseUrl';
+import axios from "axios";
 
 interface Branch {
   id: string;
@@ -33,8 +34,7 @@ interface ExcelRow {
   "State": string;
   "Country": string;
   "Pin Code": string;
-  "Sort Order"?: string | number;
-  "Created Date": string;
+  "Sort Order": number;
 }
 
 interface ImportRow {
@@ -173,42 +173,65 @@ const BranchesPage = () => {
 
   const handleExport = async () => {
     try {
-      const exportData = branches.map((branch: Branch) => ({
-        ID: branch.id,
-        "Branch Name": branch.name,
-        "Branch Head": branch.branchHead,
-        "Email": branch.email,
-        "Phone": branch.phone,
-        "Address": branch.address,
-        "City": branch.city,
-        "State": branch.state,
-        "Country": branch.country,
-        "Pin Code": branch.pinCode,
-        "Sort Order": branch.sortOrder,
-        "Created Date": new Date(branch.createdAt).toLocaleDateString()
-      }));
+      let exportData;
+      let successMessage;
+
+      if (selectedBranches.length > 0) {
+        exportData = branches
+          .filter(branch => selectedBranches.includes(branch.id))
+          .map((branch: Branch) => ({
+            ID: branch.id,
+            "Branch Name": branch.name,
+            "Branch Head": branch.branchHead,
+            "Email": branch.email,
+            "Phone": branch.phone,
+            "Address": branch.address,
+            "City": branch.city,
+            "State": branch.state,
+            "Country": branch.country,
+            "Pin Code": branch.pinCode,
+            "Sort Order": branch.sortOrder
+          }));
+        successMessage = "Selected branches exported successfully";
+      } else {
+        const response = await axios.get(`${Base_url}branches?limit=1000`);
+        const apiData = response.data;
+        exportData = apiData.results.map((branch: Branch) => ({
+          ID: branch.id,
+          "Branch Name": branch.name,
+          "Branch Head": branch.branchHead,
+          "Email": branch.email,
+          "Phone": branch.phone,
+          "Address": branch.address,
+          "City": branch.city,
+          "State": branch.state,
+          "Country": branch.country,
+          "Pin Code": branch.pinCode,
+          "Sort Order": branch.sortOrder
+        }));
+        successMessage = "All branches exported successfully";
+      }
 
       const ws = XLSX.utils.json_to_sheet(exportData);
       ws["!cols"] = [
         { wch: 20 }, // ID
-        { wch: 20 }, // Branch Name
-        { wch: 20 }, // Branch Head
+        { wch: 30 }, // Branch Name
+        { wch: 30 }, // Branch Head
         { wch: 30 }, // Email
-        { wch: 15 }, // Phone
-        { wch: 30 }, // Address
-        { wch: 15 }, // City
-        { wch: 15 }, // State
-        { wch: 15 }, // Country
-        { wch: 10 }, // Pin Code
-        { wch: 10 }, // Sort Order
-        { wch: 15 }, // Created Date
+        { wch: 20 }, // Phone
+        { wch: 40 }, // Address
+        { wch: 20 }, // City
+        { wch: 20 }, // State
+        { wch: 20 }, // Country
+        { wch: 15 }, // Pin Code
+        { wch: 15 }, // Sort Order
       ];
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Branches");
       const fileName = `branches_${new Date().toISOString().split("T")[0]}.xlsx`;
       XLSX.writeFile(wb, fileName);
-      toast.success("Branches exported successfully");
+      toast.success(successMessage);
     } catch (error) {
       console.error("Error exporting branches:", error);
       toast.error("Failed to export branches");
@@ -219,58 +242,111 @@ const BranchesPage = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    setImportProgress(0);
+    const loadingToast = toast.loading("Importing branches...");
+
     try {
       const reader = new FileReader();
       reader.onload = async (e) => {
         try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json<ImportRow>(worksheet);
-
-          setImportProgress(0);
-          const totalItems = jsonData.length;
-          let processedItems = 0;
-
-          for (const row of jsonData) {
-            const branchData = {
-              name: row["Branch Name"],
-              branchHead: row["Branch Head"],
-              email: row["Email"],
-              phone: row["Phone"],
-              address: row["Address"],
-              city: row["City"],
-              state: row["State"],
-              country: row["Country"],
-              pinCode: row["Pin Code"],
-              sortOrder: parseInt(row["Sort Order"]?.toString() || "1")
-            };
-
-            await fetch(`${Base_url}branches`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-              },
-              body: JSON.stringify(branchData)
-            });
-
-            processedItems++;
-            setImportProgress(Math.round((processedItems / totalItems) * 100));
+          const data = e.target?.result;
+          if (!data) {
+            throw new Error("No data read from file");
           }
 
-          toast.success('Branches imported successfully');
-          fetchBranches();
-        } catch (err) {
-          toast.error('Failed to import branches');
-        } finally {
+          const workbook = XLSX.read(data, { type: "array" });
+          if (!workbook.SheetNames.length) {
+            throw new Error("No sheets found in the Excel file");
+          }
+
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet) as ExcelRow[];
+
+          if (!jsonData.length) {
+            throw new Error("No data found in the Excel sheet");
+          }
+
+          let successCount = 0;
+          let errorCount = 0;
+
+          // Fetch all branches for upsert by name
+          const allResponse = await axios.get(`${Base_url}branches`);
+          const allData = allResponse.data;
+          const allBranches: Branch[] = allData.results || [];
+
+          for (let i = 0; i < jsonData.length; i++) {
+            const row = jsonData[i];
+            try {
+              const branchData = {
+                name: row["Branch Name"].toString().trim(),
+                branchHead: row["Branch Head"]?.toString().trim() || undefined,
+                email: row["Email"].toString().trim(),
+                phone: String(row["Phone"]).replace(/[^0-9+]/g, ''),
+                address: row["Address"].toString().trim(),
+                city: row["City"].toString().trim(),
+                state: row["State"].toString().trim(),
+                country: row["Country"].toString().trim(),
+                pinCode: row["Pin Code"].toString().trim(),
+                sortOrder: parseInt(row["Sort Order"]?.toString() || "1")
+              };
+
+              let branchId = row["ID"];
+              if (!branchId) {
+                // Try to find by name (case-insensitive)
+                const found = allBranches.find(
+                  (b) =>
+                    b.name.trim().toLowerCase() ===
+                    branchData.name.trim().toLowerCase()
+                );
+                if (found) branchId = found.id;
+              }
+
+              if (allBranches.find((b) => b.id === branchId)) {
+                // Update existing
+                await axios.patch(
+                  `${Base_url}branches/${branchId}`,
+                  branchData
+                );
+                successCount++;
+              } else {
+                // Create new
+                await axios.post(
+                  `${Base_url}branches`,
+                  branchData
+                );
+                successCount++;
+              }
+            } catch (error) {
+              console.error('Error processing row:', error);
+              errorCount++;
+            }
+            setImportProgress(Math.round(((i + 1) / jsonData.length) * 100));
+          }
+
+          if (fileInputRef.current) fileInputRef.current.value = "";
           setImportProgress(null);
+          toast.dismiss(loadingToast);
+
+          if (successCount > 0) {
+            toast.success(`Successfully imported/updated ${successCount} branches`);
+          }
+          if (errorCount > 0) {
+            toast.error(`Failed to import/update ${errorCount} branches`);
+          }
+
+          // Refresh the branches list
+          fetchBranches();
+        } catch (error) {
+          setImportProgress(null);
+          toast.error("Failed to process import file", { id: loadingToast });
         }
       };
 
       reader.readAsArrayBuffer(file);
-    } catch (err) {
-      toast.error('Failed to read file');
+    } catch (error) {
+      setImportProgress(null);
+      toast.error("Failed to import branches", { id: loadingToast });
     }
   };
 
@@ -428,7 +504,7 @@ const BranchesPage = () => {
                         country: "",
                         pinCode: ""
                       });
-                      setSortBy("createdAt:desc");
+                      setSortBy("name:asc");
                     }}
                   >
                     <i className="ri-refresh-line me-2"></i>
