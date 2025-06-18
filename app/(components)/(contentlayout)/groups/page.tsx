@@ -580,7 +580,7 @@ const GroupsPage = () => {
                     <input
                       type="text"
                       className="form-control py-2 w-full"
-                      placeholder="Search by group name..."
+                      placeholder="Search by name..."
                       value={filters.name}
                       onChange={(e) => {
                         const value = e.target.value;
