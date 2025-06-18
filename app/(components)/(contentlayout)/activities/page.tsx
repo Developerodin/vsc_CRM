@@ -194,93 +194,68 @@ const ActivitiesPage = () => {
     }
   };
 
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleImport = async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
 
-    try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json<ExcelRow>(worksheet);
+  try {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json<ExcelRow>(worksheet);
 
-          if (jsonData.length === 0) {
-            toast.error('No data found in the file');
-            return;
-          }
-
-          setImportProgress(0);
-          const total = jsonData.length;
-          let completed = 0;
-          let updated = 0;
-          let added = 0;
-
-          for (const row of jsonData) {
-            try {
-              const activityData = {
-                name: row["Activity Name"],
-                sortOrder: row["Sort Order"] || 1
-              };
-
-              if (row["ID"]) {
-                // Update existing activity
-                const response = await fetch(`${Base_url}activities/${row["ID"]}`, {
-                  method: 'PATCH',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                  },
-                  body: JSON.stringify(activityData)
-                });
-
-                if (!response.ok) {
-                  throw new Error(`Failed to update activity: ${row["Activity Name"]}`);
-                }
-                updated++;
-              } else {
-                // Add new activity
-                const response = await fetch(`${Base_url}activities`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                  },
-                  body: JSON.stringify(activityData)
-                });
-
-                if (!response.ok) {
-                  throw new Error(`Failed to add activity: ${row["Activity Name"]}`);
-                }
-                added++;
-              }
-
-              completed++;
-              setImportProgress(Math.round((completed / total) * 100));
-            } catch (err) {
-              console.error('Error processing row:', err);
-              toast.error(`Failed to process: ${row["Activity Name"]}`);
-            }
-          }
-
-          toast.success(`Import completed: ${added} added, ${updated} updated`);
-          fetchActivities();
-        } catch (err) {
-          console.error('Error processing file:', err);
-          toast.error('Failed to process file');
-        } finally {
-          setImportProgress(null);
+        if (jsonData.length === 0) {
+          toast.error('No data found in the file');
+          return;
         }
-      };
 
-      reader.readAsArrayBuffer(file);
-    } catch (err) {
-      console.error('Error reading file:', err);
-      toast.error('Failed to read file');
-    }
-  };
+        // Transform data for bulk import
+        const activities = jsonData.map(row => ({
+          id: row["ID"] || undefined, // Only include if exists
+          name: row["Activity Name"],
+          sortOrder: row["Sort Order"] || 1
+        }));
+
+        // Single API call instead of multiple requests
+        const response = await fetch(`${Base_url}activities/bulk-import`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({ activities })
+        });
+
+        if (!response.ok) {
+          throw new Error('Bulk import failed');
+        }
+
+        const result = await response.json();
+        
+        if (result.errors && result.errors.length > 0) {
+          toast.error(`Import completed with ${result.errors.length} errors`);
+          console.log('Import errors:', result.errors);
+        } else {
+          toast.success(`Import completed: ${result.created} added, ${result.updated} updated`);
+        }
+
+        fetchActivities(); // Refresh the list
+      } catch (err) {
+        console.error('Error processing file:', err);
+        toast.error('Failed to process file');
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
+  } catch (err) {
+    console.error('Error reading file:', err);
+    toast.error('Failed to read file');
+  }
+};
+
 
   // Condensed pagination helper
   function getPagination(currentPage: number, totalPages: number) {

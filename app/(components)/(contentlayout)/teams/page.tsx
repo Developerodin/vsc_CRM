@@ -218,131 +218,127 @@ const TeamsPage = () => {
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const file = e.target.files?.[0];
+  if (!file) return;
 
-    setImportProgress(0);
-    const loadingToast = toast.loading("Importing team members...");
+  setImportProgress(0);
+  const loadingToast = toast.loading("Importing team members...");
 
-    try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const data = e.target?.result;
-          if (!data) {
-            throw new Error("No data read from file");
-          }
-
-          const workbook = XLSX.read(data, { type: "array" });
-          if (!workbook.SheetNames.length) {
-            throw new Error("No sheets found in the Excel file");
-          }
-
-          const sheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet) as ExcelRow[];
-
-          if (!jsonData.length) {
-            throw new Error("No data found in the Excel sheet");
-          }
-
-          let successCount = 0;
-          let errorCount = 0;
-
-          // Fetch all branches and activities for reference
-          const [branchesResponse, activitiesResponse] = await Promise.all([
-            axios.get(`${Base_url}branches`),
-            axios.get(`${Base_url}activities`)
-          ]);
-
-          const branches = branchesResponse.data.results;
-          const activities = activitiesResponse.data.results;
-
-          for (let i = 0; i < jsonData.length; i++) {
-            const row = jsonData[i];
-            try {
-              // Find branch ID by name
-              const branch = branches.find((b: Branch) => 
-                b.name.toLowerCase() === row["Branch"].toLowerCase()
-              );
-
-              if (!branch) {
-                throw new Error(`Branch not found: ${row["Branch"]}`);
-              }
-
-              // Find skill IDs by names
-              const skillNames = row["Skills"].split(',').map((s: string) => s.trim());
-              const skillIds = activities
-                .filter((a: Activity) => skillNames.includes(a.name))
-                .map((a: Activity) => a.id);
-
-              if (skillIds.length === 0) {
-                throw new Error(`No valid skills found for: ${row["Name"]}`);
-              }
-
-              // Ensure phone is a string and handle potential number format
-              const phoneNumber = row["Phone"] ? String(row["Phone"]).replace(/[^0-9+]/g, '') : '';
-
-              const teamMemberData = {
-                name: row["Name"],
-                email: row["Email"],
-                phone: phoneNumber,
-                address: row["Address"],
-                city: row["City"],
-                state: row["State"],
-                country: row["Country"],
-                pinCode: row["Pin Code"],
-                branch: branch.id,
-                sortOrder: row["Sort Order"] || 1,
-                skills: skillIds
-              };
-
-              if (row["ID"]) {
-                // Update existing team member
-                await axios.patch(
-                  `${Base_url}team-members/${row["ID"]}`,
-                  teamMemberData
-                );
-              } else {
-                // Add new team member
-                await axios.post(
-                  `${Base_url}team-members`,
-                  teamMemberData
-                );
-              }
-              successCount++;
-            } catch (error) {
-              console.error('Error processing row:', error);
-              errorCount++;
-            }
-            setImportProgress(Math.round(((i + 1) / jsonData.length) * 100));
-          }
-
-          if (fileInputRef.current) fileInputRef.current.value = "";
-          setImportProgress(null);
-          toast.dismiss(loadingToast);
-
-          if (successCount > 0) {
-            toast.success(`Successfully imported/updated ${successCount} team members`);
-          }
-          if (errorCount > 0) {
-            toast.error(`Failed to import/update ${errorCount} team members`);
-          }
-
-          // Refresh the teams list
-          fetchTeams();
-        } catch (error) {
-          setImportProgress(null);
-          toast.error("Failed to process import file", { id: loadingToast });
+  try {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = e.target?.result;
+        if (!data) {
+          throw new Error("No data read from file");
         }
-      };
 
-      reader.readAsArrayBuffer(file);
-    } catch (error) {
-      setImportProgress(null);
-      toast.error("Failed to import team members", { id: loadingToast });
-    }
-  };
+        const workbook = XLSX.read(data, { type: "array" });
+        if (!workbook.SheetNames.length) {
+          throw new Error("No sheets found in the Excel file");
+        }
+
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet) as ExcelRow[];
+
+        if (!jsonData.length) {
+          throw new Error("No data found in the Excel sheet");
+        }
+
+        // Fetch all branches and activities for reference
+        const [branchesResponse, activitiesResponse] = await Promise.all([
+          axios.get(`${Base_url}branches`),
+          axios.get(`${Base_url}activities`)
+        ]);
+
+        const branches = branchesResponse.data.results;
+        const activities = activitiesResponse.data.results;
+
+        // Transform data for bulk import
+        const teamMembers = jsonData.map((row, index) => {
+          // Find branch ID by name
+          const branch = branches.find((b: Branch) => 
+            b.name.toLowerCase() === row["Branch"].toLowerCase()
+          );
+
+          if (!branch) {
+            throw new Error(`Branch not found: ${row["Branch"]}`);
+          }
+
+          // Find skill IDs by names
+          const skillNames = row["Skills"].split(',').map((s: string) => s.trim());
+          const skillIds = activities
+            .filter((a: Activity) => skillNames.includes(a.name))
+            .map((a: Activity) => a.id);
+
+          if (skillIds.length === 0) {
+            throw new Error(`No valid skills found for: ${row["Name"]}`);
+          }
+
+          // Ensure phone is a string and handle potential number format
+          const phoneNumber = row["Phone"] ? String(row["Phone"]).replace(/[^0-9+]/g, '') : '';
+
+          const teamMemberData = {
+            name: row["Name"],
+            email: row["Email"],
+            phone: phoneNumber,
+            address: row["Address"],
+            city: row["City"],
+            state: row["State"],
+            country: row["Country"],
+            pinCode: row["Pin Code"],
+            branch: branch.id,
+            sortOrder: row["Sort Order"] || 1,
+            skills: skillIds
+          };
+
+          return {
+            ...(row["ID"] && { id: row["ID"] }),
+            ...teamMemberData
+          };
+        });
+
+        // Single API call instead of multiple requests
+        const response = await axios.post(
+          `${Base_url}team-members/bulk-import`,
+          { teamMembers },
+          {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          }
+        );
+
+        const result = response.data;
+
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        setImportProgress(null);
+        toast.dismiss(loadingToast);
+
+        if (result.errors && result.errors.length > 0) {
+          toast.error(`Import completed with ${result.errors.length} errors`);
+          console.log('Import errors:', result.errors);
+        } else {
+          toast.success(`Import completed: ${result.created} added, ${result.updated} updated`);
+        }
+
+        // Refresh the teams list
+        fetchTeams();
+      } catch (error) {
+        setImportProgress(null);
+        toast.error("Failed to process import file", { id: loadingToast });
+        console.error('Error processing file:', error);
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
+  } catch (error) {
+    setImportProgress(null);
+    toast.error("Failed to import team members", { id: loadingToast });
+    console.error('Error reading file:', error);
+  }
+};
 
   // Filter teams based on search query
   // const filteredTeams = teams.filter((teamMember) =>

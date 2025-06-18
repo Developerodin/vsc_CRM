@@ -239,107 +239,98 @@ const GroupsPage = () => {
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const file = e.target.files?.[0];
+  if (!file) return;
 
-    try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json<ExcelRow>(worksheet);
+  try {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json<ExcelRow>(worksheet);
 
-          if (jsonData.length === 0) {
-            toast.error('No data found in the file');
-            return;
-          }
-
-          setImportProgress(0);
-          const total = jsonData.length;
-          let completed = 0;
-          let updated = 0;
-          let added = 0;
-
-          for (const row of jsonData) {
-            try {
-              // Get existing group data if updating
-              let existingGroup = null;
-              if (row["ID"]) {
-                const groupResponse = await fetch(`${Base_url}groups/${row["ID"]}`, {
-                  headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                  }
-                });
-                if (groupResponse.ok) {
-                  existingGroup = await groupResponse.json();
-                }
-              }
-
-              const groupData = {
-                name: row["Group Name"],
-                sortOrder: row["Sort Order"] || 1,
-                numberOfClients: existingGroup?.clients?.length || 0,
-                clients: existingGroup?.clients?.map((client: Client) => client.id) || []
-              };
-
-              if (row["ID"]) {
-                // Update existing group
-                const response = await fetch(`${Base_url}groups/${row["ID"]}`, {
-                  method: 'PATCH',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                  },
-                  body: JSON.stringify(groupData)
-                });
-
-                if (!response.ok) {
-                  throw new Error(`Failed to update group: ${row["Group Name"]}`);
-                }
-                updated++;
-              } else {
-                // Add new group
-                const response = await fetch(`${Base_url}groups`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                  },
-                  body: JSON.stringify(groupData)
-                });
-
-                if (!response.ok) {
-                  throw new Error(`Failed to add group: ${row["Group Name"]}`);
-                }
-                added++;
-              }
-
-              completed++;
-              setImportProgress(Math.round((completed / total) * 100));
-            } catch (err) {
-              console.error('Error processing row:', err);
-              toast.error(`Failed to process: ${row["Group Name"]}`);
-            }
-          }
-
-          toast.success(`Import completed: ${added} added, ${updated} updated`);
-          fetchGroups();
-        } catch (err) {
-          console.error('Error processing file:', err);
-          toast.error('Failed to process file');
-        } finally {
-          setImportProgress(null);
+        if (jsonData.length === 0) {
+          toast.error('No data found in the file');
+          return;
         }
-      };
 
-      reader.readAsArrayBuffer(file);
-    } catch (err) {
-      console.error('Error reading file:', err);
-      toast.error('Failed to read file');
-    }
-  };
+        setImportProgress(0);
+
+        // Fetch all groups for upsert by name
+        const allGroupsResponse = await fetch(`${Base_url}groups?limit=1000`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        const allGroupsData = await allGroupsResponse.json();
+        const allGroups: Group[] = allGroupsData.results || [];
+
+        // Transform data for bulk import
+        const groups = jsonData.map((row, index) => {
+          let existingGroup = null;
+          if (row["ID"]) {
+            existingGroup = allGroups.find(g => g.id === row["ID"]);
+          } else {
+            // Try to find by name (case-insensitive)
+            existingGroup = allGroups.find(
+              (g) => g.name.trim().toLowerCase() === row["Group Name"].toString().trim().toLowerCase()
+            );
+          }
+
+          const groupData = {
+            name: row["Group Name"].toString().trim(),
+            sortOrder: parseInt(row["Sort Order"]?.toString() || "1"),
+            numberOfClients: existingGroup?.clients?.length || 0,
+            clients: existingGroup?.clients?.map((client: Client) => client.id) || []
+          };
+
+          return {
+            ...(row["ID"] && { id: row["ID"] }),
+            ...groupData
+          };
+        });
+
+        // Single API call instead of multiple requests
+        const response = await fetch(`${Base_url}groups/bulk-import`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({ groups })
+        });
+
+        if (!response.ok) {
+          throw new Error('Bulk import failed');
+        }
+
+        const result = await response.json();
+        setImportProgress(100);
+
+        if (result.errors && result.errors.length > 0) {
+          toast.error(`Import completed with ${result.errors.length} errors`);
+          console.log('Import errors:', result.errors);
+        } else {
+          toast.success(`Import completed: ${result.created} added, ${result.updated} updated`);
+        }
+
+        fetchGroups(); // Refresh the groups list
+      } catch (err) {
+        console.error('Error processing file:', err);
+        toast.error('Failed to process file');
+      } finally {
+        setImportProgress(null);
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
+  } catch (err) {
+    console.error('Error reading file:', err);
+    toast.error('Failed to read file');
+  }
+};
 
   const fetchAvailableClients = async (groupId: string) => {
     try {

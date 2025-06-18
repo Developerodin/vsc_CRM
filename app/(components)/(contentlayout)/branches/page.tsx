@@ -238,117 +238,112 @@ const BranchesPage = () => {
     }
   };
 
-  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
 
-    setImportProgress(0);
-    const loadingToast = toast.loading("Importing branches...");
+  setImportProgress(0);
+  const loadingToast = toast.loading("Importing branches...");
 
-    try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const data = e.target?.result;
-          if (!data) {
-            throw new Error("No data read from file");
-          }
-
-          const workbook = XLSX.read(data, { type: "array" });
-          if (!workbook.SheetNames.length) {
-            throw new Error("No sheets found in the Excel file");
-          }
-
-          const sheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet) as ExcelRow[];
-
-          if (!jsonData.length) {
-            throw new Error("No data found in the Excel sheet");
-          }
-
-          let successCount = 0;
-          let errorCount = 0;
-
-          // Fetch all branches for upsert by name
-          const allResponse = await axios.get(`${Base_url}branches`);
-          const allData = allResponse.data;
-          const allBranches: Branch[] = allData.results || [];
-
-          for (let i = 0; i < jsonData.length; i++) {
-            const row = jsonData[i];
-            try {
-              const branchData = {
-                name: row["Branch Name"].toString().trim(),
-                branchHead: row["Branch Head"]?.toString().trim() || undefined,
-                email: row["Email"].toString().trim(),
-                phone: String(row["Phone"]).replace(/[^0-9+]/g, ''),
-                address: row["Address"].toString().trim(),
-                city: row["City"].toString().trim(),
-                state: row["State"].toString().trim(),
-                country: row["Country"].toString().trim(),
-                pinCode: row["Pin Code"].toString().trim(),
-                sortOrder: parseInt(row["Sort Order"]?.toString() || "1")
-              };
-
-              let branchId = row["ID"];
-              if (!branchId) {
-                // Try to find by name (case-insensitive)
-                const found = allBranches.find(
-                  (b) =>
-                    b.name.trim().toLowerCase() ===
-                    branchData.name.trim().toLowerCase()
-                );
-                if (found) branchId = found.id;
-              }
-
-              if (allBranches.find((b) => b.id === branchId)) {
-                // Update existing
-                await axios.patch(
-                  `${Base_url}branches/${branchId}`,
-                  branchData
-                );
-                successCount++;
-              } else {
-                // Create new
-                await axios.post(
-                  `${Base_url}branches`,
-                  branchData
-                );
-                successCount++;
-              }
-            } catch (error) {
-              console.error('Error processing row:', error);
-              errorCount++;
-            }
-            setImportProgress(Math.round(((i + 1) / jsonData.length) * 100));
-          }
-
-          if (fileInputRef.current) fileInputRef.current.value = "";
-          setImportProgress(null);
-          toast.dismiss(loadingToast);
-
-          if (successCount > 0) {
-            toast.success(`Successfully imported/updated ${successCount} branches`);
-          }
-          if (errorCount > 0) {
-            toast.error(`Failed to import/update ${errorCount} branches`);
-          }
-
-          // Refresh the branches list
-          fetchBranches();
-        } catch (error) {
-          setImportProgress(null);
-          toast.error("Failed to process import file", { id: loadingToast });
+  try {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = e.target?.result;
+        if (!data) {
+          throw new Error("No data read from file");
         }
-      };
 
-      reader.readAsArrayBuffer(file);
-    } catch (error) {
-      setImportProgress(null);
-      toast.error("Failed to import branches", { id: loadingToast });
-    }
-  };
+        const workbook = XLSX.read(data, { type: "array" });
+        if (!workbook.SheetNames.length) {
+          throw new Error("No sheets found in the Excel file");
+        }
+
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet) as ExcelRow[];
+
+        if (!jsonData.length) {
+          throw new Error("No data found in the Excel sheet");
+        }
+
+        // Fetch all branches for upsert by name
+        const allResponse = await axios.get(`${Base_url}branches`);
+        const allData = allResponse.data;
+        const allBranches: Branch[] = allData.results || [];
+
+        // Transform data for bulk import
+        const branches = jsonData.map((row, index) => {
+          const branchData = {
+            name: row["Branch Name"].toString().trim(),
+            branchHead: row["Branch Head"]?.toString().trim() || undefined,
+            email: row["Email"].toString().trim(),
+            phone: String(row["Phone"]).replace(/[^0-9+]/g, ''),
+            address: row["Address"].toString().trim(),
+            city: row["City"].toString().trim(),
+            state: row["State"].toString().trim(),
+            country: row["Country"].toString().trim(),
+            pinCode: row["Pin Code"].toString().trim(),
+            sortOrder: parseInt(row["Sort Order"]?.toString() || "1")
+          };
+
+          let branchId = row["ID"];
+          if (!branchId) {
+            // Try to find by name (case-insensitive)
+            const found = allBranches.find(
+              (b) =>
+                b.name.trim().toLowerCase() ===
+                branchData.name.trim().toLowerCase()
+            );
+            if (found) branchId = found.id;
+          }
+
+          return {
+            ...(branchId && { id: branchId }),
+            ...branchData
+          };
+        });
+
+        // Single API call instead of multiple requests
+        const response = await axios.post(
+          `${Base_url}branches/bulk-import`,
+          { branches },
+          {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          }
+        );
+
+        const result = response.data;
+        
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        setImportProgress(null);
+        toast.dismiss(loadingToast);
+
+        if (result.errors && result.errors.length > 0) {
+          toast.error(`Import completed with ${result.errors.length} errors`);
+          console.log('Import errors:', result.errors);
+        } else {
+          toast.success(`Import completed: ${result.created} added, ${result.updated} updated`);
+        }
+
+        // Refresh the branches list
+        fetchBranches();
+      } catch (error) {
+        setImportProgress(null);
+        toast.error("Failed to process import file", { id: loadingToast });
+        console.error('Error processing file:', error);
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
+  } catch (error) {
+    setImportProgress(null);
+    toast.error("Failed to import branches", { id: loadingToast });
+    console.error('Error reading file:', error);
+  }
+};
 
   // Condensed pagination helper
   function getPagination(currentPage: number, totalPages: number) {

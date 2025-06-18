@@ -234,128 +234,120 @@ const ClientsPage = () => {
     }
   };
 
-  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
 
-    setImportProgress(0);
-    const loadingToast = toast.loading("Importing clients...");
+const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
 
-    try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const data = e.target?.result;
-          if (!data) {
-            throw new Error("No data read from file");
-          }
+  setImportProgress(0);
+  const loadingToast = toast.loading("Importing clients...");
 
-          const workbook = XLSX.read(data, { type: "array" });
-          if (!workbook.SheetNames.length) {
-            throw new Error("No sheets found in the Excel file");
-          }
-
-          const sheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet) as ExcelRow[];
-
-          if (!jsonData.length) {
-            throw new Error("No data found in the Excel sheet");
-          }
-
-          let successCount = 0;
-          let errorCount = 0;
-
-          // Fetch all clients for upsert by name
-          const allResponse = await fetch(`${Base_url}clients?limit=1000`, {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            }
-          });
-          const allData = await allResponse.json();
-          const allClients: Client[] = allData.results || [];
-
-          for (let i = 0; i < jsonData.length; i++) {
-            const row = jsonData[i];
-            try {
-              const clientData = {
-                name: row["Client Name"].toString().trim(),
-                phone: String(row["Client Phone"]).replace(/[^0-9+]/g, ''),
-                email: row["Client Email"].toString().trim(),
-                address: row["Client Address"].toString().trim(),
-                city: row["Client City"].toString().trim(),
-                state: row["Client State"].toString().trim(),
-                country: row["Client Country"].toString().trim(),
-                pinCode: row["Client Pin Code"].toString().trim(),
-                sortOrder: parseInt(row["Sort Order"]?.toString() || "1")
-              };
-
-              let clientId = row["ID"];
-              if (!clientId) {
-                // Try to find by name (case-insensitive)
-                const found = allClients.find(
-                  (c) =>
-                    c.name.trim().toLowerCase() ===
-                    clientData.name.trim().toLowerCase()
-                );
-                if (found) clientId = found.id;
-              }
-
-              if (allClients.find((c) => c.id === clientId)) {
-                // Update existing
-                await fetch(`${Base_url}clients/${clientId}`, {
-                  method: 'PATCH',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                  },
-                  body: JSON.stringify(clientData)
-                });
-                successCount++;
-              } else {
-                // Create new
-                await fetch(`${Base_url}clients`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                  },
-                  body: JSON.stringify(clientData)
-                });
-                successCount++;
-              }
-            } catch (error) {
-              console.error('Error processing row:', error);
-              errorCount++;
-            }
-            setImportProgress(Math.round(((i + 1) / jsonData.length) * 100));
-          }
-
-          if (fileInputRef.current) fileInputRef.current.value = "";
-          setImportProgress(null);
-          toast.dismiss(loadingToast);
-
-          if (successCount > 0) {
-            toast.success(`Successfully imported/updated ${successCount} clients`);
-          }
-          if (errorCount > 0) {
-            toast.error(`Failed to import/update ${errorCount} clients`);
-          }
-
-          // Refresh the clients list
-          fetchClients();
-        } catch (error) {
-          setImportProgress(null);
-          toast.error("Failed to process import file", { id: loadingToast });
+  try {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = e.target?.result;
+        if (!data) {
+          throw new Error("No data read from file");
         }
-      };
 
-      reader.readAsArrayBuffer(file);
-    } catch (error) {
-      setImportProgress(null);
-      toast.error("Failed to import clients", { id: loadingToast });
-    }
-  };
+        const workbook = XLSX.read(data, { type: "array" });
+        if (!workbook.SheetNames.length) {
+          throw new Error("No sheets found in the Excel file");
+        }
+
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet) as ExcelRow[];
+
+        if (!jsonData.length) {
+          throw new Error("No data found in the Excel sheet");
+        }
+
+        // Fetch all clients for upsert by name
+        const allResponse = await fetch(`${Base_url}clients?limit=1000`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        const allData = await allResponse.json();
+        const allClients: Client[] = allData.results || [];
+
+        // Transform data for bulk import
+        const clients = jsonData.map((row, index) => {
+          const clientData = {
+            name: row["Client Name"].toString().trim(),
+            phone: String(row["Client Phone"]).replace(/[^0-9+]/g, ''),
+            email: row["Client Email"].toString().trim(),
+            address: row["Client Address"].toString().trim(),
+            city: row["Client City"].toString().trim(),
+            state: row["Client State"].toString().trim(),
+            country: row["Client Country"].toString().trim(),
+            pinCode: row["Client Pin Code"].toString().trim(),
+            sortOrder: parseInt(row["Sort Order"]?.toString() || "1")
+          };
+
+          let clientId = row["ID"];
+          if (!clientId) {
+            // Try to find by name (case-insensitive)
+            const found = allClients.find(
+              (c) =>
+                c.name.trim().toLowerCase() ===
+                clientData.name.trim().toLowerCase()
+            );
+            if (found) clientId = found.id;
+          }
+
+          return {
+            ...(clientId && { id: clientId }),
+            ...clientData
+          };
+        });
+
+        // Single API call instead of multiple requests
+        const response = await fetch(`${Base_url}clients/bulk-import`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({ clients })
+        });
+
+        if (!response.ok) {
+          throw new Error('Bulk import failed');
+        }
+
+        const result = await response.json();
+
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        setImportProgress(null);
+        toast.dismiss(loadingToast);
+
+        if (result.errors && result.errors.length > 0) {
+          toast.error(`Import completed with ${result.errors.length} errors`);
+          console.log('Import errors:', result.errors);
+        } else {
+          toast.success(`Import completed: ${result.created} added, ${result.updated} updated`);
+        }
+
+        // Refresh the clients list
+        fetchClients();
+      } catch (error) {
+        setImportProgress(null);
+        toast.error("Failed to process import file", { id: loadingToast });
+        console.error('Error processing file:', error);
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
+  } catch (error) {
+    setImportProgress(null);
+    toast.error("Failed to import clients", { id: loadingToast });
+    console.error('Error reading file:', error);
+  }
+};
+
 
   // Condensed pagination helper
   function getPagination(currentPage: number, totalPages: number) {
