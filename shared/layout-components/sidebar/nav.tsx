@@ -44,6 +44,8 @@ const BranchesIcon = < i className='bx bx-git-branch side-menu__icon'></i>;
 
 const TeamsIcon = < i className='bx bx-share-alt side-menu__icon'></i>;
 
+const TimeLineIcon = <i className="bx bx-calendar-event side-menu__icon"></i>;
+
 const badge = (
   <span className="badge !bg-warning/10 !text-warning !py-[0.25rem] !px-[0.45rem] !text-[0.75em] ms-1">
     12
@@ -129,6 +131,18 @@ export const MenuItems: any = [
     dirchange: false,
     path: "/teams",
   },
+
+
+  {
+    icon: TimeLineIcon,
+    title: "Timeline",
+    type: "link",
+    active: false,
+    selected: false,
+    dirchange: false,
+    path: "/timelines",
+  },
+
 
   {
     icon: AnalyticsIcon,
