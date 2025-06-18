@@ -1,10 +1,10 @@
-"use client"
-import React, { useState, useEffect } from 'react';
-import Seo from '@/shared/layout-components/seo/seo';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { toast, Toaster } from 'react-hot-toast';
-import { Base_url } from '@/app/api/config/BaseUrl';
+"use client";
+import React, { useState, useEffect } from "react";
+import Seo from "@/shared/layout-components/seo/seo";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { toast, Toaster } from "react-hot-toast";
+import { Base_url } from "@/app/api/config/BaseUrl";
 
 interface Branch {
   id: string;
@@ -23,31 +23,35 @@ interface Branch {
 const AddBranchPage = () => {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  
+
   const [formData, setFormData] = useState({
-    name: '',
-    branchHead: '',
-    email: '',
-    phone: '',
-    address: '',
-    city: '',
-    state: '',
-    country: '',
-    pinCode: '',
-    sortOrder: '1',
+    name: "",
+    branchHead: "",
+    email: "",
+    phone: "",
+    address: "",
+    city: "",
+    state: "",
+    country: "",
+    pinCode: "",
+    sortOrder: "1",
   });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >
+  ) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       setIsLoading(true);
 
@@ -61,29 +65,31 @@ const AddBranchPage = () => {
         state: formData.state,
         country: formData.country,
         pinCode: formData.pinCode,
-        sortOrder: parseInt(formData.sortOrder)
+        sortOrder: parseInt(formData.sortOrder),
       };
 
       const response = await fetch(`${Base_url}branches`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
         body: JSON.stringify(branchData),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create branch');
+        throw new Error(errorData.message || "Failed to create branch");
       }
 
-      toast.success('Branch created successfully');
-      router.push('/branches');
+      toast.success("Branch created successfully");
+      router.push("/branches");
     } catch (err) {
-      console.error('Error creating branch:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to create branch');
+      console.error("Error creating branch:", err);
+      toast.error(
+        err instanceof Error ? err.message : "Failed to create branch"
+      );
     } finally {
       setIsLoading(false);
     }
@@ -92,18 +98,23 @@ const AddBranchPage = () => {
   return (
     <div className="main-content">
       <Toaster position="top-right" />
-      <Seo title="Add Branch"/>
-      
+      <Seo title="Add Branch" />
+
       <div className="grid grid-cols-12 gap-6">
         <div className="col-span-12">
           {/* Page Header */}
           <div className="box !bg-transparent border-0 shadow-none">
             <div className="box-header flex justify-between items-center">
-              <h1 className="box-title text-2xl font-semibold">Add New Branch</h1>
+              <h1 className="box-title text-2xl font-semibold">
+                Add New Branch
+              </h1>
               <nav className="flex" aria-label="Breadcrumb">
                 <ol className="inline-flex items-center space-x-1 md:space-x-3">
                   <li className="inline-flex items-center">
-                    <Link href="/branches" className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-primary">
+                    <Link
+                      href="/branches"
+                      className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-primary"
+                    >
                       <i className="ri-home-line mr-2"></i>
                       Branches
                     </Link>
@@ -111,7 +122,9 @@ const AddBranchPage = () => {
                   <li>
                     <div className="flex items-center">
                       <i className="ri-arrow-right-s-line text-gray-400 mx-2"></i>
-                      <span className="text-sm font-medium text-gray-500">Add New Branch</span>
+                      <span className="text-sm font-medium text-gray-500">
+                        Add New Branch
+                      </span>
                     </div>
                   </li>
                 </ol>
@@ -124,10 +137,11 @@ const AddBranchPage = () => {
             <div className="box-body">
               <form onSubmit={handleSubmit}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
                   {/* Branch Name */}
                   <div className="form-group">
-                    <label htmlFor="name" className="form-label">Branch Name *</label>
+                    <label htmlFor="name" className="form-label">
+                      Branch Name *
+                    </label>
                     <input
                       type="text"
                       id="name"
@@ -142,7 +156,9 @@ const AddBranchPage = () => {
 
                   {/* Branch Head */}
                   <div className="form-group">
-                    <label htmlFor="branchHead" className="form-label">Branch Head</label>
+                    <label htmlFor="branchHead" className="form-label">
+                      Branch Head
+                    </label>
                     <input
                       type="text"
                       id="branchHead"
@@ -156,7 +172,9 @@ const AddBranchPage = () => {
 
                   {/* Email */}
                   <div className="form-group">
-                    <label htmlFor="email" className="form-label">Email *</label>
+                    <label htmlFor="email" className="form-label">
+                      Email *
+                    </label>
                     <input
                       type="email"
                       id="email"
@@ -171,7 +189,9 @@ const AddBranchPage = () => {
 
                   {/* Phone */}
                   <div className="form-group">
-                    <label htmlFor="phone" className="form-label">Phone *</label>
+                    <label htmlFor="phone" className="form-label">
+                      Phone *
+                    </label>
                     <input
                       type="tel"
                       id="phone"
@@ -186,7 +206,9 @@ const AddBranchPage = () => {
 
                   {/* Address */}
                   <div className="form-group">
-                    <label htmlFor="address" className="form-label">Address *</label>
+                    <label htmlFor="address" className="form-label">
+                      Address *
+                    </label>
                     <input
                       type="text"
                       id="address"
@@ -201,7 +223,9 @@ const AddBranchPage = () => {
 
                   {/* City */}
                   <div className="form-group">
-                    <label htmlFor="city" className="form-label">City *</label>
+                    <label htmlFor="city" className="form-label">
+                      City *
+                    </label>
                     <input
                       type="text"
                       id="city"
@@ -216,7 +240,9 @@ const AddBranchPage = () => {
 
                   {/* State */}
                   <div className="form-group">
-                    <label htmlFor="state" className="form-label">State *</label>
+                    <label htmlFor="state" className="form-label">
+                      State *
+                    </label>
                     <input
                       type="text"
                       id="state"
@@ -231,7 +257,9 @@ const AddBranchPage = () => {
 
                   {/* Country */}
                   <div className="form-group">
-                    <label htmlFor="country" className="form-label">Country *</label>
+                    <label htmlFor="country" className="form-label">
+                      Country *
+                    </label>
                     <input
                       type="text"
                       id="country"
@@ -246,7 +274,9 @@ const AddBranchPage = () => {
 
                   {/* Pin Code */}
                   <div className="form-group">
-                    <label htmlFor="pinCode" className="form-label">Pin Code *</label>
+                    <label htmlFor="pinCode" className="form-label">
+                      Pin Code *
+                    </label>
                     <input
                       type="text"
                       id="pinCode"
@@ -261,7 +291,9 @@ const AddBranchPage = () => {
 
                   {/* Sort Order */}
                   <div className="form-group">
-                    <label htmlFor="sortOrder" className="form-label">Sort Order *</label>
+                    <label htmlFor="sortOrder" className="form-label">
+                      Sort Order *
+                    </label>
                     <input
                       type="number"
                       id="sortOrder"
@@ -276,24 +308,22 @@ const AddBranchPage = () => {
                   </div>
 
                   {/* Form Actions */}
-                  <div className='self-end justify-self-end'>
-                    <div className="flex items-center space-x-3 col-span-1 md:col-span-2">
-                      <button
-                        type="submit"
-                        className="ti-btn ti-btn-primary"
-                        disabled={isLoading}
-                      >
-                        {isLoading ? 'Saving...' : 'Save Branch'}
-                      </button>
-                      <button
-                        type="button"
-                        className="ti-btn ti-btn-secondary"
-                        onClick={() => router.push('/branches')}
-                        disabled={isLoading}
-                      >
-                        Cancel
-                      </button>
-                    </div>
+                  <div className="flex items-center space-x-3 col-span-1 md:col-span-2">
+                    <button
+                      type="submit"
+                      className="ti-btn ti-btn-primary"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? "Saving..." : "Save Branch"}
+                    </button>
+                    <button
+                      type="button"
+                      className="ti-btn ti-btn-secondary"
+                      onClick={() => router.push("/branches")}
+                      disabled={isLoading}
+                    >
+                      Cancel
+                    </button>
                   </div>
                 </div>
               </form>
@@ -305,4 +335,4 @@ const AddBranchPage = () => {
   );
 };
 
-export default AddBranchPage; 
+export default AddBranchPage;

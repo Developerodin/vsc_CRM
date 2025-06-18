@@ -72,7 +72,9 @@ const AddGroupPage = () => {
 
       const data = await response.json();
       setClients(data.results);
-      setTotalPages(Math.ceil(data.total / 10));
+      const totalResults = data.totalResults || data.total || 0;
+      const limit = 10;
+      setTotalPages(Math.max(1, Math.ceil(totalResults / limit)));
       setCurrentPage(page);
     } catch (err) {
       console.error('Error fetching clients:', err);
