@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Seo from "@/shared/layout-components/seo/seo";
 import Link from "next/link";
 import { toast, Toaster } from "react-hot-toast";
@@ -8,172 +8,124 @@ import { Base_url } from '@/app/api/config/BaseUrl';
 
 interface Timeline {
   id: string;
-  activityName: string;
-  clientName: string;
-  clientEmail: string;
-  frequency: string;
-  udin: string;
-  turnover: string;
-  teamMemberName: string;
-  dueDate: string;
+  activity: {
+    id: string;
+    name: string;
+  };
+  client: {
+    id: string;
+    name: string;
+    email: string;
+  };
   status: 'pending' | 'completed' | 'ongoing' | 'delayed';
+  frequency: 'daily' | 'alternate day' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+  frequencyCount: 'once' | 'twice';
+  udin?: string;
+  turnover?: number;
+  assignedMember: {
+    id: string;
+    name: string;
+  };
+  dueDate?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface ApiResponse {
+  results: Timeline[];
+  page: number;
+  limit: number;
+  totalPages: number;
+  totalResults: number;
 }
 
 interface ExcelRow {
   ID?: string;
-  "Timeline Name": string;
-  "Sort Order": number;
+  "Activity ID"?: string;
+  "Activity Name": string;
+  "Client ID"?: string;
+  "Client Name": string;
+  "Client Email": string;
+  "Frequency": string;
+  "Frequency Count": string;
+  "UDIN"?: string;
+  "Turnover"?: string;
+  "Team Member ID"?: string;
+  "Team Member Name": string;
+  "Due Date"?: string;
+  "Status": string;
+  "Created At"?: string;
+  "Updated At"?: string;
 }
 
 const TimelinesPage = () => {
   const [selectedTimelines, setSelectedTimelines] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [timelines, setTimelines] = useState<Timeline[]>([
-    {
-      id: "1",
-      activityName: "Income Tax Filing",
-      clientName: "Rajesh Kumar & Associates",
-      clientEmail: "rajesh.kumar@rkassociates.com",
-      frequency: "Annual",
-      udin: "UDIN-2024-001234",
-      turnover: "₹2.5 Crores",
-      teamMemberName: "Priya Sharma",
-      dueDate: "2024-07-31",
-      status: 'pending'
-    },
-    {
-      id: "2",
-      activityName: "GST Filing",
-      clientName: "Mumbai Textiles Ltd",
-      clientEmail: "accounts@mumbaitextiles.com",
-      frequency: "Monthly",
-      udin: "UDIN-2024-005678",
-      turnover: "₹8.7 Crores",
-      teamMemberName: "Amit Patel",
-      dueDate: "2024-06-20",
-      status: 'completed'
-    },
-    {
-      id: "3",
-      activityName: "ROC/LLP Filing",
-      clientName: "Delhi Software Solutions LLP",
-      clientEmail: "compliance@delhisoftware.com",
-      frequency: "Quarterly",
-      udin: "UDIN-2024-009012",
-      turnover: "₹1.2 Crores",
-      teamMemberName: "Neha Gupta",
-      dueDate: "2024-08-15",
-      status: 'ongoing'
-    },
-    {
-      id: "4",
-      activityName: "Corporate Audit",
-      clientName: "Chennai Manufacturing Co.",
-      clientEmail: "finance@chennaimanufacturing.com",
-      frequency: "Annual",
-      udin: "UDIN-2024-003456",
-      turnover: "₹15.3 Crores",
-      teamMemberName: "Rahul Verma",
-      dueDate: "2024-09-30",
-      status: 'delayed'
-    },
-    {
-      id: "5",
-      activityName: "GST Filing",
-      clientName: "Bangalore IT Services Pvt Ltd",
-      clientEmail: "tax@bangaloreit.com",
-      frequency: "Monthly",
-      udin: "UDIN-2024-007890",
-      turnover: "₹4.8 Crores",
-      teamMemberName: "Sneha Reddy",
-      dueDate: "2024-06-20",
-      status: 'pending'
-    }
-  ]);
-  const [isLoading, setIsLoading] = useState(false); // Start with false since we have dummy data
+  const [timelines, setTimelines] = useState<Timeline[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalPages, setTotalPages] = useState(1);
-  const [totalResults, setTotalResults] = useState(5); // Match dummy data count
-  const [sortBy, setSortBy] = useState<string>("name:asc");
+  const [totalResults, setTotalResults] = useState(0);
+  const [sortBy, setSortBy] = useState<string>("activityName:asc");
   const [importProgress, setImportProgress] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [searchInputValue, setSearchInputValue] = useState("");
   const [filters, setFilters] = useState({
-    name: ""
+    activityName: "",
+    status: ""
   });
+
+  // Debounced search function
+  const debouncedSearch = useCallback(
+    (() => {
+      let timeoutId: NodeJS.Timeout;
+      return (searchValue: string) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          setFilters(prev => ({
+            ...prev,
+            activityName: searchValue
+          }));
+          setCurrentPage(1);
+        }, 500);
+      };
+    })(),
+    []
+  );
+
+  // Handle search input change
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchInputValue(value); // Update input immediately
+    debouncedSearch(value); // Debounce the API call
+  };
 
   const fetchTimelines = async (page = 1, limit = itemsPerPage) => {
     setIsLoading(true);
     setError(null);
     try {
-      // Simulate API call for timelines (since timeline API is not ready)
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Use dummy data for now
-      setTimelines([
-        {
-          id: "1",
-          activityName: "Income Tax Filing",
-          clientName: "Rajesh Kumar & Associates",
-          clientEmail: "rajesh.kumar@rkassociates.com",
-          frequency: "Annual",
-          udin: "UDIN-2024-001234",
-          turnover: "₹2.5 Crores",
-          teamMemberName: "Priya Sharma",
-          dueDate: "2024-07-31",
-          status: 'pending'
-        },
-        {
-          id: "2",
-          activityName: "GST Filing",
-          clientName: "Mumbai Textiles Ltd",
-          clientEmail: "accounts@mumbaitextiles.com",
-          frequency: "Monthly",
-          udin: "UDIN-2024-005678",
-          turnover: "₹8.7 Crores",
-          teamMemberName: "Amit Patel",
-          dueDate: "2024-06-20",
-          status: 'completed'
-        },
-        {
-          id: "3",
-          activityName: "ROC/LLP Filing",
-          clientName: "Delhi Software Solutions LLP",
-          clientEmail: "compliance@delhisoftware.com",
-          frequency: "Quarterly",
-          udin: "UDIN-2024-009012",
-          turnover: "₹1.2 Crores",
-          teamMemberName: "Neha Gupta",
-          dueDate: "2024-08-15",
-          status: 'ongoing'
-        },
-        {
-          id: "4",
-          activityName: "Corporate Audit",
-          clientName: "Chennai Manufacturing Co.",
-          clientEmail: "finance@chennaimanufacturing.com",
-          frequency: "Annual",
-          udin: "UDIN-2024-003456",
-          turnover: "₹15.3 Crores",
-          teamMemberName: "Rahul Verma",
-          dueDate: "2024-09-30",
-          status: 'delayed'
-        },
-        {
-          id: "5",
-          activityName: "GST Filing",
-          clientName: "Bangalore IT Services Pvt Ltd",
-          clientEmail: "tax@bangaloreit.com",
-          frequency: "Monthly",
-          udin: "UDIN-2024-007890",
-          turnover: "₹4.8 Crores",
-          teamMemberName: "Sneha Reddy",
-          dueDate: "2024-06-20",
-          status: 'pending'
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        ...filters,
+        ...(sortBy && { sortBy })
+      });
+
+      const response = await fetch(`${Base_url}timelines?${queryParams}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
-      ]);
-      setTotalPages(1);
-      setTotalResults(5);
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch timelines');
+      }
+
+      const data: ApiResponse = await response.json();
+      setTimelines(data.results);
+      setTotalPages(data.totalPages);
+      setTotalResults(data.totalResults);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch timelines');
       toast.error('Failed to fetch timelines');
@@ -206,11 +158,19 @@ const TimelinesPage = () => {
     if (!confirm('Are you sure you want to delete this timeline?')) return;
 
     try {
-      // Simulate API call for timeline deletion (since timeline API is not ready)
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const response = await fetch(`${Base_url}timelines/${timelineId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete timeline');
+      }
 
       toast.success('Timeline deleted successfully');
-      fetchTimelines();
+      fetchTimelines(currentPage, itemsPerPage);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to delete timeline');
     }
@@ -220,14 +180,176 @@ const TimelinesPage = () => {
     if (!confirm('Are you sure you want to delete selected timelines?')) return;
 
     try {
-      // Simulate API call for bulk timeline deletion (since timeline API is not ready)
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await Promise.all(
+        selectedTimelines.map(timelineId =>
+          fetch(`${Base_url}timelines/${timelineId}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          })
+        )
+      );
 
       toast.success('Selected timelines deleted successfully');
       setSelectedTimelines([]);
       fetchTimelines();
     } catch (err) {
       toast.error('Failed to delete some timelines');
+    }
+  };
+
+  const handleExport = async () => {
+    try {
+      let exportData;
+      let successMessage;
+
+      if (selectedTimelines.length > 0) {
+        exportData = timelines
+          .filter(timeline => selectedTimelines.includes(timeline.id))
+          .map((timeline: Timeline) => ({
+            ID: timeline.id,
+            "Activity ID": timeline.activity.id,
+            "Activity Name": timeline.activity.name,
+            "Client ID": timeline.client.id,
+            "Client Name": timeline.client.name,
+            "Client Email": timeline.client.email,
+            "Frequency": timeline.frequency,
+            "Frequency Count": timeline.frequencyCount,
+            "UDIN": timeline.udin || "",
+            "Turnover": timeline.turnover?.toString() || "",
+            "Team Member ID": timeline.assignedMember.id,
+            "Team Member Name": timeline.assignedMember.name,
+            "Due Date": timeline.dueDate || "",
+            "Status": timeline.status
+          }));
+        successMessage = "Selected timelines exported successfully";
+      } else {
+        const response = await fetch(`${Base_url}timelines?limit=1000`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch timelines for export');
+        }
+
+        const apiData: ApiResponse = await response.json();
+        exportData = apiData.results.map((timeline: Timeline) => ({
+          ID: timeline.id,
+          "Activity ID": timeline.activity.id,
+          "Activity Name": timeline.activity.name,
+          "Client ID": timeline.client.id,
+          "Client Name": timeline.client.name,
+          "Client Email": timeline.client.email,
+          "Frequency": timeline.frequency,
+          "Frequency Count": timeline.frequencyCount,
+          "UDIN": timeline.udin,
+          "Turnover": timeline.turnover?.toString() || "",
+          "Team Member ID": timeline.assignedMember.id,
+          "Team Member Name": timeline.assignedMember.name,
+          "Due Date": timeline.dueDate || "",
+          "Status": timeline.status
+        }));
+        successMessage = "All timelines exported successfully";
+      }
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      ws["!cols"] = [
+        { wch: 20 }, // ID
+        { wch: 25 }, // Activity ID
+        { wch: 30 }, // Activity Name
+        { wch: 25 }, // Client ID
+        { wch: 30 }, // Client Name
+        { wch: 30 }, // Client Email
+        { wch: 20 }, // Frequency
+        { wch: 20 }, // Frequency Count
+        { wch: 20 }, // UDIN
+        { wch: 25 }, // Turnover
+        { wch: 25 }, // Team Member ID
+        { wch: 25 }, // Team Member
+        { wch: 20 }, // Due Date
+        { wch: 20 }, // Status
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Timelines");
+      const fileName = `timelines_${new Date().toISOString().split("T")[0]}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      toast.success(successMessage);
+    } catch (error) {
+      console.error("Error exporting timelines:", error);
+      toast.error("Failed to export timelines");
+    }
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json<ExcelRow>(worksheet);
+
+          if (jsonData.length === 0) {
+            toast.error('No data found in the file');
+            return;
+          }
+
+          // Transform data for bulk import
+          const timelines = jsonData.map(row => ({
+            id: row["ID"] || undefined, // Only include if exists
+            activity: row["Activity ID"],
+            client: row["Client ID"],
+            status: row["Status"] as 'pending' | 'completed' | 'ongoing' | 'delayed',
+            frequency: row["Frequency"] as 'daily' | 'alternate day' | 'weekly' | 'monthly' | 'quarterly' | 'yearly',
+            frequencyCount: row["Frequency Count"] as 'once' | 'twice',
+            udin: row["UDIN"] || undefined,
+            turnover: row["Turnover"] ? parseFloat(row["Turnover"]) : undefined,
+            assignedMember: row["Team Member ID"],
+            dueDate: row["Due Date"] || undefined,
+          }));
+
+          // Single API call instead of multiple requests
+          const response = await fetch(`${Base_url}timelines/bulk-import`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({ timelines })
+          });
+
+          if (!response.ok) {
+            throw new Error('Bulk import failed');
+          }
+
+          const result = await response.json();
+          
+          if (result.errors && result.errors.length > 0) {
+            toast.error(`Import completed with ${result.errors.length} errors`);
+            console.log('Import errors:', result.errors);
+          } else {
+            toast.success(`Import completed: ${result.created} added, ${result.updated} updated`);
+          }
+
+          fetchTimelines(); // Refresh the list
+        } catch (err) {
+          console.error('Error processing file:', err);
+          toast.error('Failed to process file');
+        }
+      };
+
+      reader.readAsArrayBuffer(file);
+    } catch (err) {
+      console.error('Error reading file:', err);
+      toast.error('Failed to read file');
     }
   };
 
@@ -277,7 +399,7 @@ const TimelinesPage = () => {
                 <input
                   type="file"
                   ref={fileInputRef}
-                //   onChange={handleImport}
+                  onChange={handleImport}
                   accept=".xlsx,.xls"
                   className="hidden"
                 />
@@ -302,7 +424,7 @@ const TimelinesPage = () => {
                 <button
                   type="button"
                   className="ti-btn ti-btn-primary"
-                //   onClick={handleExport}
+                  onClick={handleExport}
                 >
                   <i className="ri-upload-2-line me-2"></i> Export
                 </button>
@@ -325,7 +447,7 @@ const TimelinesPage = () => {
                 {/* Pending Card */}
                 <div 
                   className="bg-warning/10 border border-warning/20 rounded-lg p-4 cursor-pointer hover:bg-warning/20 transition-colors"
-                  onClick={() => console.log('filtering by pending')}
+                  onClick={() => setFilters({ ...filters, status: 'pending' })}
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -343,7 +465,7 @@ const TimelinesPage = () => {
                 {/* Ongoing Card */}
                 <div 
                   className="bg-primary/10 border border-primary/20 rounded-lg p-4 cursor-pointer hover:bg-primary/20 transition-colors"
-                  onClick={() => console.log('filtering by ongoing')}
+                  onClick={() => setFilters({ ...filters, status: 'ongoing' })}
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -361,7 +483,7 @@ const TimelinesPage = () => {
                 {/* Completed Card */}
                 <div 
                   className="bg-success/10 border border-success/20 rounded-lg p-4 cursor-pointer hover:bg-success/20 transition-colors"
-                  onClick={() => console.log('filtering by completed')}
+                  onClick={() => setFilters({ ...filters, status: 'completed' })}
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -379,7 +501,7 @@ const TimelinesPage = () => {
                 {/* Delayed Card */}
                 <div 
                   className="bg-danger/10 border border-danger/20 rounded-lg p-4 cursor-pointer hover:bg-danger/20 transition-colors"
-                  onClick={() => console.log('filtering by delayed')}
+                  onClick={() => setFilters({ ...filters, status: 'delayed' })}
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -423,16 +545,9 @@ const TimelinesPage = () => {
                     <input
                       type="text"
                       className="form-control py-2 w-full"
-                      placeholder="Search by name..."
-                      value={filters.name}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setFilters(prev => ({
-                          ...prev,
-                          name: value
-                        }));
-                        setCurrentPage(1);
-                      }}
+                      placeholder="Search by activity name..."
+                      value={searchInputValue}
+                      onChange={handleSearchChange}
                     />
                   </div>
 
@@ -442,22 +557,24 @@ const TimelinesPage = () => {
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
                   >
-                    <option value="name:asc">Name (A-Z)</option>
-                    <option value="name:desc">Name (Z-A)</option>
+                    <option value="activityName:asc">Activity Name (A-Z)</option>
+                    <option value="activityName:desc">Activity Name (Z-A)</option>
                     <option value="createdAt:desc">Newest First</option>
                     <option value="createdAt:asc">Oldest First</option>
-                    <option value="sortOrder:asc">Sort Order (Low-High)</option>
-                    <option value="sortOrder:desc">Sort Order (High-Low)</option>
+                    <option value="dueDate:asc">Due Date (Earliest-Latest)</option>
+                    <option value="dueDate:desc">Due Date (Latest-Earliest)</option>
                   </select>
 
                   {/* Reset button */}
                   <button
                     className="ti-btn ti-btn-secondary py-2 w-full sm:w-auto"
                     onClick={() => {
+                      setSearchInputValue("");
                       setFilters({
-                        name: ""
+                        activityName: "",
+                        status: ""
                       });
-                      setSortBy("name:asc");
+                      setSortBy("activityName:asc");
                     }}
                   >
                     <i className="ri-refresh-line me-2"></i>
@@ -524,8 +641,24 @@ const TimelinesPage = () => {
                       </tr>
                     ) : timelines.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="text-center py-4">
-                          No timelines found
+                        <td colSpan={11} className="text-center py-8">
+                          <div className="flex flex-col items-center justify-center">
+                            <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
+                              <i className="ri-time-line text-4xl text-primary"></i>
+                            </div>
+                            <h3 className="text-xl font-medium mb-2">
+                              No Timelines Found
+                            </h3>
+                            <p className="text-gray-500 text-center mb-6">
+                              Start by adding your first timeline.
+                            </p>
+                            <Link
+                              href="/timelines/add"
+                              className="ti-btn ti-btn-primary"
+                            >
+                              <i className="ri-add-line me-2"></i> Add First Timeline
+                            </Link>
+                          </div>
                         </td>
                       </tr>
                     ) : (
@@ -539,14 +672,14 @@ const TimelinesPage = () => {
                               className="form-checkbox"
                             />
                           </td>
-                          <td>{timeline.activityName}</td>
-                          <td>{timeline.clientName}</td>
-                          <td>{timeline.clientEmail}</td>
+                          <td>{timeline.activity.name}</td>
+                          <td>{timeline.client.name}</td>
+                          <td>{timeline.client.email}</td>
                           <td>{timeline.frequency}</td>
                           <td>{timeline.udin || "-"}</td>
                           <td>{timeline.turnover || "-"}</td>
-                          <td>{timeline.teamMemberName || "-"}</td>
-                          <td>{timeline.dueDate ? new Date(timeline.dueDate).toLocaleString() : "-"}</td>
+                          <td>{timeline.assignedMember.name}</td>
+                          <td>{timeline.dueDate ? new Date(timeline.dueDate).toISOString().split('T')[0] : "-"}</td>
                           <td>
                             <span className={`badge ${
                               timeline.status === 'completed' ? 'bg-success' :
@@ -554,7 +687,7 @@ const TimelinesPage = () => {
                               timeline.status === 'delayed' ? 'bg-danger' :
                               'bg-warning'
                             }`}>
-                              {timeline.status.charAt(0).toUpperCase() + timeline.status.slice(1)}
+                              {timeline.status[0].toUpperCase() + timeline.status.slice(1)}
                             </span>
                           </td>
                           <td>

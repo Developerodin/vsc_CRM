@@ -1,5 +1,5 @@
 "use client"
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Seo from '@/shared/layout-components/seo/seo';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -74,18 +74,27 @@ interface Branch {
 
 interface Timeline {
   id: string;
-  activityName: string;
-  groupId: string;
-  clientId: string;
-  clientName: string;
-  clientEmail: string;
-  frequency: string;
-  frequencyCount: string;
-  udin: string;
-  turnover: string;
-  teamMemberId: string;
-  teamMemberName: string;
-  dueDate: string;
+  activity: {
+    id: string;
+    name: string;
+  };
+  client: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  status: 'pending' | 'completed' | 'ongoing' | 'delayed';
+  frequency: 'daily' | 'alternate day' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+  frequencyCount: 'once' | 'twice';
+  udin?: string;
+  turnover?: number;
+  assignedMember: {
+    id: string;
+    name: string;
+  };
+  dueDate?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const EditTimelinePage = ({ params }: { params: { id: string } }) => {
@@ -106,13 +115,14 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   
   const [formData, setFormData] = useState({
-    activityName: '',
+    activityId: '',
     groupId: '',
     clientId: '',
     clientName: '',
     clientEmail: '',
     frequency: '',
     frequencyCount: '',
+    status: 'pending' as 'pending' | 'completed' | 'ongoing' | 'delayed',
     udin: '',
     turnover: '',
     teamMemberId: '',
@@ -196,39 +206,33 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
           fetchTeamMembers()
         ]);
         
-        // Simulate API call to fetch timeline data (since timeline API is not ready)
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Dummy timeline data - in real app, this would come from API
-        const timelineData: Timeline = {
-          id: params.id,
-          activityName: "Income Tax Filing",
-          groupId: "1",
-          clientId: "1",
-          clientName: "Rajesh Kumar & Associates",
-          clientEmail: "rajesh.kumar@rkassociates.com",
-          frequency: "monthly",
-          frequencyCount: "once",
-          udin: "UDIN-2024-001234",
-          turnover: "₹2.5 Crores",
-          teamMemberId: "1",
-          teamMemberName: "Priya Sharma",
-          dueDate: "2024-12-31"
-        };
+        // Fetch timeline data from API
+        const response = await fetch(`${Base_url}timelines/${params.id}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch timeline');
+        }
+
+        const timelineData: Timeline = await response.json();
 
         setFormData({
-          activityName: timelineData.activityName,
-          groupId: timelineData.groupId,
-          clientId: timelineData.clientId,
-          clientName: timelineData.clientName,
-          clientEmail: timelineData.clientEmail,
+          activityId: timelineData.activity.id,
+          groupId: 'none',
+          clientId: timelineData.client.id,
+          clientName: timelineData.client.name,
+          clientEmail: timelineData.client.email,
           frequency: timelineData.frequency,
           frequencyCount: timelineData.frequencyCount,
-          udin: timelineData.udin,
-          turnover: timelineData.turnover,
-          teamMemberId: timelineData.teamMemberId,
-          teamMemberName: timelineData.teamMemberName,
-          dueDate: timelineData.dueDate
+          status: timelineData.status,
+          udin: timelineData.udin || '',
+          turnover: timelineData.turnover?.toString() || '',
+          teamMemberId: timelineData.assignedMember.id,
+          teamMemberName: timelineData.assignedMember.name,
+          dueDate: timelineData.dueDate ? new Date(timelineData.dueDate).toISOString().split('T')[0] : ''
         });
       } catch (error) {
         console.error('Error fetching timeline data:', error);
@@ -303,36 +307,20 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
     }));
   };
 
-  const fetchAvailableClients = async (groupId: string) => {
+  const fetchAvailableClients = async (groupId: string, searchQuery?: string, page?: number) => {
     try {
       setIsLoadingClients(true);
       const queryParams = new URLSearchParams({
-        page: clientCurrentPage.toString(),
+        page: (page || clientCurrentPage).toString(),
         limit: "10",
-        ...(clientSearchQuery && { name: clientSearchQuery })
+        ...(searchQuery && { name: searchQuery })
       });
 
-      // First get the group details to get the clients
-      const groupResponse = await fetch(`${Base_url}groups/${groupId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      if (!groupResponse.ok) {
-        throw new Error('Failed to fetch group details');
-      }
-
-      const groupData = await groupResponse.json();
+      let clientsData;
       
-      // If the group has clients array, use it directly
-      if (Array.isArray(groupData.clients)) {
-        setAvailableClients(groupData.clients);
-        setClientTotalResults(groupData.clients.length);
-        setClientTotalPages(Math.ceil(groupData.clients.length / 10));
-      } else {
-        // If no clients array, fetch clients for the group
-        const clientsResponse = await fetch(`${Base_url}groups/${groupId}/clients?${queryParams}`, {
+      if (groupId === 'none') {
+        // Fetch all clients when no group is selected
+        const clientsResponse = await fetch(`${Base_url}clients?${queryParams}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
@@ -342,11 +330,46 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
           throw new Error('Failed to fetch clients');
         }
 
-        const clientsData = await clientsResponse.json();
-        setAvailableClients(clientsData.results || []);
-        setClientTotalResults(clientsData.totalResults || 0);
-        setClientTotalPages(clientsData.totalPages || 1);
+        clientsData = await clientsResponse.json();
+      } else {
+        // First get the group details to get the clients
+        const groupResponse = await fetch(`${Base_url}groups/${groupId}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!groupResponse.ok) {
+          throw new Error('Failed to fetch group details');
+        }
+
+        const groupData = await groupResponse.json();
+        
+        // If the group has clients array, use it directly
+        if (Array.isArray(groupData.clients)) {
+          setAvailableClients(groupData.clients);
+          setClientTotalResults(groupData.clients.length);
+          setClientTotalPages(Math.ceil(groupData.clients.length / 10));
+          return;
+        } else {
+          // If no clients array, fetch clients for the group
+          const clientsResponse = await fetch(`${Base_url}groups/${groupId}/clients?${queryParams}`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+
+          if (!clientsResponse.ok) {
+            throw new Error('Failed to fetch clients');
+          }
+
+          clientsData = await clientsResponse.json();
+        }
       }
+
+      setAvailableClients(clientsData.results || []);
+      setClientTotalResults(clientsData.totalResults || 0);
+      setClientTotalPages(clientsData.totalPages || 1);
     } catch (err) {
       console.error('Error fetching clients:', err);
       toast.error('Failed to fetch clients');
@@ -355,6 +378,46 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
       setClientTotalPages(1);
     } finally {
       setIsLoadingClients(false);
+    }
+  };
+
+  // Debounced search function
+  const debouncedSearch = useCallback(
+    (() => {
+      let timeoutId: NodeJS.Timeout;
+      return (groupId: string, searchQuery: string) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          setClientCurrentPage(1);
+          fetchAvailableClients(groupId, searchQuery, 1);
+        }, 500);
+      };
+    })(),
+    []
+  );
+
+  // Handle search input change
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    setClientSearchQuery(query);
+    if (showClientModal && formData.groupId) {
+      debouncedSearch(formData.groupId, query);
+    }
+  };
+
+  // Handle search button click
+  const handleSearchClick = () => {
+    if (formData.groupId) {
+      setClientCurrentPage(1);
+      fetchAvailableClients(formData.groupId, clientSearchQuery, 1);
+    }
+  };
+
+  // Handle pagination for clients
+  const handleClientPageChange = (page: number) => {
+    setClientCurrentPage(page);
+    if (formData.groupId) {
+      fetchAvailableClients(formData.groupId, clientSearchQuery, page);
     }
   };
 
@@ -374,14 +437,34 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
     try {
       setIsLoading(true);
 
-      // Simulate API call for timeline update (since timeline API is not ready)
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch(`${Base_url}timelines/${params.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          activity: formData.activityId,
+          client: formData.clientId,
+          frequency: formData.frequency,
+          frequencyCount: formData.frequencyCount,
+          status: formData.status,
+          udin: formData.udin || undefined,
+          turnover: formData.turnover ? parseFloat(formData.turnover) : undefined,
+          assignedMember: formData.teamMemberId,
+          dueDate: formData.dueDate || undefined
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update timeline');
+      }
 
       toast.success('Timeline updated successfully');
       router.push('/timelines');
     } catch (err) {
       console.error('Error updating timeline:', err);
-      toast.error('Failed to update timeline');
+      toast.error(err instanceof Error ? err.message : 'Failed to update timeline');
     } finally {
       setIsLoading(false);
     }
@@ -475,18 +558,18 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Activity Name */}
                   <div className="form-group">
-                    <label htmlFor="activityName" className="form-label">Activity Name <span className="text-red-500">*</span></label>
+                    <label htmlFor="activityId" className="form-label">Activity Name <span className="text-red-500">*</span></label>
                     <select
-                      id="activityName"
-                      name="activityName"
+                      id="activityId"
+                      name="activityId"
                       className="form-select"
-                      value={formData.activityName}
+                      value={formData.activityId}
                       onChange={handleInputChange}
                       required
                     >
                       <option value="">Select Activity</option>
                       {activities.map(activity => (
-                        <option key={activity.id} value={activity.name}>
+                        <option key={activity.id} value={activity.id}>
                           {activity.name}
                         </option>
                       ))}
@@ -504,8 +587,7 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
                       onChange={handleGroupChange}
                       required
                     >
-                      <option value="">Select Group</option>
-                      <option value="none">None (Ungrouped Clients)</option>
+                      <option value="none">All Clients</option>
                       {groups.map(group => (
                         <option key={group.id} value={group.id}>
                           {group.name} ({group.numberOfClients} clients)
@@ -535,32 +617,6 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
                         {formData.clientName ? `Selected: ${formData.clientName}` : "Select Client"}
                       </button>
                     </div>
-                  </div>
-
-                  {/* Client Name (Read-only) */}
-                  <div className="form-group">
-                    <label htmlFor="clientName" className="form-label">Client Name</label>
-                    <input
-                      type="text"
-                      id="clientName"
-                      name="clientName"
-                      className="form-control bg-gray-50"
-                      value={formData.clientName}
-                      readOnly
-                    />
-                  </div>
-
-                  {/* Client Email (Read-only) */}
-                  <div className="form-group">
-                    <label htmlFor="clientEmail" className="form-label">Client Email</label>
-                    <input
-                      type="email"
-                      id="clientEmail"
-                      name="clientEmail"
-                      className="form-control bg-gray-50"
-                      value={formData.clientEmail}
-                      readOnly
-                    />
                   </div>
 
                   {/* Frequency */}
@@ -604,6 +660,24 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
                     </select>
                   </div>
 
+                  {/* Status */}
+                  <div className="form-group">
+                    <label htmlFor="status" className="form-label">Status <span className="text-red-500">*</span></label>
+                    <select
+                      id="status"
+                      name="status"
+                      className="form-select"
+                      value={formData.status}
+                      onChange={handleInputChange}
+                      required
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="ongoing">Ongoing</option>
+                      <option value="completed">Completed</option>
+                      <option value="delayed">Delayed</option>
+                    </select>
+                  </div>
+
                   {/* UDIN */}
                   <div className="form-group">
                     <label htmlFor="udin" className="form-label">UDIN</label>
@@ -626,7 +700,7 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
                       id="turnover"
                       name="turnover"
                       className="form-control"
-                      placeholder="Enter turnover (e.g., ₹2.5 Crores)"
+                      placeholder="Enter turnover (e.g., 25000000)"
                       value={formData.turnover}
                       onChange={handleInputChange}
                     />
@@ -650,19 +724,6 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
                         </option>
                       ))}
                     </select>
-                  </div>
-
-                  {/* Assigned Member Name (Read-only) */}
-                  <div className="form-group">
-                    <label htmlFor="teamMemberName" className="form-label">Assigned Member Name</label>
-                    <input
-                      type="text"
-                      id="teamMemberName"
-                      name="teamMemberName"
-                      className="form-control bg-gray-50"
-                      value={formData.teamMemberName}
-                      readOnly
-                    />
                   </div>
 
                   {/* Due Date */}
@@ -738,12 +799,20 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
                   <div className="relative">
                     <input
                       type="text"
-                      className="form-control py-3 pr-10"
+                      className="form-control py-3 pr-20"
                       placeholder="Search clients..."
                       value={clientSearchQuery}
-                      onChange={(e) => setClientSearchQuery(e.target.value)}
+                      onChange={handleSearchChange}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleSearchClick();
+                        }
+                      }}
                     />
-                    <button className="absolute end-0 top-0 px-4 h-full">
+                    <button 
+                      className="absolute end-0 top-0 px-4 h-full bg-primary text-white hover:bg-primary-dark"
+                      onClick={handleSearchClick}
+                    >
                       <i className="ri-search-line text-lg"></i>
                     </button>
                   </div>
@@ -808,7 +877,7 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
                         <li className={`page-item ${clientCurrentPage === 1 ? "disabled" : ""}`}>
                           <button
                             className="page-link py-2 px-3 ml-0 leading-tight text-gray-500 bg-white rounded-l-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                            onClick={() => setClientCurrentPage((prev) => Math.max(prev - 1, 1))}
+                            onClick={() => handleClientPageChange(Math.max(clientCurrentPage - 1, 1))}
                             disabled={clientCurrentPage === 1}
                           >
                             Previous
@@ -827,7 +896,7 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
                                     ? "bg-primary text-white hover:bg-primary-dark"
                                     : "bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-700"
                                 }`}
-                                onClick={() => setClientCurrentPage(Number(page))}
+                                onClick={() => handleClientPageChange(Number(page))}
                               >
                                 {page}
                               </button>
@@ -837,7 +906,7 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
                         <li className={`page-item ${clientCurrentPage === clientTotalPages ? "disabled" : ""}`}>
                           <button
                             className="page-link py-2 px-3 leading-tight text-gray-500 bg-white rounded-r-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                            onClick={() => setClientCurrentPage((prev) => Math.min(prev + 1, clientTotalPages))}
+                            onClick={() => handleClientPageChange(Math.min(clientCurrentPage + 1, clientTotalPages))}
                             disabled={clientCurrentPage === clientTotalPages}
                           >
                             Next

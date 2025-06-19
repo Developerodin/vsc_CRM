@@ -1,5 +1,5 @@
 "use client"
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Seo from '@/shared/layout-components/seo/seo';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -89,13 +89,14 @@ const AddTimelinePage = () => {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   
   const [formData, setFormData] = useState({
-    activityName: '',
-    groupId: '',
+    activityId: '',
+    groupId: 'none',
     clientId: '',
     clientName: '',
     clientEmail: '',
     frequency: '',
     frequencyCount: '',
+    status: 'pending' as 'pending' | 'completed' | 'ongoing' | 'delayed',
     udin: '',
     turnover: '',
     teamMemberId: '',
@@ -242,36 +243,20 @@ const AddTimelinePage = () => {
     }));
   };
 
-  const fetchAvailableClients = async (groupId: string) => {
+  const fetchAvailableClients = async (groupId: string, searchQuery?: string, page?: number) => {
     try {
       setIsLoadingClients(true);
       const queryParams = new URLSearchParams({
-        page: clientCurrentPage.toString(),
+        page: (page || clientCurrentPage).toString(),
         limit: "10",
-        ...(clientSearchQuery && { name: clientSearchQuery })
+        ...(searchQuery && { name: searchQuery })
       });
 
-      // First get the group details to get the clients
-      const groupResponse = await fetch(`${Base_url}groups/${groupId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      if (!groupResponse.ok) {
-        throw new Error('Failed to fetch group details');
-      }
-
-      const groupData = await groupResponse.json();
+      let clientsData;
       
-      // If the group has clients array, use it directly
-      if (Array.isArray(groupData.clients)) {
-        setAvailableClients(groupData.clients);
-        setClientTotalResults(groupData.clients.length);
-        setClientTotalPages(Math.ceil(groupData.clients.length / 10));
-      } else {
-        // If no clients array, fetch clients for the group
-        const clientsResponse = await fetch(`${Base_url}groups/${groupId}/clients?${queryParams}`, {
+      if (groupId === 'none') {
+        // Fetch all clients when no group is selected
+        const clientsResponse = await fetch(`${Base_url}clients?${queryParams}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
@@ -281,11 +266,46 @@ const AddTimelinePage = () => {
           throw new Error('Failed to fetch clients');
         }
 
-        const clientsData = await clientsResponse.json();
-        setAvailableClients(clientsData.results || []);
-        setClientTotalResults(clientsData.totalResults || 0);
-        setClientTotalPages(clientsData.totalPages || 1);
+        clientsData = await clientsResponse.json();
+      } else {
+        // First get the group details to get the clients
+        const groupResponse = await fetch(`${Base_url}groups/${groupId}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!groupResponse.ok) {
+          throw new Error('Failed to fetch group details');
+        }
+
+        const groupData = await groupResponse.json();
+        
+        // If the group has clients array, use it directly
+        if (Array.isArray(groupData.clients)) {
+          setAvailableClients(groupData.clients);
+          setClientTotalResults(groupData.clients.length);
+          setClientTotalPages(Math.ceil(groupData.clients.length / 10));
+          return;
+        } else {
+          // If no clients array, fetch clients for the group
+          const clientsResponse = await fetch(`${Base_url}groups/${groupId}/clients?${queryParams}`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+
+          if (!clientsResponse.ok) {
+            throw new Error('Failed to fetch clients');
+          }
+
+          clientsData = await clientsResponse.json();
+        }
       }
+
+      setAvailableClients(clientsData.results || []);
+      setClientTotalResults(clientsData.totalResults || 0);
+      setClientTotalPages(clientsData.totalPages || 1);
     } catch (err) {
       console.error('Error fetching clients:', err);
       toast.error('Failed to fetch clients');
@@ -294,6 +314,46 @@ const AddTimelinePage = () => {
       setClientTotalPages(1);
     } finally {
       setIsLoadingClients(false);
+    }
+  };
+
+  // Debounced search function
+  const debouncedSearch = useCallback(
+    (() => {
+      let timeoutId: NodeJS.Timeout;
+      return (groupId: string, searchQuery: string) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          setClientCurrentPage(1);
+          fetchAvailableClients(groupId, searchQuery, 1);
+        }, 500);
+      };
+    })(),
+    []
+  );
+
+  // Handle search input change
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    setClientSearchQuery(query);
+    if (showClientModal && formData.groupId) {
+      debouncedSearch(formData.groupId, query);
+    }
+  };
+
+  // Handle search button click
+  const handleSearchClick = () => {
+    if (formData.groupId) {
+      setClientCurrentPage(1);
+      fetchAvailableClients(formData.groupId, clientSearchQuery, 1);
+    }
+  };
+
+  // Handle pagination for clients
+  const handleClientPageChange = (page: number) => {
+    setClientCurrentPage(page);
+    if (formData.groupId) {
+      fetchAvailableClients(formData.groupId, clientSearchQuery, page);
     }
   };
 
@@ -313,14 +373,34 @@ const AddTimelinePage = () => {
     try {
       setIsLoading(true);
 
-      // Simulate API call for timeline creation (since timeline API is not ready)
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch(`${Base_url}timelines`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          activity: formData.activityId,
+          client: formData.clientId,
+          frequency: formData.frequency,
+          frequencyCount: formData.frequencyCount,
+          status: formData.status,
+          udin: formData.udin || undefined,
+          turnover: formData.turnover ? parseFloat(formData.turnover) : undefined,
+          assignedMember: formData.teamMemberId,
+          dueDate: formData.dueDate || undefined
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create timeline');
+      }
 
       toast.success('Timeline created successfully');
       router.push('/timelines');
     } catch (err) {
       console.error('Error creating timeline:', err);
-      toast.error('Failed to create timeline');
+      toast.error(err instanceof Error ? err.message : 'Failed to create timeline');
     } finally {
       setIsLoading(false);
     }
@@ -404,18 +484,18 @@ const AddTimelinePage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Activity Name */}
                   <div className="form-group">
-                    <label htmlFor="activityName" className="form-label">Activity Name <span className="text-red-500">*</span></label>
+                    <label htmlFor="activityId" className="form-label">Activity Name <span className="text-red-500">*</span></label>
                     <select
-                      id="activityName"
-                      name="activityName"
+                      id="activityId"
+                      name="activityId"
                       className="form-select"
-                      value={formData.activityName}
+                      value={formData.activityId}
                       onChange={handleInputChange}
                       required
                     >
                       <option value="">Select Activity</option>
                       {activities.map(activity => (
-                        <option key={activity.id} value={activity.name}>
+                        <option key={activity.id} value={activity.id}>
                           {activity.name}
                         </option>
                       ))}
@@ -433,8 +513,7 @@ const AddTimelinePage = () => {
                       onChange={handleGroupChange}
                       required
                     >
-                      <option value="">Select Group</option>
-                      <option value="none">None (Ungrouped Clients)</option>
+                      <option value="none">All Clients</option>
                       {groups.map(group => (
                         <option key={group.id} value={group.id}>
                           {group.name} ({group.numberOfClients} clients)
@@ -464,32 +543,6 @@ const AddTimelinePage = () => {
                         {formData.clientName ? `Selected: ${formData.clientName}` : "Select Client"}
                       </button>
                     </div>
-                  </div>
-
-                  {/* Client Name (Read-only) */}
-                  <div className="form-group">
-                    <label htmlFor="clientName" className="form-label">Client Name</label>
-                    <input
-                      type="text"
-                      id="clientName"
-                      name="clientName"
-                      className="form-control bg-gray-50"
-                      value={formData.clientName}
-                      readOnly
-                    />
-                  </div>
-
-                  {/* Client Email (Read-only) */}
-                  <div className="form-group">
-                    <label htmlFor="clientEmail" className="form-label">Client Email</label>
-                    <input
-                      type="email"
-                      id="clientEmail"
-                      name="clientEmail"
-                      className="form-control bg-gray-50"
-                      value={formData.clientEmail}
-                      readOnly
-                    />
                   </div>
 
                   {/* Frequency */}
@@ -533,6 +586,24 @@ const AddTimelinePage = () => {
                     </select>
                   </div>
 
+                  {/* Status */}
+                  <div className="form-group">
+                    <label htmlFor="status" className="form-label">Status <span className="text-red-500">*</span></label>
+                    <select
+                      id="status"
+                      name="status"
+                      className="form-select"
+                      value={formData.status}
+                      onChange={handleInputChange}
+                      required
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="ongoing">Ongoing</option>
+                      <option value="completed">Completed</option>
+                      <option value="delayed">Delayed</option>
+                    </select>
+                  </div>
+
                   {/* UDIN */}
                   <div className="form-group">
                     <label htmlFor="udin" className="form-label">UDIN</label>
@@ -555,7 +626,7 @@ const AddTimelinePage = () => {
                       id="turnover"
                       name="turnover"
                       className="form-control"
-                      placeholder="Enter turnover (e.g., ₹2.5 Crores)"
+                      placeholder="Enter turnover (e.g., 25000000)"
                       value={formData.turnover}
                       onChange={handleInputChange}
                     />
@@ -579,19 +650,6 @@ const AddTimelinePage = () => {
                         </option>
                       ))}
                     </select>
-                  </div>
-
-                  {/* Assigned Member Name (Read-only) */}
-                  <div className="form-group">
-                    <label htmlFor="teamMemberName" className="form-label">Assigned Member Name</label>
-                    <input
-                      type="text"
-                      id="teamMemberName"
-                      name="teamMemberName"
-                      className="form-control bg-gray-50"
-                      value={formData.teamMemberName}
-                      readOnly
-                    />
                   </div>
 
                   {/* Due Date */}
@@ -667,12 +725,20 @@ const AddTimelinePage = () => {
                   <div className="relative">
                     <input
                       type="text"
-                      className="form-control py-3 pr-10"
+                      className="form-control py-3 pr-20"
                       placeholder="Search clients..."
                       value={clientSearchQuery}
-                      onChange={(e) => setClientSearchQuery(e.target.value)}
+                      onChange={handleSearchChange}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleSearchClick();
+                        }
+                      }}
                     />
-                    <button className="absolute end-0 top-0 px-4 h-full">
+                    <button 
+                      className="absolute end-0 top-0 px-4 h-full bg-primary text-white hover:bg-primary-dark"
+                      onClick={handleSearchClick}
+                    >
                       <i className="ri-search-line text-lg"></i>
                     </button>
                   </div>
@@ -737,7 +803,7 @@ const AddTimelinePage = () => {
                         <li className={`page-item ${clientCurrentPage === 1 ? "disabled" : ""}`}>
                           <button
                             className="page-link py-2 px-3 ml-0 leading-tight text-gray-500 bg-white rounded-l-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                            onClick={() => setClientCurrentPage((prev) => Math.max(prev - 1, 1))}
+                            onClick={() => handleClientPageChange(Math.max(clientCurrentPage - 1, 1))}
                             disabled={clientCurrentPage === 1}
                           >
                             Previous
@@ -756,7 +822,7 @@ const AddTimelinePage = () => {
                                     ? "bg-primary text-white hover:bg-primary-dark"
                                     : "bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-700"
                                 }`}
-                                onClick={() => setClientCurrentPage(Number(page))}
+                                onClick={() => handleClientPageChange(Number(page))}
                               >
                                 {page}
                               </button>
@@ -766,7 +832,7 @@ const AddTimelinePage = () => {
                         <li className={`page-item ${clientCurrentPage === clientTotalPages ? "disabled" : ""}`}>
                           <button
                             className="page-link py-2 px-3 leading-tight text-gray-500 bg-white rounded-r-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                            onClick={() => setClientCurrentPage((prev) => Math.min(prev + 1, clientTotalPages))}
+                            onClick={() => handleClientPageChange(Math.min(clientCurrentPage + 1, clientTotalPages))}
                             disabled={clientCurrentPage === clientTotalPages}
                           >
                             Next

@@ -56,8 +56,8 @@ const AddGroupPage = () => {
       const queryParams = new URLSearchParams({
         page: page.toString(),
         limit: "10",
-        sort: `${sortField}:${sortOrder}`,
-        ...(searchQuery && { search: searchQuery })
+        sortBy: `${sortField}:${sortOrder}`,
+        ...(searchQuery && { name: searchQuery })
       });
 
       const response = await fetch(`${Base_url}clients?${queryParams}`, {
