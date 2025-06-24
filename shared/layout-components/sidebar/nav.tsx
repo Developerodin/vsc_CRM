@@ -113,6 +113,16 @@ export const MenuItems: any = [
   },
 
   {
+    icon: TaskIcon,
+    title: "Tasks",
+    type: "link",
+    active: false,
+    selected: false,
+    dirchange: false,
+    path: "/tasks",
+  },
+
+  {
     icon: GroupsIcon,
     title: "Groups",
     type: "link",
