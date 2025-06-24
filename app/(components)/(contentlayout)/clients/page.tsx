@@ -11,11 +11,14 @@ interface Client {
   name: string;
   phone: string;
   email: string;
+  email2: string;
   address: string;
-  city: string;
+  district: string;
   state: string;
   country: string;
-  pinCode: string;
+  fNo: string;
+  pan: string;
+  dob: string;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -31,14 +34,17 @@ interface ApiResponse {
 
 interface ExcelRow {
   ID?: string;
-  "Client Name": string;
-  "Client Phone": string;
-  "Client Email": string;
-  "Client Address": string;
-  "Client City": string;
-  "Client State": string;
-  "Client Country": string;
-  "Client Pin Code": string;
+  "Client Name"?: string;
+  "Client Phone"?: string;
+  "Client Email"?: string;
+  "Client Email 2"?: string;
+  "Client Address"?: string;
+  "Client District"?: string;
+  "Client State"?: string;
+  "Client Country"?: string;
+  "F No"?: string;
+  "PAN"?: string;
+  "Date of Birth"?: string;
   "Sort Order"?: string | number;
   "Created At"?: string;
 }
@@ -60,10 +66,11 @@ const ClientsPage = () => {
     name: "",
     email: "",
     phone: "",
-    city: "",
+    district: "",
     state: "",
     country: "",
-    pinCode: ""
+    fNo: "",
+    pan: ""
   });
 
   const fetchClients = async (page = 1, limit = itemsPerPage) => {
@@ -180,11 +187,14 @@ const ClientsPage = () => {
             "Client Name": client.name,
             "Client Phone": client.phone,
             "Client Email": client.email,
+            "Client Email 2": client.email2,
             "Client Address": client.address,
-            "Client City": client.city,
+            "Client District": client.district,
             "Client State": client.state,
             "Client Country": client.country,
-            "Client Pin Code": client.pinCode,
+            "F No": client.fNo,
+            "PAN": client.pan,
+            "Date of Birth": client.dob,
             "Sort Order": client.sortOrder,
           }));
       } else {
@@ -200,11 +210,14 @@ const ClientsPage = () => {
           "Client Name": client.name,
           "Client Phone": client.phone,
           "Client Email": client.email,
+          "Client Email 2": client.email2,
           "Client Address": client.address,
-          "Client City": client.city,
+          "Client District": client.district,
           "Client State": client.state,
           "Client Country": client.country,
-          "Client Pin Code": client.pinCode,
+          "F No": client.fNo,
+          "PAN": client.pan,
+          "Date of Birth": client.dob,
           "Sort Order": client.sortOrder
         }));
       }
@@ -215,11 +228,14 @@ const ClientsPage = () => {
         { wch: 30 }, // Name
         { wch: 20 }, // Phone
         { wch: 30 }, // Email
+        { wch: 30 }, // Email 2
         { wch: 40 }, // Address
-        { wch: 20 }, // City
+        { wch: 20 }, // District
         { wch: 20 }, // State
         { wch: 20 }, // Country
-        { wch: 15 }, // Pin Code
+        { wch: 15 }, // F No
+        { wch: 15 }, // PAN
+        { wch: 15 }, // Date of Birth
         { wch: 10 }, // Sort Order
       ];
 
@@ -275,33 +291,79 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
 
         // Transform data for bulk import
         const clients = jsonData.map((row, index) => {
-          const clientData = {
-            name: row["Client Name"].toString().trim(),
-            phone: String(row["Client Phone"]).replace(/[^0-9+]/g, ''),
-            email: row["Client Email"].toString().trim(),
-            address: row["Client Address"].toString().trim(),
-            city: row["Client City"].toString().trim(),
-            state: row["Client State"].toString().trim(),
-            country: row["Client Country"].toString().trim(),
-            pinCode: row["Client Pin Code"].toString().trim(),
-            sortOrder: parseInt(row["Sort Order"]?.toString() || "1")
-          };
+          try {
+            // Convert date format from "26.09.1991" to "1990-01-01"
+            const convertDateFormat = (dateString: string): string => {
+              if (!dateString || dateString.trim() === '') return '';
+              
+              const trimmedDate = dateString.toString().trim();
+              
+              // Handle "26.09.1991" format
+              if (trimmedDate.includes('.')) {
+                const parts = trimmedDate.split('.');
+                if (parts.length === 3) {
+                  const day = parts[0].padStart(2, '0');
+                  const month = parts[1].padStart(2, '0');
+                  const year = parts[2];
+                  return `${year}-${month}-${day}`;
+                }
+              }
+              
+              // Handle "26/09/1991" format
+              if (trimmedDate.includes('/')) {
+                const parts = trimmedDate.split('/');
+                if (parts.length === 3) {
+                  const day = parts[0].padStart(2, '0');
+                  const month = parts[1].padStart(2, '0');
+                  const year = parts[2];
+                  return `${year}-${month}-${day}`;
+                }
+              }
+              
+              // If already in "1990-01-01" format, return as is
+              if (trimmedDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                return trimmedDate;
+              }
+              
+              // If can't parse, return empty string
+              return '';
+            };
 
-          let clientId = row["ID"];
-          if (!clientId) {
-            // Try to find by name (case-insensitive)
-            const found = allClients.find(
-              (c) =>
-                c.name.trim().toLowerCase() ===
-                clientData.name.trim().toLowerCase()
-            );
-            if (found) clientId = found.id;
+            const clientData = {
+              name: (row["Client Name"]?.toString() || "").trim(),
+              phone: String(row["Client Phone"] || "").replace(/[^0-9+]/g, ''),
+              email: (row["Client Email"]?.toString() || "").trim(),
+              email2: row["Client Email 2"]?.toString().trim() || "",
+              address: (row["Client Address"]?.toString() || "").trim(),
+              district: (row["Client District"]?.toString() || "").trim(),
+              state: (row["Client State"]?.toString() || "").trim(),
+              country: (row["Client Country"]?.toString() || "").trim(),
+              fNo: row["F No"]?.toString().trim() || "",
+              pan: row["PAN"]?.toString().trim() || "",
+              dob: convertDateFormat(row["Date of Birth"]?.toString() || ""),
+              sortOrder: parseInt(row["Sort Order"]?.toString() || "1")
+            };
+
+            let clientId = row["ID"];
+            if (!clientId) {
+              // Try to find by name (case-insensitive)
+              const found = allClients.find(
+                (c) =>
+                  c.name.trim().toLowerCase() ===
+                  clientData.name.trim().toLowerCase()
+              );
+              if (found) clientId = found.id;
+            }
+
+            return {
+              ...(clientId && { id: clientId }),
+              ...clientData
+            };
+          } catch (error) {
+            console.error(`Error processing row ${index + 1}:`, error);
+            console.error('Row data:', row);
+            throw new Error(`Error processing row ${index + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`);
           }
-
-          return {
-            ...(clientId && { id: clientId }),
-            ...clientData
-          };
         });
 
         // Single API call instead of multiple requests
@@ -500,10 +562,11 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         name: "",
                         email: "",
                         phone: "",
-                        city: "",
+                        district: "",
                         state: "",
                         country: "",
-                        pinCode: ""
+                        fNo: "",
+                        pan: ""
                       });
                       setSortBy("name:asc");
                     }}
@@ -538,11 +601,14 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         </th>
                         <th className="px-4 py-3">Name</th>
                         <th className="px-4 py-3">Email</th>
+                        <th className="px-4 py-3">Email 2</th>
                         <th className="px-4 py-3">Phone</th>
-                        <th className="px-4 py-3">City</th>
+                        <th className="px-4 py-3">District</th>
                         <th className="px-4 py-3">State</th>
                         <th className="px-4 py-3">Country</th>
-                        <th className="px-4 py-3">Pin Code</th>
+                        <th className="px-4 py-3">F No</th>
+                        <th className="px-4 py-3">PAN</th>
+                        <th className="px-4 py-3">Date of Birth</th>
                         <th className="px-4 py-3">Created At</th>
                         <th className="px-4 py-3">Sort Order</th>
                         <th className="px-4 py-3">Actions</th>
@@ -567,12 +633,15 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                             </td>
                             <td>{client.name}</td>
                             <td>{client.email}</td>
+                            <td>{client.email2}</td>
                             <td>{client.phone}</td>
-                            <td>{client.city}</td>
+                            <td>{client.district}</td>
                             <td>{client.state}</td>
                             <td>{client.country}</td>
-                            <td>{client.pinCode}</td>
-                            <td>{client.createdAt}</td>
+                            <td>{client.fNo}</td>
+                            <td>{client.pan}</td>
+                            <td>{client.dob ? new Date(client.dob).toLocaleDateString() : '-'}</td>
+                            <td>{new Date(client.createdAt).toLocaleDateString()}</td>
                             <td>{client.sortOrder}</td>
                             <td>
                               <div className="flex space-x-2">
@@ -594,7 +663,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={10} className="text-center py-8">
+                          <td colSpan={14} className="text-center py-8">
                             <div className="flex flex-col items-center justify-center">
                               <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
                                 <i className="ri-folder-line text-4xl text-primary"></i>

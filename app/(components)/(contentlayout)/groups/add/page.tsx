@@ -11,11 +11,14 @@ interface Client {
   name: string;
   phone: string;
   email: string;
+  email2: string;
   address: string;
-  city: string;
+  district: string;
   state: string;
   country: string;
-  pinCode: string;
+  fNo: string;
+  pan: string;
+  dob: string;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -354,7 +357,7 @@ const AddGroupPage = () => {
                           Phone
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          City
+                          District
                         </th>
                       </tr>
                     </thead>
@@ -379,7 +382,7 @@ const AddGroupPage = () => {
                             {client.phone}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            {client.city}
+                            {client.district}
                           </td>
                         </tr>
                       ))}

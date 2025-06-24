@@ -11,11 +11,14 @@ interface Client {
   name: string;
   phone: string;
   email: string;
+  email2: string;
   address: string;
-  city: string;
+  district: string;
   state: string;
   country: string;
-  pinCode: string;
+  fNo: string;
+  pan: string;
+  dob: string;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -29,11 +32,14 @@ const AddClientPage = () => {
     name: '',
     phone: '',
     email: '',
+    email2: '',
     address: '',
-    city: '',
+    district: '',
     state: '',
     country: '',
-    pinCode: '',
+    fNo: '',
+    pan: '',
+    dob: '',
     sortOrder: 1,
   });
 
@@ -53,6 +59,12 @@ const AddClientPage = () => {
       return false;
     }
 
+    // Email2 validation (optional but if provided, should be valid)
+    if (formData.email2 && !emailRegex.test(formData.email2)) {
+      toast.error('Please enter a valid secondary email address');
+      return false;
+    }
+
     // Phone validation (basic format)
     const phoneRegex = /^\+?[\d\s-]{10,}$/;
     if (!phoneRegex.test(formData.phone)) {
@@ -60,10 +72,9 @@ const AddClientPage = () => {
       return false;
     }
 
-    // Pin code validation (basic format)
-    const pinCodeRegex = /^[\d]{6}$/;
-    if (!pinCodeRegex.test(formData.pinCode)) {
-      toast.error('Please enter a valid 6-digit pin code');
+    // PAN validation (basic format - 10 characters)
+    if (formData.pan && formData.pan.length !== 10) {
+      toast.error('PAN should be 10 characters long');
       return false;
     }
 
@@ -183,9 +194,23 @@ const AddClientPage = () => {
                     />
                   </div>
 
+                  {/* Client Email 2 */}
+                  <div className="form-group">
+                    <label htmlFor="email2" className="form-label">Secondary Email</label>
+                    <input
+                      type="email"
+                      id="email2"
+                      name="email2"
+                      className="form-control"
+                      placeholder="Enter secondary email (optional)"
+                      value={formData.email2}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+
                   {/* Client Address */}
                   <div className="form-group">
-                    <label htmlFor="address" className="form-label">Address <span className="text-red-500">*</span></label>
+                    <label htmlFor="address" className="form-label">Address</label>
                     <input
                       type="text"
                       id="address"
@@ -194,28 +219,26 @@ const AddClientPage = () => {
                       placeholder="Enter client address"
                       value={formData.address}
                       onChange={handleInputChange}
-                      required
                     />
                   </div>
 
-                  {/* Client City */}
+                  {/* Client District */}
                   <div className="form-group">
-                    <label htmlFor="city" className="form-label">City <span className="text-red-500">*</span></label>
+                    <label htmlFor="district" className="form-label">District</label>
                     <input
                       type="text"
-                      id="city"
-                      name="city"
+                      id="district"
+                      name="district"
                       className="form-control"
-                      placeholder="Enter city"
-                      value={formData.city}
+                      placeholder="Enter district"
+                      value={formData.district}
                       onChange={handleInputChange}
-                      required
                     />
                   </div>
 
                   {/* Client State */}
                   <div className="form-group">
-                    <label htmlFor="state" className="form-label">State <span className="text-red-500">*</span></label>
+                    <label htmlFor="state" className="form-label">State</label>
                     <input
                       type="text"
                       id="state"
@@ -224,13 +247,12 @@ const AddClientPage = () => {
                       placeholder="Enter state"
                       value={formData.state}
                       onChange={handleInputChange}
-                      required
                     />
                   </div>
 
                   {/* Client Country */}
                   <div className="form-group">
-                    <label htmlFor="country" className="form-label">Country <span className="text-red-500">*</span></label>
+                    <label htmlFor="country" className="form-label">Country</label>
                     <input
                       type="text"
                       id="country"
@@ -239,24 +261,48 @@ const AddClientPage = () => {
                       placeholder="Enter country"
                       value={formData.country}
                       onChange={handleInputChange}
-                      required
                     />
                   </div>
 
-                  {/* Client Pin Code */}
+                  {/* F No */}
                   <div className="form-group">
-                    <label htmlFor="pinCode" className="form-label">Pin Code <span className="text-red-500">*</span></label>
+                    <label htmlFor="fNo" className="form-label">F No</label>
                     <input
                       type="text"
-                      id="pinCode"
-                      name="pinCode"
+                      id="fNo"
+                      name="fNo"
                       className="form-control"
-                      placeholder="Enter 6-digit pin code"
-                      value={formData.pinCode}
+                      placeholder="Enter F No (optional)"
+                      value={formData.fNo}
                       onChange={handleInputChange}
-                      required
-                      maxLength={6}
-                      pattern="[0-9]{6}"
+                    />
+                  </div>
+
+                  {/* PAN */}
+                  <div className="form-group">
+                    <label htmlFor="pan" className="form-label">PAN</label>
+                    <input
+                      type="text"
+                      id="pan"
+                      name="pan"
+                      className="form-control"
+                      placeholder="Enter PAN (10 characters)"
+                      value={formData.pan}
+                      onChange={handleInputChange}
+                      maxLength={10}
+                    />
+                  </div>
+
+                  {/* Date of Birth */}
+                  <div className="form-group">
+                    <label htmlFor="dob" className="form-label">Date of Birth</label>
+                    <input
+                      type="date"
+                      id="dob"
+                      name="dob"
+                      className="form-control"
+                      value={formData.dob}
+                      onChange={handleInputChange}
                     />
                   </div>
 
