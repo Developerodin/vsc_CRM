@@ -26,7 +26,8 @@ interface Timeline {
     id: string;
     name: string;
   };
-  dueDate?: string;
+  startDate?: string;
+  endDate?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -52,7 +53,8 @@ interface ExcelRow {
   "Turnover"?: string;
   "Team Member ID"?: string;
   "Team Member Name": string;
-  "Due Date"?: string;
+  "Start Date"?: string;
+  "End Date"?: string;
   "Status": string;
   "Created At"?: string;
   "Updated At"?: string;
@@ -220,7 +222,8 @@ const TimelinesPage = () => {
             "Turnover": timeline.turnover?.toString() || "",
             "Team Member ID": timeline.assignedMember.id,
             "Team Member Name": timeline.assignedMember.name,
-            "Due Date": timeline.dueDate || "",
+            "Start Date": timeline.startDate || "",
+            "End Date": timeline.endDate || "",
             "Status": timeline.status
           }));
         successMessage = "Selected timelines exported successfully";
@@ -249,7 +252,8 @@ const TimelinesPage = () => {
           "Turnover": timeline.turnover?.toString() || "",
           "Team Member ID": timeline.assignedMember.id,
           "Team Member Name": timeline.assignedMember.name,
-          "Due Date": timeline.dueDate || "",
+          "Start Date": timeline.startDate || "",
+          "End Date": timeline.endDate || "",
           "Status": timeline.status
         }));
         successMessage = "All timelines exported successfully";
@@ -269,7 +273,8 @@ const TimelinesPage = () => {
         { wch: 25 }, // Turnover
         { wch: 25 }, // Team Member ID
         { wch: 25 }, // Team Member
-        { wch: 20 }, // Due Date
+        { wch: 20 }, // Start Date
+        { wch: 20 }, // End Date
         { wch: 20 }, // Status
       ];
 
@@ -313,7 +318,8 @@ const TimelinesPage = () => {
             udin: row["UDIN"] || undefined,
             turnover: row["Turnover"] ? parseFloat(row["Turnover"]) : undefined,
             assignedMember: row["Team Member ID"],
-            dueDate: row["Due Date"] || undefined,
+            startDate: row["Start Date"] || undefined,
+            endDate: row["End Date"] || undefined,
           }));
 
           // Single API call instead of multiple requests
@@ -561,8 +567,8 @@ const TimelinesPage = () => {
                     <option value="activityName:desc">Activity Name (Z-A)</option>
                     <option value="createdAt:desc">Newest First</option>
                     <option value="createdAt:asc">Oldest First</option>
-                    <option value="dueDate:asc">Due Date (Earliest-Latest)</option>
-                    <option value="dueDate:desc">Due Date (Latest-Earliest)</option>
+                    <option value="endDate:asc">End Date (Earliest-Latest)</option>
+                    <option value="endDate:desc">End Date (Latest-Earliest)</option>
                   </select>
 
                   {/* Reset button */}
@@ -619,7 +625,8 @@ const TimelinesPage = () => {
                       <th className="px-4 py-3">UDIN</th>
                       <th className="px-4 py-3">Turnover</th>
                       <th className="px-4 py-3">Assigned Member</th>
-                      <th className="px-4 py-3">Due Date</th>
+                      <th className="px-4 py-3">Start Date</th>
+                      <th className="px-4 py-3">End Date</th>
                       <th className="px-4 py-3">Status</th>
                       <th className="px-4 py-3">Actions</th>
                     </tr>
@@ -641,7 +648,7 @@ const TimelinesPage = () => {
                       </tr>
                     ) : timelines.length === 0 ? (
                       <tr>
-                        <td colSpan={11} className="text-center py-8">
+                        <td colSpan={12} className="text-center py-8">
                           <div className="flex flex-col items-center justify-center">
                             <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
                               <i className="ri-time-line text-4xl text-primary"></i>
@@ -679,7 +686,8 @@ const TimelinesPage = () => {
                           <td>{timeline.udin || "-"}</td>
                           <td>{timeline.turnover || "-"}</td>
                           <td>{timeline.assignedMember.name}</td>
-                          <td>{timeline.dueDate ? new Date(timeline.dueDate).toISOString().split('T')[0] : "-"}</td>
+                          <td>{timeline.startDate ? new Date(timeline.startDate).toISOString().split('T')[0] : "-"}</td>
+                          <td>{timeline.endDate ? new Date(timeline.endDate).toISOString().split('T')[0] : "-"}</td>
                           <td>
                             <span className={`badge ${
                               timeline.status === 'completed' ? 'bg-success' :
