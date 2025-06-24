@@ -84,15 +84,29 @@ interface Timeline {
     email: string;
   };
   status: 'pending' | 'completed' | 'ongoing' | 'delayed';
-  frequency: 'daily' | 'alternate day' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
-  frequencyCount: 'once' | 'twice';
+  frequency: 'Hourly' | 'Daily' | 'Weekly' | 'Monthly' | 'Quarterly' | 'Yearly';
+  frequencyConfig: {
+    hourlyInterval: number;
+    dailyTime: string;
+    weeklyDays: string[];
+    weeklyTime: string;
+    monthlyDay: number;
+    monthlyTime: string;
+    quarterlyMonths: string[];
+    quarterlyDay: number;
+    quarterlyTime: string;
+    yearlyMonth: string[];
+    yearlyDate: number;
+    yearlyTime: string;
+  };
   udin?: string;
   turnover?: number;
   assignedMember: {
     id: string;
     name: string;
   };
-  dueDate?: string;
+  startDate?: string;
+  endDate?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -109,6 +123,9 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
   const [clientTotalPages, setClientTotalPages] = useState(1);
   const [clientTotalResults, setClientTotalResults] = useState(0);
   
+  // Frequency configuration modal state
+  const [showFrequencyModal, setShowFrequencyModal] = useState(false);
+  
   // API data states
   const [activities, setActivities] = useState<Activity[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -121,14 +138,86 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
     clientName: '',
     clientEmail: '',
     frequency: '',
-    frequencyCount: '',
+    frequencyConfig: {
+      hourlyInterval: 1,
+      dailyTime: '',
+      weeklyDays: [] as string[],
+      weeklyTime: '',
+      monthlyDay: 1,
+      monthlyTime: '',
+      quarterlyMonths: [] as string[],
+      quarterlyDay: 1,
+      quarterlyTime: '',
+      yearlyMonth: [] as string[],
+      yearlyDate: 1,
+      yearlyTime: ''
+    },
     status: 'pending' as 'pending' | 'completed' | 'ongoing' | 'delayed',
     udin: '',
     turnover: '',
     teamMemberId: '',
     teamMemberName: '',
-    dueDate: ''
+    startDate: '',
+    endDate: ''
   });
+
+  // State for managing selected client in modal
+  const [selectedClientInModal, setSelectedClientInModal] = useState<Client | null>(null);
+
+  // Helper function to format ISO date to yyyy-MM-dd for date inputs
+  const formatDateForInput = (dateString?: string) => {
+    if (!dateString) return '';
+    try {
+      return new Date(dateString).toISOString().split('T')[0];
+    } catch (error) {
+      return '';
+    }
+  };
+
+  // Helper function to convert time from "HH:MM AM/PM" to "HH:MM" format
+  const formatTimeForInput = (timeString?: string) => {
+    if (!timeString) return '';
+    try {
+      // Handle "HH:MM AM/PM" format
+      const timeMatch = timeString.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      if (timeMatch) {
+        let hours = parseInt(timeMatch[1]);
+        const minutes = timeMatch[2];
+        const ampm = timeMatch[3].toUpperCase();
+        
+        // Convert 12-hour to 24-hour format
+        if (ampm === 'PM' && hours !== 12) {
+          hours += 12;
+        } else if (ampm === 'AM' && hours === 12) {
+          hours = 0;
+        }
+        
+        return `${hours.toString().padStart(2, '0')}:${minutes}`;
+      }
+      
+      // If it's already in "HH:MM" format, return as is
+      if (timeString.match(/^\d{2}:\d{2}$/)) {
+        return timeString;
+      }
+      
+      return '';
+    } catch (error) {
+      return '';
+    }
+  };
+
+  // Helper function to format date to ISO format with time set to 23:59:59.000Z
+  const formatDateToISO = (dateString?: string) => {
+    if (!dateString) return undefined;
+    try {
+      const date = new Date(dateString);
+      // Set time to 23:59:59.000Z for the end of the day
+      date.setHours(23, 59, 59, 0);
+      return date.toISOString();
+    } catch (error) {
+      return undefined;
+    }
+  };
 
   // Fetch activities from API
   const fetchActivities = async () => {
@@ -219,6 +308,8 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
 
         const timelineData: Timeline = await response.json();
 
+        console.log(timelineData);
+
         setFormData({
           activityId: timelineData.activity.id,
           groupId: 'none',
@@ -226,13 +317,21 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
           clientName: timelineData.client.name,
           clientEmail: timelineData.client.email,
           frequency: timelineData.frequency,
-          frequencyCount: timelineData.frequencyCount,
+          frequencyConfig: {
+            ...timelineData.frequencyConfig,
+            dailyTime: formatTimeForInput(timelineData.frequencyConfig.dailyTime),
+            weeklyTime: formatTimeForInput(timelineData.frequencyConfig.weeklyTime),
+            monthlyTime: formatTimeForInput(timelineData.frequencyConfig.monthlyTime),
+            quarterlyTime: formatTimeForInput(timelineData.frequencyConfig.quarterlyTime),
+            yearlyTime: formatTimeForInput(timelineData.frequencyConfig.yearlyTime)
+          },
           status: timelineData.status,
           udin: timelineData.udin || '',
           turnover: timelineData.turnover?.toString() || '',
           teamMemberId: timelineData.assignedMember.id,
           teamMemberName: timelineData.assignedMember.name,
-          dueDate: timelineData.dueDate ? new Date(timelineData.dueDate).toISOString().split('T')[0] : ''
+          startDate: formatDateForInput(timelineData.startDate),
+          endDate: formatDateForInput(timelineData.endDate)
         });
       } catch (error) {
         console.error('Error fetching timeline data:', error);
@@ -421,21 +520,137 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
     }
   };
 
-  const handleSelectClient = (client: Client) => {
+
+  // Frequency configuration functions
+  const handleFrequencyConfigChange = (field: string, value: any) => {
     setFormData(prev => ({
       ...prev,
-      clientId: client.id,
-      clientName: client.name,
-      clientEmail: client.email
+      frequencyConfig: {
+        ...prev.frequencyConfig,
+        [field]: value
+      }
     }));
-    setShowClientModal(false);
+  };
+
+  const validateFrequencyConfig = () => {
+    const { frequency, frequencyConfig } = formData;
+    
+    switch (frequency) {
+      case 'Hourly':
+        return frequencyConfig.hourlyInterval > 0;
+      case 'Daily':
+        return frequencyConfig.dailyTime !== '';
+      case 'Weekly':
+        return frequencyConfig.weeklyDays.length > 0 && frequencyConfig.weeklyTime !== '';
+      case 'Monthly':
+        return frequencyConfig.monthlyDay > 0 && frequencyConfig.monthlyDay <= 31 && frequencyConfig.monthlyTime !== '';
+      case 'Quarterly':
+        return frequencyConfig.quarterlyMonths.length > 0 && frequencyConfig.quarterlyDay > 0 && frequencyConfig.quarterlyDay <= 31 && frequencyConfig.quarterlyTime !== '';
+      case 'Yearly':
+        return frequencyConfig.yearlyMonth.length > 0 && frequencyConfig.yearlyDate > 0 && frequencyConfig.yearlyDate <= 31 && frequencyConfig.yearlyTime !== '';
+      default:
+        return false;
+    }
+  };
+
+  const formatTimeForAPI = (timeString: string) => {
+    if (!timeString) return '';
+    
+    // Convert 24-hour format to 12-hour format with AM/PM
+    const [hours, minutes] = timeString.split(':');
+    const minutesWithoutAMPM = minutes.split(' ')[0];
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12;
+    return `${displayHour.toString().padStart(2, '0')}:${minutesWithoutAMPM} ${ampm}`;
+  };
+
+  const handleSaveFrequencyConfig = () => {
+    if (validateFrequencyConfig()) {
+      setShowFrequencyModal(false);
+      toast.success('Frequency configuration saved');
+    } else {
+      toast.error('Please fill in all required fields for the selected frequency');
+    }
+  };
+
+  const handleCancelFrequencyConfig = () => {
+    setShowFrequencyModal(false);
+  };
+
+  const getFrequencyConfigStatus = () => {
+    if (!formData.frequency) return 'Not configured';
+    return validateFrequencyConfig() ? 'Configured' : 'Incomplete';
+  };
+
+  const getFrequencyConfigStatusColor = () => {
+    if (!formData.frequency) return 'text-gray-500';
+    return validateFrequencyConfig() ? 'text-green-600' : 'text-red-600';
+  };
+
+  // Helper function to remove empty fields from request body
+  const removeEmptyFields = (obj: any) => {
+    const cleaned: any = {};
+    Object.keys(obj).forEach(key => {
+      const value = obj[key];
+      if (value !== null && value !== undefined && value !== '') {
+        if (Array.isArray(value)) {
+          if (value.length > 0) {
+            cleaned[key] = value;
+          }
+        } else if (typeof value === 'object') {
+          const cleanedObj = removeEmptyFields(value);
+          if (Object.keys(cleanedObj).length > 0) {
+            cleaned[key] = cleanedObj;
+          }
+        } else {
+          cleaned[key] = value;
+        }
+      }
+    });
+    return cleaned;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if(!formData.clientId) {
+      toast.error('Please select a client');
+      return;
+    }
+    
+    // Validate frequency configuration
+    if (!validateFrequencyConfig()) {
+      toast.error('Please configure the frequency settings properly');
+      return;
+    }
     
     try {
       setIsLoading(true);
+
+      // Format frequency configuration for API
+      const formattedFrequencyConfig = {
+        ...formData.frequencyConfig,
+        dailyTime: formatTimeForAPI(formData.frequencyConfig.dailyTime),
+        weeklyTime: formatTimeForAPI(formData.frequencyConfig.weeklyTime),
+        monthlyTime: formatTimeForAPI(formData.frequencyConfig.monthlyTime),
+        quarterlyTime: formatTimeForAPI(formData.frequencyConfig.quarterlyTime),
+        yearlyTime: formatTimeForAPI(formData.frequencyConfig.yearlyTime)
+      };
+
+      // Remove empty fields from request body
+      const cleanedFormData = removeEmptyFields({
+        activity: formData.activityId,
+        client: formData.clientId,
+        frequency: formData.frequency,
+        frequencyConfig: formattedFrequencyConfig,
+        status: formData.status,
+        udin: formData.udin || undefined,
+        turnover: formData.turnover ? parseFloat(formData.turnover) : undefined,
+        assignedMember: formData.teamMemberId,
+        startDate: formatDateToISO(formData.startDate),
+        endDate: formatDateToISO(formData.endDate)
+      });
 
       const response = await fetch(`${Base_url}timelines/${params.id}`, {
         method: 'PATCH',
@@ -443,17 +658,7 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({
-          activity: formData.activityId,
-          client: formData.clientId,
-          frequency: formData.frequency,
-          frequencyCount: formData.frequencyCount,
-          status: formData.status,
-          udin: formData.udin || undefined,
-          turnover: formData.turnover ? parseFloat(formData.turnover) : undefined,
-          assignedMember: formData.teamMemberId,
-          dueDate: formData.dueDate || undefined
-        })
+        body: JSON.stringify(cleanedFormData)
       });
 
       if (!response.ok) {
@@ -472,20 +677,12 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
 
   const getFrequencyOptions = () => {
     const options = [
-      { value: 'daily', label: 'Daily' },
-      { value: 'alternate-day', label: 'Alternate Day' },
-      { value: 'weekly', label: 'Weekly' },
-      { value: 'monthly', label: 'Monthly' },
-      { value: 'quarterly', label: 'Quarterly' },
-      { value: 'yearly', label: 'Yearly' }
-    ];
-    return options;
-  };
-
-  const getFrequencyCountOptions = () => {
-    const options = [
-      { value: 'once', label: 'Once' },
-      { value: 'twice', label: 'Twice' }
+      { value: 'Hourly', label: 'Hourly' },
+      { value: 'Daily', label: 'Daily' },
+      { value: 'Weekly', label: 'Weekly' },
+      { value: 'Monthly', label: 'Monthly' },
+      { value: 'Quarterly', label: 'Quarterly' },
+      { value: 'Yearly', label: 'Yearly' }
     ];
     return options;
   };
@@ -555,8 +752,8 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
           <div className="box">
             <div className="box-body">
               <form onSubmit={handleSubmit}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Activity Name */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* First Row: Activity Name, Group, Client */}
                   <div className="form-group">
                     <label htmlFor="activityId" className="form-label">Activity Name <span className="text-red-500">*</span></label>
                     <select
@@ -576,7 +773,6 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
                     </select>
                   </div>
 
-                  {/* Group Selection */}
                   <div className="form-group">
                     <label htmlFor="groupId" className="form-label">Group <span className="text-red-500">*</span></label>
                     <select
@@ -596,30 +792,41 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
                     </select>
                   </div>
 
-                  {/* Client Selection */}
                   <div className="form-group">
                     <label htmlFor="clientId" className="form-label">Client <span className="text-red-500">*</span></label>
-                    <div className="flex gap-2">
+                    <div className="relative">
                       <button
                         type="button"
-                        className={`ti-btn ti-btn-primary ${
-                          !formData.groupId ? 'opacity-50 cursor-not-allowed' : ''
+                        className={`w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary ${
+                          !formData.groupId ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
                         }`}
                         onClick={() => {
                           if (formData.groupId) {
                             fetchAvailableClients(formData.groupId);
                             setShowClientModal(true);
+                            // Reset pagination and search when opening modal
+                            setClientCurrentPage(1);
+                            setClientSearchQuery("");
+                            // Initialize modal with currently selected client
+                            const currentSelectedClient = availableClients.find(client => 
+                              formData.clientId === client.id
+                            );
+                            setSelectedClientInModal(currentSelectedClient || null);
                           }
                         }}
                         disabled={!formData.groupId}
                       >
-                        <i className="ri-search-line me-2"></i>
-                        {formData.clientName ? `Selected: ${formData.clientName}` : "Select Client"}
+                        <span className="truncate">
+                          {formData.clientName ? formData.clientName : "Select Client"}
+                        </span>
+                        <i className="ri-arrow-down-s-line text-gray-400"></i>
                       </button>
                     </div>
                   </div>
+                </div>
 
-                  {/* Frequency */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+                  {/* Second Row: Frequency, Frequency Configuration, Status */}
                   <div className="form-group">
                     <label htmlFor="frequency" className="form-label">Frequency <span className="text-red-500">*</span></label>
                     <select
@@ -639,28 +846,33 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
                     </select>
                   </div>
 
-                  {/* Frequency Count */}
                   <div className="form-group">
-                    <label htmlFor="frequencyCount" className="form-label">Frequency Count <span className="text-red-500">*</span></label>
-                    <select
-                      id="frequencyCount"
-                      name="frequencyCount"
-                      className="form-select"
-                      value={formData.frequencyCount}
-                      onChange={handleInputChange}
+                    <label className="form-label">Frequency Configuration <span className="text-red-500">*</span></label>
+                    <button
+                      type="button"
+                      className={`w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary ${
+                        !formData.frequency ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
+                      }`}
+                      onClick={() => {
+                        if (formData.frequency) {
+                          setShowFrequencyModal(true);
+                        }
+                      }}
                       disabled={!formData.frequency}
-                      required
                     >
-                      <option value="">Select Count</option>
-                      {formData.frequency && getFrequencyCountOptions().map(option => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                      <span className="truncate">
+                        {formData.frequency ? (
+                          <span className={`${getFrequencyConfigStatusColor()}`}>
+                            {getFrequencyConfigStatus()}
+                          </span>
+                        ) : (
+                          'Select Frequency Configuration'
+                        )}
+                      </span>
+                      <i className="ri-settings-3-line text-gray-400"></i>
+                    </button>
                   </div>
 
-                  {/* Status */}
                   <div className="form-group">
                     <label htmlFor="status" className="form-label">Status <span className="text-red-500">*</span></label>
                     <select
@@ -677,8 +889,10 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
                       <option value="delayed">Delayed</option>
                     </select>
                   </div>
+                </div>
 
-                  {/* UDIN */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+                  {/* Third Row: UDIN, Turnover, Assigned Member */}
                   <div className="form-group">
                     <label htmlFor="udin" className="form-label">UDIN</label>
                     <input
@@ -692,7 +906,6 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
                     />
                   </div>
 
-                  {/* Turnover */}
                   <div className="form-group">
                     <label htmlFor="turnover" className="form-label">Turnover</label>
                     <input
@@ -706,7 +919,6 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
                     />
                   </div>
 
-                  {/* Assigned Member */}
                   <div className="form-group">
                     <label htmlFor="teamMemberId" className="form-label">Assigned Member <span className="text-red-500">*</span></label>
                     <select
@@ -725,45 +937,59 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
                       ))}
                     </select>
                   </div>
+                </div>
 
-                  {/* Due Date */}
-                  <div className="form-group md:col-span-2">
-                    <label htmlFor="dueDate" className="form-label">Due Date</label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                  {/* Date Fields: Start Date and End Date */}
+                  <div className="form-group">
+                    <label htmlFor="startDate" className="form-label">Start Date</label>
                     <input
                       type="date"
-                      id="dueDate"
-                      name="dueDate"
+                      id="startDate"
+                      name="startDate"
                       className="form-control"
-                      value={formData.dueDate}
+                      value={formData.startDate}
                       onChange={handleInputChange}
                     />
                   </div>
 
-                  {/* Form Actions */}
-                  <div className="flex items-center space-x-3 col-span-1 md:col-span-2">
-                    <button
-                      type="submit"
-                      className="ti-btn ti-btn-primary"
-                      disabled={isLoading}
-                    >
-                      {isLoading ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Updating...
-                        </>
-                      ) : (
-                        'Update Timeline'
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      className="ti-btn ti-btn-secondary"
-                      onClick={() => router.push('/timelines')}
-                      disabled={isLoading}
-                    >
-                      Cancel
-                    </button>
+                  <div className="form-group">
+                    <label htmlFor="endDate" className="form-label">End Date</label>
+                    <input
+                      type="date"
+                      id="endDate"
+                      name="endDate"
+                      className="form-control"
+                      value={formData.endDate}
+                      onChange={handleInputChange}
+                    />
                   </div>
+                </div>
+
+                {/* Form Actions */}
+                <div className="flex items-center space-x-3 mt-6">
+                  <button
+                    type="submit"
+                    className="ti-btn ti-btn-primary"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Updating...
+                      </>
+                    ) : (
+                      'Update Timeline'
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className="ti-btn ti-btn-secondary"
+                    onClick={() => router.push('/timelines')}
+                    disabled={isLoading}
+                  >
+                    Cancel
+                  </button>
                 </div>
               </form>
             </div>
@@ -827,30 +1053,48 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
                     <table className="table whitespace-nowrap table-bordered min-w-full">
                       <thead>
                         <tr className="border-b border-gray-200">
+                          <th scope="col" className="text-start w-12">
+                            <input
+                              type="radio"
+                              className="form-radio"
+                              checked={availableClients.length > 0 && selectedClientInModal !== null}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedClientInModal(availableClients[0]);
+                                } else {
+                                  setSelectedClientInModal(null);
+                                }
+                              }}
+                            />
+                          </th>
                           <th scope="col" className="text-start">Name</th>
                           <th scope="col" className="text-start">Email</th>
                           <th scope="col" className="text-start">Phone</th>
                           <th scope="col" className="text-start">City</th>
-                          <th scope="col" className="text-start">Action</th>
                         </tr>
                       </thead>
                       <tbody>
                         {Array.isArray(availableClients) && availableClients.length > 0 ? (
                           availableClients.map((client) => (
-                            <tr key={client.id} className="border-b border-gray-200">
+                            <tr key={client.id} className="border-b border-gray-200 hover:bg-gray-50">
+                              <td>
+                                <input
+                                  type="radio"
+                                  className="form-radio"
+                                  checked={selectedClientInModal !== null && selectedClientInModal.id === client.id}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedClientInModal(client);
+                                    } else {
+                                      setSelectedClientInModal(null);
+                                    }
+                                  }}
+                                />
+                              </td>
                               <td>{client.name}</td>
                               <td>{client.email}</td>
                               <td>{client.phone}</td>
                               <td>{client.city}</td>
-                              <td>
-                                <button
-                                  type="button"
-                                  className="ti-btn ti-btn-primary ti-btn-sm"
-                                  onClick={() => handleSelectClient(client)}
-                                >
-                                  <i className="ri-check-line"></i>
-                                </button>
-                              </td>
                             </tr>
                           ))
                         ) : (
@@ -916,6 +1160,286 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
                     </nav>
                   </div>
                 )}
+
+                {/* Modal Actions */}
+                <div className="flex justify-end space-x-3 mt-4 pt-4 border-t">
+                  <button
+                    type="button"
+                    className="ti-btn ti-btn-secondary"
+                    onClick={() => {
+                      setShowClientModal(false);
+                      setSelectedClientInModal(null);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="ti-btn ti-btn-primary"
+                    onClick={() => {
+                      setFormData(prev => ({
+                        ...prev,
+                        clientId: selectedClientInModal?.id || '',
+                        clientName: selectedClientInModal?.name || '',
+                        clientEmail: selectedClientInModal?.email || ''
+                      }));
+                      setShowClientModal(false);
+                    }}
+                  >
+                    Save Client
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Frequency Configuration Modal */}
+      {showFrequencyModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4">
+            <div className="fixed inset-0 bg-black opacity-50"></div>
+            <div className="relative bg-white rounded-lg shadow-xl w-full max-w-2xl">
+              <div className="flex items-center justify-between p-4 border-b">
+                <h3 className="text-xl font-semibold">
+                  Configure {formData.frequency} Frequency
+                </h3>
+                <button
+                  onClick={handleCancelFrequencyConfig}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <i className="ri-close-line text-2xl"></i>
+                </button>
+              </div>
+
+              <div className="p-6">
+                {formData.frequency === 'Hourly' && (
+                  <div className="space-y-4">
+                    <div className="form-group">
+                      <label className="form-label">Hourly Interval <span className="text-red-500">*</span></label>
+                      <select
+                        className="form-select"
+                        value={formData.frequencyConfig.hourlyInterval}
+                        onChange={(e) => handleFrequencyConfigChange('hourlyInterval', parseInt(e.target.value) || 1)}
+                      >
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map(hour => (
+                          <option key={hour} value={hour}>
+                            Every {hour} hour{hour > 1 ? 's' : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <small className="text-gray-500">How many hours between each occurrence</small>
+                    </div>
+                  </div>
+                )}
+
+                {formData.frequency === 'Daily' && (
+                  <div className="space-y-4">
+                    <div className="form-group">
+                      <label className="form-label">Daily Time <span className="text-red-500">*</span></label>
+                      <input
+                        type="time"
+                        className="form-control"
+                        value={formData.frequencyConfig.dailyTime}
+                        onChange={(e) => handleFrequencyConfigChange('dailyTime', e.target.value)}
+                      />
+                      <small className="text-gray-500">Time of day for the activity</small>
+                    </div>
+                  </div>
+                )}
+
+                {formData.frequency === 'Weekly' && (
+                  <div className="space-y-4">
+                    <div className="form-group">
+                      <label className="form-label">Days of Week <span className="text-red-500">*</span></label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
+                          <label key={day} className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              className="form-checkbox"
+                              checked={formData.frequencyConfig.weeklyDays.includes(day)}
+                              onChange={(e) => {
+                                const currentDays = formData.frequencyConfig.weeklyDays;
+                                if (e.target.checked) {
+                                  handleFrequencyConfigChange('weeklyDays', [...currentDays, day]);
+                                } else {
+                                  handleFrequencyConfigChange('weeklyDays', currentDays.filter((d: string) => d !== day));
+                                }
+                              }}
+                            />
+                            <span className="text-sm">{day}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Weekly Time <span className="text-red-500">*</span></label>
+                      <input
+                        type="time"
+                        className="form-control"
+                        value={formData.frequencyConfig.weeklyTime}
+                        onChange={(e) => handleFrequencyConfigChange('weeklyTime', e.target.value)}
+                      />
+                      <small className="text-gray-500">Time of day for the activity</small>
+                    </div>
+                  </div>
+                )}
+
+                {formData.frequency === 'Monthly' && (
+                  <div className="space-y-4">
+                    <div className="form-group">
+                      <label className="form-label">Day of Month <span className="text-red-500">*</span></label>
+                      <select
+                        className="form-select"
+                        value={formData.frequencyConfig.monthlyDay}
+                        onChange={(e) => handleFrequencyConfigChange('monthlyDay', parseInt(e.target.value) || 1)}
+                      >
+                        {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                          <option key={day} value={day}>
+                            {day}
+                          </option>
+                        ))}
+                      </select>
+                      <small className="text-gray-500">Day of the month for the activity</small>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Monthly Time <span className="text-red-500">*</span></label>
+                      <input
+                        type="time"
+                        className="form-control"
+                        value={formData.frequencyConfig.monthlyTime}
+                        onChange={(e) => handleFrequencyConfigChange('monthlyTime', e.target.value)}
+                      />
+                      <small className="text-gray-500">Time of day for the activity</small>
+                    </div>
+                  </div>
+                )}
+
+                {formData.frequency === 'Quarterly' && (
+                  <div className="space-y-4">
+                    <div className="form-group">
+                      <label className="form-label">Quarterly Months <span className="text-red-500">*</span></label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(month => (
+                          <label key={month} className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              className="form-checkbox"
+                              checked={formData.frequencyConfig.quarterlyMonths.includes(month)}
+                              onChange={(e) => {
+                                const currentMonths = formData.frequencyConfig.quarterlyMonths;
+                                if (e.target.checked) {
+                                  handleFrequencyConfigChange('quarterlyMonths', [...currentMonths, month]);
+                                } else {
+                                  handleFrequencyConfigChange('quarterlyMonths', currentMonths.filter((m: string) => m !== month));
+                                }
+                              }}
+                            />
+                            <span className="text-sm">{month}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Day of Month <span className="text-red-500">*</span></label>
+                      <select
+                        className="form-select"
+                        value={formData.frequencyConfig.quarterlyDay}
+                        onChange={(e) => handleFrequencyConfigChange('quarterlyDay', parseInt(e.target.value) || 1)}
+                      >
+                        {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                          <option key={day} value={day}>
+                            {day}
+                          </option>
+                        ))}
+                      </select>
+                      <small className="text-gray-500">Day of the month for the activity</small>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Quarterly Time <span className="text-red-500">*</span></label>
+                      <input
+                        type="time"
+                        className="form-control"
+                        value={formData.frequencyConfig.quarterlyTime}
+                        onChange={(e) => handleFrequencyConfigChange('quarterlyTime', e.target.value)}
+                      />
+                      <small className="text-gray-500">Time of day for the activity</small>
+                    </div>
+                  </div>
+                )}
+
+                {formData.frequency === 'Yearly' && (
+                  <div className="space-y-4">
+                    <div className="form-group">
+                      <label className="form-label">Months <span className="text-red-500">*</span></label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(month => (
+                          <label key={month} className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              className="form-checkbox"
+                              checked={formData.frequencyConfig.yearlyMonth.includes(month)}
+                              onChange={(e) => {
+                                const currentMonths = formData.frequencyConfig.yearlyMonth;
+                                if (e.target.checked) {
+                                  handleFrequencyConfigChange('yearlyMonth', [...currentMonths, month]);
+                                } else {
+                                  handleFrequencyConfigChange('yearlyMonth', currentMonths.filter((m: string) => m !== month));
+                                }
+                              }}
+                            />
+                            <span className="text-sm">{month}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Day of Month <span className="text-red-500">*</span></label>
+                      <select
+                        className="form-select"
+                        value={formData.frequencyConfig.yearlyDate}
+                        onChange={(e) => handleFrequencyConfigChange('yearlyDate', parseInt(e.target.value) || 1)}
+                      >
+                        {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                          <option key={day} value={day}>
+                            {day}
+                          </option>
+                        ))}
+                      </select>
+                      <small className="text-gray-500">Day of the month for the activity</small>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Yearly Time <span className="text-red-500">*</span></label>
+                      <input
+                        type="time"
+                        className="form-control"
+                        value={formData.frequencyConfig.yearlyTime}
+                        onChange={(e) => handleFrequencyConfigChange('yearlyTime', e.target.value)}
+                      />
+                      <small className="text-gray-500">Time of day for the activity</small>
+                    </div>
+                  </div>
+                )}
+
+                {/* Modal Actions */}
+                <div className="flex justify-end space-x-3 mt-6 pt-4 border-t">
+                  <button
+                    type="button"
+                    className="ti-btn ti-btn-secondary"
+                    onClick={handleCancelFrequencyConfig}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="ti-btn ti-btn-primary"
+                    onClick={handleSaveFrequencyConfig}
+                  >
+                    Save Configuration
+                  </button>
+                </div>
               </div>
             </div>
           </div>
