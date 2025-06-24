@@ -25,18 +25,21 @@ interface Group {
 }
 
 interface Client {
-    id: string;
-    name: string;
-    phone: string;
-    email: string;
-    address: string;
-    city: string;
-    state: string;
-    country: string;
-    pinCode: string;
-    sortOrder: number;
-    createdAt: string;
-    updatedAt: string;
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  email2: string;
+  address: string;
+  district: string;
+  state: string;
+  country: string;
+  fNo: string;
+  pan: string;
+  dob: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface TeamMember {
@@ -1070,7 +1073,7 @@ const AddTimelinePage = () => {
                           <th scope="col" className="text-start">Name</th>
                           <th scope="col" className="text-start">Email</th>
                           <th scope="col" className="text-start">Phone</th>
-                          <th scope="col" className="text-start">City</th>
+                          <th scope="col" className="text-start">District</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1088,7 +1091,7 @@ const AddTimelinePage = () => {
                               <td>{client.name}</td>
                               <td>{client.email}</td>
                               <td>{client.phone}</td>
-                              <td>{client.city}</td>
+                              <td>{client.district}</td>
                             </tr>
                           ))
                         ) : (
