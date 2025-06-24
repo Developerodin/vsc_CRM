@@ -82,25 +82,25 @@ export const MenuItems: any = [
     path: "/dashboard",
   },
   
-  {
-    icon: BranchesIcon,
-    title: "Branches",
-    type: "link",
-    active: false,
-    selected: false,
-    dirchange: false,
-    path: "/branches",
-  },
+  // {
+  //   icon: BranchesIcon,
+  //   title: "Branches",
+  //   type: "link",
+  //   active: false,
+  //   selected: false,
+  //   dirchange: false,
+  //   path: "/branches",
+  // },
 
-  {
-    icon: ActivitiesIcon,
-    title: "Activities",
-    type: "link",
-    active: false,
-    selected: false,
-    dirchange: false,
-    path: "/activities",
-  },
+  // {
+  //   icon: ActivitiesIcon,
+  //   title: "Activities",
+  //   type: "link",
+  //   active: false,
+  //   selected: false,
+  //   dirchange: false,
+  //   path: "/activities",
+  // },
 
   {
     icon: ClientsIcon,
@@ -155,55 +155,45 @@ export const MenuItems: any = [
   },
 
 
-  // {
-  //   icon: NestedmenuIcon,
-  //   title: "Nested Menu",
-  //   selected: false,
-  //   active: false,
-  //   type: "sub",
-  //   children: [
-  //     {
-  //       path: "",
-  //       title: "Nested-1",
-  //       type: "empty",
-  //       active: false,
-  //       selected: false,
-  //       dirchange: false,
-  //     },
-
-  //     {
-  //       title: "Nested-2",
-  //       type: "sub",
-  //       active: false,
-  //       selected: false,
-  //       dirchange: false,
-  //       children: [
-  //         {
-  //           path: "",
-  //           type: "empty",
-  //           active: false,
-  //           selected: false,
-  //           dirchange: false,
-  //           title: "Nested-2-1",
-  //         },
-  //         {
-  //           path: "",
-  //           type: "empty",
-  //           ctive: false,
-  //           selected: false,
-  //           dirchange: false,
-  //           title: "Nested-2-2",
-  //         },
-  //         {
-  //           path: "",
-  //           type: "empty",
-  //           active: false,
-  //           selected: false,
-  //           dirchange: false,
-  //           title: "Nested-2-3",
-  //         },
-  //       ],
-  //     },
-  //   ],
-  // },
+  {
+    icon: NestedmenuIcon,
+    title: "Settings",
+    selected: false,
+    active: false,
+    type: "sub",
+    children: [
+      {
+        title: "Activities",
+        type: "link",
+        active: false,
+        selected: false,
+        dirchange: false,
+        path: "/activities",
+      },
+      {
+        title: "Branches",
+        type: "link",
+        active: false,
+        selected: false,
+        dirchange: false,
+        path: "/branches",
+      },
+      {
+        title: "Users",
+        type: "link",
+        active: false,
+        selected: false,
+        dirchange: false,
+        path: "/users",
+      },
+      {
+        title: "Roles",
+        type: "link",
+        active: false,
+        selected: false,
+        dirchange: false,
+        path: "/roles",
+      },
+    ],
+  },
 ];
