@@ -7,6 +7,7 @@ import store from '@/shared/redux/store';
 import Modalsearch from '../modal-search/modalsearch';
 import { basePath } from '@/next.config';
 import { useRouter } from 'next/navigation';
+import { logout } from "@/shared/utils/permissions";
 
 const Header = ({ local_varaiable, ThemeChanger }:any) => {
 
@@ -769,8 +770,12 @@ const Header = ({ local_varaiable, ThemeChanger }:any) => {
                       className="ti ti-wallet text-[1.125rem] me-2 opacity-[0.7 !inline-flex"></i>Bal: $7,12,950</Link></li>
                     <li><Link className="w-full ti-dropdown-item !text-[0.8125rem] !p-[0.65rem] !gap-x-0 !inline-flex" href="#!"><i
                       className="ti ti-headset text-[1.125rem] me-2 opacity-[0.7] !inline-flex"></i>Support</Link></li> */}
-                    <li><Link className="w-full ti-dropdown-item !text-[0.8125rem] !p-[0.65rem] !gap-x-0 !inline-flex" href="/"><i
-                      className="ti ti-logout text-[1.125rem] me-2 opacity-[0.7] !inline-flex"></i>Log Out</Link></li>
+                    <li><button 
+                      onClick={logout}
+                      className="w-full ti-dropdown-item !text-[0.8125rem] !p-[0.65rem] !gap-x-0 !inline-flex text-left"
+                    >
+                      <i className="ti ti-logout text-[1.125rem] me-2 opacity-[0.7] !inline-flex"></i>Log Out
+                    </button></li>
                   </ul>
                 </div>
               </div>

@@ -9,11 +9,35 @@ import SimpleBar from 'simplebar-react';
 import Menuloop from "./menuloop";
 import { usePathname, useRouter } from "next/navigation";
 import { MenuItems } from "./nav";
+import { filterMenuItems, getUserFromStorage } from "@/shared/utils/permissions";
 
 const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
 	const [menuitems, setMenuitems] = useState(MenuItems);
+	const [filteredMenuItems, setFilteredMenuItems] = useState(MenuItems);
 
-	const path = usePathname()	
+	const router = useRouter();
+	const pathname = usePathname();
+
+	// Filter menu items based on user permissions
+	useEffect(() => {
+		try {
+			const user = getUserFromStorage();
+			if (user) {
+				const filtered = filterMenuItems(MenuItems);
+				setFilteredMenuItems(filtered);
+				setMenuitems(filtered);
+			} else {
+				// If no user, show all items (for login page)
+				setFilteredMenuItems(MenuItems);
+				setMenuitems(MenuItems);
+			}
+		} catch (error) {
+			console.error('Error filtering menu items:', error);
+			// Fallback to showing all items if there's an error
+			setFilteredMenuItems(MenuItems);
+			setMenuitems(MenuItems);
+		}
+	}, [pathname]); // Re-filter when pathname changes (user might have logged in/out)
 
 	function closeMenu() {
 		const closeMenudata = (items: any) => {
@@ -22,7 +46,7 @@ const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
 				closeMenudata(item.children);
 			});
 		};
-		closeMenudata(MenuItems);
+		closeMenudata(filteredMenuItems);
 		setMenuitems((arr: any) => [...arr]);
 	}
 
@@ -46,9 +70,6 @@ const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
 			window.removeEventListener('resize', checkHoriMenu);
 		};
 	}, []);
-
-	const router = useRouter();
-	const pathname = usePathname()
 
 	function Onhover() {
 
@@ -426,7 +447,7 @@ const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
 				setSubmenuRecursively(item.children);
 			});
 		};
-		setSubmenuRecursively(MenuItems);
+		setSubmenuRecursively(filteredMenuItems);
 	}
 	const [previousUrl, setPreviousUrl] = useState("/");
 
@@ -448,7 +469,7 @@ const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
 			setMenuUsingUrl(currentPath);
 			setPreviousUrl(currentPath);
 		}
-	}, [pathname]);
+	}, [pathname, filteredMenuItems]);
 
 	function toggleSidemenu(event: any, targetObject: any, MenuItems = menuitems) {
 		const theme = store.getState();
@@ -654,7 +675,7 @@ const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
 							</svg></div>
 
 							<ul className="main-menu" onClick={() => Sideclick()}>
-								{MenuItems.map((levelone: any, index:any) => (
+								{filteredMenuItems.map((levelone: any, index:any) => (
 									<Fragment key={index}>
 										<li className={`${levelone.menutitle ? 'slide__category' : ''} ${levelone.type === 'link' ? 'slide' : ''}
                                                ${levelone.type === 'sub' ? 'slide has-sub' : ''} ${levelone?.active ? 'open' : ''} ${levelone?.selected ? 'active' : ''}`}>
