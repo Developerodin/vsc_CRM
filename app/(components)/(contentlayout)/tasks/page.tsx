@@ -53,27 +53,7 @@ interface ApiResponse {
   totalResults: number;
 }
 
-interface ExcelRow {
-  ID?: string;
-  "Activity ID"?: string;
-  "Activity Name": string;
-  "Client ID"?: string;
-  "Client Name": string;
-  "Client Email": string;
-  "Frequency": string;
-  "UDIN"?: string;
-  "Turnover"?: string;
-  "Team Member ID"?: string;
-  "Team Member Name": string;
-  "Start Date"?: string;
-  "End Date"?: string;
-  "Status": string;
-  "Created At"?: string;
-  "Updated At"?: string;
-}
-
 const TimelinesPage = () => {
-  const [selectedTimelines, setSelectedTimelines] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [timelines, setTimelines] = useState<Timeline[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -81,13 +61,13 @@ const TimelinesPage = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalResults, setTotalResults] = useState(0);
   const [sortBy, setSortBy] = useState<string>("activityName:asc");
-  const [importProgress, setImportProgress] = useState<number | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [searchInputValue, setSearchInputValue] = useState("");
   const [filters, setFilters] = useState({
     activityName: "",
-    status: ""
+    status: "",
+    // startDate: "",
+    // endDate: ""
   });
 
   // Debounced search function
@@ -153,221 +133,6 @@ const TimelinesPage = () => {
     fetchTimelines(currentPage, itemsPerPage);
   }, [currentPage, sortBy, filters, itemsPerPage]);
 
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) {
-      setSelectedTimelines(timelines.map(timeline => timeline.id));
-    } else {
-      setSelectedTimelines([]);
-    }
-  };
-
-  const handleSelectTimeline = (timelineId: string) => {
-    setSelectedTimelines(prev =>
-      prev.includes(timelineId)
-        ? prev.filter(id => id !== timelineId)
-        : [...prev, timelineId]
-    );
-  };
-
-  const handleDelete = async (timelineId: string) => {
-    if (!confirm('Are you sure you want to delete this timeline?')) return;
-
-    try {
-      const response = await fetch(`${Base_url}timelines/${timelineId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete timeline');
-      }
-
-      toast.success('Timeline deleted successfully');
-      fetchTimelines(currentPage, itemsPerPage);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to delete timeline');
-    }
-  };
-
-  const handleDeleteSelected = async () => {
-    if (!confirm('Are you sure you want to delete selected timelines?')) return;
-
-    try {
-      await Promise.all(
-        selectedTimelines.map(timelineId =>
-          fetch(`${Base_url}timelines/${timelineId}`, {
-            method: 'DELETE',
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            }
-          })
-        )
-      );
-
-      toast.success('Selected timelines deleted successfully');
-      setSelectedTimelines([]);
-      fetchTimelines();
-    } catch (err) {
-      toast.error('Failed to delete some timelines');
-    }
-  };
-
-  const handleExport = async () => {
-    try {
-      let exportData;
-      let successMessage;
-
-      if (selectedTimelines.length > 0) {
-        exportData = timelines
-          .filter(timeline => selectedTimelines.includes(timeline.id))
-          .map((timeline: Timeline) => ({
-            ID: timeline.id,
-            "Activity ID": timeline.activity.id,
-            "Activity Name": timeline.activity.name,
-            "Client ID": timeline.client.id,
-            "Client Name": timeline.client.name,
-            "Client Email": timeline.client.email,
-            "Frequency": timeline.frequency,
-            "UDIN": timeline.udin || "",
-            "Turnover": timeline.turnover?.toString() || "",
-            "Team Member ID": timeline.assignedMember.id,
-            "Team Member Name": timeline.assignedMember.name,
-            "Start Date": timeline.startDate || "",
-            "End Date": timeline.endDate || "",
-            "Status": timeline.status
-          }));
-        successMessage = "Selected timelines exported successfully";
-      } else {
-        const response = await fetch(`${Base_url}timelines?limit=1000`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch timelines for export');
-        }
-
-        const apiData: ApiResponse = await response.json();
-        exportData = apiData.results.map((timeline: Timeline) => ({
-          ID: timeline.id,
-          "Activity ID": timeline.activity.id,
-          "Activity Name": timeline.activity.name,
-          "Client ID": timeline.client.id,
-          "Client Name": timeline.client.name,
-          "Client Email": timeline.client.email,
-          "Frequency": timeline.frequency,
-          "UDIN": timeline.udin,
-          "Turnover": timeline.turnover?.toString() || "",
-          "Team Member ID": timeline.assignedMember.id,
-          "Team Member Name": timeline.assignedMember.name,
-          "Start Date": timeline.startDate || "",
-          "End Date": timeline.endDate || "",
-          "Status": timeline.status
-        }));
-        successMessage = "All timelines exported successfully";
-      }
-
-      const ws = XLSX.utils.json_to_sheet(exportData);
-      ws["!cols"] = [
-        { wch: 20 }, // ID
-        { wch: 25 }, // Activity ID
-        { wch: 30 }, // Activity Name
-        { wch: 25 }, // Client ID
-        { wch: 30 }, // Client Name
-        { wch: 30 }, // Client Email
-        { wch: 20 }, // Frequency
-        { wch: 20 }, // UDIN
-        { wch: 25 }, // Turnover
-        { wch: 25 }, // Team Member ID
-        { wch: 25 }, // Team Member
-        { wch: 20 }, // Start Date
-        { wch: 20 }, // End Date
-        { wch: 20 }, // Status
-      ];
-
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Timelines");
-      const fileName = `timelines_${new Date().toISOString().split("T")[0]}.xlsx`;
-      XLSX.writeFile(wb, fileName);
-      toast.success(successMessage);
-    } catch (error) {
-      console.error("Error exporting timelines:", error);
-      toast.error("Failed to export timelines");
-    }
-  };
-
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json<ExcelRow>(worksheet);
-
-          if (jsonData.length === 0) {
-            toast.error('No data found in the file');
-            return;
-          }
-
-          // Transform data for bulk import
-          const timelines = jsonData.map(row => ({
-            id: row["ID"] || undefined, // Only include if exists
-            activity: row["Activity ID"],
-            client: row["Client ID"],
-            status: row["Status"] as 'pending' | 'completed' | 'ongoing' | 'delayed',
-            frequency: row["Frequency"] as 'Hourly' | 'Daily' | 'Weekly' | 'Monthly' | 'Quarterly' | 'Yearly',
-            udin: row["UDIN"] || undefined,
-            turnover: row["Turnover"] ? parseFloat(row["Turnover"]) : undefined,
-            assignedMember: row["Team Member ID"],
-            startDate: row["Start Date"] || undefined,
-            endDate: row["End Date"] || undefined,
-          }));
-
-          // Single API call instead of multiple requests
-          const response = await fetch(`${Base_url}timelines/bulk-import`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            },
-            body: JSON.stringify({ timelines })
-          });
-
-          if (!response.ok) {
-            throw new Error('Bulk import failed');
-          }
-
-          const result = await response.json();
-          
-          if (result.errors && result.errors.length > 0) {
-            toast.error(`Import completed with ${result.errors.length} errors`);
-            console.log('Import errors:', result.errors);
-          } else {
-            toast.success(`Import completed: ${result.created} added, ${result.updated} updated`);
-          }
-
-          fetchTimelines(); // Refresh the list
-        } catch (err) {
-          console.error('Error processing file:', err);
-          toast.error('Failed to process file');
-        }
-      };
-
-      reader.readAsArrayBuffer(file);
-    } catch (err) {
-      console.error('Error reading file:', err);
-      toast.error('Failed to read file');
-    }
-  };
-
   // Condensed pagination helper
   function getPagination(currentPage: number, totalPages: number) {
     const pages = [];
@@ -394,66 +159,8 @@ const TimelinesPage = () => {
       <Toaster position="top-right" />
       <Seo title="Timelines" />
 
-      <div className="grid grid-cols-12 gap-6">
+      <div className="grid grid-cols-12 gap-6 mt-7">
         <div className="col-span-12">
-          {/* Page Header */}
-          <div className="box !bg-transparent border-0 shadow-none">
-            <div className="box-header flex justify-between items-center">
-              <h1 className="box-title text-2xl font-semibold">Timelines</h1>
-              <div className="box-tools flex items-center space-x-2">
-              {selectedTimelines.length > 0 && (
-                  <button
-                    type="button"
-                    className="ti-btn ti-btn-danger"
-                    onClick={handleDeleteSelected}
-                  >
-                    <i className="ri-delete-bin-line me-2"></i>
-                    Delete Selected ({selectedTimelines.length})
-                  </button>
-                )}
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleImport}
-                  accept=".xlsx,.xls"
-                  className="hidden"
-                />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="ti-btn ti-btn-success"
-                >
-                  <i className="ri-download-2-line me-2"></i>
-                  Import
-                </button>
-                {importProgress !== null && (
-                  <div className="w-40 h-3 bg-gray-200 rounded-full overflow-hidden flex items-center ml-2">
-                    <div
-                      className="bg-primary h-full transition-all duration-200"
-                      style={{ width: `${importProgress}%` }}
-                    ></div>
-                    <span className="ml-2 text-xs text-gray-700">
-                      {importProgress}%
-                    </span>
-                  </div>
-                )}
-                <button
-                  type="button"
-                  className="ti-btn ti-btn-primary"
-                  onClick={handleExport}
-                >
-                  <i className="ri-upload-2-line me-2"></i> Export
-                </button>
-                <Link
-                  href="/timelines/add"
-                  className="ti-btn ti-btn-primary"
-                >
-                  <i className="ri-add-line me-2"></i>
-                  Add New Timeline
-                </Link>
-              </div>
-            </div>
-          </div>
-
           {/* Content Box */}
           <div className="box">
             <div className="box-body">
@@ -587,7 +294,9 @@ const TimelinesPage = () => {
                       setSearchInputValue("");
                       setFilters({
                         activityName: "",
-                        status: ""
+                        status: "",
+                        // startDate: "",
+                        // endDate: ""
                       });
                       setSortBy("activityName:asc");
                     }}
@@ -598,35 +307,11 @@ const TimelinesPage = () => {
                 </div>
               </div>
 
-              {/* Import Progress */}
-              {/* {importProgress > 0 && importProgress < 100 && (
-                <div className="mb-4">
-                  <div className="flex justify-between mb-1">
-                    <span>Importing...</span>
-                    <span>{Math.round(importProgress)}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-primary h-2 rounded-full"
-                      style={{ width: `${importProgress}%` }}
-                    ></div>
-                  </div>
-                </div>
-              )} */}
-
               {/* Timelines Table */}
               <div className="table-responsive">
                 <table className="table whitespace-nowrap table-bordered">
                   <thead>
                     <tr>
-                      <th className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          className="form-checkbox"
-                          checked={selectedTimelines.length === timelines.length}
-                          onChange={handleSelectAll}
-                        />
-                      </th>
                       <th className="px-4 py-3">Activity</th>
                       <th className="px-4 py-3">Client Name</th>
                       <th className="px-4 py-3">Client Email</th>
@@ -637,7 +322,6 @@ const TimelinesPage = () => {
                       <th className="px-4 py-3">Start Date</th>
                       <th className="px-4 py-3">End Date</th>
                       <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -663,31 +347,14 @@ const TimelinesPage = () => {
                               <i className="ri-time-line text-4xl text-primary"></i>
                             </div>
                             <h3 className="text-xl font-medium mb-2">
-                              No Timelines Found
+                              No Tasks Found
                             </h3>
-                            <p className="text-gray-500 text-center mb-6">
-                              Start by adding your first timeline.
-                            </p>
-                            <Link
-                              href="/timelines/add"
-                              className="ti-btn ti-btn-primary"
-                            >
-                              <i className="ri-add-line me-2"></i> Add First Timeline
-                            </Link>
                           </div>
                         </td>
                       </tr>
                     ) : (
                       timelines.map((timeline) => (
                         <tr key={timeline.id}>
-                          <td>
-                            <input
-                              type="checkbox"
-                              checked={selectedTimelines.includes(timeline.id)}
-                              onChange={() => handleSelectTimeline(timeline.id)}
-                              className="form-checkbox"
-                            />
-                          </td>
                           <td>{timeline.activity.name}</td>
                           <td>{timeline.client.name}</td>
                           <td>{timeline.client.email}</td>
@@ -706,24 +373,6 @@ const TimelinesPage = () => {
                             }`}>
                               {timeline.status[0].toUpperCase() + timeline.status.slice(1)}
                             </span>
-                          </td>
-                          <td>
-                            <div className="flex space-x-2">
-                              <Link
-                                href={`/timelines/edit/${timeline.id}`}
-                                className="ti-btn ti-btn-primary ti-btn-sm"
-                                title="Edit"
-                              >
-                                <i className="ri-edit-line"></i>
-                              </Link>
-                              <button
-                                onClick={() => handleDelete(timeline.id)}
-                                className="ti-btn ti-btn-danger ti-btn-sm"
-                                title="Delete"
-                              >
-                                <i className="ri-delete-bin-line"></i>
-                              </button>
-                            </div>
                           </td>
                         </tr>
                       ))
