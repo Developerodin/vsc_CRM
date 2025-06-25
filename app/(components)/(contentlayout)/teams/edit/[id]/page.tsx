@@ -5,6 +5,7 @@ import Seo from "@/shared/layout-components/seo/seo";
 import { toast, Toaster } from "react-hot-toast";
 import axios from "axios";
 import { Base_url } from "@/app/api/config/BaseUrl";
+import { useBranchContext } from "@/shared/contextapi";
 
 interface Branch {
   id: string;
@@ -32,9 +33,9 @@ interface TeamMemberData {
 
 export default function EditTeamPage({ params }: { params: { id: string } }) {
   const router = useRouter();
+  const { branches } = useBranchContext();
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [branches, setBranches] = useState<Branch[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [formData, setFormData] = useState<TeamMemberData>({
     name: "",
@@ -58,10 +59,6 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
           `${Base_url}team-members/${params.id}`
         );
         const teamMemberData = teamMemberResponse.data;
-
-        // Fetch branches
-        const branchesResponse = await axios.get(`${Base_url}branches`);
-        setBranches(branchesResponse.data.results || []);
 
         // Fetch activities
         const activitiesResponse = await axios.get(`${Base_url}activities`);

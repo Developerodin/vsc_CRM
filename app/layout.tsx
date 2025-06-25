@@ -1,11 +1,10 @@
-
 "use client"
 import "./globals.scss";
 import { Provider } from "react-redux";
 import store from "@/shared/redux/store";
 import PrelineScript from "./PrelineScript";
 import {   useState } from "react";
-import { Initialload } from "@/shared/contextapi";
+import { Initialload, BranchProvider } from "@/shared/contextapi";
 
 
 const RootLayout = ({children}:any) =>{
@@ -13,9 +12,11 @@ const RootLayout = ({children}:any) =>{
     return(
       <>
       <Provider store={store}>
-        <Initialload.Provider value={{ pageloading , setpageloading }}>
-          {children}
-        </Initialload.Provider>
+        <BranchProvider>
+          <Initialload.Provider value={{ pageloading , setpageloading }}>
+            {children}
+          </Initialload.Provider>
+        </BranchProvider>
       </Provider>
       <PrelineScript/>
       </>

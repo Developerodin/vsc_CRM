@@ -8,9 +8,12 @@ import Modalsearch from '../modal-search/modalsearch';
 import { basePath } from '@/next.config';
 import { useRouter } from 'next/navigation';
 import { logout } from "@/shared/utils/permissions";
+import axios from 'axios';
+import { Base_url } from '@/app/api/config/BaseUrl';
+import { useBranchContext } from '@/shared/contextapi';
 
 const Header = ({ local_varaiable, ThemeChanger }:any) => {
-
+  const { branches, selectedBranch, setSelectedBranch, loading } = useBranchContext();
 
   const [passwordshow1, setpasswordshow1] = useState(false);
 
@@ -369,12 +372,12 @@ const Header = ({ local_varaiable, ThemeChanger }:any) => {
               <div className="header-element">
                 <div className="horizontal-logo">
                   <Link href="/dashboard" className="header-logo">
-                    <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/images/brand-logos/desktop-logo.png`} alt="logo" className="desktop-logo" />
-                    <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/images/brand-logos/toggle-logo.png`} alt="logo" className="toggle-logo" />
-                    <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/images/brand-logos/desktop-dark.png`} alt="logo" className="desktop-dark" />
-                    <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/images/brand-logos/toggle-dark.png`} alt="logo" className="toggle-dark" />
-                    <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/images/brand-logos/desktop-white.png`} alt="logo" className="desktop-white" />
-                    <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/images/brand-logos/toggle-white.png`} alt="logo" className="toggle-white" />
+                    <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/images/brand-logos/logo.png`} alt="logo" className="desktop-logo" />
+                    <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/images/brand-logos/logo.png`} alt="logo" className="toggle-logo" />
+                    <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/images/brand-logos/logo.png`} alt="logo" className="desktop-dark" />
+                    <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/images/brand-logos/logo.png`} alt="logo" className="toggle-dark" />
+                    <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/images/brand-logos/logo.png`} alt="logo" className="desktop-white" />
+                    <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/images/brand-logos/logo.png`} alt="logo" className="toggle-white" />
                   </Link>
                 </div>
               </div>
@@ -384,6 +387,34 @@ const Header = ({ local_varaiable, ThemeChanger }:any) => {
               </div>
             </div>
             <div className="header-content-right">
+
+              <div className="header-element py-[1rem] md:px-[0.65rem] px-2">
+                {loading ? (
+                  <div className="flex items-center">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                    <span className="text-sm text-gray-500">Loading branches...</span>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <select
+                      className="form-select bg-white border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                      value={selectedBranch?.id || ''}
+                      onChange={(e) => {
+                        const branch = branches.find(b => b.id === e.target.value);
+                        if (branch) {
+                          setSelectedBranch(branch);
+                        }
+                      }}
+                    >
+                      {branches.map((branch) => (
+                        <option key={branch.id} value={branch.id}>
+                          {branch.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
 
               <div className="header-element py-[1rem] md:px-[0.65rem] px-2 header-search">
                 <button aria-label="button" type="button" data-hs-overlay="#search-modal"

@@ -5,17 +5,22 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast, Toaster } from "react-hot-toast";
 import { Base_url } from "@/app/api/config/BaseUrl";
+import { useBranchContext } from "@/shared/contextapi";
 
 interface Client {
   id: string;
   name: string;
   phone: string;
   email: string;
+  email2: string;
   address: string;
-  city: string;
+  district: string;
   state: string;
   country: string;
-  pinCode: string;
+  fNo: string;
+  pan: string;
+  dob: string;
+  branchId: string;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -26,6 +31,7 @@ interface Group {
   name: string;
   numberOfClients: number;
   clients: Client[];
+  branchId: string;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -33,6 +39,7 @@ interface Group {
 
 const EditGroupPage = ({ params }: { params: { id: string } }) => {
   const router = useRouter();
+  const { branches } = useBranchContext();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -47,6 +54,7 @@ const EditGroupPage = ({ params }: { params: { id: string } }) => {
 
   const [formData, setFormData] = useState({
     name: "",
+    branchId: "",
     sortOrder: 1,
   });
 
@@ -66,6 +74,7 @@ const EditGroupPage = ({ params }: { params: { id: string } }) => {
         const data = await response.json();
         setFormData({
           name: data.name,
+          branchId: data.branchId,
           sortOrder: data.sortOrder,
         });
         setSelectedClients(data.clients);
@@ -149,6 +158,17 @@ const EditGroupPage = ({ params }: { params: { id: string } }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validate form
+    if (!formData.name.trim()) {
+      toast.error('Please enter a group name');
+      return;
+    }
+
+    if (!formData.branchId) {
+      toast.error('Please select a branch');
+      return;
+    }
+
     try {
       setIsSaving(true);
 
@@ -156,6 +176,7 @@ const EditGroupPage = ({ params }: { params: { id: string } }) => {
         name: formData.name,
         numberOfClients: selectedClients.length,
         clients: selectedClients.map(client => client.id),
+        branchId: formData.branchId,
         sortOrder: formData.sortOrder
       };
 
@@ -255,6 +276,28 @@ const EditGroupPage = ({ params }: { params: { id: string } }) => {
                       onChange={handleInputChange}
                       required
                     />
+                  </div>
+
+                  {/* Branch */}
+                  <div className="form-group">
+                    <label htmlFor="branchId" className="form-label">
+                      Branch <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="branchId"
+                      name="branchId"
+                      className="form-select"
+                      value={formData.branchId}
+                      onChange={handleInputChange}
+                      required
+                    >
+                      <option value="">Select a branch</option>
+                      {branches.map((branch) => (
+                        <option key={branch.id} value={branch.id}>
+                          {branch.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   {/* Sort Order */}
@@ -382,16 +425,19 @@ const EditGroupPage = ({ params }: { params: { id: string } }) => {
                           Select
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          F.No
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Name
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Email
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Phone
+                          PAN
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          City
+                          Phone
                         </th>
                       </tr>
                     </thead>
@@ -407,16 +453,19 @@ const EditGroupPage = ({ params }: { params: { id: string } }) => {
                             />
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
+                            {client.fNo}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
                             {client.name}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             {client.email}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            {client.phone}
+                            {client.pan}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            {client.city}
+                            {client.phone}
                           </td>
                         </tr>
                       ))}
