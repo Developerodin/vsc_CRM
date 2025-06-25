@@ -20,7 +20,7 @@ interface Client {
   fNo: string;
   pan: string;
   dob: string;
-  branchId: string;
+  branch: string;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -44,7 +44,7 @@ const AddClientPage = () => {
     fNo: '',
     pan: '',
     dob: '',
-    branchId: selectedBranchId || '',
+    branch: selectedBranchId || '',
     sortOrder: 1,
   });
 
@@ -84,7 +84,7 @@ const AddClientPage = () => {
     }
 
     // Branch validation
-    if (!formData.branchId) {
+    if (!formData.branch) {
       toast.error('Please select a branch');
       return false;
     }
@@ -326,12 +326,12 @@ const AddClientPage = () => {
 
                   {/* Branch */}
                   <div className="form-group">
-                    <label htmlFor="branchId" className="form-label">Branch <span className="text-red-500">*</span></label>
+                    <label htmlFor="branch" className="form-label">Branch <span className="text-red-500">*</span></label>
                     <select
-                      id="branchId"
-                      name="branchId"
+                      id="branch"
+                      name="branch"
                       className="form-control"
-                      value={formData.branchId}
+                      value={formData.branch}
                       onChange={handleInputChange}
                       required
                     >

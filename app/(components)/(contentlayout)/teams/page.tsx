@@ -117,7 +117,11 @@ const TeamsPage = () => {
       });
 
       const response = await axios.get<ApiResponse>(
-        `${Base_url}team-members?${queryParams.toString()}`
+        `${Base_url}team-members?${queryParams.toString()}`,{
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        }
       );
 
       setTeams(response.data.results);
@@ -158,7 +162,11 @@ const TeamsPage = () => {
 
   const handleDelete = async (teamMemberId: string) => {
     try {
-      await axios.delete(`${Base_url}team-members/${teamMemberId}`);
+      await axios.delete(`${Base_url}team-members/${teamMemberId}`,{
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
       toast.success("Team member deleted successfully");
       setTeams((prevTeams) =>
         prevTeams.filter((teamMember) => teamMember.id !== teamMemberId)
@@ -182,7 +190,11 @@ const TeamsPage = () => {
         let hasError = false;
         const deletePromises = selectedTeams.map(async (id) => {
           try {
-            await axios.delete(`${Base_url}team-members/${id}`);
+            await axios.delete(`${Base_url}team-members/${id}`,{
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              }
+            });
             return id;
           } catch (err) {
             hasError = true;

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast, Toaster } from 'react-hot-toast';
 import { Base_url } from '@/app/api/config/BaseUrl';
+import { useBranchContext } from "@/shared/contextapi";
 
 interface Activity {
     id: string;
@@ -19,6 +20,7 @@ interface Group {
     name: string;
     numberOfClients: number;
     clients: Client[];
+    branchId: string;
     sortOrder: number;
     createdAt: string;
     updatedAt: string;
@@ -34,6 +36,7 @@ interface Client {
     state: string;
     country: string;
     pinCode: string;
+    branchId: string;
     sortOrder: number;
     createdAt: string;
     updatedAt: string;
@@ -83,6 +86,10 @@ interface Timeline {
     name: string;
     email: string;
   };
+  branch: {
+    id: string;
+    name: string;
+  };
   status: 'pending' | 'completed' | 'ongoing' | 'delayed';
   frequency: 'Hourly' | 'Daily' | 'Weekly' | 'Monthly' | 'Quarterly' | 'Yearly';
   frequencyConfig: {
@@ -113,6 +120,7 @@ interface Timeline {
 
 const EditTimelinePage = ({ params }: { params: { id: string } }) => {
   const router = useRouter();
+  const { branches } = useBranchContext();
   
   const [isLoading, setIsLoading] = useState(false);
   const [showClientModal, setShowClientModal] = useState(false);
@@ -137,6 +145,7 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
     clientId: '',
     clientName: '',
     clientEmail: '',
+    branchId: '',
     frequency: '',
     frequencyConfig: {
       hourlyInterval: 1,
@@ -316,6 +325,7 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
           clientId: timelineData.client.id,
           clientName: timelineData.client.name,
           clientEmail: timelineData.client.email,
+          branchId: timelineData.branch.id,
           frequency: timelineData.frequency,
           frequencyConfig: {
             ...timelineData.frequencyConfig,
@@ -619,9 +629,21 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
       return;
     }
     
+    // Validate branch selection
+    if (!formData.branchId) {
+      toast.error('Please select a branch');
+      return;
+    }
+    
     // Validate frequency configuration
     if (!validateFrequencyConfig()) {
       toast.error('Please configure the frequency settings properly');
+      return;
+    }
+    
+    // Validate that end date is not before start date
+    if (formData.startDate && formData.endDate && new Date(formData.endDate) < new Date(formData.startDate)) {
+      toast.error('End date cannot be before start date');
       return;
     }
     
@@ -642,6 +664,7 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
       const cleanedFormData = removeEmptyFields({
         activity: formData.activityId,
         client: formData.clientId,
+        branch: formData.branchId,
         frequency: formData.frequency,
         frequencyConfig: formattedFrequencyConfig,
         status: formData.status,
@@ -939,8 +962,27 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                  {/* Date Fields: Start Date and End Date */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+                  {/* Fourth Row: Branch, Start Date, End Date */}
+                  <div className="form-group">
+                    <label htmlFor="branchId" className="form-label">Branch <span className="text-red-500">*</span></label>
+                    <select
+                      id="branchId"
+                      name="branchId"
+                      className="form-select"
+                      value={formData.branchId}
+                      onChange={handleInputChange}
+                      required
+                    >
+                      <option value="">Select a branch</option>
+                      {branches.map((branch) => (
+                        <option key={branch.id} value={branch.id}>
+                          {branch.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div className="form-group">
                     <label htmlFor="startDate" className="form-label">Start Date</label>
                     <input

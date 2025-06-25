@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast, Toaster } from 'react-hot-toast';
 import { Base_url } from '@/app/api/config/BaseUrl';
+import { useSelectedBranchId, useBranchContext } from "@/shared/contextapi";
 
 interface Activity {
     id: string;
@@ -19,6 +20,7 @@ interface Group {
     name: string;
     numberOfClients: number;
     clients: Client[];
+    branchId: string;
     sortOrder: number;
     createdAt: string;
     updatedAt: string;
@@ -37,6 +39,7 @@ interface Client {
   fNo: string;
   pan: string;
   dob: string;
+  branchId: string;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -77,6 +80,8 @@ interface Branch {
 
 const AddTimelinePage = () => {
   const router = useRouter();
+  const selectedBranchId = useSelectedBranchId();
+  const { branches, selectedBranch } = useBranchContext();
   const [isLoading, setIsLoading] = useState(false);
   const [showClientModal, setShowClientModal] = useState(false);
   const [availableClients, setAvailableClients] = useState<Client[]>([]);
@@ -100,6 +105,7 @@ const AddTimelinePage = () => {
     clientId: [] as string[],
     clientName: [] as string[],
     clientEmail: [] as string[],
+    branchId: selectedBranchId || '',
     frequency: '',
     frequencyConfig: {
       hourlyInterval: 1,
@@ -206,6 +212,14 @@ const AddTimelinePage = () => {
 
     loadData();
   }, []);
+
+  // Update form data when selected branch changes
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      branchId: selectedBranchId || ''
+    }));
+  }, [selectedBranchId]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -603,6 +617,12 @@ const AddTimelinePage = () => {
       return;
     }
     
+    // Validate branch selection
+    if (!formData.branchId) {
+      toast.error('Please select a branch');
+      return;
+    }
+    
     // Validate frequency configuration
     if (!validateFrequencyConfig()) {
       toast.error('Please configure the frequency settings properly');
@@ -632,6 +652,7 @@ const AddTimelinePage = () => {
       const cleanedFormData = removeEmptyFields({
         activity: formData.activityId,
         client: formData.clientId,
+        branchId: formData.branchId,
         frequency: formData.frequency,
         frequencyConfig: formattedFrequencyConfig,
         status: formData.status,
@@ -922,8 +943,27 @@ const AddTimelinePage = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                  {/* Date Fields: Start Date and End Date */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+                  {/* Fourth Row: Branch, Start Date, End Date */}
+                  <div className="form-group">
+                    <label htmlFor="branchId" className="form-label">Branch <span className="text-red-500">*</span></label>
+                    <select
+                      id="branchId"
+                      name="branchId"
+                      className="form-select"
+                      value={formData.branchId}
+                      onChange={handleInputChange}
+                      required
+                    >
+                      <option value="">Select a branch</option>
+                      {branches.map((branch) => (
+                        <option key={branch.id} value={branch.id}>
+                          {branch.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div className="form-group">
                     <label htmlFor="startDate" className="form-label">Start Date</label>
                     <input

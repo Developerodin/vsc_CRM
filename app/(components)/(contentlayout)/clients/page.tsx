@@ -20,6 +20,10 @@ interface Client {
   fNo: string;
   pan: string;
   dob: string;
+  branch: {
+    id: string;
+    name: string;
+  };
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -43,6 +47,8 @@ interface ExcelRow {
   "Client District"?: string;
   "Client State"?: string;
   "Client Country"?: string;
+  "Client BranchId"?: string;
+  "Client BranchName"?: string;
   "F No"?: string;
   "PAN"?: string;
   "Date of Birth"?: string;
@@ -199,6 +205,8 @@ const ClientsPage = () => {
             "Client District": client.district,
             "Client State": client.state,
             "Client Country": client.country,
+            "Client BranchId": client.branch.id,
+            "Client BranchName": client.branch.name,
             "F No": client.fNo,
             "PAN": client.pan,
             "Date of Birth": client.dob,
@@ -222,6 +230,8 @@ const ClientsPage = () => {
           "Client District": client.district,
           "Client State": client.state,
           "Client Country": client.country,
+          "Client BranchId": client.branch.id,
+          "Client BranchName": client.branch.name,
           "F No": client.fNo,
           "PAN": client.pan,
           "Date of Birth": client.dob,
@@ -240,6 +250,8 @@ const ClientsPage = () => {
         { wch: 20 }, // District
         { wch: 20 }, // State
         { wch: 20 }, // Country
+        { wch: 20 }, // BranchId
+        { wch: 20 }, // BranchName
         { wch: 15 }, // F No
         { wch: 15 }, // PAN
         { wch: 15 }, // Date of Birth
