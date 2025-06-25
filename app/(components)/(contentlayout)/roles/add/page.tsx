@@ -24,7 +24,7 @@ interface Permission {
   key: string;
   title: string;
   description?: string;
-  category: string;
+  category: 'navigation' | 'api';
   path?: string;
   group?: string;
   children?: Record<string, Permission>;
@@ -69,28 +69,42 @@ const AddRolePage = () => {
       });
       if (response.ok) {
         const data: ApiPermissionsResponse = await response.json();
-        
-        // Convert the nested structure to a flat array
+        console.log("data ====>",data)
+        // Convert the nested structure to a flat array with proper categorization
         const flatPermissions: Permission[] = [];
         
         // Process navigation permissions
-        Object.values(data.navigationPermissions).forEach(permission => {
-          flatPermissions.push(permission);
+        Object.entries(data.navigationPermissions).forEach(([key, permission]) => {
+          // Add the main navigation permission
+          flatPermissions.push({
+            ...permission,
+            key: key,
+            category: 'navigation'
+          });
           
           // Add children if they exist
           if (permission.children) {
-            Object.values(permission.children).forEach(child => {
-              flatPermissions.push(child);
+            Object.entries(permission.children).forEach(([childKey, childPermission]) => {
+              flatPermissions.push({
+                ...childPermission,
+                key: `${key}.${childKey}`,
+                category: 'navigation'
+              });
             });
           }
         });
         
         // Process API permissions
-        Object.values(data.apiPermissions).forEach(permission => {
-          flatPermissions.push(permission);
+        Object.entries(data.apiPermissions).forEach(([key, permission]) => {
+          flatPermissions.push({
+            ...permission,
+            key: key,
+            category: 'api'
+          });
         });
         
         setPermissions(flatPermissions);
+        console.log('Fetched permissions:', flatPermissions); // Debug log
       } else {
         console.error('Failed to fetch permissions:', response.status);
         toast.error('Failed to fetch permissions');
@@ -205,54 +219,47 @@ const AddRolePage = () => {
     try {
       setIsLoading(true);
 
-      // Convert selected permissions to the role schema structure
-      const navigationPermissions: Record<string, any> = {
-        dashboard: false,
-        clients: false,
-        groups: false,
-        teams: false,
-        timelines: false,
-        analytics: false,
-        settings: {
-          activities: false,
-          branches: false,
-          users: false,
-          roles: false,
-        },
-      };
+      // Dynamically build permission structure based on selected permissions
+      const navigationPermissions: Record<string, any> = {};
+      const apiPermissions: Record<string, any> = {};
 
-      const apiPermissions: Record<string, any> = {
-        getUsers: false,
-        manageUsers: false,
-        getTeamMembers: false,
-        manageTeamMembers: false,
-        getActivities: false,
-        manageActivities: false,
-        getBranches: false,
-        manageBranches: false,
-        getClients: false,
-        manageClients: false,
-        getGroups: false,
-        manageGroups: false,
-        getRoles: false,
-        manageRoles: false,
-      };
-
+      // Get all available permissions to understand the structure
+      const allPermissions = permissions || [];
+      
+      // Initialize all permissions to false first
+      allPermissions.forEach(permission => {
+        if (permission.category === 'navigation') {
+          // Handle nested navigation permissions
+          if (permission.key.includes('.')) {
+            const [parent, child] = permission.key.split('.');
+            if (!navigationPermissions[parent]) {
+              navigationPermissions[parent] = {};
+            }
+            navigationPermissions[parent][child] = false;
+          } else {
+            navigationPermissions[permission.key] = false;
+          }
+        } else if (permission.category === 'api') {
+          apiPermissions[permission.key] = false;
+        }
+      });
+     console.log("SElected PErmsioons ====>",selectedPermissions)
       // Set selected permissions to true
       selectedPermissions.forEach(permissionKey => {
-        if (permissionKey.includes('.')) {
-          // Handle nested permissions like 'settings.activities'
-          const [parent, child] = permissionKey.split('.');
-          if (navigationPermissions[parent] && typeof navigationPermissions[parent] === 'object') {
-            navigationPermissions[parent][child] = true;
+        const permission = allPermissions.find(p => p.key === permissionKey);
+        if (permission) {
+          if (permission.category === 'navigation') {
+            if (permissionKey.includes('.')) {
+              const [parent, child] = permissionKey.split('.');
+              if (navigationPermissions[parent] && typeof navigationPermissions[parent] === 'object') {
+                navigationPermissions[parent][child] = true;
+              }
+            } else {
+              navigationPermissions[permissionKey] = true;
+            }
+          } else if (permission.category === 'api') {
+            apiPermissions[permissionKey] = true;
           }
-        } else if (navigationPermissions.hasOwnProperty(permissionKey)) {
-          // Only set top-level permissions, not nested ones
-          if (typeof navigationPermissions[permissionKey] === 'boolean') {
-            navigationPermissions[permissionKey] = true;
-          }
-        } else if (apiPermissions.hasOwnProperty(permissionKey)) {
-          apiPermissions[permissionKey] = true;
         }
       });
 
