@@ -5,6 +5,7 @@ import Link from "next/link";
 import { toast, Toaster } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { Base_url } from "@/app/api/config/BaseUrl";
+import { useSelectedBranchId } from "@/shared/contextapi";
 
 interface Client {
   id: string;
@@ -50,6 +51,7 @@ interface ExcelRow {
 }
 
 const ClientsPage = () => {
+  const selectedBranchId = useSelectedBranchId();
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -73,11 +75,16 @@ const ClientsPage = () => {
     pan: ""
   });
 
+
+  console.log(selectedBranchId, "selectedBranchId");
+
   const fetchClients = async (page = 1, limit = itemsPerPage) => {
     try {
       setIsLoading(true);
       setError(null);
 
+     
+      
       const queryParams = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),

@@ -1,10 +1,11 @@
 "use client"
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Seo from '@/shared/layout-components/seo/seo';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast, Toaster } from 'react-hot-toast';
 import { Base_url } from '@/app/api/config/BaseUrl';
+import { useSelectedBranchId, useBranchContext } from "@/shared/contextapi";
 
 interface Client {
   id: string;
@@ -19,12 +20,15 @@ interface Client {
   fNo: string;
   pan: string;
   dob: string;
+  branchId: string;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
 }
 
 const AddClientPage = () => {
+  const selectedBranchId = useSelectedBranchId();
+  const { branches, selectedBranch } = useBranchContext();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   
@@ -40,10 +44,11 @@ const AddClientPage = () => {
     fNo: '',
     pan: '',
     dob: '',
+    branchId: selectedBranchId || '',
     sortOrder: 1,
   });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -75,6 +80,12 @@ const AddClientPage = () => {
     // PAN validation (basic format - 10 characters)
     if (formData.pan && formData.pan.length !== 10) {
       toast.error('PAN should be 10 characters long');
+      return false;
+    }
+
+    // Branch validation
+    if (!formData.branchId) {
+      toast.error('Please select a branch');
       return false;
     }
 
@@ -113,6 +124,13 @@ const AddClientPage = () => {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      branchId: selectedBranchId || ''
+    }));
+  }, [selectedBranchId]);
 
   return (
     <div className="main-content">
@@ -304,6 +322,26 @@ const AddClientPage = () => {
                       value={formData.dob}
                       onChange={handleInputChange}
                     />
+                  </div>
+
+                  {/* Branch */}
+                  <div className="form-group">
+                    <label htmlFor="branchId" className="form-label">Branch <span className="text-red-500">*</span></label>
+                    <select
+                      id="branchId"
+                      name="branchId"
+                      className="form-control"
+                      value={formData.branchId}
+                      onChange={handleInputChange}
+                      required
+                    >
+                      <option value="">Select a branch</option>
+                      {branches.map((branch) => (
+                        <option key={branch.id} value={branch.id}>
+                          {branch.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   {/* Sort Order */}
