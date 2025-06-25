@@ -595,6 +595,36 @@ const AddTimelinePage = () => {
     return `${activity?.name} activity will be created ${frequencyText} for ${clients}${dateRange ? `, ${dateRange}` : ''}`;
   };
 
+  const includeSelectedFrequency = (frequency: string, frequencyConfig: object) => {
+    const frequencyConfigObject : any = {};
+    switch (formData.frequency) {
+      case 'Hourly':
+        frequencyConfigObject['hourlyInterval'] = formData.frequencyConfig.hourlyInterval;
+        break;
+      case 'Daily':
+        frequencyConfigObject['dailyTime'] = formData.frequencyConfig.dailyTime;
+        break;
+      case 'Weekly':
+        frequencyConfigObject['weeklyDays'] = formData.frequencyConfig.weeklyDays;
+        frequencyConfigObject['weeklyTime'] = formData.frequencyConfig.weeklyTime;
+        break;
+      case 'Monthly':
+        frequencyConfigObject['monthlyDay'] = formData.frequencyConfig.monthlyDay;
+        frequencyConfigObject['monthlyTime'] = formData.frequencyConfig.monthlyTime;
+        break;
+      case 'Quarterly':
+        frequencyConfigObject['quarterlyMonths'] = formData.frequencyConfig.quarterlyMonths;
+        frequencyConfigObject['quarterlyDay'] = formData.frequencyConfig.quarterlyDay;
+        frequencyConfigObject['quarterlyTime'] = formData.frequencyConfig.quarterlyTime;
+        break;
+      case 'Yearly':
+        frequencyConfigObject['yearlyMonth'] = formData.frequencyConfig.yearlyMonth;
+        frequencyConfigObject['yearlyDate'] = formData.frequencyConfig.yearlyDate;
+        frequencyConfigObject['yearlyTime'] = formData.frequencyConfig.yearlyTime;
+        break;
+    }
+    return frequencyConfigObject;
+  }
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -628,12 +658,15 @@ const AddTimelinePage = () => {
         yearlyTime: formatTimeForAPI(formData.frequencyConfig.yearlyTime)
       };
 
+      const cleanedFrequencyConfig = includeSelectedFrequency(formData.frequency, formattedFrequencyConfig);
+      formData.frequencyConfig = cleanedFrequencyConfig;
+
       // Remove empty fields from request body
       const cleanedFormData = removeEmptyFields({
         activity: formData.activityId,
         client: formData.clientId,
         frequency: formData.frequency,
-        frequencyConfig: formattedFrequencyConfig,
+        frequencyConfig: formData.frequencyConfig,
         status: formData.status,
         udin: formData.udin || undefined,
         turnover: formData.turnover ? parseFloat(formData.turnover) : undefined,
