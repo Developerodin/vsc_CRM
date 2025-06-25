@@ -105,7 +105,7 @@ const AddTimelinePage = () => {
     clientId: [] as string[],
     clientName: [] as string[],
     clientEmail: [] as string[],
-    branchId: selectedBranchId || '',
+    branch: selectedBranchId || '',
     frequency: '',
     frequencyConfig: {
       hourlyInterval: 1,
@@ -217,7 +217,7 @@ const AddTimelinePage = () => {
   useEffect(() => {
     setFormData(prev => ({
       ...prev,
-      branchId: selectedBranchId || ''
+      branch: selectedBranchId || ''
     }));
   }, [selectedBranchId]);
 
@@ -648,7 +648,7 @@ const AddTimelinePage = () => {
     }
     
     // Validate branch selection
-    if (!formData.branchId) {
+    if (!formData.branch) {
       toast.error('Please select a branch');
       return;
     }
@@ -685,7 +685,7 @@ const AddTimelinePage = () => {
       const cleanedFormData = removeEmptyFields({
         activity: formData.activityId,
         client: formData.clientId,
-        branchId: formData.branchId,
+        branch: formData.branch,
         frequency: formData.frequency,
         frequencyConfig: formData.frequencyConfig,
         status: formData.status,
@@ -979,12 +979,12 @@ const AddTimelinePage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
                   {/* Fourth Row: Branch, Start Date, End Date */}
                   <div className="form-group">
-                    <label htmlFor="branchId" className="form-label">Branch <span className="text-red-500">*</span></label>
+                    <label htmlFor="branch" className="form-label">Branch <span className="text-red-500">*</span></label>
                     <select
-                      id="branchId"
-                      name="branchId"
+                      id="branch"
+                      name="branch"
                       className="form-select"
-                      value={formData.branchId}
+                      value={formData.branch}
                       onChange={handleInputChange}
                       required
                     >

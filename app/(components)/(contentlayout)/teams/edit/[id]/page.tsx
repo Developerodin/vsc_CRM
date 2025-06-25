@@ -68,12 +68,23 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
       try {
         // Fetch team member data
         const teamMemberResponse = await axios.get(
-          `${Base_url}team-members/${params.id}`
+          `${Base_url}team-members/${params.id}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          }
         );
         const teamMemberData = teamMemberResponse.data;
 
         // Fetch activities
-        const activitiesResponse = await axios.get(`${Base_url}activities`);
+        const activitiesResponse = await axios.get(`${Base_url}activities`,
+          {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          }
+        );
         setActivities(activitiesResponse.data.results || []);
 
         // Set form data
@@ -200,7 +211,12 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
 
       await axios.patch(
         `${Base_url}team-members/${params.id}`,
-        requestBody
+        requestBody,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        }
       );
 
       toast.success("Team member updated successfully", { id: loadingToast });

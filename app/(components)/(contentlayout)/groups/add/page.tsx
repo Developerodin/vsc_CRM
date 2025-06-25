@@ -56,6 +56,8 @@ const AddGroupPage = () => {
     description: "",
     branch: selectedBranchId || "",
     sortOrder: 1,
+    clients: [] as string[],
+    numberOfClients: 0,
   });
 
   const fetchClients = async (page: number = 1) => {
@@ -129,7 +131,8 @@ const AddGroupPage = () => {
   const handleModalSubmit = () => {
     setFormData(prev => ({
       ...prev,
-      clients: selectedClients.map(client => client.id)
+      clients: selectedClients.map(client => client.id),
+      numberOfClients: selectedClients.length
     }));
     setShowModal(false);
   };
@@ -155,7 +158,9 @@ const AddGroupPage = () => {
         name: formData.name,
         description: formData.description,
         branch: formData.branch,
-        sortOrder: formData.sortOrder
+        sortOrder: formData.sortOrder,
+        clients: selectedClients.map(client => client.id),
+        numberOfClients: selectedClients.length
       };
 
       const response = await fetch(`${Base_url}groups`, {
@@ -295,11 +300,11 @@ const AddGroupPage = () => {
                         className="ti-btn ti-btn-primary"
                         onClick={() => setShowModal(true)}
                       >
-                        Select Clients ({formData.clients.length} selected)
+                        Select Clients ({selectedClients.length} selected)
                       </button>
-                      {formData.clients.length > 0 && (
+                      {selectedClients.length > 0 && (
                         <span className="text-sm text-gray-500">
-                          {formData.clients.length} clients selected
+                          {selectedClients.length} clients selected
                         </span>
                       )}
                     </div>

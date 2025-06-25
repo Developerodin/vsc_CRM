@@ -20,7 +20,7 @@ interface Group {
     name: string;
     numberOfClients: number;
     clients: Client[];
-    branchId: string;
+    branch: string;
     sortOrder: number;
     createdAt: string;
     updatedAt: string;
@@ -36,7 +36,7 @@ interface Client {
     state: string;
     country: string;
     pinCode: string;
-    branchId: string;
+    branch: string;
     sortOrder: number;
     createdAt: string;
     updatedAt: string;
@@ -145,7 +145,7 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
     clientId: '',
     clientName: '',
     clientEmail: '',
-    branchId: '',
+    branch: '',
     frequency: '',
     frequencyConfig: {
       hourlyInterval: 1,
@@ -321,20 +321,13 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
 
         setFormData({
           activityId: timelineData.activity.id,
-          groupId: 'none',
+          groupId: '',
           clientId: timelineData.client.id,
           clientName: timelineData.client.name,
           clientEmail: timelineData.client.email,
-          branchId: timelineData.branch.id,
+          branch: timelineData.branch.id,
           frequency: timelineData.frequency,
-          frequencyConfig: {
-            ...timelineData.frequencyConfig,
-            dailyTime: formatTimeForInput(timelineData.frequencyConfig.dailyTime),
-            weeklyTime: formatTimeForInput(timelineData.frequencyConfig.weeklyTime),
-            monthlyTime: formatTimeForInput(timelineData.frequencyConfig.monthlyTime),
-            quarterlyTime: formatTimeForInput(timelineData.frequencyConfig.quarterlyTime),
-            yearlyTime: formatTimeForInput(timelineData.frequencyConfig.yearlyTime)
-          },
+          frequencyConfig: timelineData.frequencyConfig,
           status: timelineData.status,
           udin: timelineData.udin || '',
           turnover: timelineData.turnover?.toString() || '',
@@ -630,7 +623,7 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
     }
     
     // Validate branch selection
-    if (!formData.branchId) {
+    if (!formData.branch) {
       toast.error('Please select a branch');
       return;
     }
@@ -664,7 +657,7 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
       const cleanedFormData = removeEmptyFields({
         activity: formData.activityId,
         client: formData.clientId,
-        branch: formData.branchId,
+        branch: formData.branch,
         frequency: formData.frequency,
         frequencyConfig: formattedFrequencyConfig,
         status: formData.status,
@@ -965,12 +958,12 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
                   {/* Fourth Row: Branch, Start Date, End Date */}
                   <div className="form-group">
-                    <label htmlFor="branchId" className="form-label">Branch <span className="text-red-500">*</span></label>
+                    <label htmlFor="branch" className="form-label">Branch <span className="text-red-500">*</span></label>
                     <select
-                      id="branchId"
-                      name="branchId"
+                      id="branch"
+                      name="branch"
                       className="form-select"
-                      value={formData.branchId}
+                      value={formData.branch}
                       onChange={handleInputChange}
                       required
                     >
