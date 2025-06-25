@@ -107,6 +107,7 @@ interface BranchContextType {
   error: string | null;
   userRole: Role | null;
   allBranchesAccess: boolean;
+  reinitialize: () => Promise<void>;
 }
 
 export const BranchContext = createContext<BranchContextType | undefined>(undefined);
@@ -137,84 +138,104 @@ export const BranchProvider = ({ children }: BranchProviderProps) => {
   const [userRole, setUserRole] = useState<Role | null>(null);
   const [allBranchesAccess, setAllBranchesAccess] = useState(false);
 
-  useEffect(() => {
-    const fetchUserRoleAndBranches = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  const fetchUserRoleAndBranches = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-        // Get user data from localStorage
-        const userDataString = localStorage.getItem('user');
-        if (!userDataString) {
-          throw new Error('User data not found in localStorage');
+      // Get user data from localStorage
+      const userDataString = localStorage.getItem('user');
+      if (!userDataString) {
+        throw new Error('User data not found in localStorage');
+      }
+
+      const userData: User = JSON.parse(userDataString);
+      const roleId = userData.role?.id;
+
+      if (!roleId) {
+        throw new Error('Role ID not found in user data');
+      }
+
+      // Fetch role by ID
+      const roleResponse = await fetch(`${Base_url}roles/${roleId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
+      });
 
-        const userData: User = JSON.parse(userDataString);
-        const roleId = userData.role?.id;
+      if (!roleResponse.ok) {
+        throw new Error('Failed to fetch role');
+      }
 
-        if (!roleId) {
-          throw new Error('Role ID not found in user data');
-        }
+      const roleData: Role = await roleResponse.json();
+      setUserRole(roleData);
+      setAllBranchesAccess(roleData.allBranchesAccess);
 
-        // Fetch role by ID
-        const roleResponse = await fetch(`${Base_url}roles/${roleId}`, {
+      // If user has access to all branches, fetch all branches
+      if (roleData.allBranchesAccess) {
+        const branchesResponse = await fetch(`${Base_url}branches`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
         });
 
-        if (!roleResponse.ok) {
-          throw new Error('Failed to fetch role');
+        if (!branchesResponse.ok) {
+          throw new Error('Failed to fetch branches');
         }
 
-        const roleData: Role = await roleResponse.json();
-        setUserRole(roleData);
-        setAllBranchesAccess(roleData.allBranchesAccess);
+        const branchesData = await branchesResponse.json();
+        setBranches(branchesData.results || []);
+      } else {
+        // Use branch access from role
+        setBranches(roleData.branchAccess || []);
+      }
 
-        // If user has access to all branches, fetch all branches
-        if (roleData.allBranchesAccess) {
-          const branchesResponse = await fetch(`${Base_url}branches`, {
+      // Set the first branch as default if branches exist
+      const availableBranches = roleData.allBranchesAccess 
+        ? (await fetch(`${Base_url}branches`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
-          });
+          }).then(res => res.json()).then(data => data.results || []))
+        : roleData.branchAccess || [];
 
-          if (!branchesResponse.ok) {
-            throw new Error('Failed to fetch branches');
-          }
+      if (availableBranches.length > 0) {
+        setSelectedBranch(availableBranches[0]);
+      }
+    } catch (err) {
+      console.error('Error fetching user role and branches:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch user role and branches');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-          const branchesData = await branchesResponse.json();
-          setBranches(branchesData.results || []);
-        } else {
-          // Use branch access from role
-          setBranches(roleData.branchAccess || []);
-        }
+  useEffect(() => {
+    fetchUserRoleAndBranches();
+  }, []);
 
-        // Set the first branch as default if branches exist
-        const availableBranches = roleData.allBranchesAccess 
-          ? (await fetch(`${Base_url}branches`, {
-              headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-              }
-            }).then(res => res.json()).then(data => data.results || []))
-          : roleData.branchAccess || [];
-
-        if (availableBranches.length > 0) {
-          setSelectedBranch(availableBranches[0]);
-        }
-      } catch (err) {
-        console.error('Error fetching user role and branches:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch user role and branches');
-      } finally {
-        setLoading(false);
+  // Listen for localStorage changes (when user logs in/out)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'user' && e.newValue) {
+        // User data was updated, re-initialize context
+        fetchUserRoleAndBranches();
       }
     };
 
-    fetchUserRoleAndBranches();
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
   const handleSetSelectedBranch = (branch: Branch) => {
     setSelectedBranch(branch);
+  };
+
+  const reinitialize = async () => {
+    await fetchUserRoleAndBranches();
   };
 
   return (
@@ -225,7 +246,8 @@ export const BranchProvider = ({ children }: BranchProviderProps) => {
       loading,
       error,
       userRole,
-      allBranchesAccess
+      allBranchesAccess,
+      reinitialize
     }}>
       {children}
     </BranchContext.Provider>

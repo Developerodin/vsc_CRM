@@ -20,10 +20,7 @@ interface Client {
   fNo: string;
   pan: string;
   dob: string;
-  branch: {
-    id: string;
-    name: string;
-  };
+  branch: string;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -47,8 +44,7 @@ interface ExcelRow {
   "Client District"?: string;
   "Client State"?: string;
   "Client Country"?: string;
-  "Client BranchId"?: string;
-  "Client BranchName"?: string;
+  "Branch"?: string;
   "F No"?: string;
   "PAN"?: string;
   "Date of Birth"?: string;
@@ -78,7 +74,8 @@ const ClientsPage = () => {
     state: "",
     country: "",
     fNo: "",
-    pan: ""
+    pan: "",
+    branch: ""
   });
 
 
@@ -96,6 +93,7 @@ const ClientsPage = () => {
         limit: limit.toString(),
         sortBy,
         ...(filters.name && { name: filters.name }),
+        ...(filters.branch && { branch: filters.branch }),
       });
 
       const response = await fetch(`${Base_url}clients?${queryParams}`, {
@@ -205,8 +203,7 @@ const ClientsPage = () => {
             "Client District": client.district,
             "Client State": client.state,
             "Client Country": client.country,
-            "Client BranchId": client.branch.id,
-            "Client BranchName": client.branch.name,
+            "Branch": client.branch,
             "F No": client.fNo,
             "PAN": client.pan,
             "Date of Birth": client.dob,
@@ -230,8 +227,7 @@ const ClientsPage = () => {
           "Client District": client.district,
           "Client State": client.state,
           "Client Country": client.country,
-          "Client BranchId": client.branch.id,
-          "Client BranchName": client.branch.name,
+          "Branch": client.branch,
           "F No": client.fNo,
           "PAN": client.pan,
           "Date of Birth": client.dob,
@@ -250,8 +246,7 @@ const ClientsPage = () => {
         { wch: 20 }, // District
         { wch: 20 }, // State
         { wch: 20 }, // Country
-        { wch: 20 }, // BranchId
-        { wch: 20 }, // BranchName
+        { wch: 30 }, // Branch ID
         { wch: 15 }, // F No
         { wch: 15 }, // PAN
         { wch: 15 }, // Date of Birth
@@ -360,6 +355,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
               fNo: row["F No"]?.toString().trim() || "",
               pan: row["PAN"]?.toString().trim() || "",
               dob: convertDateFormat(row["Date of Birth"]?.toString() || ""),
+              branch: row["Branch"]?.toString().trim() || "",
               sortOrder: parseInt(row["Sort Order"]?.toString() || "1")
             };
 
@@ -585,7 +581,8 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         state: "",
                         country: "",
                         fNo: "",
-                        pan: ""
+                        pan: "",
+                        branch: ""
                       });
                       setSortBy("name:asc");
                     }}
@@ -697,7 +694,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                                 href="/clients/add"
                                 className="ti-btn ti-btn-primary"
                               >
-                                <i className="ri-add-line me-2"></i> Add First
+                                <i className="ri-add-line mr-2"></i> Add First
                                 Client
                               </Link>
                             </div>

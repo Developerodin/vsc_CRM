@@ -35,7 +35,7 @@ const AddTeamPage = () => {
     country: "",
     pinCode: "",
     branch: selectedBranchId || "",
-    sortOrder: "1",
+    sortOrder: 1,
   });
 
   // Fetch activities on component mount
@@ -136,7 +136,7 @@ const AddTeamPage = () => {
 
       const teamMemberData = {
         ...formData,
-        sortOrder: parseInt(formData.sortOrder),
+        sortOrder: parseInt(formData.sortOrder.toString()),
         skills: selectedSkills
       };
 

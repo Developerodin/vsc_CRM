@@ -71,8 +71,9 @@ export default function Home() {
         // Store user data
         localStorage.setItem("user", JSON.stringify(user));
         
-        // Navigate to dashboard
-        RouteChange();
+        // Navigate to dashboard - this will trigger a full page reload
+        // which will re-initialize the branch context with the new user data
+        window.location.href = "/dashboard";
       }
     } catch (error: any) {
       console.error("Login error:", error);

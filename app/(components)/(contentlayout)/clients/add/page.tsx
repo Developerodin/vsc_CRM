@@ -128,7 +128,7 @@ const AddClientPage = () => {
   useEffect(() => {
     setFormData(prev => ({
       ...prev,
-      branchId: selectedBranchId || ''
+      branch: selectedBranchId || ''
     }));
   }, [selectedBranchId]);
 

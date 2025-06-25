@@ -20,7 +20,7 @@ interface Client {
   fNo: string;
   pan: string;
   dob: string;
-  branchId: string;
+  branch: string;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -44,7 +44,7 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     fNo: '',
     pan: '',
     dob: '',
-    branchId: '',
+    branch: '',
     sortOrder: 1,
   });
 
@@ -74,7 +74,7 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
           fNo: data.fNo || '',
           pan: data.pan || '',
           dob: data.dob ? new Date(data.dob).toISOString().split('T')[0] : '',
-          branchId: data.branchId || '',
+          branch: data.branch || '',
           sortOrder: data.sortOrder || 1,
         });
       } catch (err) {
@@ -125,7 +125,7 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     }
 
     // Branch validation
-    if (!formData.branchId) {
+    if (!formData.branch) {
       toast.error('Please select a branch');
       return false;
     }
@@ -370,12 +370,12 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
 
                   {/* Branch */}
                   <div className="form-group">
-                    <label htmlFor="branchId" className="form-label">Branch</label>
+                    <label htmlFor="branch" className="form-label">Branch</label>
                     <select
-                      id="branchId"
-                      name="branchId"
+                      id="branch"
+                      name="branch"
                       className="form-control"
-                      value={formData.branchId}
+                      value={formData.branch}
                       onChange={handleInputChange}
                     >
                       <option value="">Select a branch</option>

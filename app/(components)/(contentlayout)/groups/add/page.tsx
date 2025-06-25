@@ -29,9 +29,8 @@ interface Client {
 interface Group {
   id: string;
   name: string;
-  numberOfClients: number;
-  clients: Client[];
-  branchId: string;
+  description: string;
+  branch: string;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -54,8 +53,8 @@ const AddGroupPage = () => {
 
   const [formData, setFormData] = useState({
     name: "",
-    clients: [] as string[],
-    branchId: selectedBranchId || "",
+    description: "",
+    branch: selectedBranchId || "",
     sortOrder: 1,
   });
 
@@ -102,7 +101,7 @@ const AddGroupPage = () => {
   useEffect(() => {
     setFormData(prev => ({
       ...prev,
-      branchId: selectedBranchId || ''
+      branch: selectedBranchId || ''
     }));
   }, [selectedBranchId]);
 
@@ -144,7 +143,7 @@ const AddGroupPage = () => {
       return;
     }
 
-    if (!formData.branchId) {
+    if (!formData.branch) {
       toast.error('Please select a branch');
       return;
     }
@@ -154,9 +153,8 @@ const AddGroupPage = () => {
 
       const groupData = {
         name: formData.name,
-        numberOfClients: formData.clients.length,
-        clients: formData.clients,
-        branchId: formData.branchId,
+        description: formData.description,
+        branch: formData.branch,
         sortOrder: formData.sortOrder
       };
 
@@ -250,14 +248,12 @@ const AddGroupPage = () => {
 
                   {/* Branch */}
                   <div className="form-group">
-                    <label htmlFor="branchId" className="form-label">
-                      Branch <span className="text-red-500">*</span>
-                    </label>
+                    <label htmlFor="branch" className="form-label">Branch <span className="text-red-500">*</span></label>
                     <select
-                      id="branchId"
-                      name="branchId"
+                      id="branch"
+                      name="branch"
                       className="form-control"
-                      value={formData.branchId}
+                      value={formData.branch}
                       onChange={handleInputChange}
                       required
                     >

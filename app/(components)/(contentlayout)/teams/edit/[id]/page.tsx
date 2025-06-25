@@ -31,6 +31,18 @@ interface TeamMemberData {
   skills: string[];
 }
 
+interface TeamMember {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+  branch: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export default function EditTeamPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const { branches } = useBranchContext();
@@ -38,15 +50,15 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [formData, setFormData] = useState<TeamMemberData>({
-    name: "",
-    email: "",
-    phone: "",
-    address: "",
-    city: "",
-    state: "",
-    country: "",
-    pinCode: "",
-    branch: "",
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    city: '',
+    state: '',
+    country: '',
+    pinCode: '',
+    branch: '',
     sortOrder: 1,
     skills: [],
   });
@@ -66,16 +78,16 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
 
         // Set form data
         setFormData({
-          name: teamMemberData.name,
-          email: teamMemberData.email,
-          phone: teamMemberData.phone,
-          address: teamMemberData.address,
-          city: teamMemberData.city,
-          state: teamMemberData.state,
-          country: teamMemberData.country,
-          pinCode: teamMemberData.pinCode,
+          name: teamMemberData.name || '',
+          email: teamMemberData.email || '',
+          phone: teamMemberData.phone || '',
+          address: teamMemberData.address || '',
+          city: teamMemberData.city || '',
+          state: teamMemberData.state || '',
+          country: teamMemberData.country || '',
+          pinCode: teamMemberData.pinCode || '',
           branch: teamMemberData.branch.id,
-          sortOrder: teamMemberData.sortOrder,
+          sortOrder: teamMemberData.sortOrder || 1,
           skills: teamMemberData.skills.map((skill: Activity) => skill.id),
         });
       } catch (error) {
@@ -154,7 +166,7 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
       return false;
     }
     if (!formData.branch) {
-      toast.error("Branch is required");
+      toast.error("Please select a branch");
       return false;
     }
     if (formData.skills.length === 0) {
@@ -349,12 +361,12 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
                 <select
                   id="branch"
                   name="branch"
-                  className="form-select"
+                  className="form-control"
                   value={formData.branch}
                   onChange={handleInputChange}
                   required
                 >
-                  <option value="">Select Branch</option>
+                  <option value="">Select a branch</option>
                   {branches.map((branch) => (
                     <option key={branch.id} value={branch.id}>
                       {branch.name}
