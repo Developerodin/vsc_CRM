@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast, Toaster } from 'react-hot-toast';
 import { Base_url } from '@/app/api/config/BaseUrl';
+import { useBranchContext } from "@/shared/contextapi";
 
 interface Client {
   id: string;
@@ -19,6 +20,7 @@ interface Client {
   fNo: string;
   pan: string;
   dob: string;
+  branchId: string;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -26,6 +28,7 @@ interface Client {
 
 const EditClientPage = ({ params }: { params: { id: string } }) => {
   const router = useRouter();
+  const { branches } = useBranchContext();
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -41,6 +44,7 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     fNo: '',
     pan: '',
     dob: '',
+    branchId: '',
     sortOrder: 1,
   });
 
@@ -70,6 +74,7 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
           fNo: data.fNo || '',
           pan: data.pan || '',
           dob: data.dob ? new Date(data.dob).toISOString().split('T')[0] : '',
+          branchId: data.branchId || '',
           sortOrder: data.sortOrder || 1,
         });
       } catch (err) {
@@ -84,7 +89,7 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     fetchClient();
   }, [params.id, router]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -116,6 +121,12 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     // PAN validation (basic format - 10 characters)
     if (formData.pan && formData.pan.length !== 10) {
       toast.error('PAN should be 10 characters long');
+      return false;
+    }
+
+    // Branch validation
+    if (!formData.branchId) {
+      toast.error('Please select a branch');
       return false;
     }
 
@@ -355,6 +366,23 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                       value={formData.dob}
                       onChange={handleInputChange}
                     />
+                  </div>
+
+                  {/* Branch */}
+                  <div className="form-group">
+                    <label htmlFor="branchId" className="form-label">Branch</label>
+                    <select
+                      id="branchId"
+                      name="branchId"
+                      className="form-control"
+                      value={formData.branchId}
+                      onChange={handleInputChange}
+                    >
+                      <option value="">Select a branch</option>
+                      {branches.map((branch) => (
+                        <option key={branch.id} value={branch.id}>{branch.name}</option>
+                      ))}
+                    </select>
                   </div>
 
                   {/* Sort Order */}

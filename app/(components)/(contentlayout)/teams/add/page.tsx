@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast, Toaster } from "react-hot-toast";
 import { Base_url } from "@/app/api/config/BaseUrl";
+import { useSelectedBranchId, useBranchContext } from "@/shared/contextapi";
 
 interface Activity {
   id: string;
@@ -18,8 +19,9 @@ interface Branch {
 
 const AddTeamPage = () => {
   const router = useRouter();
+  const selectedBranchId = useSelectedBranchId();
+  const { branches, selectedBranch } = useBranchContext();
   const [isLoading, setIsLoading] = useState(false);
-  const [branches, setBranches] = useState<Branch[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
 
@@ -32,25 +34,14 @@ const AddTeamPage = () => {
     state: "",
     country: "",
     pinCode: "",
-    branch: "",
+    branch: selectedBranchId || "",
     sortOrder: "1",
   });
 
-  // Fetch branches and activities on component mount
+  // Fetch activities on component mount
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchActivities = async () => {
       try {
-        // Fetch branches
-        const branchesResponse = await fetch(`${Base_url}branches`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
-        if (!branchesResponse.ok) throw new Error('Failed to fetch branches');
-        const branchesData = await branchesResponse.json();
-        setBranches(branchesData.results || []);
-
-        // Fetch activities
         const activitiesResponse = await fetch(`${Base_url}activities`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -60,13 +51,21 @@ const AddTeamPage = () => {
         const activitiesData = await activitiesResponse.json();
         setActivities(activitiesData.results || []);
       } catch (err) {
-        console.error('Error fetching data:', err);
-        toast.error('Failed to fetch required data');
+        console.error('Error fetching activities:', err);
+        toast.error('Failed to fetch activities');
       }
     };
 
-    fetchData();
+    fetchActivities();
   }, []);
+
+  // Update form data when selected branch changes
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      branch: selectedBranchId || ''
+    }));
+  }, [selectedBranchId]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -107,6 +106,12 @@ const AddTeamPage = () => {
     const pinCodeRegex = /^\d{6}$/;
     if (!pinCodeRegex.test(formData.pinCode)) {
       toast.error('Please enter a valid 6-digit pin code');
+      return false;
+    }
+
+    // Branch validation
+    if (!formData.branch) {
+      toast.error('Please select a branch');
       return false;
     }
 

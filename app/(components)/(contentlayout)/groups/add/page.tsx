@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast, Toaster } from "react-hot-toast";
 import { Base_url } from "@/app/api/config/BaseUrl";
+import { useSelectedBranchId, useBranchContext } from "@/shared/contextapi";
 
 interface Client {
   id: string;
@@ -19,6 +20,7 @@ interface Client {
   fNo: string;
   pan: string;
   dob: string;
+  branchId: string;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -29,6 +31,7 @@ interface Group {
   name: string;
   numberOfClients: number;
   clients: Client[];
+  branchId: string;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -36,6 +39,8 @@ interface Group {
 
 const AddGroupPage = () => {
   const router = useRouter();
+  const selectedBranchId = useSelectedBranchId();
+  const { branches, selectedBranch } = useBranchContext();
   const [isLoading, setIsLoading] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
   const [isLoadingClients, setIsLoadingClients] = useState(true);
@@ -50,6 +55,7 @@ const AddGroupPage = () => {
   const [formData, setFormData] = useState({
     name: "",
     clients: [] as string[],
+    branchId: selectedBranchId || "",
     sortOrder: 1,
   });
 
@@ -93,6 +99,13 @@ const AddGroupPage = () => {
     }
   }, [showModal, sortField, sortOrder, searchQuery, currentPage]);
 
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      branchId: selectedBranchId || ''
+    }));
+  }, [selectedBranchId]);
+
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
@@ -125,6 +138,17 @@ const AddGroupPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validate form
+    if (!formData.name.trim()) {
+      toast.error('Please enter a group name');
+      return;
+    }
+
+    if (!formData.branchId) {
+      toast.error('Please select a branch');
+      return;
+    }
+
     try {
       setIsLoading(true);
 
@@ -132,6 +156,7 @@ const AddGroupPage = () => {
         name: formData.name,
         numberOfClients: formData.clients.length,
         clients: formData.clients,
+        branchId: formData.branchId,
         sortOrder: formData.sortOrder
       };
 
@@ -221,6 +246,28 @@ const AddGroupPage = () => {
                       onChange={handleInputChange}
                       required
                     />
+                  </div>
+
+                  {/* Branch */}
+                  <div className="form-group">
+                    <label htmlFor="branchId" className="form-label">
+                      Branch <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="branchId"
+                      name="branchId"
+                      className="form-control"
+                      value={formData.branchId}
+                      onChange={handleInputChange}
+                      required
+                    >
+                      <option value="">Select a branch</option>
+                      {branches.map((branch) => (
+                        <option key={branch.id} value={branch.id}>
+                          {branch.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   {/* Sort Order */}
@@ -347,6 +394,10 @@ const AddGroupPage = () => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Select
                         </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              F.No
+                            </th>
+
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Name
                         </th>
@@ -354,11 +405,12 @@ const AddGroupPage = () => {
                           Email
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              PAN
+                            </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Phone
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          District
-                        </th>
+                        
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -373,17 +425,21 @@ const AddGroupPage = () => {
                             />
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
+                            {client.fNo}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
                             {client.name}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             {client.email}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            {client.phone}
+                            {client.pan}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            {client.district}
+                            {client.phone}
                           </td>
+                         
                         </tr>
                       ))}
                     </tbody>
