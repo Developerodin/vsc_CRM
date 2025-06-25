@@ -86,10 +86,7 @@ interface Timeline {
     name: string;
     email: string;
   };
-  branch: {
-    id: string;
-    name: string;
-  };
+  branch: string;
   status: 'pending' | 'completed' | 'ongoing' | 'delayed';
   frequency: 'Hourly' | 'Daily' | 'Weekly' | 'Monthly' | 'Quarterly' | 'Yearly';
   frequencyConfig: {
@@ -317,7 +314,8 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
 
         const timelineData: Timeline = await response.json();
 
-        console.log(timelineData);
+        console.log('Timeline Data:', timelineData);
+        console.log('Branch from API:', timelineData.branch);
 
         setFormData({
           activityId: timelineData.activity.id,
@@ -325,7 +323,7 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
           clientId: timelineData.client.id,
           clientName: timelineData.client.name,
           clientEmail: timelineData.client.email,
-          branch: timelineData.branch.id,
+          branch: timelineData.branch || '',
           frequency: timelineData.frequency,
           frequencyConfig: timelineData.frequencyConfig,
           status: timelineData.status,
@@ -335,6 +333,11 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
           teamMemberName: timelineData.assignedMember.name,
           startDate: formatDateForInput(timelineData.startDate),
           endDate: formatDateForInput(timelineData.endDate)
+        });
+
+        console.log('Form Data after setting:', {
+          activityId: timelineData.activity.id,
+          branch: timelineData.branch || '',
         });
       } catch (error) {
         console.error('Error fetching timeline data:', error);
@@ -349,6 +352,12 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
       fetchTimelineData();
     }
   }, [params.id, router]);
+
+  // Debug useEffect to monitor formData changes
+  useEffect(() => {
+    console.log('FormData changed:', formData);
+    console.log('Current branch value:', formData.branch);
+  }, [formData]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
