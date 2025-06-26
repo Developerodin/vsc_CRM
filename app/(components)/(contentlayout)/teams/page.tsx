@@ -260,8 +260,16 @@ const TeamsPage = () => {
 
         // Fetch all branches and activities for reference
         const [branchesResponse, activitiesResponse] = await Promise.all([
-          axios.get(`${Base_url}branches`),
-          axios.get(`${Base_url}activities`)
+          axios.get(`${Base_url}branches`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          }),
+          axios.get(`${Base_url}activities`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          })
         ]);
 
         const branches = branchesResponse.data.results;
@@ -388,7 +396,11 @@ const TeamsPage = () => {
         successMessage = "Selected team members exported successfully";
       } else {
         // Export all teams if none are selected
-        const response = await axios.get(`${Base_url}team-members?limit=1000`);
+        const response = await axios.get(`${Base_url}team-members?limit=1000`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
         const apiData: ApiResponse = response.data;
         exportData = apiData.results.map((team: TeamMember) => ({
           ID: team.id,

@@ -70,7 +70,7 @@ const UsersPage = () => {
     name: "",
     email: "",
     role: "",
-    branch: "",
+    assignedBranch: "",
   });
 
   const fetchUsers = async (page = 1, limit = itemsPerPage) => {
@@ -85,7 +85,7 @@ const UsersPage = () => {
         ...(filters.name && { name: filters.name }),
         ...(filters.email && { email: filters.email }),
         ...(filters.role && { role: filters.role }),
-        ...(filters.branch && { branch: filters.branch }),
+        ...(filters.assignedBranch && { assignedBranch: filters.assignedBranch }),
       });
 
       const response = await fetch(`${Base_url}users?${queryParams}`, {
@@ -508,11 +508,11 @@ const UsersPage = () => {
                   {/* Branch filter */}
                   <select
                     className="form-select py-2 w-full sm:w-auto"
-                    value={filters.branch}
+                    value={filters.assignedBranch}
                     onChange={(e) => {
                       setFilters(prev => ({
                         ...prev,
-                        branch: e.target.value,
+                        assignedBranch: e.target.value,
                       }));
                       setCurrentPage(1);
                     }}
@@ -547,7 +547,7 @@ const UsersPage = () => {
                         name: "",
                         email: "",
                         role: "",
-                        branch: "",
+                        assignedBranch: "",
                       });
                       setSortBy("name:asc");
                     }}

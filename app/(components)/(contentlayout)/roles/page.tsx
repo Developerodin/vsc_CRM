@@ -47,7 +47,7 @@ const RolesPage = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [filters, setFilters] = useState({
     name: "",
-    status: "",
+    isActive: "",
   });
 
   const fetchRoles = async (page = 1, limit = itemsPerPage) => {
@@ -60,7 +60,7 @@ const RolesPage = () => {
         limit: limit.toString(),
         sortBy,
         ...(filters.name && { name: filters.name }),
-        ...(filters.status && { status: filters.status }),
+        ...(filters.isActive && { isActive: filters.isActive === 'Active' ? "true" : "false" }),
       });
 
       const response = await fetch(`${Base_url}roles?${queryParams}`, {
@@ -407,18 +407,18 @@ const RolesPage = () => {
                   {/* Status filter */}
                   <select
                     className="form-select py-2 w-full sm:w-auto"
-                    value={filters.status}
+                    value={filters.isActive}
                     onChange={(e) => {
                       setFilters(prev => ({
                         ...prev,
-                        status: e.target.value,
+                        isActive: e.target.value,
                       }));
                       setCurrentPage(1);
                     }}
                   >
                     <option value="">All Status</option>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
                   </select>
 
                   {/* Sort dropdown */}
@@ -439,7 +439,7 @@ const RolesPage = () => {
                     onClick={() => {
                       setFilters({
                         name: "",
-                        status: "",
+                        isActive: "",
                       });
                       setSortBy("name:asc");
                     }}

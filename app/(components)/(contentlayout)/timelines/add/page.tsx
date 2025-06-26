@@ -609,36 +609,37 @@ const AddTimelinePage = () => {
     return `${activity?.name} activity will be created ${frequencyText} for ${clients}${dateRange ? `, ${dateRange}` : ''}`;
   };
 
-  const includeSelectedFrequency = (frequency: string, frequencyConfig: object) => {
+  const includeSelectedFrequency = (frequency: string, frequencyConfig: any) => {
     const frequencyConfigObject : any = {};
     switch (formData.frequency) {
       case 'Hourly':
         frequencyConfigObject['hourlyInterval'] = formData.frequencyConfig.hourlyInterval;
         break;
       case 'Daily':
-        frequencyConfigObject['dailyTime'] = formData.frequencyConfig.dailyTime;
+        frequencyConfigObject['dailyTime'] = frequencyConfig.dailyTime;
         break;
       case 'Weekly':
         frequencyConfigObject['weeklyDays'] = formData.frequencyConfig.weeklyDays;
-        frequencyConfigObject['weeklyTime'] = formData.frequencyConfig.weeklyTime;
+        frequencyConfigObject['weeklyTime'] = frequencyConfig.weeklyTime;
         break;
       case 'Monthly':
         frequencyConfigObject['monthlyDay'] = formData.frequencyConfig.monthlyDay;
-        frequencyConfigObject['monthlyTime'] = formData.frequencyConfig.monthlyTime;
+        frequencyConfigObject['monthlyTime'] = frequencyConfig.monthlyTime;
         break;
       case 'Quarterly':
         frequencyConfigObject['quarterlyMonths'] = formData.frequencyConfig.quarterlyMonths;
         frequencyConfigObject['quarterlyDay'] = formData.frequencyConfig.quarterlyDay;
-        frequencyConfigObject['quarterlyTime'] = formData.frequencyConfig.quarterlyTime;
+        frequencyConfigObject['quarterlyTime'] = frequencyConfig.quarterlyTime;
         break;
       case 'Yearly':
         frequencyConfigObject['yearlyMonth'] = formData.frequencyConfig.yearlyMonth;
         frequencyConfigObject['yearlyDate'] = formData.frequencyConfig.yearlyDate;
-        frequencyConfigObject['yearlyTime'] = formData.frequencyConfig.yearlyTime;
+        frequencyConfigObject['yearlyTime'] = frequencyConfig.yearlyTime;
         break;
     }
     return frequencyConfigObject;
   }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 

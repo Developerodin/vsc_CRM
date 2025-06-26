@@ -356,9 +356,10 @@ const GroupsPage = () => {
       
       // If the group has clients array, use it directly
       if (Array.isArray(groupData.clients)) {
-        setAvailableClients(groupData.clients);
-        setClientTotalResults(groupData.clients.length);
-        setClientTotalPages(Math.ceil(groupData.clients.length / 10));
+        const searchedClients = groupData.clients.filter((client: Client) => client.name.toLowerCase().includes(clientSearchQuery.toLowerCase()));
+        setAvailableClients(searchedClients);
+        setClientTotalResults(searchedClients.length);
+        setClientTotalPages(Math.ceil(searchedClients.length / 10));
       } else {
         // If no clients array, fetch clients for the group
         const clientsResponse = await fetch(`${Base_url}groups/${groupId}/clients?${queryParams}`, {
