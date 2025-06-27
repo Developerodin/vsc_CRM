@@ -72,6 +72,16 @@ const TasksPage = () => {
   });
   const [showModal, setShowModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Timeline | null>(null);
+  
+  // New state for status update confirmation modal
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [statusUpdateData, setStatusUpdateData] = useState<{
+    taskId: string;
+    oldStatus: string;
+    newStatus: string;
+    taskName: string;
+  } | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   // Debounced search function
   const debouncedSearch = useCallback(
@@ -129,6 +139,74 @@ const TasksPage = () => {
       toast.error('Failed to fetch tasks');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Function to handle status change
+  const handleStatusChange = (taskId: string, oldStatus: string, newStatus: string, taskName: string) => {
+    setStatusUpdateData({
+      taskId,
+      oldStatus,
+      newStatus,
+      taskName
+    });
+    setShowStatusModal(true);
+  };
+
+  // Function to confirm status update
+  const confirmStatusUpdate = async () => {
+    if (!statusUpdateData) return;
+
+    setIsUpdatingStatus(true);
+    try {
+      const response = await fetch(`${Base_url}timelines/${statusUpdateData.taskId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          status: statusUpdateData.newStatus
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update task status');
+      }
+
+      // Update the task in local state
+      setTasks(prevTasks => 
+        prevTasks.map(task => 
+          task.id === statusUpdateData.taskId 
+            ? { ...task, status: statusUpdateData.newStatus as 'pending' | 'completed' | 'ongoing' | 'delayed' }
+            : task
+        )
+      );
+
+      toast.success(`Task status updated from ${statusUpdateData.oldStatus} to ${statusUpdateData.newStatus}`);
+      setShowStatusModal(false);
+      setStatusUpdateData(null);
+    } catch (err) {
+      toast.error('Failed to update task status');
+      console.error('Error updating task status:', err);
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  // Function to get status styling
+  const getStatusStyling = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'bg-success text-black';
+      case 'ongoing':
+        return 'bg-primary text-black';
+      case 'delayed':
+        return 'bg-danger text-black';
+      case 'pending':
+        return 'bg-warning text-black';
+      default:
+        return 'bg-warning text-black';
     }
   };
 
@@ -401,14 +479,29 @@ const TasksPage = () => {
                           <td>{timeline.startDate ? new Date(timeline.startDate).toISOString().split('T')[0] : "-"}</td>
                           <td>{timeline.endDate ? new Date(timeline.endDate).toISOString().split('T')[0] : "-"}</td>
                           <td>
-                            <span className={`badge ${
-                              timeline.status === 'completed' ? 'bg-success' :
-                              timeline.status === 'ongoing' ? 'bg-primary' :
-                              timeline.status === 'delayed' ? 'bg-danger' :
-                              'bg-warning'
-                            }`}>
-                              {timeline.status[0].toUpperCase() + timeline.status.slice(1)}
-                            </span>
+                            <select
+                              className={`badge border-0 cursor-pointer ${getStatusStyling(timeline.status)}`}
+                              value={timeline.status}
+                              onChange={(e) => handleStatusChange(
+                                timeline.id,
+                                timeline.status,
+                                e.target.value,
+                                timeline.activity.name
+                              )}
+                              style={{ 
+                                appearance: 'none',
+                                backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='white' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
+                                backgroundPosition: 'right 0.5rem center',
+                                backgroundRepeat: 'no-repeat',
+                                backgroundSize: '1.5em 1.5em',
+                                paddingRight: '2rem'
+                              }}
+                            >
+                              <option value="pending" className="bg-warning text-black">Pending</option>
+                              <option value="ongoing" className="bg-primary text-black">Ongoing</option>
+                              <option value="completed" className="bg-success text-black">Completed</option>
+                              <option value="delayed" className="bg-danger text-black">Delayed</option>
+                            </select>
                           </td>
                           <td>
                             <button
@@ -505,8 +598,81 @@ const TasksPage = () => {
           </div>
         </div>
       </div>
+      
+      {/* Task Details Modal */}
       {showModal && selectedTask && (
         <TaskDetailsModal task={selectedTask} onClose={() => setShowModal(false)} />
+      )}
+      
+      {/* Status Update Confirmation Modal */}
+      {showStatusModal && statusUpdateData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6 relative">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-800">Confirm Status Update</h2>
+              <button 
+                className="text-gray-500 hover:text-gray-700"
+                onClick={() => {
+                  setShowStatusModal(false);
+                  setStatusUpdateData(null);
+                }}
+              >
+                <i className="ri-close-line text-2xl"></i>
+              </button>
+            </div>
+            
+            <div className="mb-6">
+              <p className="text-gray-600 mb-4">
+                Are you sure you want to update the status of task <strong>"{statusUpdateData.taskName}"</strong>?
+              </p>
+              
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <span className="text-sm text-gray-600">Current Status:</span>
+                <span className={`badge ${getStatusStyling(statusUpdateData.oldStatus)}`}>
+                  {statusUpdateData.oldStatus[0].toUpperCase() + statusUpdateData.oldStatus.slice(1)}
+                </span>
+              </div>
+              
+              <div className="flex items-center justify-center my-3">
+                <i className="ri-arrow-down-line text-gray-400 text-xl"></i>
+              </div>
+              
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <span className="text-sm text-gray-600">New Status:</span>
+                <span className={`badge ${getStatusStyling(statusUpdateData.newStatus)}`}>
+                  {statusUpdateData.newStatus[0].toUpperCase() + statusUpdateData.newStatus.slice(1)}
+                </span>
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-3">
+              <button
+                className="ti-btn ti-btn-secondary"
+                onClick={() => {
+                  setShowStatusModal(false);
+                  setStatusUpdateData(null);
+                }}
+                disabled={isUpdatingStatus}
+              >
+                Cancel
+              </button>
+              <button
+                className="ti-btn ti-btn-primary"
+                onClick={confirmStatusUpdate}
+                disabled={isUpdatingStatus}
+              >
+                {isUpdatingStatus ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Updating...
+                  </>
+                ) : (
+                  'Confirm Update'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
