@@ -142,15 +142,21 @@ const TasksPage = () => {
     }
   };
 
-  // Function to handle status change
-  const handleStatusChange = (taskId: string, oldStatus: string, newStatus: string, taskName: string) => {
+  // Function to handle status button click
+  const handleStatusButtonClick = (taskId: string, currentStatus: string, taskName: string) => {
     setStatusUpdateData({
       taskId,
-      oldStatus,
-      newStatus,
+      oldStatus: currentStatus,
+      newStatus: currentStatus,
       taskName
     });
     setShowStatusModal(true);
+  };
+
+  // Function to handle status selection in modal
+  const handleStatusSelection = (newStatus: string) => {
+    if (!statusUpdateData) return;
+    setStatusUpdateData(prev => prev ? { ...prev, newStatus } : null);
   };
 
   // Function to confirm status update
@@ -479,29 +485,16 @@ const TasksPage = () => {
                           <td>{timeline.startDate ? new Date(timeline.startDate).toISOString().split('T')[0] : "-"}</td>
                           <td>{timeline.endDate ? new Date(timeline.endDate).toISOString().split('T')[0] : "-"}</td>
                           <td>
-                            <select
+                            <button
                               className={`badge border-0 cursor-pointer ${getStatusStyling(timeline.status)}`}
-                              value={timeline.status}
-                              onChange={(e) => handleStatusChange(
+                              onClick={() => handleStatusButtonClick(
                                 timeline.id,
                                 timeline.status,
-                                e.target.value,
                                 timeline.activity.name
                               )}
-                              style={{ 
-                                appearance: 'none',
-                                backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='white' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
-                                backgroundPosition: 'right 0.5rem center',
-                                backgroundRepeat: 'no-repeat',
-                                backgroundSize: '1.5em 1.5em',
-                                paddingRight: '2rem'
-                              }}
                             >
-                              <option value="pending" className="bg-warning text-black">Pending</option>
-                              <option value="ongoing" className="bg-primary text-black">Ongoing</option>
-                              <option value="completed" className="bg-success text-black">Completed</option>
-                              <option value="delayed" className="bg-danger text-black">Delayed</option>
-                            </select>
+                              {timeline.status.charAt(0).toUpperCase() + timeline.status.slice(1)}
+                            </button>
                           </td>
                           <td>
                             <button
@@ -604,12 +597,12 @@ const TasksPage = () => {
         <TaskDetailsModal task={selectedTask} onClose={() => setShowModal(false)} />
       )}
       
-      {/* Status Update Confirmation Modal */}
+      {/* Status Update Modal */}
       {showStatusModal && statusUpdateData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
           <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6 relative">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-800">Confirm Status Update</h2>
+              <h2 className="text-xl font-bold text-gray-800">Update Task Status</h2>
               <button 
                 className="text-gray-500 hover:text-gray-700"
                 onClick={() => {
@@ -623,26 +616,83 @@ const TasksPage = () => {
             
             <div className="mb-6">
               <p className="text-gray-600 mb-4">
-                Are you sure you want to update the status of task <strong>"{statusUpdateData.taskName}"</strong>?
+                Select new status for task <strong>"{statusUpdateData.taskName}"</strong>
               </p>
               
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <span className="text-sm text-gray-600">Current Status:</span>
-                <span className={`badge ${getStatusStyling(statusUpdateData.oldStatus)}`}>
-                  {statusUpdateData.oldStatus[0].toUpperCase() + statusUpdateData.oldStatus.slice(1)}
-                </span>
+              <div className="space-y-3 mb-6">
+                <label className="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="status"
+                    value="pending"
+                    checked={statusUpdateData.newStatus === 'pending'}
+                    className="mr-3"
+                    onChange={() => handleStatusSelection('pending')}
+                  />
+                  <span className="text-sm">Pending</span>
+                </label>
+                
+                <label className="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="status"
+                    value="ongoing"
+                    checked={statusUpdateData.newStatus === 'ongoing'}
+                    className="mr-3"
+                    onChange={() => handleStatusSelection('ongoing')}
+                  />
+                  <span className="text-sm">Ongoing</span>
+                </label>
+                
+                <label className="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="status"
+                    value="completed"
+                    checked={statusUpdateData.newStatus === 'completed'}
+                    className="mr-3"
+                    onChange={() => handleStatusSelection('completed')}
+                  />
+                  <span className="text-sm">Completed</span>
+                </label>
+                
+                <label className="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="status"
+                    value="delayed"
+                    checked={statusUpdateData.newStatus === 'delayed'}
+                    className="mr-3"
+                    onChange={() => handleStatusSelection('delayed')}
+                  />
+                  <span className="text-sm">Delayed</span>
+                </label>
               </div>
-              
-              <div className="flex items-center justify-center my-3">
-                <i className="ri-arrow-down-line text-gray-400 text-xl"></i>
-              </div>
-              
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <span className="text-sm text-gray-600">New Status:</span>
-                <span className={`badge ${getStatusStyling(statusUpdateData.newStatus)}`}>
-                  {statusUpdateData.newStatus[0].toUpperCase() + statusUpdateData.newStatus.slice(1)}
-                </span>
-              </div>
+
+              {/* Status change preview */}
+              {statusUpdateData.oldStatus !== statusUpdateData.newStatus && (
+                <div className="mb-6">
+                  <p className="text-gray-600 mb-3">Status will change from:</p>
+                  
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg mb-3">
+                    <span className="text-sm text-gray-600">Current Status:</span>
+                    <span className={`badge ${getStatusStyling(statusUpdateData.oldStatus)}`}>
+                      {statusUpdateData.oldStatus[0].toUpperCase() + statusUpdateData.oldStatus.slice(1)}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center justify-center my-3">
+                    <i className="ri-arrow-down-line text-gray-400 text-xl"></i>
+                  </div>
+                  
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span className="text-sm text-gray-600">New Status:</span>
+                    <span className={`badge ${getStatusStyling(statusUpdateData.newStatus)}`}>
+                      {statusUpdateData.newStatus[0].toUpperCase() + statusUpdateData.newStatus.slice(1)}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
             
             <div className="flex justify-end gap-3">
@@ -659,7 +709,7 @@ const TasksPage = () => {
               <button
                 className="ti-btn ti-btn-primary"
                 onClick={confirmStatusUpdate}
-                disabled={isUpdatingStatus}
+                disabled={isUpdatingStatus || statusUpdateData.oldStatus === statusUpdateData.newStatus}
               >
                 {isUpdatingStatus ? (
                   <>
@@ -667,7 +717,7 @@ const TasksPage = () => {
                     Updating...
                   </>
                 ) : (
-                  'Confirm Update'
+                  'Update Status'
                 )}
               </button>
             </div>
