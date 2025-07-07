@@ -1,10 +1,16 @@
 "use client";
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Seo from "@/shared/layout-components/seo/seo";
-import Link from "next/link";
 import { toast, Toaster } from "react-hot-toast";
-import * as XLSX from "xlsx";
 import { Base_url } from '@/app/api/config/BaseUrl';
+import axios from "axios";
+
+interface UdinEntry {
+  fieldName: string;
+  udin: string;
+  frequency: 'Hourly' | 'Daily' | 'Weekly' | 'Monthly' | 'Quarterly' | 'Yearly';
+  _id?: string; // Optional field that comes from API response
+}
 
 interface Timeline {
   id: string;
@@ -33,7 +39,7 @@ interface Timeline {
     yearlyDate: number;
     yearlyTime: string;
   };
-  udin?: string;
+  udin?: string | UdinEntry[];
   turnover?: number;
   assignedMember: {
     id: string;
@@ -83,6 +89,119 @@ const TasksPage = () => {
   } | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
+  // New state for UDIN edit modal
+  const [showUdinModal, setShowUdinModal] = useState(false);
+  const [selectedTaskForUdin, setSelectedTaskForUdin] = useState<Timeline | null>(null);
+  const [udinEntries, setUdinEntries] = useState<UdinEntry[]>([]);
+  const [isLoadingUdin, setIsLoadingUdin] = useState(false);
+  const [isSavingUdin, setIsSavingUdin] = useState(false);
+
+  // Function to fetch UDIN data for a task
+  const fetchUdinData = async (taskId: string) => {
+    setIsLoadingUdin(true);
+    try {
+      const response = await axios.get(`${Base_url}timelines/${taskId}/udin`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      const data = response.data;
+      setUdinEntries(data.udin || []);
+    } catch (err) {
+      console.error('Error fetching UDIN data:', err);
+      setUdinEntries([]);
+      toast.error('Failed to fetch UDIN data');
+    } finally {
+      setIsLoadingUdin(false);
+    }
+  };
+
+  // Function to handle UDIN edit button click
+  const handleUdinEditClick = async (task: Timeline) => {
+    setSelectedTaskForUdin(task);
+    setShowUdinModal(true);
+    await fetchUdinData(task.id);
+  };
+
+  // Function to add new UDIN entry
+  const addUdinEntry = (frequency: 'Hourly' | 'Daily' | 'Weekly' | 'Monthly' | 'Quarterly' | 'Yearly') => {
+    if (frequency === 'Weekly' || frequency === 'Yearly' || frequency === 'Quarterly') {
+    setUdinEntries(prev => [...prev, {
+        fieldName: '',
+        udin: '',
+        frequency: frequency
+      }]);
+    } else {
+      setUdinEntries(prev => [...prev, {
+        fieldName: 'All',
+        udin: '',
+        frequency: frequency
+      }]);
+    }
+  };
+
+  // Function to remove UDIN entry
+  const removeUdinEntry = (index: number) => {
+    setUdinEntries(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Function to update UDIN entry
+  const updateUdinEntry = (index: number, field: keyof UdinEntry, value: string) => {
+    setUdinEntries(prev => prev.map((entry, i) => 
+      i === index ? { ...entry, [field]: value } : entry
+    ));
+  };
+
+  // Function to save UDIN data
+  const saveUdinData = async () => {
+    if (!selectedTaskForUdin) return;
+
+    // Validate entries and clean them (remove _id fields)
+    const validEntries = udinEntries.filter(entry => {
+      // For Weekly, Yearly, Quarterly - both fieldName and udin are required
+      if (entry.frequency === 'Weekly' || entry.frequency === 'Yearly' || entry.frequency === 'Quarterly') {
+        return entry.fieldName.trim() && entry.udin.trim();
+      }
+      // For Hourly, Daily, Monthly - only udin is required
+      return entry.udin.trim();
+    }).map(entry => {
+      // Remove _id field and any other unwanted fields, keep only the required ones
+      const { _id, ...cleanEntry } = entry;
+      return cleanEntry;
+    });
+
+    setIsSavingUdin(true);
+    try {
+      await axios.patch(`${Base_url}timelines/${selectedTaskForUdin.id}/udin`, {
+        udin: validEntries
+      }, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      // Update the task in local state
+      setTasks(prevTasks => 
+        prevTasks.map(task => 
+          task.id === selectedTaskForUdin.id 
+            ? { ...task, udin: validEntries }
+            : task
+        )
+      );
+
+      toast.success('UDIN data updated successfully');
+      setShowUdinModal(false);
+      setSelectedTaskForUdin(null);
+      setUdinEntries([]);
+    } catch (err) {
+      toast.error('Failed to update UDIN data');
+      console.error('Error updating UDIN data:', err);
+    } finally {
+      setIsSavingUdin(false);
+    }
+  };
+
   // Debounced search function
   const debouncedSearch = useCallback(
     (() => {
@@ -119,17 +238,13 @@ const TasksPage = () => {
         ...(sortBy && { sortBy })
       });
 
-      const response = await fetch(`${Base_url}timelines?${queryParams}`, {
+      const response = await axios.get(`${Base_url}timelines?${queryParams}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch tasks');
-      }
-
-      const data: ApiResponse = await response.json();
+      const data: ApiResponse = response.data;
       console.log(data.results);
       setTasks(data.results);
       setTotalPages(data.totalPages);
@@ -165,20 +280,13 @@ const TasksPage = () => {
 
     setIsUpdatingStatus(true);
     try {
-      const response = await fetch(`${Base_url}timelines/${statusUpdateData.taskId}`, {
-        method: 'PATCH',
+      await axios.patch(`${Base_url}timelines/${statusUpdateData.taskId}`, {
+        status: statusUpdateData.newStatus
+      }, {
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          status: statusUpdateData.newStatus
-        })
+        }
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to update task status');
-      }
 
       // Update the task in local state
       setTasks(prevTasks => 
@@ -479,7 +587,19 @@ const TasksPage = () => {
                           <td>{timeline.client.name}</td>
                           <td>{timeline.client.email}</td>
                           <td>{timeline.frequency}</td>
-                          <td>{timeline.udin || "-"}</td>
+                          <td>
+                            <button
+                              className="w-full text-left hover:bg-primary/10 hover:text-primary transition-colors duration-200 rounded px-2 py-1 group relative"
+                              onClick={() => handleUdinEditClick(timeline)}
+                              title="Click to edit UDIN"
+                            >
+                              <span className="flex items-center gap-2">
+                                <span className="truncate">{formatUdinDisplay(timeline.udin)}</span>
+                                <i className="ri-edit-line text-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-primary ml-auto"></i>
+                              </span>
+                              <div className="absolute inset-0 border border-transparent group-hover:border-primary/30 rounded transition-colors duration-200 pointer-events-none"></div>
+                            </button>
+                          </td>
                           <td>{timeline.turnover || "-"}</td>
                           <td>{timeline.assignedMember.name}</td>
                           <td>{timeline.startDate ? new Date(timeline.startDate).toISOString().split('T')[0] : "-"}</td>
@@ -724,8 +844,233 @@ const TasksPage = () => {
           </div>
         </div>
       )}
+
+      {/* UDIN Edit Modal */}
+      {showUdinModal && selectedTaskForUdin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h2 className="text-xl font-bold text-gray-800 truncate flex-1 mr-6">
+                Edit UDIN - {selectedTaskForUdin.activity.name}
+              </h2>
+              <div className="flex items-center gap-4 flex-shrink-0">
+                <button
+                  className="ti-btn ti-btn-primary px-3 py-1.5 text-sm"
+                  onClick={() => addUdinEntry(selectedTaskForUdin.frequency)}
+                  disabled={isLoadingUdin || 
+                    // For Daily, Monthly, Hourly - disable if any entries exist
+                    (['Daily', 'Monthly', 'Hourly'].includes(selectedTaskForUdin.frequency) && udinEntries.length > 0) ||
+                    // For Weekly, Yearly, Quarterly - disable if no available options
+                    (['Weekly', 'Yearly', 'Quarterly'].includes(selectedTaskForUdin.frequency) && 
+                     getFieldOptions(selectedTaskForUdin.frequency, selectedTaskForUdin, udinEntries).length === 0)
+                  }
+                  title={
+                    ['Daily', 'Monthly', 'Hourly'].includes(selectedTaskForUdin.frequency) && udinEntries.length > 0
+                      ? `${selectedTaskForUdin.frequency} frequency can only have one UDIN entry`
+                      : ['Weekly', 'Yearly', 'Quarterly'].includes(selectedTaskForUdin.frequency) && 
+                        getFieldOptions(selectedTaskForUdin.frequency, selectedTaskForUdin, udinEntries).length === 0
+                      ? `All ${selectedTaskForUdin.frequency === 'Weekly' ? 'days' : selectedTaskForUdin.frequency === 'Yearly' ? 'months' : 'quarters'} already have UDINs assigned`
+                      : 'Add new UDIN entry'
+                  }
+                >
+                  <i className="ri-add-line me-1"></i>
+                  Add Entry
+                </button>
+                <button 
+                  className="text-gray-500 hover:text-gray-700 flex-shrink-0 p-1"
+                  onClick={() => {
+                    setShowUdinModal(false);
+                    setSelectedTaskForUdin(null);
+                    setUdinEntries([]);
+                  }}
+                >
+                  <i className="ri-close-line text-2xl"></i>
+                </button>
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6">
+              {isLoadingUdin ? (
+                <div className="flex justify-center items-center h-32">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : udinEntries.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
+                    <i className="ri-file-list-line text-2xl text-primary"></i>
+                  </div>
+                  <h3 className="text-lg font-medium mb-2">No UDIN Entries</h3>
+                  {(['Daily', 'Monthly', 'Hourly'].includes(selectedTaskForUdin.frequency) && udinEntries.length > 0) ? (
+                    <p className="text-amber-600 mb-4">
+                      <i className="ri-information-line mr-1"></i>
+                      {selectedTaskForUdin.frequency} frequency can only have one UDIN entry
+                    </p>
+                  ) : (['Weekly', 'Yearly', 'Quarterly'].includes(selectedTaskForUdin.frequency) && 
+                       getFieldOptions(selectedTaskForUdin.frequency, selectedTaskForUdin, udinEntries).length === 0) ? (
+                    <p className="text-amber-600 mb-4">
+                      <i className="ri-information-line mr-1"></i>
+                      All {selectedTaskForUdin.frequency === 'Weekly' ? 'days' : selectedTaskForUdin.frequency === 'Yearly' ? 'months' : 'quarters'} already have UDINs assigned
+                    </p>
+                  ) : (
+                    <p className="text-gray-500 mb-4">Click "Add Entry" to start adding UDIN data</p>
+                  )}
+                  <button
+                    className="ti-btn ti-btn-primary"
+                    onClick={() => addUdinEntry(selectedTaskForUdin.frequency)}
+                    disabled={
+                      // For Daily, Monthly, Hourly - disable if any entries exist
+                      (['Daily', 'Monthly', 'Hourly'].includes(selectedTaskForUdin.frequency) && udinEntries.length > 0) ||
+                      // For Weekly, Yearly, Quarterly - disable if no available options
+                      (['Weekly', 'Yearly', 'Quarterly'].includes(selectedTaskForUdin.frequency) && 
+                       getFieldOptions(selectedTaskForUdin.frequency, selectedTaskForUdin, udinEntries).length === 0)
+                    }
+                    title={
+                      ['Daily', 'Monthly', 'Hourly'].includes(selectedTaskForUdin.frequency) && udinEntries.length > 0
+                        ? `${selectedTaskForUdin.frequency} frequency can only have one UDIN entry`
+                        : ['Weekly', 'Yearly', 'Quarterly'].includes(selectedTaskForUdin.frequency) && 
+                          getFieldOptions(selectedTaskForUdin.frequency, selectedTaskForUdin, udinEntries).length === 0
+                        ? `All ${selectedTaskForUdin.frequency === 'Weekly' ? 'days' : selectedTaskForUdin.frequency === 'Yearly' ? 'months' : 'quarters'} already have UDINs assigned`
+                        : 'Add first UDIN entry'
+                    }
+                  >
+                    <i className="ri-add-line me-2"></i>
+                    Add First Entry
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {udinEntries.map((entry, index) => (
+                    <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-medium text-gray-700">Entry {index + 1}</h4>
+                        <button
+                          className="ti-btn ti-btn-danger ti-btn-xs"
+                          onClick={() => removeUdinEntry(index)}
+                        >
+                          <i className="ri-delete-bin-line"></i>
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Show field selection only for Weekly, Yearly, Quarterly */}
+                        {(entry.frequency === 'Weekly' || entry.frequency === 'Yearly' || entry.frequency === 'Quarterly') && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              {entry.frequency === 'Weekly' ? 'Day' : entry.frequency === 'Yearly' ? 'Month' : 'Quarter'} <span className="text-red-500">*</span>
+                            </label>
+                            <select
+                              className="form-select"
+                              value={entry.fieldName}
+                              onChange={(e) => updateUdinEntry(index, 'fieldName', e.target.value)}
+                            >
+                              <option value="">Select {entry.frequency === 'Weekly' ? 'Day' : entry.frequency === 'Yearly' ? 'Month' : 'Quarter'}</option>
+                              {getFieldOptions(entry.frequency, selectedTaskForUdin, udinEntries, index).map((option) => (
+                                <option key={option} value={option}>{option}</option>
+                              ))}
+                            </select>
+                            {getFieldOptions(entry.frequency, selectedTaskForUdin, udinEntries, index).length === 0 && (
+                              <p className="text-sm text-amber-600 mt-1">
+                                <i className="ri-information-line mr-1"></i>
+                                All {entry.frequency === 'Weekly' ? 'days' : entry.frequency === 'Yearly' ? 'months' : 'quarters'} already have UDINs assigned
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            UDIN <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            className="form-control"
+                            placeholder="e.g., UDIN-2024-001234"
+                            value={entry.udin}
+                            onChange={(e) => updateUdinEntry(index, 'udin', e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <div className="flex justify-end gap-3 p-6 border-t">
+              <button
+                className="ti-btn ti-btn-secondary"
+                onClick={() => {
+                  setShowUdinModal(false);
+                  setSelectedTaskForUdin(null);
+                  setUdinEntries([]);
+                }}
+                disabled={isSavingUdin}
+              >
+                Cancel
+              </button>
+              <button
+                className="ti-btn ti-btn-primary"
+                onClick={saveUdinData}
+                disabled={isSavingUdin}
+              >
+                {isSavingUdin ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  'Save Changes'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+};
+
+// Function to format UDIN display (moved outside component for reuse)
+const formatUdinDisplay = (udin: string | UdinEntry[] | undefined) => {
+  if (!udin) return "-";
+  if (typeof udin === 'string') return udin;
+  if (Array.isArray(udin)) {
+    if (udin.length === 0) return "-";
+    if (udin.length === 1) return udin[0].udin;
+    return `${udin.length} entries`;
+  }
+  return "-";
+};
+
+// Function to get available field options based on frequency and timeline config
+const getFieldOptions = (frequency: string, timeline: Timeline, existingEntries: UdinEntry[] = [], currentEntryIndex?: number) => {
+  let allOptions: string[] = [];
+  
+  switch (frequency) {
+    case 'Weekly':
+      allOptions = timeline.frequencyConfig.weeklyDays || [];
+      break;
+    case 'Yearly':
+      allOptions = timeline.frequencyConfig.yearlyMonth || [];
+      break;
+    case 'Quarterly':
+      allOptions = timeline.frequencyConfig.quarterlyMonths || [];
+      break;
+    default:
+      return [];
+  }
+  
+  // Filter out options that already have UDINs associated with them
+  // But include the current entry's fieldName if it exists (for editing)
+  const usedOptions = existingEntries
+    .filter((entry, index) => 
+      entry.frequency === frequency && 
+      entry.fieldName && 
+      index !== currentEntryIndex // Don't count the current entry as "used"
+    )
+    .map(entry => entry.fieldName);
+  
+  return allOptions.filter(option => !usedOptions.includes(option));
 };
 
 // Modal for viewing task details
@@ -796,7 +1141,7 @@ const TaskDetailsModal = ({ task, onClose }: { task: Timeline, onClose: () => vo
               </div>
             )}
           </div>
-          <div><strong>UDIN:</strong> {task.udin || '-'}</div>
+          <div><strong>UDIN:</strong> {formatUdinDisplay(task.udin)}</div>
           <div><strong>Turnover:</strong> {task.turnover || '-'}</div>
           <div><strong>Assigned Member:</strong> {task.assignedMember.name}</div>
           <div><strong>Start Date:</strong> {task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : '-'}</div>
