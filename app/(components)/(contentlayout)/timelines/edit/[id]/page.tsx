@@ -103,7 +103,6 @@ interface Timeline {
     yearlyDate: number;
     yearlyTime: string;
   };
-  udin?: string;
   turnover?: number;
   assignedMember: {
     id: string;
@@ -159,7 +158,6 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
       yearlyTime: ''
     },
     status: 'pending' as 'pending' | 'completed' | 'ongoing' | 'delayed',
-    udin: '',
     turnover: '',
     teamMemberId: '',
     teamMemberName: '',
@@ -327,7 +325,6 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
           frequency: timelineData.frequency,
           frequencyConfig: timelineData.frequencyConfig,
           status: timelineData.status,
-          udin: timelineData.udin || '',
           turnover: timelineData.turnover?.toString() || '',
           teamMemberId: timelineData.assignedMember.id,
           teamMemberName: timelineData.assignedMember.name,
@@ -670,7 +667,6 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
         frequency: formData.frequency,
         frequencyConfig: formattedFrequencyConfig,
         status: formData.status,
-        udin: formData.udin || undefined,
         turnover: formData.turnover ? parseFloat(formData.turnover) : undefined,
         assignedMember: formData.teamMemberId,
         startDate: formatDateToISO(formData.startDate),
@@ -917,20 +913,7 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-                  {/* Third Row: UDIN, Turnover, Assigned Member */}
-                  <div className="form-group">
-                    <label htmlFor="udin" className="form-label">UDIN</label>
-                    <input
-                      type="text"
-                      id="udin"
-                      name="udin"
-                      className="form-control"
-                      placeholder="Enter UDIN (e.g., UDIN-2024-001234)"
-                      value={formData.udin}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-
+                  {/* Third Row: Turnover, Assigned Member */}
                   <div className="form-group">
                     <label htmlFor="turnover" className="form-label">Turnover</label>
                     <input

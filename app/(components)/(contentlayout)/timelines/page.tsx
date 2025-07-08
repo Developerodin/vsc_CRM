@@ -33,7 +33,6 @@ interface Timeline {
     yearlyDate: number;
     yearlyTime: string;
   };
-  udin?: string;
   turnover?: number;
   assignedMember: {
     id: string;
@@ -61,7 +60,6 @@ interface ExcelRow {
   "Client Name": string;
   "Client Email": string;
   "Frequency": string;
-  "UDIN"?: string;
   "Turnover"?: string;
   "Team Member ID"?: string;
   "Team Member Name": string;
@@ -230,7 +228,6 @@ const TimelinesPage = () => {
             "Client Name": timeline.client.name,
             "Client Email": timeline.client.email,
             "Frequency": timeline.frequency,
-            "UDIN": timeline.udin || "",
             "Turnover": timeline.turnover?.toString() || "",
             "Team Member ID": timeline.assignedMember.id,
             "Team Member Name": timeline.assignedMember.name,
@@ -259,7 +256,6 @@ const TimelinesPage = () => {
           "Client Name": timeline.client.name,
           "Client Email": timeline.client.email,
           "Frequency": timeline.frequency,
-          "UDIN": timeline.udin,
           "Turnover": timeline.turnover?.toString() || "",
           "Team Member ID": timeline.assignedMember.id,
           "Team Member Name": timeline.assignedMember.name,
@@ -279,7 +275,6 @@ const TimelinesPage = () => {
         { wch: 30 }, // Client Name
         { wch: 30 }, // Client Email
         { wch: 20 }, // Frequency
-        { wch: 20 }, // UDIN
         { wch: 25 }, // Turnover
         { wch: 25 }, // Team Member ID
         { wch: 25 }, // Team Member
@@ -324,7 +319,6 @@ const TimelinesPage = () => {
             client: row["Client ID"],
             status: row["Status"] as 'pending' | 'completed' | 'ongoing' | 'delayed',
             frequency: row["Frequency"] as 'Hourly' | 'Daily' | 'Weekly' | 'Monthly' | 'Quarterly' | 'Yearly',
-            udin: row["UDIN"] || undefined,
             turnover: row["Turnover"] ? parseFloat(row["Turnover"]) : undefined,
             assignedMember: row["Team Member ID"],
             startDate: row["Start Date"] || undefined,
@@ -631,7 +625,6 @@ const TimelinesPage = () => {
                       <th className="px-4 py-3">Client Name</th>
                       <th className="px-4 py-3">Client Email</th>
                       <th className="px-4 py-3">Frequency</th>
-                      <th className="px-4 py-3">UDIN</th>
                       <th className="px-4 py-3">Turnover</th>
                       <th className="px-4 py-3">Assigned Member</th>
                       <th className="px-4 py-3">Start Date</th>
@@ -692,7 +685,6 @@ const TimelinesPage = () => {
                           <td>{timeline.client.name}</td>
                           <td>{timeline.client.email}</td>
                           <td>{timeline.frequency}</td>
-                          <td>{timeline.udin || "-"}</td>
                           <td>{timeline.turnover || "-"}</td>
                           <td>{timeline.assignedMember.name}</td>
                           <td>{timeline.startDate ? new Date(timeline.startDate).toISOString().split('T')[0] : "-"}</td>
