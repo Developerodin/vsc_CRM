@@ -1,784 +1,733 @@
-
 "use client"
-import { Dealsstatistics  } from '@/shared/data/dashboards/crmdata';
 import Seo from '@/shared/layout-components/seo/seo';
 import Link from 'next/link';
-import React, { Fragment } from 'react'
+import React, { Fragment, useState, useEffect } from 'react'
 import * as Crmdata from "@/shared/data/dashboards/crmdata";
 import dynamic from "next/dynamic";
+import { Base_url } from '@/app/api/config/BaseUrl';
+import { toast } from 'react-hot-toast';
+import axios from 'axios';
+import { useBranchContext } from '@/shared/contextapi';
+import { ApexOptions } from 'apexcharts';
+
 const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
+interface DashboardData {
+  totalBranches: number;
+  totalCustomers: number;
+  totalTeams: number;
+  totalActivities: number;
+  totalOngoingTasks: number;
+}
+
+interface TimelineCounts {
+  branch: {
+    id: string;
+    name: string;
+  };
+  counts: {
+    pending: number;
+    ongoing: number;
+    completed: number;
+    delayed: number;
+    total: number;
+  };
+}
+
+interface MonthlyTaskData {
+  pending: number[];
+  delayed: number[];
+  completed: number[];
+  assigned: number[];
+  months: string[];
+}
+
+// Skeleton Components
+const CardSkeleton = () => (
+  <div className="box overflow-hidden h-full animate-pulse">
+    <div className="box-body flex flex-col justify-between">
+      <div className='flex flex-col'>
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <div className="w-[2.5rem] h-[2.5rem] rounded-full bg-gray-300"></div>
+          </div>
+        </div>
+        <div className="mb-4">
+          <div className="h-4 bg-gray-300 rounded w-24 mb-2"></div>
+          <div className="h-8 bg-gray-300 rounded w-16"></div>
+        </div>
+      </div>
+      <div className="flex justify-end">
+        <div className="h-4 bg-gray-300 rounded w-16"></div>
+      </div>
+    </div>
+  </div>
+);
+
+const ChartSkeleton = () => (
+  <div className="box h-full animate-pulse">
+    <div className="box-header justify-between">
+      <div className="h-6 bg-gray-300 rounded w-32"></div>
+      <div className="w-[1.75rem] h-[1.75rem] bg-gray-300 rounded"></div>
+    </div>
+    <div className="box-body overflow-hidden">
+      <div className="flex items-center justify-center h-[250px]">
+        <div className="w-48 h-48 bg-gray-300 rounded-full"></div>
+      </div>
+    </div>
+    <div className="grid grid-cols-4 border-t border-dashed dark:border-defaultborder/10">
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} className="col !p-0">
+          <div className={`p-[0.95rem] text-center ${i < 4 ? 'border-e border-dashed dark:border-defaultborder/10' : ''}`}>
+            <div className="h-3 bg-gray-300 rounded w-12 mb-1 mx-auto"></div>
+            <div className="h-5 bg-gray-300 rounded w-8 mx-auto"></div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const LineChartSkeleton = () => (
+  <div className="box h-full animate-pulse">
+    <div className="box-header justify-between">
+      <div className="h-6 bg-gray-300 rounded w-40"></div>
+      <div className="w-[1.75rem] h-[1.75rem] bg-gray-300 rounded"></div>
+    </div>
+    <div className="box-body !py-5">
+      <div className="h-[350px] bg-gray-300 rounded"></div>
+    </div>
+  </div>
+);
+
 const Dashboard = () => {
+  const { branches } = useBranchContext();
+  const [dashboardData, setDashboardData] = useState<DashboardData>({
+    totalBranches: 0,
+    totalCustomers: 0,
+    totalTeams: 0,
+    totalActivities: 0,
+    totalOngoingTasks: 0
+  });
+  const [timelineCounts, setTimelineCounts] = useState<TimelineCounts | null>(null);
+  const [selectedBranchId, setSelectedBranchId] = useState<string>('');
+  const [monthlyTaskData, setMonthlyTaskData] = useState<MonthlyTaskData>({
+    pending: [],
+    delayed: [],
+    completed: [],
+    assigned: [],
+    months: []
+  });
+  const [error, setError] = useState<string | null>(null);
+  
+  // Loading states
+  const [isLoadingDashboard, setIsLoadingDashboard] = useState(true);
+  const [isLoadingTimeline, setIsLoadingTimeline] = useState(false);
+  const [isLoadingMonthly, setIsLoadingMonthly] = useState(false);
+
+  const fetchDashboardData = async () => {
+    setError(null);
+    setIsLoadingDashboard(true);
+    
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+
+      // Fetch all dashboard data in parallel using axios
+      const [
+        branchesResponse,
+        customersResponse,
+        teamsResponse,
+        activitiesResponse,
+        tasksResponse
+      ] = await Promise.all([
+        axios.get(`${Base_url}dashboard/total-branches`, { headers }),
+        axios.get(`${Base_url}dashboard/total-clients`, { headers }),
+        axios.get(`${Base_url}dashboard/total-teams`, { headers }),
+        axios.get(`${Base_url}dashboard/total-activities`, { headers }),
+        axios.get(`${Base_url}dashboard/total-ongoing-tasks`, { headers })
+      ]);
+
+      setDashboardData({
+        totalBranches: branchesResponse.data.total || 0,
+        totalCustomers: customersResponse.data.total || 0,
+        totalTeams: teamsResponse.data.total || 0,
+        totalActivities: activitiesResponse.data.total || 0,
+        totalOngoingTasks: tasksResponse.data.total || 0
+      });
+
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch dashboard data');
+      toast.error('Failed to load dashboard data');
+    } finally {
+      setIsLoadingDashboard(false);
+    }
+  };
+
+  const fetchTimelineCounts = async (branchId: string) => {
+    if (!branchId) return;
+    
+    setIsLoadingTimeline(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+
+      const response = await axios.get(`${Base_url}dashboard/timeline-counts-by-branch`, { 
+        headers,
+        params: { branchId }
+      });
+      setTimelineCounts(response.data);
+    } catch (err) {
+      console.error('Error fetching timeline counts:', err);
+      toast.error('Failed to load timeline data');
+      setTimelineCounts(null);
+    } finally {
+      setIsLoadingTimeline(false);
+    }
+  };
+
+  const fetchMonthlyTaskData = async (branchId: string) => {
+    if (!branchId) return;
+    
+    setIsLoadingMonthly(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+
+      // Get last 12 months
+      const months = [];
+      const pendingData = [];
+      const delayedData = [];
+      const completedData = [];
+      const assignedData = [];
+
+      for (let i = 11; i >= 0; i--) {
+        const date = new Date();
+        date.setMonth(date.getMonth() - i);
+        
+        const startDate = new Date(date.getFullYear(), date.getMonth(), 1);
+        const endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+        
+        const monthName = startDate.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+        months.push(monthName);
+
+        // Fetch timeline counts for the month
+        const timelineResponse = await axios.get(`${Base_url}dashboard/timeline-counts-by-branch`, {
+          headers,
+          params: { 
+            branchId
+          }
+        });
+
+        // Fetch assigned task count for the month
+        const assignedResponse = await axios.get(`${Base_url}dashboard/assigned-task-counts`, {
+          headers,
+          params: {
+            branchId,
+            startDate: startDate.toISOString().split('T')[0],
+            endDate: endDate.toISOString().split('T')[0]
+          }
+        });
+
+        pendingData.push(timelineResponse.data.counts?.pending || 0);
+        delayedData.push(timelineResponse.data.counts?.delayed || 0);
+        completedData.push(timelineResponse.data.counts?.completed || 0);
+        assignedData.push(assignedResponse.data.count || 0);
+      }
+
+      setMonthlyTaskData({
+        pending: pendingData,
+        delayed: delayedData,
+        completed: completedData,
+        assigned: assignedData,
+        months: months
+      });
+
+    } catch (err) {
+      console.error('Error fetching monthly task data:', err);
+      toast.error('Failed to load monthly task data');
+      setMonthlyTaskData({
+        pending: [],
+        delayed: [],
+        completed: [],
+        assigned: [],
+        months: []
+      });
+    } finally {
+      setIsLoadingMonthly(false);
+    }
+  };
+
+  // Initialize branch selection when branches are loaded
+  useEffect(() => {
+    if (branches.length > 0 && !selectedBranchId) {
+      const firstBranch = branches[0];
+      setSelectedBranchId(firstBranch.id);
+      fetchTimelineCounts(firstBranch.id);
+      fetchMonthlyTaskData(firstBranch.id);
+    }
+  }, [branches]);
+
+  // Fetch timeline counts when branch selection changes
+  useEffect(() => {
+    if (selectedBranchId) {
+      fetchTimelineCounts(selectedBranchId);
+      fetchMonthlyTaskData(selectedBranchId);
+    }
+  }, [selectedBranchId]);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const handleBranchChange = (branchId: string) => {
+    setSelectedBranchId(branchId);
+  };
+
+  // Generate chart data from timeline counts
+  const getTimelineChartData = () => {
+    if (!timelineCounts) {
+      return {
+        series: [0, 0, 0, 0],
+        options: Crmdata.Sourcedata.options,
+        total: 0
+      };
+    }
+
+    const { counts } = timelineCounts;
+    const series = [counts.pending, counts.ongoing, counts.completed, counts.delayed];
+    
+    return {
+      series,
+      options: {
+        ...Crmdata.Sourcedata.options,
+        colors: ["rgb(245, 184, 73)", "rgb(35, 183, 229)", "rgb(38, 191, 148)", "rgb(220, 53, 69)"],
+        tooltip: {
+          enabled: true,
+          custom: function({ series, seriesIndex, w }: any) {
+            const statusNames = ['Pending', 'Ongoing', 'Completed', 'Delayed'];
+            const value = series[seriesIndex];
+            const statusName = statusNames[seriesIndex];
+            return `<div class="custom-tooltip p-2">
+              <span style="color: ${w.config.colors[seriesIndex]}">●</span>
+              <span style="font-weight: bold; margin-left: 5px;">${statusName}: ${value}</span>
+            </div>`;
+          }
+        },
+        plotOptions: {
+          ...Crmdata.Sourcedata.options?.plotOptions,
+          pie: {
+            ...Crmdata.Sourcedata.options?.plotOptions?.pie,
+            donut: {
+              ...Crmdata.Sourcedata.options?.plotOptions?.pie?.donut,
+              labels: {
+                show: false,
+                name: {
+                  show: true,
+                  fontSize: '20px',
+                  color: '#495057',
+                  offsetY: -4
+                },
+                                 value: {
+                   show: true,
+                   fontSize: '18px',
+                   color: undefined,
+                   offsetY: 8,
+                   formatter: function (val: string) {
+                     return val;
+                   }
+                 },
+              }
+            }
+          }
+        }
+      },
+      total: counts.total
+    };
+  };
+
+  const chartData = getTimelineChartData();
+
+  // Generate chart options for all task types on one chart
+  const getTaskChartOptions = (): ApexOptions => ({
+    chart: {
+      type: 'line' as const,
+      height: 350,
+      toolbar: {
+        show: false
+      },
+      zoom: {
+        enabled: false
+      }
+    },
+    colors: ['#f5b849', '#dc3545', '#26bf94', '#23b7e5'], // Pending, Delayed, Completed, Assigned
+    dataLabels: {
+      enabled: false
+    },
+    stroke: {
+      curve: 'smooth' as const,
+      width: 3
+    },
+    grid: {
+      borderColor: '#e7e7e7',
+      row: {
+        colors: ['#f3f3f3', 'transparent'],
+        opacity: 0.5
+      }
+    },
+    xaxis: {
+      categories: monthlyTaskData.months,
+      labels: {
+        style: {
+          colors: '#8c9097',
+          fontSize: '12px'
+        }
+      }
+    },
+    yaxis: {
+      title: {
+        text: 'Number of Tasks',
+        style: {
+          color: '#8c9097',
+          fontSize: '12px'
+        }
+      },
+      labels: {
+        style: {
+          colors: '#8c9097',
+          fontSize: '12px'
+        }
+      }
+    },
+    legend: {
+      position: 'top' as const,
+      horizontalAlign: 'right' as const,
+      fontSize: '12px',
+      labels: {
+        colors: '#8c9097'
+      }
+    },
+    tooltip: {
+      y: {
+        formatter: function (val: number) {
+          return val + ' tasks';
+        }
+      }
+    }
+  });
+
+  const taskChartOptions = getTaskChartOptions();
+
+  console.log(branches);
 
   return (
     <Fragment>
       <Seo title={"Crm"} />
-      <div className="h1 text-center mt-[300px]">Dashboard</div>
-      {/* <div className="md:flex block items-center justify-between my-[1.5rem] page-header-breadcrumb">
+      <div className="md:flex block items-center justify-between my-[1.5rem] page-header-breadcrumb">
         <div>
-          <p className="font-semibold text-[1.125rem] text-defaulttextcolor dark:text-defaulttextcolor/70 !mb-0 ">Welcome back, Json Taylor !</p>
+          <p className="font-semibold text-[1.125rem] text-defaulttextcolor dark:text-defaulttextcolor/70 !mb-0 ">Welcome back!</p>
           <p className="font-normal text-[#8c9097] dark:text-white/50 text-[0.813rem]">Track your sales activity, leads and deals here.</p>
         </div>
-        <div className="btn-list md:mt-0 mt-2">
-          <button type="button"
-            className="ti-btn bg-primary text-white btn-wave !font-medium !me-[0.45rem] !ms-0 !text-[0.85rem] !rounded-[0.35rem] !py-[0.51rem] !px-[0.86rem] shadow-none">
-            <i className="ri-filter-3-fill  inline-block"></i>Filters
-          </button>
-          <button type="button"
-            className="ti-btn ti-btn-outline-secondary btn-wave !font-medium  !me-[0.45rem]  !ms-0 !text-[0.85rem] !rounded-[0.35rem] !py-[0.51rem] !px-[0.86rem] shadow-none">
-            <i className="ri-upload-cloud-line  inline-block"></i>Export
-          </button>
-        </div>
       </div>
-      <div className="grid grid-cols-12 gap-x-6">
-        <div className="xxl:col-span-9 xl:col-span-12  col-span-12">
-          <div className="grid grid-cols-12 gap-x-6">
-            <div className="xxl:col-span-4 xl:col-span-4  col-span-12">
-              <div className="xxl:col-span-12 xl:col-span-12 col-span-12">
-                <div className="box crm-highlight-card">
-                  <div className="box-body">
-                    <div className="flex items-center justify-between">
+      
+      {/* First Row: Five Cards */}
+      <div className="flex flex-wrap gap-6 mb-6">
+        {isLoadingDashboard ? (
+          <>
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="flex-1 min-w-[200px]">
+                <CardSkeleton />
+              </div>
+            ))}
+          </>
+        ) : (
+          <>
+            <div className="flex-1 min-w-[200px]">
+              <div className="box overflow-hidden h-full">
+                <div className="box-body flex flex-col justify-between">
+                  <div className='flex flex-col'>
+                    <div className="flex items-start justify-between mb-4">
                       <div>
-                        <div className="font-semibold text-[1.125rem] text-white mb-2">Your target is incomplete</div>
-                        <span className="block text-[0.75rem] text-white"><span className="opacity-[0.7] text-nowrap me-1 rtl:ms-1">You have
-                          completed</span>
-                          <span className="font-semibold text-warning">48%</span> <span className="opacity-[0.7]">of the given
-                            target, you can also check your status</span>.</span>
-                        <span className="block font-semibold mt-[0.125rem]"><Link className="text-white text-[0.813rem]"
-                          href="#!" scroll={false}><u>Click
-                            here</u></Link></span>
+                        <span
+                          className="!text-[0.8rem]  !w-[2.5rem] !h-[2.5rem] !leading-[2.5rem] !rounded-full inline-flex items-center justify-center bg-primary">
+                          <i className="ti ti-building text-[1rem] text-white"></i>
+                        </span>
                       </div>
+                    </div>
+                    <div className="mb-4">
+                      <p className="text-[#8c9097] dark:text-white/50 text-[0.813rem] mb-2">Total Branches</p>
+                      <h4 className="font-semibold text-[1.5rem] !mb-0">
+                        {dashboardData.totalBranches.toLocaleString()}
+                      </h4>
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <Link className="text-primary text-[0.813rem] hover:underline" href="/branches" scroll={false}>
+                      View All<i className="ti ti-arrow-narrow-right ms-2 font-semibold inline-block"></i>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex-1 min-w-[200px]">
+              <div className="box overflow-hidden h-full">
+                <div className="box-body flex flex-col justify-between">
+                  <div className='flex flex-col'>
+                    <div className="flex items-start justify-between mb-4">
                       <div>
-                        <div id="crm-main">
-                          <ReactApexChart options={Crmdata.Target.options} series={Crmdata.Target.series} type="radialBar" width={100} height={127} />
-                        </div>
+                        <span
+                          className="!text-[0.8rem]  !w-[2.5rem] !h-[2.5rem] !leading-[2.5rem] !rounded-full inline-flex items-center justify-center bg-secondary">
+                          <i className="ti ti-users text-[1rem] text-white"></i>
+                        </span>
                       </div>
                     </div>
-                  </div>
-                </div>
-              </div>
-              <div className="xxl:col-span-12 xl:col-span-12 col-span-12">
-                <div className="box">
-                  <div className="box-header flex justify-between">
-                    <div className="box-title">
-                      Top Deals
-                    </div>
-                    <div className="hs-dropdown ti-dropdown">
-                      <Link aria-label="anchor" href="#!"  scroll={false} 
-                        className="flex items-center justify-center w-[1.75rem] h-[1.75rem]  !text-[0.8rem] !py-1 !px-2 rounded-sm bg-light border-light shadow-none !font-medium"
-                        aria-expanded="false">
-                        <i className="fe fe-more-vertical text-[0.8rem]"></i>
-                      </Link>
-                      <ul className="hs-dropdown-menu ti-dropdown-menu hidden">
-                        <li><Link className="ti-dropdown-item !py-2 !px-[0.9375rem] !text-[0.8125rem] !font-medium block"
-                          href="#!" scroll={false}>Week</Link></li>
-                        <li><Link className="ti-dropdown-item !py-2 !px-[0.9375rem] !text-[0.8125rem] !font-medium block"
-                          href="#!" scroll={false}>Month</Link></li>
-                        <li><Link className="ti-dropdown-item !py-2 !px-[0.9375rem] !text-[0.8125rem] !font-medium block"
-                          href="#!" scroll={false}>Year</Link></li>
-                      </ul>
+                    <div className="mb-4">
+                      <p className="text-[#8c9097] dark:text-white/50 text-[0.813rem] mb-2">Total Customers</p>
+                      <h4 className="font-semibold text-[1.5rem] !mb-0">
+                        {dashboardData.totalCustomers.toLocaleString()}
+                      </h4>
                     </div>
                   </div>
-                  <div className="box-body">
-                    <ul className="list-none crm-top-deals mb-0">
-                      <li className="mb-[0.9rem]">
-                        <div className="flex items-start flex-wrap">
-                          <div className="me-2">
-                            <span className=" inline-flex items-center justify-center">
-                              <img src="../../assets/images/faces/10.jpg" alt=""
-                                className="w-[1.75rem] h-[1.75rem] leading-[1.75rem] text-[0.65rem]  rounded-full" />
-                            </span>
-                          </div>
-                          <div className="flex-grow">
-                            <p className="font-semibold mb-[1.4px]  text-[0.813rem]">Michael Jordan
-                            </p>
-                            <p className="text-[#8c9097] dark:text-white/50 text-[0.75rem]">michael.jordan@example.com</p>
-                          </div>
-                          <div className="font-semibold text-[0.9375rem] ">$2,893</div>
-                        </div>
-                      </li>
-                      <li className="mb-[0.9rem]">
-                        <div className="flex items-start flex-wrap">
-                          <div className="me-2">
-                            <span
-                              className="inline-flex items-center justify-center !w-[1.75rem] !h-[1.75rem] leading-[1.75rem] text-[0.65rem]  rounded-full text-warning  bg-warning/10 font-semibold">
-                              EK
-                            </span>
-                          </div>
-                          <div className="flex-grow">
-                            <p className="font-semibold mb-[1.4px]  text-[0.813rem]">Emigo Kiaren</p>
-                            <p className="text-[#8c9097] dark:text-white/50 text-[0.75rem]">emigo.kiaren@gmail.com</p>
-                          </div>
-                          <div className="font-semibold text-[0.9375rem] ">$4,289</div>
-                        </div>
-                      </li>
-                      <li className="mb-[0.9rem]">
-                        <div className="flex items-top flex-wrap">
-                          <div className="me-2">
-                            <span className="inline-flex items-center justify-center">
-                              <img src="../../assets/images/faces/12.jpg" alt=""
-                                className="!w-[1.75rem] !h-[1.75rem] leading-[1.75rem] text-[0.65rem]  rounded-full" />
-                            </span>
-                          </div>
-                          <div className="flex-grow">
-                            <p className="font-semibold mb-[1.4px]  text-[0.813rem]">Randy Origoan
-                            </p>
-                            <p className="text-[#8c9097] dark:text-white/50 text-[0.75rem]">randy.origoan@gmail.com</p>
-                          </div>
-                          <div className="font-semibold text-[0.9375rem] ">$6,347</div>
-                        </div>
-                      </li>
-                      <li className="mb-[0.9rem]">
-                        <div className="flex items-top flex-wrap">
-                          <div className="me-2">
-                            <span
-                              className="inline-flex items-center justify-center !w-[1.75rem] !h-[1.75rem] leading-[1.75rem] text-[0.65rem]  rounded-full text-success bg-success/10 font-semibold">
-                              GP
-                            </span>
-                          </div>
-                          <div className="flex-grow">
-                            <p className="font-semibold mb-[1.4px]  text-[0.813rem]">George Pieterson
-                            </p>
-                            <p className="text-[#8c9097] dark:text-white/50 text-[0.75rem]">george.pieterson@gmail.com</p>
-                          </div>
-                          <div className="font-semibold text-[0.9375rem] ">$3,894</div>
-                        </div>
-                      </li>
-                      <li>
-                        <div className="flex items-top flex-wrap">
-                          <div className="me-2">
-                            <span
-                              className="inline-flex items-center justify-center !w-[1.75rem] !h-[1.75rem] leading-[1.75rem] text-[0.65rem]  rounded-full text-primary bg-primary/10 font-semibold">
-                              KA
-                            </span>
-                          </div>
-                          <div className="flex-grow">
-                            <p className="font-semibold mb-[1.4px]  text-[0.813rem]">Kiara Advain</p>
-                            <p className="text-[#8c9097] dark:text-white/50 text-[0.75rem]">kiaraadvain214@gmail.com</p>
-                          </div>
-                          <div className="font-semibold text-[0.9375rem] ">$2,679</div>
-                        </div>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-              <div className="xxl:col-span-12 xl:col-span-12 col-span-12">
-                <div className="box">
-                  <div className="box-header justify-between">
-                    <div className="box-title">Profit Earned</div>
-                    <div className="hs-dropdown ti-dropdown">
-                      <Link href="#!" scroll={false} className="px-2 font-normal text-[0.75rem] text-[#8c9097] dark:text-white/50"
-                        aria-expanded="false">
-                        View All<i className="ri-arrow-down-s-line align-middle ms-1 inline-block"></i>
-                      </Link>
-                      <ul className="hs-dropdown-menu ti-dropdown-menu hidden" role="menu">
-                        <li><Link className="ti-dropdown-item !py-2 !px-[0.9375rem] !text-[0.8125rem] !font-medium block"
-                          href="#!" scroll={false}>Today</Link></li>
-                        <li><Link className="ti-dropdown-item !py-2 !px-[0.9375rem] !text-[0.8125rem] !font-medium block"
-                          href="#!" scroll={false}>This Week</Link></li>
-                        <li><Link className="ti-dropdown-item !py-2 !px-[0.9375rem] !text-[0.8125rem] !font-medium block"
-                          href="#!" scroll={false}>Last Week</Link></li>
-                      </ul>
-                    </div>
-                  </div>
-                  <div className="box-body !py-0 !ps-0">
-                    <div id="crm-profits-earned">
-                      <ReactApexChart options={Crmdata.Earned.options} series={Crmdata.Earned.series} type="bar" width={"100%"} height={180} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="xxl:col-span-8  xl:col-span-8  col-span-12">
-              <div className="grid grid-cols-12 gap-x-6">
-                <div className="xxl:col-span-6 xl:col-span-6 col-span-12">
-                  <div className="box overflow-hidden">
-                    <div className="box-body">
-                      <div className="flex items-top justify-between">
-                        <div>
-                          <span
-                            className="!text-[0.8rem]  !w-[2.5rem] !h-[2.5rem] !leading-[2.5rem] !rounded-full inline-flex items-center justify-center bg-primary">
-                            <i className="ti ti-users text-[1rem] text-white"></i>
-                          </span>
-                        </div>
-                        <div className="flex-grow ms-4">
-                          <div className="flex items-center justify-between flex-wrap">
-                            <div>
-                              <p className="text-[#8c9097] dark:text-white/50 text-[0.813rem] mb-0">Total Customers</p>
-                              <h4 className="font-semibold  text-[1.5rem] !mb-2 ">1,02,890</h4>
-                            </div>
-                            <div id="crm-total-customers">
-                              <ReactApexChart options={Crmdata.Customers.options} series={Crmdata.Customers.series} type="line" height={40} width={100} />
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between !mt-1">
-                            <div>
-                              <Link className="text-primary text-[0.813rem]" href="#!" scroll={false}>View All<i
-                                className="ti ti-arrow-narrow-right ms-2 font-semibold inline-block"></i></Link>
-                            </div>
-                            <div className="text-end">
-                              <p className="mb-0 text-success text-[0.813rem] font-semibold">+40%</p>
-                              <p className="text-[#8c9097] dark:text-white/50 opacity-[0.7] text-[0.6875rem]">this month</p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="xxl:col-span-6 xl:col-span-6 col-span-12">
-                  <div className="box overflow-hidden">
-                    <div className="box-body">
-                      <div className="flex items-top justify-between">
-                        <div>
-                          <span
-                            className="!text-[0.8rem]  !w-[2.5rem] !h-[2.5rem] !leading-[2.5rem] !rounded-full inline-flex items-center justify-center bg-secondary">
-                            <i className="ti ti-wallet text-[1rem] text-white"></i>
-                          </span>
-                        </div>
-                        <div className="flex-grow ms-4">
-                          <div className="flex items-center justify-between flex-wrap">
-                            <div>
-                              <p className="text-[#8c9097] dark:text-white/50 text-[0.813rem] mb-0">Total Revenue</p>
-                              <h4 className="font-semibold text-[1.5rem] !mb-2 ">$56,562</h4>
-                            </div>
-                            <div id="crm-total-revenue">
-                              <ReactApexChart options={Crmdata.Revenue.options} series={Crmdata.Revenue.series} type="line" height={40} width={100} />
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between mt-1">
-                            <div>
-                              <Link className="text-secondary text-[0.813rem]" href="#!" scroll={false}>View All<i
-                                className="ti ti-arrow-narrow-right ms-2 font-semibold inline-block"></i></Link>
-                            </div>
-                            <div className="text-end">
-                              <p className="mb-0 text-success text-[0.813rem] font-semibold">+25%</p>
-                              <p className="text-[#8c9097] dark:text-white/50 opacity-[0.7] text-[0.6875rem]">this month</p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="xxl:col-span-6 xl:col-span-6 col-span-12">
-                  <div className="box overflow-hidden">
-                    <div className="box-body">
-                      <div className="flex items-top justify-between">
-                        <div>
-                          <span
-                            className="!text-[0.8rem]  !w-[2.5rem] !h-[2.5rem] !leading-[2.5rem] !rounded-full inline-flex items-center justify-center bg-success">
-                            <i className="ti ti-wave-square text-[1rem] text-white"></i>
-                          </span>
-                        </div>
-                        <div className="flex-grow ms-4">
-                          <div className="flex items-center justify-between flex-wrap">
-                            <div>
-                              <p className="text-[#8c9097] dark:text-white/50 text-[0.813rem] mb-0">Conversion Ratio</p>
-                              <h4 className="font-semibold text-[1.5rem] !mb-2 ">12.08%</h4>
-                            </div>
-                            <div id="crm-conversion-ratio">
-                              <ReactApexChart options={Crmdata.Ratio.options} series={Crmdata.Ratio.series} type="line" height={40} width={100} />
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between mt-1">
-                            <div>
-                              <Link className="text-success text-[0.813rem]" href="#!" scroll={false}>View All<i
-                                className="ti ti-arrow-narrow-right ms-2 font-semibold inline-block"></i></Link>
-                            </div>
-                            <div className="text-end">
-                              <p className="mb-0 text-danger text-[0.813rem] font-semibold">-12%</p>
-                              <p className="text-[#8c9097] dark:text-white/50 opacity-[0.7] text-[0.6875rem]">this month</p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="xxl:col-span-6 xl:col-span-6 col-span-12">
-                  <div className="box overflow-hidden">
-                    <div className="box-body">
-                      <div className="flex items-top justify-between">
-                        <div>
-                          <span
-                            className="!text-[0.8rem]  !w-[2.5rem] !h-[2.5rem] !leading-[2.5rem] !rounded-full inline-flex items-center justify-center bg-warning">
-                            <i className="ti ti-briefcase text-[1rem] text-white"></i>
-                          </span>
-                        </div>
-                        <div className="flex-grow ms-4">
-                          <div className="flex items-center justify-between flex-wrap">
-                            <div>
-                              <p className="text-[#8c9097] dark:text-white/50 text-[0.813rem] mb-0">Total Deals</p>
-                              <h4 className="font-semibold text-[1.5rem] !mb-2 ">2,543</h4>
-                            </div>
-                            <div id="crm-total-deals">
-                              <ReactApexChart options={Crmdata.Deals.options} series={Crmdata.Deals.series} type="line" height={40} width={100} />
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between mt-1">
-                            <div>
-                              <Link className="text-warning text-[0.813rem]" href="#!" scroll={false}>View All<i
-                                className="ti ti-arrow-narrow-right ms-2 font-semibold inline-block"></i></Link>
-                            </div>
-                            <div className="text-end">
-                              <p className="mb-0 text-success text-[0.813rem] font-semibold">+19%</p>
-                              <p className="text-[#8c9097] dark:text-white/50  opacity-[0.7] text-[0.6875rem]">this month</p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="xxl:col-span-12 xl:col-span-12 col-span-12">
-                  <div className="box">
-                    <div className="box-header !gap-0 !m-0 justify-between">
-                      <div className="box-title">
-                        Revenue Analytics
-                      </div>
-                      <div className="hs-dropdown ti-dropdown">
-                        <Link href="#!" scroll={false} className="text-[0.75rem] px-2 font-normal text-[#8c9097] dark:text-white/50"
-                          aria-expanded="false">
-                          View All<i className="ri-arrow-down-s-line align-middle ms-1 inline-block"></i>
-                        </Link>
-                        <ul className="hs-dropdown-menu ti-dropdown-menu hidden" role="menu">
-                          <li><Link className="ti-dropdown-item !py-2 !px-[0.9375rem] !text-[0.8125rem] !font-medium block"
-                            href="#!" scroll={false}>Today</Link></li>
-                          <li><Link className="ti-dropdown-item !py-2 !px-[0.9375rem] !text-[0.8125rem] !font-medium block"
-                            href="#!" scroll={false}>This Week</Link></li>
-                          <li><Link className="ti-dropdown-item !py-2 !px-[0.9375rem] !text-[0.8125rem] !font-medium block"
-                            href="#!" scroll={false}>Last Week</Link></li>
-                        </ul>
-                      </div>
-                    </div>
-                    <div className="box-body !py-5">
-                      <div id="crm-revenue-analytics">
-                        <ReactApexChart options={Crmdata.Revenueanalytics.options} series={Crmdata.Revenueanalytics.series} type="line" width={"100%"} height={350} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="xxl:col-span-12 xl:col-span-12 col-span-12">
-              <div className="box custom-card">
-                <div className="box-header justify-between">
-                  <div className="box-title">
-                    Deals Statistics
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <div>
-                      <input className="ti-form-control form-control-sm" type="text" placeholder="Search Here"
-                        aria-label=".form-control-sm example" />
-                    </div>
-                    <div className="hs-dropdown ti-dropdown">
-                      <Link href="#!"  scroll={false} 
-                        className="ti-btn ti-btn-primary !bg-primary !text-white !py-1 !px-2 !text-[0.75rem] !m-0 !gap-0 !font-medium"
-                        aria-expanded="false">
-                        Sort By<i className="ri-arrow-down-s-line align-middle ms-1 inline-block"></i>
-                      </Link>
-                      <ul className="hs-dropdown-menu ti-dropdown-menu !-mt-2 hidden" role="menu">
-                        <li><Link className="ti-dropdown-item !py-2 !px-[0.9375rem] !text-[0.8125rem] !font-medium block"
-                          href="#!" scroll={false}>New</Link></li>
-                        <li><Link className="ti-dropdown-item !py-2 !px-[0.9375rem] !text-[0.8125rem] !font-medium block"
-                          href="#!" scroll={false}>Popular</Link></li>
-                        <li><Link className="ti-dropdown-item !py-2 !px-[0.9375rem] !text-[0.8125rem] !font-medium block"
-                          href="#!" scroll={false}>Relevant</Link></li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-                <div className="box-body">
-                  <div className="overflow-x-auto">
-                    <table className="table min-w-full whitespace-nowrap table-hover border table-bordered">
-                      <thead>
-                        <tr className="border border-inherit border-solid dark:border-defaultborder/10">
-                          <th scope="row" className="!ps-4 !pe-5"><input className="form-check-input" type="checkbox"
-                            id="checkboxNoLabel1" defaultValue="" aria-label="..." /></th>
-                          <th scope="col" className="!text-start !text-[0.85rem] min-w-[200px]">Sales Rep</th>
-                          <th scope="col" className="!text-start !text-[0.85rem]">Category</th>
-                          <th scope="col" className="!text-start !text-[0.85rem]">Mail</th>
-                          <th scope="col" className="!text-start !text-[0.85rem]">Location</th>
-                          <th scope="col" className="!text-start !text-[0.85rem]">Date</th>
-                          <th scope="col" className="!text-start !text-[0.85rem]">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Dealsstatistics.map((idx) => (
-                          <tr className="border border-inherit border-solid hover:bg-gray-100 dark:border-defaultborder/10 dark:hover:bg-light" key={Math.random()}>
-                            <th scope="row" className="!ps-4 !pe-5"><input className="form-check-input" type="checkbox" defaultChecked={idx.checked === 'defaultChecked'}
-                               defaultValue="" aria-label="..." /></th>
-                            <td>
-                              <div className="flex items-center font-semibold">
-                                <span className="!me-2 inline-flex justify-center items-center">
-                                  <img src={idx.src} alt="img"
-                                    className="w-[1.75rem] h-[1.75rem] leading-[1.75rem] text-[0.65rem]  rounded-full" />
-                                </span>{idx.name}
-                              </div>
-                            </td>
-                            <td>{idx.role}</td>
-                            <td>{idx.mail}</td>
-                            <td>
-                              <span
-                                className={`inline-flex text-${idx.color} !py-[0.15rem] !px-[0.45rem] rounded-sm !font-semibold !text-[0.75em] bg-${idx.color}/10`}>{idx.location}</span>
-                            </td>
-                            <td>{idx.date}</td>
-                            <td>
-                              <div className="flex flex-row items-center !gap-2 text-[0.9375rem]">
-                                <Link aria-label="anchor" href="#!" scroll={false}
-                                  className="ti-btn ti-btn-icon ti-btn-wave !gap-0 !m-0 !h-[1.75rem] !w-[1.75rem] text-[0.8rem] bg-success/10 text-success hover:bg-success hover:text-white hover:border-success"><i
-                                    className="ri-download-2-line"></i></Link>
-                                <Link aria-label="anchor" href="#!" scroll={false}
-                                  className="ti-btn ti-btn-icon ti-btn-wave !gap-0 !m-0 !h-[1.75rem] !w-[1.75rem] text-[0.8rem] bg-primary/10 text-primary hover:bg-primary hover:text-white hover:border-primary"><i
-                                    className="ri-edit-line"></i></Link>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-                <div className="box-footer">
-                  <div className="sm:flex items-center">
-                    <div className="text-defaulttextcolor dark:text-defaulttextcolor/70">
-                      Showing 5 Entries <i className="bi bi-arrow-right ms-2 font-semibold"></i>
-                    </div>
-                    <div className="ms-auto">
-                      <nav aria-label="Page navigation" className="pagination-style-4">
-                        <ul className="ti-pagination mb-0">
-                          <li className="page-item disabled">
-                            <Link className="page-link" href="#!" scroll={false}>
-                              Prev
-                            </Link>
-                          </li>
-                          <li className="page-item"><Link className="page-link active" href="#!" scroll={false}>1</Link></li>
-                          <li className="page-item"><Link className="page-link" href="#!" scroll={false}>2</Link></li>
-                          <li className="page-item">
-                            <Link className="page-link !text-primary" href="#!" scroll={false}>
-                              next
-                            </Link>
-                          </li>
-                        </ul>
-                      </nav>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="xxl:col-span-3 xl:col-span-12 col-span-12">
-          <div className="grid grid-cols-12 gap-x-6">
-            <div className="xxl:col-span-12 xl:col-span-12  col-span-12">
-              <div className="box">
-                <div className="box-header justify-between">
-                  <div className="box-title">
-                    Leads By Source
-                  </div>
-                  <div className="hs-dropdown ti-dropdown">
-                    <Link aria-label="anchor" href="#!" scroll={false}
-                      className="flex items-center justify-center w-[1.75rem] h-[1.75rem] ! !text-[0.8rem] !py-1 !px-2 rounded-sm bg-light border-light shadow-none !font-medium"
-                      aria-expanded="false">
-                      <i className="fe fe-more-vertical text-[0.8rem]"></i>
+                  <div className="flex justify-end">
+                    <Link className="text-secondary text-[0.813rem] hover:underline" href="/clients" scroll={false}>
+                      View All<i className="ti ti-arrow-narrow-right ms-2 font-semibold inline-block"></i>
                     </Link>
-                    <ul className="hs-dropdown-menu ti-dropdown-menu hidden">
-                      <li><Link className="ti-dropdown-item !py-2 !px-[0.9375rem] !text-[0.8125rem] !font-medium block"
-                        href="#!" scroll={false}>Week</Link></li>
-                      <li><Link className="ti-dropdown-item !py-2 !px-[0.9375rem] !text-[0.8125rem] !font-medium block"
-                        href="#!" scroll={false}>Month</Link></li>
-                      <li><Link className="ti-dropdown-item !py-2 !px-[0.9375rem] !text-[0.8125rem] !font-medium block"
-                        href="#!" scroll={false}>Year</Link></li>
-                    </ul>
-                  </div>
-                </div>
-                <div className="box-body overflow-hidden">
-                  <div className="leads-source-chart flex items-center justify-center">
-                    <ReactApexChart options={Crmdata.Sourcedata.options} series={Crmdata.Sourcedata.series} type="donut" width={"100%"} height={250} />
-                    <div className="lead-source-value ">
-                      <span className="block text-[0.875rem] ">Total</span>
-                      <span className="block text-[1.5625rem] font-bold">4,145</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-4 border-t border-dashed dark:border-defaultborder/10">
-                  <div className="col !p-0">
-                    <div className="!ps-4 p-[0.95rem] text-center border-e border-dashed dark:border-defaultborder/10">
-                      <span className="text-[#8c9097] dark:text-white/50 text-[0.75rem] mb-1 crm-lead-legend mobile inline-block">Mobile
-                      </span>
-                      <div><span className="text-[1rem]  font-semibold">1,624</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="col !p-0">
-                    <div className="p-[0.95rem] text-center border-e border-dashed dark:border-defaultborder/10">
-                      <span className="text-[#8c9097] dark:text-white/50 text-[0.75rem] mb-1 crm-lead-legend desktop inline-block">Desktop
-                      </span>
-                      <div><span className="text-[1rem]  font-semibold">1,267</span></div>
-                    </div>
-                  </div>
-                  <div className="col !p-0">
-                    <div className="p-[0.95rem] text-center border-e border-dashed dark:border-defaultborder/10">
-                      <span className="text-[#8c9097] dark:text-white/50 text-[0.75rem] mb-1 crm-lead-legend laptop inline-block">Laptop
-                      </span>
-                      <div><span className="text-[1rem]  font-semibold">1,153</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="col !p-0">
-                    <div className="!pe-4 p-[0.95rem] text-center">
-                      <span className="text-[#8c9097] dark:text-white/50 text-[0.75rem] mb-1 crm-lead-legend tablet inline-block">Tablet
-                      </span>
-                      <div><span className="text-[1rem]  font-semibold">679</span></div>
-                    </div>
                   </div>
                 </div>
               </div>
             </div>
-            <div className="xxl:col-span-12 xl:col-span-6  col-span-12">
-              <div className="box">
-                <div className="box-header justify-between">
-                  <div className="box-title">
-                    Deals Status
-                  </div>
-                  <div className="hs-dropdown ti-dropdown">
-                    <Link href="#!" scroll={false} className="text-[0.75rem] px-2 font-normal text-[#8c9097] dark:text-white/50"
-                      aria-expanded="false">
-                      View All<i className="ri-arrow-down-s-line align-middle ms-1 inline-block"></i>
-                    </Link>
-                    <ul className="hs-dropdown-menu ti-dropdown-menu hidden" role="menu">
-                      <li><Link className="ti-dropdown-item !py-2 !px-[0.9375rem] !text-[0.8125rem] !font-medium block"
-                        href="#!" scroll={false}>Today</Link></li>
-                      <li><Link className="ti-dropdown-item !py-2 !px-[0.9375rem] !text-[0.8125rem] !font-medium block"
-                        href="#!" scroll={false}>This Week</Link></li>
-                      <li><Link className="ti-dropdown-item !py-2 !px-[0.9375rem] !text-[0.8125rem] !font-medium block"
-                        href="#!" scroll={false}>Last Week</Link></li>
-                    </ul>
-                  </div>
-                </div>
-                <div className="box-body">
-                  <div className="flex items-center mb-[0.8rem]">
-                    <h4 className="font-bold mb-0 text-[1.5rem] ">4,289</h4>
-                    <div className="ms-2">
-                      <span
-                        className="py-[0.18rem] px-[0.45rem] rounded-sm text-success !font-medium !text-[0.75em] bg-success/10">1.02<i
-                          className="ri-arrow-up-s-fill align-mmiddle ms-1"></i></span>
-                      <span className="text-[#8c9097] dark:text-white/50 text-[0.813rem] ms-1">compared to last week</span>
+            <div className="flex-1 min-w-[200px]">
+              <div className="box overflow-hidden h-full">
+                <div className="box-body flex flex-col justify-between">
+                  <div className='flex flex-col'>
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <span
+                          className="!text-[0.8rem]  !w-[2.5rem] !h-[2.5rem] !leading-[2.5rem] !rounded-full inline-flex items-center justify-center bg-success">
+                          <i className="ti ti-share text-[1rem] text-white"></i>
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mb-4">
+                      <p className="text-[#8c9097] dark:text-white/50 text-[0.813rem] mb-2">Total Team</p>
+                      <h4 className="font-semibold text-[1.5rem] !mb-0">
+                        {dashboardData.totalTeams.toLocaleString()}
+                      </h4>
                     </div>
                   </div>
+                  <div className="flex justify-end">
+                    <Link className="text-success text-[0.813rem] hover:underline" href="/teams" scroll={false}>
+                      View All<i className="ti ti-arrow-narrow-right ms-2 font-semibold inline-block"></i>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex-1 min-w-[200px]">
+              <div className="box overflow-hidden h-full">
+                <div className="box-body flex flex-col justify-between">
+                  <div className='flex flex-col'>
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <span
+                          className="!text-[0.8rem]  !w-[2.5rem] !h-[2.5rem] !leading-[2.5rem] !rounded-full inline-flex items-center justify-center bg-warning">
+                          <i className="ti ti-briefcase text-[1rem] text-white"></i>
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mb-4">
+                      <p className="text-[#8c9097] dark:text-white/50 text-[0.813rem] mb-2">Total Activities</p>
+                      <h4 className="font-semibold text-[1.5rem] !mb-0">
+                        {dashboardData.totalActivities.toLocaleString()}
+                      </h4>
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <Link className="text-warning text-[0.813rem] hover:underline" href="/activities" scroll={false}>
+                      View All<i className="ti ti-arrow-narrow-right ms-2 font-semibold inline-block"></i>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex-1 min-w-[200px]">
+              <div className="box overflow-hidden h-full">
+                <div className="box-body flex flex-col justify-between">
+                  <div className='flex flex-col'>
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <span
+                          className="!text-[0.8rem]  !w-[2.5rem] !h-[2.5rem] !leading-[2.5rem] !rounded-full inline-flex items-center justify-center bg-info">
+                          <i className="ti ti-checklist text-[1rem] text-white"></i>
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mb-4">
+                      <p className="text-[#8c9097] dark:text-white/50 text-[0.813rem] mb-2">Ongoing Tasks</p>
+                      <h4 className="font-semibold text-[1.5rem] !mb-0">
+                        {dashboardData.totalOngoingTasks.toLocaleString()}
+                      </h4>
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <Link className="text-info text-[0.813rem] hover:underline" href="/tasks" scroll={false}>
+                      View All<i className="ti ti-arrow-narrow-right ms-2 font-semibold inline-block"></i>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
 
-                  <div className="flex w-full h-[0.3125rem] mb-6 rounded-full overflow-hidden">
-                    <div className="flex flex-col justify-center rounded-s-[0.625rem] overflow-hidden bg-primary w-[21%]" aria-valuenow={21} aria-valuemin={0} aria-valuemax={100}>
-                    </div>
-                    <div className="flex flex-col justify-center rounded-none overflow-hidden bg-info w-[26%]" aria-valuenow={26} aria-valuemin={0} aria-valuemax={100}>
-                    </div>
-                    <div className="flex flex-col justify-center rounded-none overflow-hidden bg-warning w-[35%]"  aria-valuenow={35} aria-valuemin={0} aria-valuemax={100}>
-                    </div>
-                    <div className="flex flex-col justify-center rounded-e-[0.625rem] overflow-hidden bg-success w-[18%]" aria-valuenow={18} aria-valuemin={0} aria-valuemax={100}>
-                    </div>
-                  </div>
-                  <ul className="list-none mb-0 pt-2 crm-deals-status">
-                    <li className="primary">
-                      <div className="flex items-center text-[0.813rem]  justify-between">
-                        <div>Successful Deals</div>
-                        <div className="text-[0.75rem] text-[#8c9097] dark:text-white/50">987 deals</div>
-                      </div>
-                    </li>
-                    <li className="info">
-                      <div className="flex items-center text-[0.813rem]  justify-between">
-                        <div>Pending Deals</div>
-                        <div className="text-[0.75rem] text-[#8c9097] dark:text-white/50">1,073 deals</div>
-                      </div>
-                    </li>
-                    <li className="warning">
-                      <div className="flex items-center text-[0.813rem]  justify-between">
-                        <div>Rejected Deals</div>
-                        <div className="text-[0.75rem] text-[#8c9097] dark:text-white/50">1,674 deals</div>
-                      </div>
-                    </li>
-                    <li className="success">
-                      <div className="flex items-center text-[0.813rem]  justify-between">
-                        <div>Upcoming Deals</div>
-                        <div className="text-[0.75rem] text-[#8c9097] dark:text-white/50">921 deals</div>
-                      </div>
-                    </li>
+      {/* Second Row */}
+      <div className="grid grid-cols-12 gap-x-6 mb-6">
+        <div className="lg:col-span-6 col-span-12">
+          {isLoadingTimeline ? (
+            <ChartSkeleton />
+          ) : (
+            <div className="box h-full">
+              <div className="box-header justify-between">
+                <div className="box-title">
+                  Timelines by branches
+                </div>
+                <div className="hs-dropdown ti-dropdown">
+                  <Link aria-label="anchor" href="#!" scroll={false}
+                    className="flex items-center justify-center w-[1.75rem] h-[1.75rem] ! !text-[0.8rem] !py-1 !px-2 rounded-sm bg-light border-light shadow-none !font-medium"
+                    aria-expanded="false">
+                    <i className="fe fe-more-vertical text-[0.8rem]"></i>
+                  </Link>
+                  <ul className="hs-dropdown-menu ti-dropdown-menu hidden">
+                    {branches.map((branch) => (
+                      <li key={branch.id}>
+                        <button 
+                          className={`ti-dropdown-item !py-2 !px-[0.9375rem] !text-[0.8125rem] !font-medium block w-full text-left ${selectedBranchId === branch.id ? 'bg-primary/10 text-primary' : ''}`}
+                          onClick={() => handleBranchChange(branch.id)}
+                        >
+                          {branch.name}
+                        </button>
+                      </li>
+                    ))}
                   </ul>
                 </div>
               </div>
-            </div>
-            <div className="xxl:col-span-12 xl:col-span-6  col-span-12">
-              <div className="box">
-                <div className="box-header justify-between">
-                  <div className="box-title">
-                    Recent Activity
-                  </div>
-                  <div className="hs-dropdown ti-dropdown">
-                    <Link href="#!" scroll={false} className="text-[0.75rem] px-2 font-normal text-[#8c9097] dark:text-white/50"
-                      aria-expanded="false">
-                      View All<i className="ri-arrow-down-s-line align-middle ms-1 inline-block"></i>
-                    </Link>
-                    <ul className="hs-dropdown-menu ti-dropdown-menu hidden" role="menu">
-                      <li><Link className="ti-dropdown-item !py-2 !px-[0.9375rem] !text-[0.8125rem] !font-medium block"
-                        href="#!" scroll={false}>Today</Link></li>
-                      <li><Link className="ti-dropdown-item !py-2 !px-[0.9375rem] !text-[0.8125rem] !font-medium block"
-                        href="#!" scroll={false}>This Week</Link></li>
-                      <li><Link className="ti-dropdown-item !py-2 !px-[0.9375rem] !text-[0.8125rem] !font-medium block"
-                        href="#!" scroll={false}>Last Week</Link></li>
-                    </ul>
+              <div className="box-body overflow-hidden">
+                <div className="leads-source-chart flex items-center justify-center">
+                  <ReactApexChart options={chartData.options} series={chartData.series} type="donut" width={"100%"} height={250} />
+                  <div className="lead-source-value ">
+                    <span className="block text-[0.875rem] ">Total</span>
+                    <span className="block text-[1.5625rem] font-bold">{chartData.total}</span>
                   </div>
                 </div>
-                <div className="box-body">
-                  <div>
-                    <ul className="list-none mb-0 crm-recent-activity">
-                      <li className="crm-recent-activity-content">
-                        <div className="flex items-start">
-                          <div className="me-4">
-                            <span
-                              className="w-[1.25rem] h-[1.25rem] inline-flex items-center justify-center font-medium leading-[1.25rem] text-[0.65rem] text-primary bg-primary/10 rounded-full">
-                              <i className="bi bi-circle-fill text-[0.5rem]"></i>
-                            </span>
-                          </div>
-                          <div className="crm-timeline-content text-defaultsize">
-                            <span className="font-semibold rtl:ms-1">Update of calendar events
-                              &amp;</span><span><Link href="#!" scroll={false} className="text-primary font-semibold ms-1">
-                                Added new events in next week.</Link></span>
-                          </div>
-                          <div className="flex-grow text-end">
-                            <span className="block text-[#8c9097] dark:text-white/50 text-[0.6875rem] opacity-[0.7]">4:45PM</span>
-                          </div>
-                        </div>
-                      </li>
-                      <li className="crm-recent-activity-content">
-                        <div className="flex items-start  text-defaultsize">
-                          <div className="me-4">
-                            <span
-                              className="w-[1.25rem] h-[1.25rem] leading-[1.25rem] inline-flex items-center justify-center font-medium text-[0.65rem] text-secondary bg-secondary/10 rounded-full">
-                              <i className="bi bi-circle-fill text-[0.5rem]"></i>
-                            </span>
-                          </div>
-                          <div className="crm-timeline-content">
-                            <span>New theme for <span className="font-semibold">Spruko Website</span> completed</span>
-                            <span className="block text-[0.75rem] text-[#8c9097] dark:text-white/50">Lorem ipsum, dolor sit amet.</span>
-                          </div>
-                          <div className="flex-grow text-end">
-                            <span className="block text-[#8c9097] dark:text-white/50 text-[0.6875rem] opacity-[0.7]">3 hrs</span>
-                          </div>
-                        </div>
-                      </li>
-                      <li className="crm-recent-activity-content  text-defaultsize">
-                        <div className="flex items-start">
-                          <div className="me-4">
-                            <span
-                              className="w-[1.25rem] h-[1.25rem] leading-[1.25rem] inline-flex items-center justify-center font-medium text-[0.65rem] text-success bg-success/10 rounded-full">
-                              <i className="bi bi-circle-fill  text-[0.5rem]"></i>
-                            </span>
-                          </div>
-                          <div className="crm-timeline-content">
-                            <span>Created a <span className="text-success font-semibold">New Task</span> today <span
-                              className="w-[1.25rem] h-[1.25rem] leading-[1.25rem] text-[0.65rem] inline-flex items-center justify-center font-medium bg-purplemain/10 rounded-full ms-1"><i
-                                className="ri-add-fill text-purple text-[0.75rem]"></i></span></span>
-                          </div>
-                          <div className="flex-grow text-end">
-                            <span className="block text-[#8c9097] dark:text-white/50 text-[0.6875rem] opacity-[0.7]">22 hrs</span>
-                          </div>
-                        </div>
-                      </li>
-                      <li className="crm-recent-activity-content  text-defaultsize">
-                        <div className="flex items-start">
-                          <div className="me-4">
-                            <span
-                              className="w-[1.25rem] h-[1.25rem] leading-[1.25rem] inline-flex items-center justify-center font-medium text-[0.65rem] text-pinkmain bg-pinkmain/10 rounded-full">
-                              <i className="bi bi-circle-fill text-[0.5rem]"></i>
-                            </span>
-                          </div>
-                          <div className="crm-timeline-content">
-                            <span>New member <span
-                              className="py-[0.2rem] px-[0.45rem] font-semibold rounded-sm text-pinkmain text-[0.75em] bg-pinkmain/10">@andreas
-                              gurrero</span> added today to AI Summit.</span>
-                          </div>
-                          <div className="flex-grow text-end">
-                            <span className="block text-[#8c9097] dark:text-white/50 text-[0.6875rem] opacity-[0.7]">Today</span>
-                          </div>
-                        </div>
-                      </li>
-                      <li className="crm-recent-activity-content  text-defaultsize">
-                        <div className="flex items-start">
-                          <div className="me-4">
-                            <span
-                              className="w-[1.25rem] h-[1.25rem] leading-[1.25rem] inline-flex items-center justify-center font-medium text-[0.65rem] text-warning bg-warning/10 rounded-full">
-                              <i className="bi bi-circle-fill text-[0.5rem]"></i>
-                            </span>
-                          </div>
-                          <div className="crm-timeline-content">
-                            <span>32 New people joined summit.</span>
-                          </div>
-                          <div className="flex-grow text-end">
-                            <span className="block text-[#8c9097] dark:text-white/50 text-[0.6875rem] opacity-[0.7]">22 hrs</span>
-                          </div>
-                        </div>
-                      </li>
-                      <li className="crm-recent-activity-content  text-defaultsize">
-                        <div className="flex items-start">
-                          <div className="me-4">
-                            <span
-                              className="w-[1.25rem] h-[1.25rem] leading-[1.25rem] inline-flex items-center justify-center font-medium text-[0.65rem] text-info bg-info/10 rounded-full">
-                              <i className="bi bi-circle-fill text-[0.5rem]"></i>
-                            </span>
-                          </div>
-                          <div className="crm-timeline-content">
-                            <span>Neon Tarly added <span className="text-info font-semibold">Robert Bright</span> to AI
-                              summit project.</span>
-                          </div>
-                          <div className="flex-grow text-end">
-                            <span className="block text-[#8c9097] dark:text-white/50 text-[0.6875rem] opacity-[0.7]">12 hrs</span>
-                          </div>
-                        </div>
-                      </li>
-                      <li className="crm-recent-activity-content  text-defaultsize">
-                        <div className="flex items-start">
-                          <div className="me-4">
-                            <span
-                              className="w-[1.25rem] h-[1.25rem] leading-[1.25rem] inline-flex items-center justify-center font-medium text-[0.65rem] text-[#232323] dark:text-white bg-[#232323]/10 dark:bg-white/20 rounded-full">
-                              <i className="bi bi-circle-fill text-[0.5rem]"></i>
-                            </span>
-                          </div>
-                          <div className="crm-timeline-content">
-                            <span>Replied to new support request <i
-                              className="ri-checkbox-circle-line text-success text-[1rem] align-middle"></i></span>
-                          </div>
-                          <div className="flex-grow text-end">
-                            <span className="block text-[#8c9097] dark:text-white/50 text-[0.6875rem] opacity-[0.7]">4 hrs</span>
-                          </div>
-                        </div>
-                      </li>
-                      <li className="crm-recent-activity-content  text-defaultsize">
-                        <div className="flex items-start">
-                          <div className="me-4">
-                            <span
-                              className="w-[1.25rem] h-[1.25rem] leading-[1.25rem] inline-flex items-center justify-center font-medium text-[0.65rem] text-purplemain bg-purplemain/10 rounded-full">
-                              <i className="bi bi-circle-fill text-[0.5rem]"></i>
-                            </span>
-                          </div>
-                          <div className="crm-timeline-content">
-                            <span>Completed documentation of <Link href="#!" scroll={false}
-                              className="text-purplemain underline font-semibold">AI Summit.</Link></span>
-                          </div>
-                          <div className="flex-grow text-end">
-                            <span className="block text-[#8c9097] dark:text-white/50 text-[0.6875rem] opacity-[0.7]">4 hrs</span>
-                          </div>
-                        </div>
-                      </li>
-                    </ul>
+              </div>
+              <div className="grid grid-cols-4 border-t border-dashed dark:border-defaultborder/10">
+                <div className="col !p-0">
+                  <div className="!ps-4 p-[0.95rem] text-center border-e border-dashed dark:border-defaultborder/10">
+                    <span className="text-[#8c9097] dark:text-white/50 text-[0.75rem] mb-1 crm-lead-legend pending inline-block">Pending
+                    </span>
+                    <div><span className="text-[1rem]  font-semibold">{timelineCounts?.counts.pending || 0}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="col !p-0">
+                  <div className="p-[0.95rem] text-center border-e border-dashed dark:border-defaultborder/10">
+                    <span className="text-[#8c9097] dark:text-white/50 text-[0.75rem] mb-1 crm-lead-legend ongoing inline-block">Ongoing
+                    </span>
+                    <div><span className="text-[1rem]  font-semibold">{timelineCounts?.counts.ongoing || 0}</span></div>
+                  </div>
+                </div>
+                <div className="col !p-0">
+                  <div className="p-[0.95rem] text-center border-e border-dashed dark:border-defaultborder/10">
+                    <span className="text-[#8c9097] dark:text-white/50 text-[0.75rem] mb-1 crm-lead-legend completed inline-block">Completed
+                    </span>
+                    <div><span className="text-[1rem]  font-semibold">{timelineCounts?.counts.completed || 0}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="col !p-0">
+                  <div className="!pe-4 p-[0.95rem] text-center">
+                    <span className="text-[#8c9097] dark:text-white/50 text-[0.75rem] mb-1 crm-lead-legend delayed inline-block">Delayed
+                    </span>
+                    <div><span className="text-[1rem]  font-semibold">{timelineCounts?.counts.delayed || 0}</span></div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
-      </div> */}
+        <div className="lg:col-span-6 col-span-12">
+          {isLoadingMonthly ? (
+            <LineChartSkeleton />
+          ) : (
+            <div className="box h-full">
+              <div className="box-header justify-between">
+                <div className="box-title">
+                  Task Completion by Branches
+                </div>
+                <div className="hs-dropdown ti-dropdown">
+                  <Link aria-label="anchor" href="#!" scroll={false}
+                    className="flex items-center justify-center w-[1.75rem] h-[1.75rem] ! !text-[0.8rem] !py-1 !px-2 rounded-sm bg-light border-light shadow-none !font-medium"
+                    aria-expanded="false">
+                    <i className="fe fe-more-vertical text-[0.8rem]"></i>
+                  </Link>
+                  <ul className="hs-dropdown-menu ti-dropdown-menu hidden">
+                    {branches.map((branch) => (
+                      <li key={branch.id}>
+                        <button 
+                          className={`ti-dropdown-item !py-2 !px-[0.9375rem] !text-[0.8125rem] !font-medium block w-full text-left ${selectedBranchId === branch.id ? 'bg-primary/10 text-primary' : ''}`}
+                          onClick={() => handleBranchChange(branch.id)}
+                        >
+                          {branch.name}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              <div className="box-body !py-5">
+                <div id="task-completion-chart">
+                  <ReactApexChart 
+                    options={taskChartOptions} 
+                    series={[
+                      { name: 'Pending', data: monthlyTaskData.pending },
+                      { name: 'Delayed', data: monthlyTaskData.delayed },
+                      { name: 'Completed', data: monthlyTaskData.completed },
+                      { name: 'Assigned', data: monthlyTaskData.assigned }
+                    ]} 
+                    type="line" 
+                    width="100%" 
+                    height={350} 
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </Fragment>
   )
 }
-export default Dashboard;
+export default Dashboard; 
