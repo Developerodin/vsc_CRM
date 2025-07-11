@@ -710,24 +710,6 @@ const Dashboard = () => {
                 <div className="box-title">
                   Top 5 Clients
                 </div>
-                <div className="flex items-center gap-2">
-                  <select
-                    className="form-select !py-1 !px-2 !text-[0.8rem] !min-w-[150px]"
-                    value={selectedBranch?.id || ''}
-                    onChange={(e) => handleBranchChange(e.target.value)}
-                    disabled={branches.length === 0}
-                  >
-                    {branches.length === 0 ? (
-                      <option value="">No branches available</option>
-                    ) : (
-                      branches.map((branch) => (
-                        <option key={branch.id} value={branch.id}>
-                          {branch.name}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                </div>
               </div>
               <div className="box-body">
                 <div className="overflow-x-auto">
@@ -779,24 +761,6 @@ const Dashboard = () => {
               <div className="box-header justify-between">
                 <div className="box-title">
                   Top 5 Activities
-                </div>
-                <div className="flex items-center gap-2">
-                  <select
-                    className="form-select !py-1 !px-2 !text-[0.8rem] !min-w-[150px]"
-                    value={selectedBranch?.id || ''}
-                    onChange={(e) => handleBranchChange(e.target.value)}
-                    disabled={branches.length === 0}
-                  >
-                    {branches.length === 0 ? (
-                      <option value="">No branches available</option>
-                    ) : (
-                      branches.map((branch) => (
-                        <option key={branch.id} value={branch.id}>
-                          {branch.name}
-                        </option>
-                      ))
-                    )}
-                  </select>
                 </div>
               </div>
               <div className="box-body">
@@ -853,24 +817,6 @@ const Dashboard = () => {
               <div className="box-header justify-between">
                 <div className="box-title">
                   Timelines by branches
-                </div>
-                <div className="flex items-center gap-2">
-                  <select
-                    className="form-select !py-1 !px-2 !text-[0.8rem] !min-w-[150px]"
-                    value={selectedBranch?.id || ''}
-                    onChange={(e) => handleBranchChange(e.target.value)}
-                    disabled={branches.length === 0}
-                  >
-                    {branches.length === 0 ? (
-                      <option value="">No branches available</option>
-                    ) : (
-                      branches.map((branch) => (
-                        <option key={branch.id} value={branch.id}>
-                          {branch.name}
-                        </option>
-                      ))
-                    )}
-                  </select>
                 </div>
               </div>
               <div className="box-body overflow-hidden">
@@ -937,24 +883,6 @@ const Dashboard = () => {
               <div className="box-header justify-between">
                 <div className="box-title">
                   Assigned Tasks by Month
-                </div>
-                <div className="flex items-center gap-2">
-                  <select
-                    className="form-select !py-1 !px-2 !text-[0.8rem] !min-w-[150px]"
-                    value={selectedBranch?.id || ''}
-                    onChange={(e) => handleBranchChange(e.target.value)}
-                    disabled={branches.length === 0}
-                  >
-                    {branches.length === 0 ? (
-                      <option value="">No branches available</option>
-                    ) : (
-                      branches.map((branch) => (
-                        <option key={branch.id} value={branch.id}>
-                          {branch.name}
-                        </option>
-                      ))
-                    )}
-                  </select>
                 </div>
               </div>
               <div className="box-body !py-5">
