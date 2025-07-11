@@ -4,6 +4,7 @@ import Seo from "@/shared/layout-components/seo/seo";
 import { toast, Toaster } from "react-hot-toast";
 import { Base_url } from '@/app/api/config/BaseUrl';
 import axios from "axios";
+import { useSearchParams } from "next/navigation";
 
 interface UdinEntry {
   fieldName: string;
@@ -60,6 +61,8 @@ interface ApiResponse {
 }
 
 const TasksPage = () => {
+  const searchParams = useSearchParams();
+  const status = searchParams.get('status');
   const [currentPage, setCurrentPage] = useState(1);
   const [tasks, setTasks] = useState<Timeline[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -71,7 +74,7 @@ const TasksPage = () => {
   const [searchInputValue, setSearchInputValue] = useState("");
   const [filters, setFilters] = useState({
     activityName: "",
-    status: "",
+    status: status || "",
     startDate: "",
     endDate: "",
     today: "false",

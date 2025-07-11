@@ -9,6 +9,7 @@ import { toast } from 'react-hot-toast';
 import axios from 'axios';
 import { useBranchContext } from '@/shared/contextapi';
 import { ApexOptions } from 'apexcharts';
+import { useRouter } from 'next/navigation';
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
@@ -35,11 +36,20 @@ interface TimelineCounts {
 }
 
 interface MonthlyTaskData {
-  pending: number[];
-  delayed: number[];
-  completed: number[];
   assigned: number[];
   months: string[];
+}
+
+interface TopClient {
+  ranking: number;
+  name: string;
+  frequency: number;
+}
+
+interface TopActivity {
+  ranking: number;
+  name: string;
+  frequency: number;
 }
 
 // Skeleton Components
@@ -100,8 +110,40 @@ const LineChartSkeleton = () => (
   </div>
 );
 
+const TableCardSkeleton = () => (
+  <div className="box h-full animate-pulse">
+    <div className="box-header justify-between">
+      <div className="h-6 bg-gray-300 rounded w-32"></div>
+      <div className="w-[1.75rem] h-[1.75rem] bg-gray-300 rounded"></div>
+    </div>
+    <div className="box-body">
+      <div className="overflow-x-auto">
+        <table className="table">
+          <thead>
+            <tr>
+              <th className="h-4 bg-gray-300 rounded w-16"></th>
+              <th className="h-4 bg-gray-300 rounded w-24"></th>
+              <th className="h-4 bg-gray-300 rounded w-20"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {[1, 2, 3, 4, 5].map((i) => (
+              <tr key={i}>
+                <td className="h-4 bg-gray-300 rounded w-8"></td>
+                <td className="h-4 bg-gray-300 rounded w-32"></td>
+                <td className="h-4 bg-gray-300 rounded w-12"></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+);
+
 const Dashboard = () => {
-  const { branches } = useBranchContext();
+  const { branches, selectedBranch, setSelectedBranch, loading: contextLoading } = useBranchContext();
+  const router = useRouter();
   const [dashboardData, setDashboardData] = useState<DashboardData>({
     totalBranches: 0,
     totalCustomers: 0,
@@ -110,22 +152,22 @@ const Dashboard = () => {
     totalOngoingTasks: 0
   });
   const [timelineCounts, setTimelineCounts] = useState<TimelineCounts | null>(null);
-  const [selectedBranchId, setSelectedBranchId] = useState<string>('');
   const [monthlyTaskData, setMonthlyTaskData] = useState<MonthlyTaskData>({
-    pending: [],
-    delayed: [],
-    completed: [],
     assigned: [],
     months: []
   });
+  const [topClients, setTopClients] = useState<TopClient[]>([]);
+  const [topActivities, setTopActivities] = useState<TopActivity[]>([]);
   const [error, setError] = useState<string | null>(null);
   
   // Loading states
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(true);
   const [isLoadingTimeline, setIsLoadingTimeline] = useState(false);
   const [isLoadingMonthly, setIsLoadingMonthly] = useState(false);
+  const [isLoadingTopClients, setIsLoadingTopClients] = useState(false);
+  const [isLoadingTopActivities, setIsLoadingTopActivities] = useState(false);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async (branchId?: string) => {
     setError(null);
     setIsLoadingDashboard(true);
     
@@ -140,6 +182,9 @@ const Dashboard = () => {
         'Content-Type': 'application/json'
       };
 
+      // Prepare query parameters for branch-specific data
+      const branchParams = branchId ? { branchId } : {};
+
       // Fetch all dashboard data in parallel using axios
       const [
         branchesResponse,
@@ -149,10 +194,10 @@ const Dashboard = () => {
         tasksResponse
       ] = await Promise.all([
         axios.get(`${Base_url}dashboard/total-branches`, { headers }),
-        axios.get(`${Base_url}dashboard/total-clients`, { headers }),
-        axios.get(`${Base_url}dashboard/total-teams`, { headers }),
+        axios.get(`${Base_url}dashboard/total-clients`, { headers, params: branchParams }),
+        axios.get(`${Base_url}dashboard/total-teams`, { headers, params: branchParams }),
         axios.get(`${Base_url}dashboard/total-activities`, { headers }),
-        axios.get(`${Base_url}dashboard/total-ongoing-tasks`, { headers })
+        axios.get(`${Base_url}dashboard/total-ongoing-tasks`, { headers, params: branchParams })
       ]);
 
       setDashboardData({
@@ -216,62 +261,25 @@ const Dashboard = () => {
         'Content-Type': 'application/json'
       };
 
-      // Get last 12 months
-      const months = [];
-      const pendingData = [];
-      const delayedData = [];
-      const completedData = [];
-      const assignedData = [];
+      // Fetch assigned task counts for last 12 months in a single call
+      const response = await axios.get(`${Base_url}dashboard/assigned-task-counts`, {
+        headers,
+        params: { branchId }
+      });
 
-      for (let i = 11; i >= 0; i--) {
-        const date = new Date();
-        date.setMonth(date.getMonth() - i);
-        
-        const startDate = new Date(date.getFullYear(), date.getMonth(), 1);
-        const endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-        
-        const monthName = startDate.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
-        months.push(monthName);
+      const assignedData = response.data;
+      console.log(assignedData);
 
-        // Fetch timeline counts for the month
-        const timelineResponse = await axios.get(`${Base_url}dashboard/timeline-counts-by-branch`, {
-          headers,
-          params: { 
-            branchId
-          }
-        });
-
-        // Fetch assigned task count for the month
-        const assignedResponse = await axios.get(`${Base_url}dashboard/assigned-task-counts`, {
-          headers,
-          params: {
-            branchId,
-            startDate: startDate.toISOString().split('T')[0],
-            endDate: endDate.toISOString().split('T')[0]
-          }
-        });
-
-        pendingData.push(timelineResponse.data.counts?.pending || 0);
-        delayedData.push(timelineResponse.data.counts?.delayed || 0);
-        completedData.push(timelineResponse.data.counts?.completed || 0);
-        assignedData.push(assignedResponse.data.count || 0);
-      }
-
+      // Use the data directly from the backend response
       setMonthlyTaskData({
-        pending: pendingData,
-        delayed: delayedData,
-        completed: completedData,
-        assigned: assignedData,
-        months: months
+        assigned: assignedData.assigned || Array(12).fill(0),
+        months: assignedData.months || []
       });
 
     } catch (err) {
       console.error('Error fetching monthly task data:', err);
       toast.error('Failed to load monthly task data');
       setMonthlyTaskData({
-        pending: [],
-        delayed: [],
-        completed: [],
         assigned: [],
         months: []
       });
@@ -280,30 +288,92 @@ const Dashboard = () => {
     }
   };
 
-  // Initialize branch selection when branches are loaded
-  useEffect(() => {
-    if (branches.length > 0 && !selectedBranchId) {
-      const firstBranch = branches[0];
-      setSelectedBranchId(firstBranch.id);
-      fetchTimelineCounts(firstBranch.id);
-      fetchMonthlyTaskData(firstBranch.id);
-    }
-  }, [branches]);
+  const fetchTopClients = async (branchId: string) => {
+    if (!branchId) return;
+    
+    setIsLoadingTopClients(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
 
-  // Fetch timeline counts when branch selection changes
-  useEffect(() => {
-    if (selectedBranchId) {
-      fetchTimelineCounts(selectedBranchId);
-      fetchMonthlyTaskData(selectedBranchId);
-    }
-  }, [selectedBranchId]);
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
 
+      const response = await axios.get(`${Base_url}dashboard/top-clients`, {
+        headers,
+        params: { branchId }
+      });
+
+      setTopClients(response.data || []);
+    } catch (err) {
+      console.error('Error fetching top clients:', err);
+      toast.error('Failed to load top clients data');
+      setTopClients([]);
+    } finally {
+      setIsLoadingTopClients(false);
+    }
+  };
+
+  const fetchTopActivities = async (branchId: string) => {
+    if (!branchId) return;
+    
+    setIsLoadingTopActivities(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+
+      const response = await axios.get(`${Base_url}dashboard/top-activities`, {
+        headers,
+        params: { branchId }
+      });
+
+      setTopActivities(response.data || []);
+    } catch (err) {
+      console.error('Error fetching top activities:', err);
+      toast.error('Failed to load top activities data');
+      setTopActivities([]);
+    } finally {
+      setIsLoadingTopActivities(false);
+    }
+  };
+
+  // Fetch timeline counts and dashboard data when selected branch changes
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    if (selectedBranch?.id) {
+      fetchTimelineCounts(selectedBranch.id);
+      fetchMonthlyTaskData(selectedBranch.id);
+      fetchDashboardData(selectedBranch.id);
+      fetchTopClients(selectedBranch.id);
+      fetchTopActivities(selectedBranch.id);
+    }
+  }, [selectedBranch]);
+
 
   const handleBranchChange = (branchId: string) => {
-    setSelectedBranchId(branchId);
+    const branch = branches.find(b => b.id === branchId);
+    if (branch) {
+      setSelectedBranch(branch);
+    }
+  };
+
+  const handleStatusClick = (status: string) => {
+    // Redirect to tasks page with status filter
+    const queryParams = new URLSearchParams({
+      status: status
+    });
+    
+    router.push(`/tasks?${queryParams.toString()}`);
   };
 
   // Generate chart data from timeline counts
@@ -370,7 +440,7 @@ const Dashboard = () => {
 
   const chartData = getTimelineChartData();
 
-  // Generate chart options for all task types on one chart
+  // Generate chart options for assigned tasks chart
   const getTaskChartOptions = (): ApexOptions => ({
     chart: {
       type: 'line' as const,
@@ -382,7 +452,7 @@ const Dashboard = () => {
         enabled: false
       }
     },
-    colors: ['#f5b849', '#dc3545', '#26bf94', '#23b7e5'], // Pending, Delayed, Completed, Assigned
+    colors: ['#23b7e5'], // Assigned tasks color
     dataLabels: {
       enabled: false
     },
@@ -408,7 +478,7 @@ const Dashboard = () => {
     },
     yaxis: {
       title: {
-        text: 'Number of Tasks',
+        text: 'Number of Assigned Tasks',
         style: {
           color: '#8c9097',
           fontSize: '12px'
@@ -422,17 +492,12 @@ const Dashboard = () => {
       }
     },
     legend: {
-      position: 'top' as const,
-      horizontalAlign: 'right' as const,
-      fontSize: '12px',
-      labels: {
-        colors: '#8c9097'
-      }
+      show: false // Hide legend since we only have one series
     },
     tooltip: {
       y: {
         formatter: function (val: number) {
-          return val + ' tasks';
+          return val + ' assigned tasks';
         }
       }
     }
@@ -440,7 +505,38 @@ const Dashboard = () => {
 
   const taskChartOptions = getTaskChartOptions();
 
-  console.log(branches);
+  // Show loading state while context is loading
+  if (contextLoading) {
+    return (
+      <Fragment>
+        <Seo title={"Crm"} />
+        <div className="md:flex block items-center justify-between my-[1.5rem] page-header-breadcrumb">
+          <div>
+            <p className="font-semibold text-[1.125rem] text-defaulttextcolor dark:text-defaulttextcolor/70 !mb-0 ">Welcome back!</p>
+            <p className="font-normal text-[#8c9097] dark:text-white/50 text-[0.813rem]">Track your sales activity, leads and deals here.</p>
+          </div>
+        </div>
+        
+        {/* Loading skeleton */}
+        <div className="flex flex-wrap gap-6 mb-6">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="flex-1 min-w-[200px]">
+              <CardSkeleton />
+            </div>
+          ))}
+        </div>
+        
+        <div className="grid grid-cols-12 gap-x-6 mb-6">
+          <div className="lg:col-span-6 col-span-12">
+            <ChartSkeleton />
+          </div>
+          <div className="lg:col-span-6 col-span-12">
+            <LineChartSkeleton />
+          </div>
+        </div>
+      </Fragment>
+    );
+  }
 
   return (
     <Fragment>
@@ -603,7 +699,151 @@ const Dashboard = () => {
         )}
       </div>
 
-      {/* Second Row */}
+      {/* Second Row: Top Clients and Top Activities Cards */}
+      <div className="grid grid-cols-12 gap-x-6 mb-6">
+        <div className="lg:col-span-6 col-span-12">
+          {isLoadingTopClients ? (
+            <TableCardSkeleton />
+          ) : (
+            <div className="box h-full">
+              <div className="box-header justify-between">
+                <div className="box-title">
+                  Top 5 Clients
+                </div>
+                <div className="flex items-center gap-2">
+                  <select
+                    className="form-select !py-1 !px-2 !text-[0.8rem] !min-w-[150px]"
+                    value={selectedBranch?.id || ''}
+                    onChange={(e) => handleBranchChange(e.target.value)}
+                    disabled={branches.length === 0}
+                  >
+                    {branches.length === 0 ? (
+                      <option value="">No branches available</option>
+                    ) : (
+                      branches.map((branch) => (
+                        <option key={branch.id} value={branch.id}>
+                          {branch.name}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+              </div>
+              <div className="box-body">
+                <div className="overflow-x-auto">
+                  <table className="table w-full [&_th]:!text-center [&_td]:!text-center">
+                    <thead>
+                      <tr>
+                        <th className="text-[0.75rem] font-medium text-[#8c9097] dark:text-white/50 w-1/6">Rank</th>
+                        <th className="text-[0.75rem] font-medium text-[#8c9097] dark:text-white/50 w-2/3">Client Name</th>
+                        <th className="text-[0.75rem] font-medium text-[#8c9097] dark:text-white/50 w-1/6">Frequency</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {topClients.length > 0 ? (
+                        topClients.map((client) => (
+                          <tr key={client.ranking}>
+                            <td className="text-[0.875rem]">
+                              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium ${
+                                client.ranking === 1 ? 'bg-yellow-100 text-yellow-800' :
+                                client.ranking === 2 ? 'bg-gray-100 text-gray-800' :
+                                client.ranking === 3 ? 'bg-orange-100 text-orange-800' :
+                                'bg-blue-100 text-blue-800'
+                              }`}>
+                                {client.ranking}
+                              </span>
+                            </td>
+                            <td className="text-[0.875rem] font-medium">{client.name}</td>
+                            <td className="text-[0.875rem] text-[#8c9097] dark:text-white/50">{client.frequency}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={3} className="text-center text-[0.875rem] text-[#8c9097] dark:text-white/50 py-4">
+                            No clients data available
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="lg:col-span-6 col-span-12">
+          {isLoadingTopActivities ? (
+            <TableCardSkeleton />
+          ) : (
+            <div className="box h-full">
+              <div className="box-header justify-between">
+                <div className="box-title">
+                  Top 5 Activities
+                </div>
+                <div className="flex items-center gap-2">
+                  <select
+                    className="form-select !py-1 !px-2 !text-[0.8rem] !min-w-[150px]"
+                    value={selectedBranch?.id || ''}
+                    onChange={(e) => handleBranchChange(e.target.value)}
+                    disabled={branches.length === 0}
+                  >
+                    {branches.length === 0 ? (
+                      <option value="">No branches available</option>
+                    ) : (
+                      branches.map((branch) => (
+                        <option key={branch.id} value={branch.id}>
+                          {branch.name}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+              </div>
+              <div className="box-body">
+                <div className="overflow-x-auto">
+                  <table className="table w-full [&_th]:!text-center [&_td]:!text-center">
+                    <thead>
+                      <tr>
+                        <th className="text-[0.75rem] font-medium text-[#8c9097] dark:text-white/50 w-1/6">Rank</th>
+                        <th className="text-[0.75rem] font-medium text-[#8c9097] dark:text-white/50 w-2/3">Activity Name</th>
+                        <th className="text-[0.75rem] font-medium text-[#8c9097] dark:text-white/50 w-1/6">Frequency</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {topActivities.length > 0 ? (
+                        topActivities.map((activity) => (
+                          <tr key={activity.ranking}>
+                            <td className="text-[0.875rem]">
+                              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium ${
+                                activity.ranking === 1 ? 'bg-yellow-100 text-yellow-800' :
+                                activity.ranking === 2 ? 'bg-gray-100 text-gray-800' :
+                                activity.ranking === 3 ? 'bg-orange-100 text-orange-800' :
+                                'bg-blue-100 text-blue-800'
+                              }`}>
+                                {activity.ranking}
+                              </span>
+                            </td>
+                            <td className="text-[0.875rem] font-medium">{activity.name}</td>
+                            <td className="text-[0.875rem] text-[#8c9097] dark:text-white/50">{activity.frequency}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={3} className="text-center text-[0.875rem] text-[#8c9097] dark:text-white/50 py-4">
+                            No activities data available
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Third Row */}
       <div className="grid grid-cols-12 gap-x-6 mb-6">
         <div className="lg:col-span-6 col-span-12">
           {isLoadingTimeline ? (
@@ -614,24 +854,23 @@ const Dashboard = () => {
                 <div className="box-title">
                   Timelines by branches
                 </div>
-                <div className="hs-dropdown ti-dropdown">
-                  <Link aria-label="anchor" href="#!" scroll={false}
-                    className="flex items-center justify-center w-[1.75rem] h-[1.75rem] ! !text-[0.8rem] !py-1 !px-2 rounded-sm bg-light border-light shadow-none !font-medium"
-                    aria-expanded="false">
-                    <i className="fe fe-more-vertical text-[0.8rem]"></i>
-                  </Link>
-                  <ul className="hs-dropdown-menu ti-dropdown-menu hidden">
-                    {branches.map((branch) => (
-                      <li key={branch.id}>
-                        <button 
-                          className={`ti-dropdown-item !py-2 !px-[0.9375rem] !text-[0.8125rem] !font-medium block w-full text-left ${selectedBranchId === branch.id ? 'bg-primary/10 text-primary' : ''}`}
-                          onClick={() => handleBranchChange(branch.id)}
-                        >
+                <div className="flex items-center gap-2">
+                  <select
+                    className="form-select !py-1 !px-2 !text-[0.8rem] !min-w-[150px]"
+                    value={selectedBranch?.id || ''}
+                    onChange={(e) => handleBranchChange(e.target.value)}
+                    disabled={branches.length === 0}
+                  >
+                    {branches.length === 0 ? (
+                      <option value="">No branches available</option>
+                    ) : (
+                      branches.map((branch) => (
+                        <option key={branch.id} value={branch.id}>
                           {branch.name}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+                        </option>
+                      ))
+                    )}
+                  </select>
                 </div>
               </div>
               <div className="box-body overflow-hidden">
@@ -645,7 +884,10 @@ const Dashboard = () => {
               </div>
               <div className="grid grid-cols-4 border-t border-dashed dark:border-defaultborder/10">
                 <div className="col !p-0">
-                  <div className="!ps-4 p-[0.95rem] text-center border-e border-dashed dark:border-defaultborder/10">
+                  <div 
+                    className="!ps-4 p-[0.95rem] text-center border-e border-dashed dark:border-defaultborder/10 cursor-pointer hover:bg-warning/5 transition-colors"
+                    onClick={() => handleStatusClick('pending')}
+                  >
                     <span className="text-[#8c9097] dark:text-white/50 text-[0.75rem] mb-1 crm-lead-legend pending inline-block">Pending
                     </span>
                     <div><span className="text-[1rem]  font-semibold">{timelineCounts?.counts.pending || 0}</span>
@@ -653,14 +895,20 @@ const Dashboard = () => {
                   </div>
                 </div>
                 <div className="col !p-0">
-                  <div className="p-[0.95rem] text-center border-e border-dashed dark:border-defaultborder/10">
+                  <div 
+                    className="p-[0.95rem] text-center border-e border-dashed dark:border-defaultborder/10 cursor-pointer hover:bg-primary/5 transition-colors"
+                    onClick={() => handleStatusClick('ongoing')}
+                  >
                     <span className="text-[#8c9097] dark:text-white/50 text-[0.75rem] mb-1 crm-lead-legend ongoing inline-block">Ongoing
                     </span>
                     <div><span className="text-[1rem]  font-semibold">{timelineCounts?.counts.ongoing || 0}</span></div>
                   </div>
                 </div>
                 <div className="col !p-0">
-                  <div className="p-[0.95rem] text-center border-e border-dashed dark:border-defaultborder/10">
+                  <div 
+                    className="p-[0.95rem] text-center border-e border-dashed dark:border-defaultborder/10 cursor-pointer hover:bg-success/5 transition-colors"
+                    onClick={() => handleStatusClick('completed')}
+                  >
                     <span className="text-[#8c9097] dark:text-white/50 text-[0.75rem] mb-1 crm-lead-legend completed inline-block">Completed
                     </span>
                     <div><span className="text-[1rem]  font-semibold">{timelineCounts?.counts.completed || 0}</span>
@@ -668,7 +916,10 @@ const Dashboard = () => {
                   </div>
                 </div>
                 <div className="col !p-0">
-                  <div className="!pe-4 p-[0.95rem] text-center">
+                  <div 
+                    className="!pe-4 p-[0.95rem] text-center cursor-pointer hover:bg-danger/5 transition-colors"
+                    onClick={() => handleStatusClick('delayed')}
+                  >
                     <span className="text-[#8c9097] dark:text-white/50 text-[0.75rem] mb-1 crm-lead-legend delayed inline-block">Delayed
                     </span>
                     <div><span className="text-[1rem]  font-semibold">{timelineCounts?.counts.delayed || 0}</span></div>
@@ -685,26 +936,25 @@ const Dashboard = () => {
             <div className="box h-full">
               <div className="box-header justify-between">
                 <div className="box-title">
-                  Task Completion by Branches
+                  Assigned Tasks by Month
                 </div>
-                <div className="hs-dropdown ti-dropdown">
-                  <Link aria-label="anchor" href="#!" scroll={false}
-                    className="flex items-center justify-center w-[1.75rem] h-[1.75rem] ! !text-[0.8rem] !py-1 !px-2 rounded-sm bg-light border-light shadow-none !font-medium"
-                    aria-expanded="false">
-                    <i className="fe fe-more-vertical text-[0.8rem]"></i>
-                  </Link>
-                  <ul className="hs-dropdown-menu ti-dropdown-menu hidden">
-                    {branches.map((branch) => (
-                      <li key={branch.id}>
-                        <button 
-                          className={`ti-dropdown-item !py-2 !px-[0.9375rem] !text-[0.8125rem] !font-medium block w-full text-left ${selectedBranchId === branch.id ? 'bg-primary/10 text-primary' : ''}`}
-                          onClick={() => handleBranchChange(branch.id)}
-                        >
+                <div className="flex items-center gap-2">
+                  <select
+                    className="form-select !py-1 !px-2 !text-[0.8rem] !min-w-[150px]"
+                    value={selectedBranch?.id || ''}
+                    onChange={(e) => handleBranchChange(e.target.value)}
+                    disabled={branches.length === 0}
+                  >
+                    {branches.length === 0 ? (
+                      <option value="">No branches available</option>
+                    ) : (
+                      branches.map((branch) => (
+                        <option key={branch.id} value={branch.id}>
                           {branch.name}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+                        </option>
+                      ))
+                    )}
+                  </select>
                 </div>
               </div>
               <div className="box-body !py-5">
@@ -712,10 +962,7 @@ const Dashboard = () => {
                   <ReactApexChart 
                     options={taskChartOptions} 
                     series={[
-                      { name: 'Pending', data: monthlyTaskData.pending },
-                      { name: 'Delayed', data: monthlyTaskData.delayed },
-                      { name: 'Completed', data: monthlyTaskData.completed },
-                      { name: 'Assigned', data: monthlyTaskData.assigned }
+                      { name: 'Assigned Tasks', data: monthlyTaskData.assigned }
                     ]} 
                     type="line" 
                     width="100%" 
