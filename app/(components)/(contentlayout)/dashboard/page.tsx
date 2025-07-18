@@ -4,12 +4,23 @@ import Link from 'next/link';
 import React, { Fragment, useState, useEffect } from 'react'
 import * as Crmdata from "@/shared/data/dashboards/crmdata";
 import dynamic from "next/dynamic";
-import { Base_url } from '@/app/api/config/BaseUrl';
 import { toast } from 'react-hot-toast';
-import axios from 'axios';
 import { useBranchContext } from '@/shared/contextapi';
 import { ApexOptions } from 'apexcharts';
 import { useRouter } from 'next/navigation';
+import DashboardService, { 
+  FrequencyStatusData, 
+  TimelinePeriodData, 
+  FrequencyAnalyticsData, 
+  StatusTrendsData, 
+  CompletionRatesData
+} from './services/DashboardService';
+import {
+  FrequencyAnalyticsChart,
+  StatusTrendsChart,
+  CompletionRatesCard,
+  TimelinePeriodTable
+} from './components';
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
@@ -144,6 +155,8 @@ const TableCardSkeleton = () => (
 const Dashboard = () => {
   const { branches, selectedBranch, setSelectedBranch, loading: contextLoading } = useBranchContext();
   const router = useRouter();
+  
+  // Dashboard data state
   const [dashboardData, setDashboardData] = useState<DashboardData>({
     totalBranches: 0,
     totalCustomers: 0,
@@ -158,7 +171,16 @@ const Dashboard = () => {
   });
   const [topClients, setTopClients] = useState<TopClient[]>([]);
   const [topActivities, setTopActivities] = useState<TopActivity[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  
+  // New frequency-based data state
+  const [frequencyStatusData, setFrequencyStatusData] = useState<FrequencyStatusData[]>([]);
+  const [timelinePeriodData, setTimelinePeriodData] = useState<TimelinePeriodData[]>([]);
+  const [frequencyAnalyticsData, setFrequencyAnalyticsData] = useState<FrequencyAnalyticsData[]>([]);
+  const [statusTrendsData, setStatusTrendsData] = useState<StatusTrendsData[]>([]);
+  const [completionRatesData, setCompletionRatesData] = useState<CompletionRatesData | null>(null);
+  
+  // Frequency selection state
+  const [selectedFrequency, setSelectedFrequency] = useState<string>('Daily');
   
   // Loading states
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(true);
@@ -166,48 +188,22 @@ const Dashboard = () => {
   const [isLoadingMonthly, setIsLoadingMonthly] = useState(false);
   const [isLoadingTopClients, setIsLoadingTopClients] = useState(false);
   const [isLoadingTopActivities, setIsLoadingTopActivities] = useState(false);
+  const [isLoadingFrequencyData, setIsLoadingFrequencyData] = useState(false);
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
+  const [isLoadingTrends, setIsLoadingTrends] = useState(false);
+  const [isLoadingCompletionRates, setIsLoadingCompletionRates] = useState(false);
+  const [isLoadingPeriods, setIsLoadingPeriods] = useState(false);
+  
+  const [error, setError] = useState<string | null>(null);
 
+  // Fetch basic dashboard data
   const fetchDashboardData = async (branchId?: string) => {
     setError(null);
     setIsLoadingDashboard(true);
     
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-
-      const headers = {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      };
-
-      // Prepare query parameters for branch-specific data
-      const branchParams = branchId ? { branchId } : {};
-
-      // Fetch all dashboard data in parallel using axios
-      const [
-        branchesResponse,
-        customersResponse,
-        teamsResponse,
-        activitiesResponse,
-        tasksResponse
-      ] = await Promise.all([
-        axios.get(`${Base_url}dashboard/total-branches`, { headers }),
-        axios.get(`${Base_url}dashboard/total-clients`, { headers, params: branchParams }),
-        axios.get(`${Base_url}dashboard/total-teams`, { headers, params: branchParams }),
-        axios.get(`${Base_url}dashboard/total-activities`, { headers }),
-        axios.get(`${Base_url}dashboard/total-ongoing-tasks`, { headers, params: branchParams })
-      ]);
-
-      setDashboardData({
-        totalBranches: branchesResponse.data.total || 0,
-        totalCustomers: customersResponse.data.total || 0,
-        totalTeams: teamsResponse.data.total || 0,
-        totalActivities: activitiesResponse.data.total || 0,
-        totalOngoingTasks: tasksResponse.data.total || 0
-      });
-
+      const data = await DashboardService.getDashboardData(branchId);
+      setDashboardData(data);
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch dashboard data');
@@ -217,26 +213,14 @@ const Dashboard = () => {
     }
   };
 
+  // Fetch timeline counts
   const fetchTimelineCounts = async (branchId: string) => {
     if (!branchId) return;
     
     setIsLoadingTimeline(true);
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-
-      const headers = {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      };
-
-      const response = await axios.get(`${Base_url}dashboard/timeline-counts-by-branch`, { 
-        headers,
-        params: { branchId }
-      });
-      setTimelineCounts(response.data);
+      const data = await DashboardService.getTimelineCountsByBranch(branchId);
+      setTimelineCounts(data);
     } catch (err) {
       console.error('Error fetching timeline counts:', err);
       toast.error('Failed to load timeline data');
@@ -246,69 +230,34 @@ const Dashboard = () => {
     }
   };
 
+  // Fetch monthly task data
   const fetchMonthlyTaskData = async (branchId: string) => {
     if (!branchId) return;
     
     setIsLoadingMonthly(true);
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-
-      const headers = {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      };
-
-      // Fetch assigned task counts for last 12 months in a single call
-      const response = await axios.get(`${Base_url}dashboard/assigned-task-counts`, {
-        headers,
-        params: { branchId }
-      });
-
-      const assignedData = response.data;
-      console.log(assignedData);
-
-      // Use the data directly from the backend response
+      const data = await DashboardService.getAssignedTaskCounts(branchId);
       setMonthlyTaskData({
-        assigned: assignedData.assigned || Array(12).fill(0),
-        months: assignedData.months || []
+        assigned: data.assigned || Array(12).fill(0),
+        months: data.months || []
       });
-
     } catch (err) {
       console.error('Error fetching monthly task data:', err);
       toast.error('Failed to load monthly task data');
-      setMonthlyTaskData({
-        assigned: [],
-        months: []
-      });
+      setMonthlyTaskData({ assigned: [], months: [] });
     } finally {
       setIsLoadingMonthly(false);
     }
   };
 
+  // Fetch top clients
   const fetchTopClients = async (branchId: string) => {
     if (!branchId) return;
     
     setIsLoadingTopClients(true);
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-
-      const headers = {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      };
-
-      const response = await axios.get(`${Base_url}dashboard/top-clients`, {
-        headers,
-        params: { branchId }
-      });
-
-      setTopClients(response.data || []);
+      const data = await DashboardService.getTopClients(branchId);
+      setTopClients(data);
     } catch (err) {
       console.error('Error fetching top clients:', err);
       toast.error('Failed to load top clients data');
@@ -318,27 +267,14 @@ const Dashboard = () => {
     }
   };
 
+  // Fetch top activities
   const fetchTopActivities = async (branchId: string) => {
     if (!branchId) return;
     
     setIsLoadingTopActivities(true);
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-
-      const headers = {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      };
-
-      const response = await axios.get(`${Base_url}dashboard/top-activities`, {
-        headers,
-        params: { branchId }
-      });
-
-      setTopActivities(response.data || []);
+      const data = await DashboardService.getTopActivities(branchId);
+      setTopActivities(data);
     } catch (err) {
       console.error('Error fetching top activities:', err);
       toast.error('Failed to load top activities data');
@@ -348,18 +284,98 @@ const Dashboard = () => {
     }
   };
 
-  // Fetch timeline counts and dashboard data when selected branch changes
-  useEffect(() => {
-    if (selectedBranch?.id) {
-      fetchTimelineCounts(selectedBranch.id);
-      fetchMonthlyTaskData(selectedBranch.id);
-      fetchDashboardData(selectedBranch.id);
-      fetchTopClients(selectedBranch.id);
-      fetchTopActivities(selectedBranch.id);
+  // Fetch frequency-based data (without filters)
+  const fetchFrequencyData = async () => {
+    setIsLoadingFrequencyData(true);
+    try {
+      const filters = {
+        branchId: selectedBranch?.id || ''
+      };
+      const data = await DashboardService.getTimelineStatusByFrequency(filters);
+      setFrequencyStatusData(data);
+    } catch (err) {
+      console.error('Error fetching frequency data:', err);
+      toast.error('Failed to load frequency data');
+      setFrequencyStatusData([]);
+    } finally {
+      setIsLoadingFrequencyData(false);
     }
-  }, [selectedBranch]);
+  };
 
+  // Fetch analytics data (without filters)
+  const fetchAnalyticsData = async () => {
+    setIsLoadingAnalytics(true);
+    try {
+      const filters = {
+        branchId: selectedBranch?.id || ''
+      };
+      const data = await DashboardService.getTimelineFrequencyAnalytics(filters);
+      setFrequencyAnalyticsData(data);
+    } catch (err) {
+      console.error('Error fetching analytics data:', err);
+      toast.error('Failed to load analytics data');
+      setFrequencyAnalyticsData([]);
+    } finally {
+      setIsLoadingAnalytics(false);
+    }
+  };
 
+  // Fetch trends data (without filters)
+  const fetchTrendsData = async () => {
+    setIsLoadingTrends(true);
+    try {
+      const filters = {
+        branchId: selectedBranch?.id || ''
+      };
+      const data = await DashboardService.getTimelineStatusTrends(filters);
+      setStatusTrendsData(data);
+    } catch (err) {
+      console.error('Error fetching trends data:', err);
+      toast.error('Failed to load trends data');
+      setStatusTrendsData([]);
+    } finally {
+      setIsLoadingTrends(false);
+    }
+  };
+
+  // Fetch completion rates (without filters)
+  const fetchCompletionRates = async () => {
+    setIsLoadingCompletionRates(true);
+    try {
+      const filters = {
+        branchId: selectedBranch?.id || ''
+      };
+      const data = await DashboardService.getTimelineCompletionRates(filters);
+      setCompletionRatesData(data);
+    } catch (err) {
+      console.error('Error fetching completion rates:', err);
+      toast.error('Failed to load completion rates');
+      setCompletionRatesData(null);
+    } finally {
+      setIsLoadingCompletionRates(false);
+    }
+  };
+
+  // Fetch period data (without filters)
+  const fetchPeriodData = async () => {
+    setIsLoadingPeriods(true);
+    try {
+      const filters = {
+        branchId: selectedBranch?.id || '',
+        frequency: selectedFrequency
+      };
+      const data = await DashboardService.getTimelineStatusByPeriod(filters);
+      setTimelinePeriodData(data.periods || []);
+    } catch (err) {
+      console.error('Error fetching period data:', err);
+      toast.error('Failed to load period data');
+      setTimelinePeriodData([]);
+    } finally {
+      setIsLoadingPeriods(false);
+    }
+  };
+
+  // Handle branch change
   const handleBranchChange = (branchId: string) => {
     const branch = branches.find(b => b.id === branchId);
     if (branch) {
@@ -367,18 +383,42 @@ const Dashboard = () => {
     }
   };
 
+  // Handle frequency change
+  const handleFrequencyChange = (frequency: string) => {
+    setSelectedFrequency(frequency);
+  };
+
+  // Fetch all data when selected branch changes
+  useEffect(() => {
+    if (selectedBranch?.id) {
+      fetchTimelineCounts(selectedBranch.id);
+      fetchMonthlyTaskData(selectedBranch.id);
+      fetchDashboardData(selectedBranch.id);
+      fetchTopClients(selectedBranch.id);
+      fetchTopActivities(selectedBranch.id);
+      fetchFrequencyData();
+      fetchAnalyticsData();
+      fetchTrendsData();
+      fetchCompletionRates();
+      fetchPeriodData();
+    }
+  }, [selectedBranch]);
+
+  // Fetch period data when frequency changes
+  useEffect(() => {
+    if (selectedBranch?.id) {
+      fetchPeriodData();
+    }
+  }, [selectedFrequency]);
+
   const handleStatusClick = (status: string) => {
-    // Redirect to tasks page with status filter
-    const queryParams = new URLSearchParams({
-      status: status
-    });
-    
+    const queryParams = new URLSearchParams({ status });
     router.push(`/tasks?${queryParams.toString()}`);
   };
 
   // Generate chart data from timeline counts
   const getTimelineChartData = () => {
-    if (!timelineCounts) {
+    if (!timelineCounts || !timelineCounts.counts) {
       return {
         series: [0, 0, 0, 0],
         options: Crmdata.Sourcedata.options,
@@ -387,7 +427,12 @@ const Dashboard = () => {
     }
 
     const { counts } = timelineCounts;
-    const series = [counts.pending, counts.ongoing, counts.completed, counts.delayed];
+    const series = [
+      counts.pending || 0, 
+      counts.ongoing || 0, 
+      counts.completed || 0, 
+      counts.delayed || 0
+    ];
     
     return {
       series,
@@ -398,7 +443,7 @@ const Dashboard = () => {
           enabled: true,
           custom: function({ series, seriesIndex, w }: any) {
             const statusNames = ['Pending', 'Ongoing', 'Completed', 'Delayed'];
-            const value = series[seriesIndex];
+            const value = series[seriesIndex] || 0;
             const statusName = statusNames[seriesIndex];
             return `<div class="custom-tooltip p-2">
               <span style="color: ${w.config.colors[seriesIndex]}">●</span>
@@ -420,21 +465,21 @@ const Dashboard = () => {
                   color: '#495057',
                   offsetY: -4
                 },
-                                 value: {
-                   show: true,
-                   fontSize: '18px',
-                   color: undefined,
-                   offsetY: 8,
-                   formatter: function (val: string) {
-                     return val;
-                   }
-                 },
+                value: {
+                  show: true,
+                  fontSize: '18px',
+                  color: undefined,
+                  offsetY: 8,
+                  formatter: function (val: string) {
+                    return val || '0';
+                  }
+                },
               }
             }
           }
         }
       },
-      total: counts.total
+      total: counts.total || 0
     };
   };
 
@@ -452,7 +497,7 @@ const Dashboard = () => {
         enabled: false
       }
     },
-    colors: ['#23b7e5'], // Assigned tasks color
+    colors: ['#23b7e5'],
     dataLabels: {
       enabled: false
     },
@@ -468,7 +513,7 @@ const Dashboard = () => {
       }
     },
     xaxis: {
-      categories: monthlyTaskData.months,
+      categories: monthlyTaskData.months || [],
       labels: {
         style: {
           colors: '#8c9097',
@@ -492,12 +537,12 @@ const Dashboard = () => {
       }
     },
     legend: {
-      show: false // Hide legend since we only have one series
+      show: false
     },
     tooltip: {
       y: {
         formatter: function (val: number) {
-          return val + ' assigned tasks';
+          return (val || 0) + ' assigned tasks';
         }
       }
     }
@@ -517,22 +562,12 @@ const Dashboard = () => {
           </div>
         </div>
         
-        {/* Loading skeleton */}
         <div className="flex flex-wrap gap-6 mb-6">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="flex-1 min-w-[200px]">
               <CardSkeleton />
             </div>
           ))}
-        </div>
-        
-        <div className="grid grid-cols-12 gap-x-6 mb-6">
-          <div className="lg:col-span-6 col-span-12">
-            <ChartSkeleton />
-          </div>
-          <div className="lg:col-span-6 col-span-12">
-            <LineChartSkeleton />
-          </div>
         </div>
       </Fragment>
     );
@@ -566,8 +601,7 @@ const Dashboard = () => {
                   <div className='flex flex-col'>
                     <div className="flex items-start justify-between mb-4">
                       <div>
-                        <span
-                          className="!text-[0.8rem]  !w-[2.5rem] !h-[2.5rem] !leading-[2.5rem] !rounded-full inline-flex items-center justify-center bg-primary">
+                        <span className="!text-[0.8rem]  !w-[2.5rem] !h-[2.5rem] !leading-[2.5rem] !rounded-full inline-flex items-center justify-center bg-primary">
                           <i className="ti ti-building text-[1rem] text-white"></i>
                         </span>
                       </div>
@@ -593,8 +627,7 @@ const Dashboard = () => {
                   <div className='flex flex-col'>
                     <div className="flex items-start justify-between mb-4">
                       <div>
-                        <span
-                          className="!text-[0.8rem]  !w-[2.5rem] !h-[2.5rem] !leading-[2.5rem] !rounded-full inline-flex items-center justify-center bg-secondary">
+                        <span className="!text-[0.8rem]  !w-[2.5rem] !h-[2.5rem] !leading-[2.5rem] !rounded-full inline-flex items-center justify-center bg-secondary">
                           <i className="ti ti-users text-[1rem] text-white"></i>
                         </span>
                       </div>
@@ -620,8 +653,7 @@ const Dashboard = () => {
                   <div className='flex flex-col'>
                     <div className="flex items-start justify-between mb-4">
                       <div>
-                        <span
-                          className="!text-[0.8rem]  !w-[2.5rem] !h-[2.5rem] !leading-[2.5rem] !rounded-full inline-flex items-center justify-center bg-success">
+                        <span className="!text-[0.8rem]  !w-[2.5rem] !h-[2.5rem] !leading-[2.5rem] !rounded-full inline-flex items-center justify-center bg-success">
                           <i className="ti ti-share text-[1rem] text-white"></i>
                         </span>
                       </div>
@@ -647,8 +679,7 @@ const Dashboard = () => {
                   <div className='flex flex-col'>
                     <div className="flex items-start justify-between mb-4">
                       <div>
-                        <span
-                          className="!text-[0.8rem]  !w-[2.5rem] !h-[2.5rem] !leading-[2.5rem] !rounded-full inline-flex items-center justify-center bg-warning">
+                        <span className="!text-[0.8rem]  !w-[2.5rem] !h-[2.5rem] !leading-[2.5rem] !rounded-full inline-flex items-center justify-center bg-warning">
                           <i className="ti ti-briefcase text-[1rem] text-white"></i>
                         </span>
                       </div>
@@ -674,8 +705,7 @@ const Dashboard = () => {
                   <div className='flex flex-col'>
                     <div className="flex items-start justify-between mb-4">
                       <div>
-                        <span
-                          className="!text-[0.8rem]  !w-[2.5rem] !h-[2.5rem] !leading-[2.5rem] !rounded-full inline-flex items-center justify-center bg-info">
+                        <span className="!text-[0.8rem]  !w-[2.5rem] !h-[2.5rem] !leading-[2.5rem] !rounded-full inline-flex items-center justify-center bg-info">
                           <i className="ti ti-checklist text-[1rem] text-white"></i>
                         </span>
                       </div>
@@ -699,116 +729,14 @@ const Dashboard = () => {
         )}
       </div>
 
-      {/* Second Row: Top Clients and Top Activities Cards */}
+      {/* Completion Rates Card */}
       <div className="grid grid-cols-12 gap-x-6 mb-6">
         <div className="lg:col-span-6 col-span-12">
-          {isLoadingTopClients ? (
-            <TableCardSkeleton />
-          ) : (
-            <div className="box h-full">
-              <div className="box-header justify-between">
-                <div className="box-title">
-                  Top 5 Clients
-                </div>
-              </div>
-              <div className="box-body">
-                <div className="overflow-x-auto">
-                  <table className="table w-full [&_th]:!text-center [&_td]:!text-center">
-                    <thead>
-                      <tr>
-                        <th className="text-[0.75rem] font-medium text-[#8c9097] dark:text-white/50 w-1/6">Rank</th>
-                        <th className="text-[0.75rem] font-medium text-[#8c9097] dark:text-white/50 w-2/3">Client Name</th>
-                        <th className="text-[0.75rem] font-medium text-[#8c9097] dark:text-white/50 w-1/6">Frequency</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {topClients.length > 0 ? (
-                        topClients.map((client) => (
-                          <tr key={client.ranking}>
-                            <td className="text-[0.875rem]">
-                              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium ${
-                                client.ranking === 1 ? 'bg-yellow-100 text-yellow-800' :
-                                client.ranking === 2 ? 'bg-gray-100 text-gray-800' :
-                                client.ranking === 3 ? 'bg-orange-100 text-orange-800' :
-                                'bg-blue-100 text-blue-800'
-                              }`}>
-                                {client.ranking}
-                              </span>
-                            </td>
-                            <td className="text-[0.875rem] font-medium">{client.name}</td>
-                            <td className="text-[0.875rem] text-[#8c9097] dark:text-white/50">{client.frequency}</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={3} className="text-center text-[0.875rem] text-[#8c9097] dark:text-white/50 py-4">
-                            No clients data available
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
+          <CompletionRatesCard
+            data={completionRatesData}
+            isLoading={isLoadingCompletionRates}
+          />
         </div>
-        <div className="lg:col-span-6 col-span-12">
-          {isLoadingTopActivities ? (
-            <TableCardSkeleton />
-          ) : (
-            <div className="box h-full">
-              <div className="box-header justify-between">
-                <div className="box-title">
-                  Top 5 Activities
-                </div>
-              </div>
-              <div className="box-body">
-                <div className="overflow-x-auto">
-                  <table className="table w-full [&_th]:!text-center [&_td]:!text-center">
-                    <thead>
-                      <tr>
-                        <th className="text-[0.75rem] font-medium text-[#8c9097] dark:text-white/50 w-1/6">Rank</th>
-                        <th className="text-[0.75rem] font-medium text-[#8c9097] dark:text-white/50 w-2/3">Activity Name</th>
-                        <th className="text-[0.75rem] font-medium text-[#8c9097] dark:text-white/50 w-1/6">Frequency</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {topActivities.length > 0 ? (
-                        topActivities.map((activity) => (
-                          <tr key={activity.ranking}>
-                            <td className="text-[0.875rem]">
-                              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium ${
-                                activity.ranking === 1 ? 'bg-yellow-100 text-yellow-800' :
-                                activity.ranking === 2 ? 'bg-gray-100 text-gray-800' :
-                                activity.ranking === 3 ? 'bg-orange-100 text-orange-800' :
-                                'bg-blue-100 text-blue-800'
-                              }`}>
-                                {activity.ranking}
-                              </span>
-                            </td>
-                            <td className="text-[0.875rem] font-medium">{activity.name}</td>
-                            <td className="text-[0.875rem] text-[#8c9097] dark:text-white/50">{activity.frequency}</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={3} className="text-center text-[0.875rem] text-[#8c9097] dark:text-white/50 py-4">
-                            No activities data available
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Third Row */}
-      <div className="grid grid-cols-12 gap-x-6 mb-6">
         <div className="lg:col-span-6 col-span-12">
           {isLoadingTimeline ? (
             <ChartSkeleton />
@@ -875,7 +803,144 @@ const Dashboard = () => {
             </div>
           )}
         </div>
-        <div className="lg:col-span-6 col-span-12">
+      </div>
+
+      {/* Frequency Analytics and Status Trends */}
+      <div className="grid grid-cols-12 gap-x-6 mb-6">
+        <div className="lg:col-span-12 col-span-12">
+          <FrequencyAnalyticsChart
+            data={frequencyAnalyticsData}
+            isLoading={isLoadingAnalytics}
+          />
+        </div>
+        <div className="lg:col-span-12 col-span-12">
+          <StatusTrendsChart
+            data={statusTrendsData}
+            isLoading={isLoadingTrends}
+            interval="day"
+          />
+        </div>
+      </div>
+
+      {/* Top Clients and Top Activities */}
+      <div className="grid grid-cols-12 gap-x-6 mb-6">
+        <div className="lg:col-span-12 col-span-12">
+          {isLoadingTopClients ? (
+            <TableCardSkeleton />
+          ) : (
+            <div className="box h-full">
+              <div className="box-header justify-between">
+                <div className="box-title">
+                  Top 5 Clients
+                </div>
+              </div>
+              <div className="box-body">
+                <div className="overflow-x-auto">
+                  <table className="table w-full [&_th]:!text-center [&_td]:!text-center">
+                    <thead>
+                      <tr>
+                        <th className="text-[0.75rem] font-medium text-[#8c9097] dark:text-white/50 w-1/6">Rank</th>
+                        <th className="text-[0.75rem] font-medium text-[#8c9097] dark:text-white/50 w-2/3">Client Name</th>
+                        <th className="text-[0.75rem] font-medium text-[#8c9097] dark:text-white/50 w-1/6">Frequency</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {topClients.length > 0 ? (
+                        topClients.map((client) => (
+                          <tr key={client.ranking}>
+                            <td className="text-[0.875rem]">
+                              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium ${
+                                client.ranking === 1 ? 'bg-yellow-100 text-yellow-800' :
+                                client.ranking === 2 ? 'bg-gray-100 text-gray-800' :
+                                client.ranking === 3 ? 'bg-orange-100 text-orange-800' :
+                                'bg-blue-100 text-blue-800'
+                              }`}>
+                                {client.ranking}
+                              </span>
+                            </td>
+                            <td className="text-[0.875rem] font-medium">{client.name}</td>
+                            <td className="text-[0.875rem] text-[#8c9097] dark:text-white/50">{client.frequency}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={3} className="text-center text-[0.875rem] text-[#8c9097] dark:text-white/50 py-4">
+                            No clients data available
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="lg:col-span-12 col-span-12">
+          {isLoadingTopActivities ? (
+            <TableCardSkeleton />
+          ) : (
+            <div className="box h-full">
+              <div className="box-header justify-between">
+                <div className="box-title">
+                  Top 5 Activities
+                </div>
+              </div>
+              <div className="box-body">
+                <div className="overflow-x-auto">
+                  <table className="table w-full [&_th]:!text-center [&_td]:!text-center">
+                    <thead>
+                      <tr>
+                        <th className="text-[0.75rem] font-medium text-[#8c9097] dark:text-white/50 w-1/6">Rank</th>
+                        <th className="text-[0.75rem] font-medium text-[#8c9097] dark:text-white/50 w-2/3">Activity Name</th>
+                        <th className="text-[0.75rem] font-medium text-[#8c9097] dark:text-white/50 w-1/6">Frequency</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {topActivities.length > 0 ? (
+                        topActivities.map((activity) => (
+                          <tr key={activity.ranking}>
+                            <td className="text-[0.875rem]">
+                              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium ${
+                                activity.ranking === 1 ? 'bg-yellow-100 text-yellow-800' :
+                                activity.ranking === 2 ? 'bg-gray-100 text-gray-800' :
+                                activity.ranking === 3 ? 'bg-orange-100 text-orange-800' :
+                                'bg-blue-100 text-blue-800'
+                              }`}>
+                                {activity.ranking}
+                              </span>
+                            </td>
+                            <td className="text-[0.875rem] font-medium">{activity.name}</td>
+                            <td className="text-[0.875rem] text-[#8c9097] dark:text-white/50">{activity.frequency}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={3} className="text-center text-[0.875rem] text-[#8c9097] dark:text-white/50 py-4">
+                            No activities data available
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Timeline Periods Table and Monthly Tasks Chart */}
+      <div className="grid grid-cols-12 gap-x-6 mb-6">
+        <div className="lg:col-span-12 col-span-12">
+          <TimelinePeriodTable
+            data={timelinePeriodData}
+            isLoading={isLoadingPeriods}
+            frequency={selectedFrequency}
+            onFrequencyChange={handleFrequencyChange}
+          />
+        </div>
+        <div className="lg:col-span-12 col-span-12">
           {isLoadingMonthly ? (
             <LineChartSkeleton />
           ) : (
@@ -905,4 +970,5 @@ const Dashboard = () => {
     </Fragment>
   )
 }
+
 export default Dashboard; 
