@@ -13,7 +13,8 @@ import DashboardService, {
   TimelinePeriodData, 
   FrequencyAnalyticsData, 
   StatusTrendsData, 
-  CompletionRatesData
+  CompletionRatesData,
+  FrequencyStatusStats
 } from './services/DashboardService';
 import {
   FrequencyAnalyticsChart,
@@ -178,6 +179,7 @@ const Dashboard = () => {
   const [frequencyAnalyticsData, setFrequencyAnalyticsData] = useState<FrequencyAnalyticsData[]>([]);
   const [statusTrendsData, setStatusTrendsData] = useState<StatusTrendsData[]>([]);
   const [completionRatesData, setCompletionRatesData] = useState<CompletionRatesData | null>(null);
+  const [frequencyStatusStats, setFrequencyStatusStats] = useState<FrequencyStatusStats | null>(null);
   
   // Frequency selection state
   const [selectedFrequency, setSelectedFrequency] = useState<string>('Daily');
@@ -193,6 +195,7 @@ const Dashboard = () => {
   const [isLoadingTrends, setIsLoadingTrends] = useState(false);
   const [isLoadingCompletionRates, setIsLoadingCompletionRates] = useState(false);
   const [isLoadingPeriods, setIsLoadingPeriods] = useState(false);
+  const [isLoadingFrequencyStats, setIsLoadingFrequencyStats] = useState(false);
   
   const [error, setError] = useState<string | null>(null);
 
@@ -356,6 +359,34 @@ const Dashboard = () => {
     }
   };
 
+  // Fetch frequency status stats
+  const fetchFrequencyStatusStats = async () => {
+    setIsLoadingFrequencyStats(true);
+    try {
+      const filters = {
+        branchId: selectedBranch?.id || ''
+      };
+      const data = await DashboardService.getFrequencyStatusStats(filters);
+      setFrequencyStatusStats(data);
+    } catch (err) {
+      console.error('Error fetching frequency status stats:', err);
+      toast.error('Failed to load frequency status stats');
+      setFrequencyStatusStats(null);
+    } finally {
+      setIsLoadingFrequencyStats(false);
+    }
+  };
+
+  // Global function to refresh frequency status stats (can be called from other components)
+  const refreshFrequencyStatusStats = async () => {
+    await fetchFrequencyStatusStats();
+  };
+
+  // Expose the refresh function globally
+  if (typeof window !== 'undefined') {
+    (window as any).refreshFrequencyStatusStats = refreshFrequencyStatusStats;
+  }
+
   // Fetch period data (without filters)
   const fetchPeriodData = async () => {
     setIsLoadingPeriods(true);
@@ -400,6 +431,7 @@ const Dashboard = () => {
       fetchAnalyticsData();
       fetchTrendsData();
       fetchCompletionRates();
+      fetchFrequencyStatusStats();
       fetchPeriodData();
     }
   }, [selectedBranch]);
@@ -804,6 +836,8 @@ const Dashboard = () => {
           )}
         </div>
       </div>
+
+
 
       {/* Frequency Analytics and Status Trends */}
       <div className="grid grid-cols-12 gap-x-6 mb-6">

@@ -76,6 +76,14 @@ interface FrequencyStatusResponse {
   frequencyStatus: FrequencyStatusEntry[];
 }
 
+interface FrequencyStatusStats {
+  pending: number;
+  ongoing: number;
+  delayed: number;
+  completed: number;
+  total: number;
+}
+
 const getFrequencyStatus = async (timelineId: string): Promise<FrequencyStatusResponse> => {
   const response = await fetch(`${Base_url}timelines/${timelineId}/frequency-status`, {
     method: 'GET',
@@ -162,6 +170,10 @@ const TasksPage = () => {
   const [frequencyStatusError, setFrequencyStatusError] = useState<string | null>(null);
   const [frequencyStatusTask, setFrequencyStatusTask] = useState<Timeline | null>(null);
   const [frequencyStatusUpdateLoading, setFrequencyStatusUpdateLoading] = useState<string | null>(null); // period being updated
+
+  // --- Frequency Status Stats State ---
+  const [frequencyStatusStats, setFrequencyStatusStats] = useState<FrequencyStatusStats | null>(null);
+  const [isLoadingFrequencyStats, setIsLoadingFrequencyStats] = useState(false);
 
   // Function to fetch UDIN data for a task
   const fetchUdinData = async (taskId: string) => {
@@ -312,6 +324,18 @@ const TasksPage = () => {
       );
       
       toast.success(`Status for period ${period} updated to ${newStatus}`);
+
+      // Refresh frequency status stats on current page
+      await fetchFrequencyStatusStats();
+
+      // Refresh frequency status stats on dashboard
+      if (typeof window !== 'undefined' && (window as any).refreshFrequencyStatusStats) {
+        try {
+          await (window as any).refreshFrequencyStatusStats();
+        } catch (err) {
+          console.error('Error refreshing frequency status stats:', err);
+        }
+      }
     } catch (err: any) {
       toast.error(err.message || 'Failed to update frequency status');
     } finally {
@@ -374,6 +398,25 @@ const TasksPage = () => {
     }
   };
 
+  // Fetch frequency status stats
+  const fetchFrequencyStatusStats = async () => {
+    setIsLoadingFrequencyStats(true);
+    try {
+      const response = await axios.get(`${Base_url}timelines/frequency-status-stats`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      setFrequencyStatusStats(response.data);
+    } catch (err) {
+      console.error('Error fetching frequency status stats:', err);
+      toast.error('Failed to load frequency status stats');
+      setFrequencyStatusStats(null);
+    } finally {
+      setIsLoadingFrequencyStats(false);
+    }
+  };
+
   // Function to handle status button click
   const handleStatusButtonClick = (taskId: string, currentStatus: string, taskName: string) => {
     setStatusUpdateData({
@@ -417,6 +460,18 @@ const TasksPage = () => {
       toast.success(`Task status updated from ${statusUpdateData.oldStatus} to ${statusUpdateData.newStatus}`);
       setShowStatusModal(false);
       setStatusUpdateData(null);
+
+      // Refresh frequency status stats on current page
+      await fetchFrequencyStatusStats();
+
+      // Refresh frequency status stats on dashboard
+      if (typeof window !== 'undefined' && (window as any).refreshFrequencyStatusStats) {
+        try {
+          await (window as any).refreshFrequencyStatusStats();
+        } catch (err) {
+          console.error('Error refreshing frequency status stats:', err);
+        }
+      }
     } catch (err) {
       toast.error('Failed to update task status');
       console.error('Error updating task status:', err);
@@ -444,6 +499,11 @@ const TasksPage = () => {
   useEffect(() => {
     fetchTasks(currentPage, itemsPerPage);
   }, [currentPage, sortBy, filters, itemsPerPage]);
+
+  // Fetch frequency status stats on component mount
+  useEffect(() => {
+    fetchFrequencyStatusStats();
+  }, []);
 
   // Condensed pagination helper
   function getPagination(currentPage: number, totalPages: number) {
@@ -547,6 +607,142 @@ const TasksPage = () => {
                     <div className="bg-danger/20 p-3 rounded-full">
                       <i className="ri-error-warning-line text-danger text-xl"></i>
                     </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Frequency Status Stats Cards */}
+              <div className="mb-6">
+                <div className="box">
+                  <div className="box-header justify-between">
+                    <div className="box-title">
+                      Frequency Status Statistics
+                    </div>
+                  </div>
+                  <div className="box-body">
+                    {isLoadingFrequencyStats ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {[1, 2, 3, 4].map((i) => (
+                          <div key={i} className="animate-pulse">
+                            <div className="h-24 bg-gray-200 rounded-lg"></div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : frequencyStatusStats ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {/* Pending Card */}
+                        <div className="bg-gradient-to-br from-warning/10 to-warning/5 border border-warning/20 rounded-lg p-4 hover:shadow-md transition-shadow">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center">
+                              <div className="w-3 h-3 rounded-full mr-2 bg-warning"></div>
+                              <h3 className="font-semibold text-gray-800 text-sm">Pending</h3>
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {frequencyStatusStats.total} total
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-gray-600">Count:</span>
+                              <span className="text-sm font-medium text-warning">{frequencyStatusStats.pending}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-gray-600">Percentage:</span>
+                              <span className="text-sm font-semibold text-warning">
+                                {frequencyStatusStats.total > 0 ? ((frequencyStatusStats.pending / frequencyStatusStats.total) * 100).toFixed(1) : 0}%
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Ongoing Card */}
+                        <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-lg p-4 hover:shadow-md transition-shadow">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center">
+                              <div className="w-3 h-3 rounded-full mr-2 bg-primary"></div>
+                              <h3 className="font-semibold text-gray-800 text-sm">Ongoing</h3>
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {frequencyStatusStats.total} total
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-gray-600">Count:</span>
+                              <span className="text-sm font-medium text-primary">{frequencyStatusStats.ongoing}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-gray-600">Percentage:</span>
+                              <span className="text-sm font-semibold text-primary">
+                                {frequencyStatusStats.total > 0 ? ((frequencyStatusStats.ongoing / frequencyStatusStats.total) * 100).toFixed(1) : 0}%
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Completed Card */}
+                        <div className="bg-gradient-to-br from-success/10 to-success/5 border border-success/20 rounded-lg p-4 hover:shadow-md transition-shadow">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center">
+                              <div className="w-3 h-3 rounded-full mr-2 bg-success"></div>
+                              <h3 className="font-semibold text-gray-800 text-sm">Completed</h3>
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {frequencyStatusStats.total} total
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-gray-600">Count:</span>
+                              <span className="text-sm font-medium text-success">{frequencyStatusStats.completed}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-gray-600">Percentage:</span>
+                              <span className="text-sm font-semibold text-success">
+                                {frequencyStatusStats.total > 0 ? ((frequencyStatusStats.completed / frequencyStatusStats.total) * 100).toFixed(1) : 0}%
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Delayed Card */}
+                        <div className="bg-gradient-to-br from-danger/10 to-danger/5 border border-danger/20 rounded-lg p-4 hover:shadow-md transition-shadow">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center">
+                              <div className="w-3 h-3 rounded-full mr-2 bg-danger"></div>
+                              <h3 className="font-semibold text-gray-800 text-sm">Delayed</h3>
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {frequencyStatusStats.total} total
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-gray-600">Count:</span>
+                              <span className="text-sm font-medium text-danger">{frequencyStatusStats.delayed}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-gray-600">Percentage:</span>
+                              <span className="text-sm font-semibold text-danger">
+                                {frequencyStatusStats.total > 0 ? ((frequencyStatusStats.delayed / frequencyStatusStats.total) * 100).toFixed(1) : 0}%
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center mx-auto mb-4">
+                          <i className="ri-bar-chart-line text-2xl text-gray-400"></i>
+                        </div>
+                        <h3 className="text-lg font-medium text-gray-600 mb-2">No Frequency Status Data</h3>
+                        <p className="text-sm text-gray-500">Frequency status statistics are not available.</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

@@ -55,6 +55,14 @@ export interface CompletionRatesData {
   onTimeRate: number;
 }
 
+export interface FrequencyStatusStats {
+  pending: number;
+  ongoing: number;
+  delayed: number;
+  completed: number;
+  total: number;
+}
+
 export interface DashboardFilters {
   startDate?: string;
   endDate?: string;
@@ -148,6 +156,20 @@ class DashboardService {
       return response.data.overallStats;
     } catch (error) {
       console.error('Error fetching timeline completion rates:', error);
+      throw error;
+    }
+  }
+
+  // Get frequency status stats
+  async getFrequencyStatusStats(filters: DashboardFilters): Promise<FrequencyStatusStats> {
+    try {
+      const response = await axios.get(`${Base_url}timelines/frequency-status-stats`, {
+        headers: this.getHeaders(),
+        params: filters
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching frequency status stats:', error);
       throw error;
     }
   }
