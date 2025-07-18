@@ -60,6 +60,62 @@ interface ApiResponse {
   totalResults: number;
 }
 
+// --- Frequency Status Types & API Helpers ---
+
+interface FrequencyStatusEntry {
+  period: string;
+  status: 'pending' | 'completed' | 'delayed' | 'ongoing';
+  completedAt: string | null;
+  notes: string;
+}
+
+interface FrequencyStatusResponse {
+  timelineId: string;
+  frequency: string;
+  overallStatus: string;
+  frequencyStatus: FrequencyStatusEntry[];
+}
+
+const getFrequencyStatus = async (timelineId: string): Promise<FrequencyStatusResponse> => {
+  const response = await fetch(`${Base_url}timelines/${timelineId}/frequency-status`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  if (!response.ok) throw new Error('Failed to fetch frequency status');
+  return response.json();
+};
+
+const updateFrequencyStatus = async (
+  timelineId: string,
+  period: string,
+  statusData: { status: string; notes?: string }
+) => {
+  // Always send notes as string - use default if empty
+  const cleanStatusData: { status: string; notes: string } = { 
+    status: statusData.status,
+    notes: statusData.notes && statusData.notes.trim() !== '' 
+      ? statusData.notes.trim() 
+      : `Status updated to ${statusData.status} on ${new Date().toLocaleDateString()}`
+  };
+  
+  // Debug: Log what we're sending
+  console.log('PATCH Request Body:', JSON.stringify(cleanStatusData, null, 2));
+  
+  const response = await fetch(`${Base_url}timelines/${timelineId}/frequency-status/${period}`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(cleanStatusData),
+  });
+  if (!response.ok) throw new Error('Failed to update frequency status');
+  return response.json();
+};
+
 const TasksPage = () => {
   const searchParams = useSearchParams();
   const status = searchParams.get('status');
@@ -98,6 +154,14 @@ const TasksPage = () => {
   const [udinEntries, setUdinEntries] = useState<UdinEntry[]>([]);
   const [isLoadingUdin, setIsLoadingUdin] = useState(false);
   const [isSavingUdin, setIsSavingUdin] = useState(false);
+
+  // --- Frequency Status Modal State ---
+  const [showFrequencyModal, setShowFrequencyModal] = useState(false);
+  const [frequencyStatusLoading, setFrequencyStatusLoading] = useState(false);
+  const [frequencyStatusData, setFrequencyStatusData] = useState<FrequencyStatusResponse | null>(null);
+  const [frequencyStatusError, setFrequencyStatusError] = useState<string | null>(null);
+  const [frequencyStatusTask, setFrequencyStatusTask] = useState<Timeline | null>(null);
+  const [frequencyStatusUpdateLoading, setFrequencyStatusUpdateLoading] = useState<string | null>(null); // period being updated
 
   // Function to fetch UDIN data for a task
   const fetchUdinData = async (taskId: string) => {
@@ -197,11 +261,61 @@ const TasksPage = () => {
       setShowUdinModal(false);
       setSelectedTaskForUdin(null);
       setUdinEntries([]);
+      
+      // Refresh the table data to ensure consistency
+      fetchTasks(currentPage, itemsPerPage);
     } catch (err) {
       toast.error('Failed to update UDIN data');
       console.error('Error updating UDIN data:', err);
     } finally {
       setIsSavingUdin(false);
+    }
+  };
+
+  // Open frequency status modal and load data
+  const handleFrequencyStatusClick = async (task: Timeline) => {
+    setFrequencyStatusTask(task);
+    setShowFrequencyModal(true);
+    setFrequencyStatusLoading(true);
+    setFrequencyStatusError(null);
+    try {
+      const data = await getFrequencyStatus(task.id);
+      setFrequencyStatusData(data);
+    } catch (err: any) {
+      setFrequencyStatusError(err.message || 'Failed to load frequency status');
+      setFrequencyStatusData(null);
+    } finally {
+      setFrequencyStatusLoading(false);
+    }
+  };
+
+  // Update frequency status for a period
+  const handleFrequencyStatusUpdate = async (period: string, newStatus: string, notes: string = '') => {
+    if (!frequencyStatusTask) return;
+    setFrequencyStatusUpdateLoading(period);
+    try {
+      // Only include notes if not empty
+      const statusData: { status: string; notes?: string } = { status: newStatus };
+      if (notes && notes.trim() !== '') statusData.notes = notes;
+      await updateFrequencyStatus(frequencyStatusTask.id, period, statusData);
+      // Reload frequency status
+      const data = await getFrequencyStatus(frequencyStatusTask.id);
+      setFrequencyStatusData(data);
+      
+      // Update the task in local state with new overall status
+      setTasks(prevTasks => 
+        prevTasks.map(task => 
+          task.id === frequencyStatusTask.id 
+            ? { ...task, status: data.overallStatus as 'pending' | 'completed' | 'ongoing' | 'delayed' }
+            : task
+        )
+      );
+      
+      toast.success(`Status for period ${period} updated to ${newStatus}`);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update frequency status');
+    } finally {
+      setFrequencyStatusUpdateLoading(null);
     }
   };
 
@@ -610,11 +724,8 @@ const TasksPage = () => {
                           <td>
                             <button
                               className={`badge border-0 cursor-pointer ${getStatusStyling(timeline.status)}`}
-                              onClick={() => handleStatusButtonClick(
-                                timeline.id,
-                                timeline.status,
-                                timeline.activity.name
-                              )}
+                              onClick={() => handleFrequencyStatusClick(timeline)}
+                              title="View & update frequency status"
                             >
                               {timeline.status.charAt(0).toUpperCase() + timeline.status.slice(1)}
                             </button>
@@ -1024,6 +1135,185 @@ const TasksPage = () => {
                 ) : (
                   'Save Changes'
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Frequency Status Modal */}
+      {showFrequencyModal && frequencyStatusTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b">
+              <div className="flex-1 mr-6">
+                <h2 className="text-xl font-bold text-gray-800 truncate">
+                  Frequency Status - {frequencyStatusTask.activity.name}
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Client: {frequencyStatusTask.client.name} | Frequency: {frequencyStatusTask.frequency}
+                </p>
+              </div>
+              <button 
+                className="text-gray-500 hover:text-gray-700 flex-shrink-0 p-1"
+                onClick={() => {
+                  setShowFrequencyModal(false);
+                  setFrequencyStatusTask(null);
+                  setFrequencyStatusData(null);
+                  setFrequencyStatusError(null);
+                  // Refresh table data to ensure consistency after modal updates
+                  fetchTasks(currentPage, itemsPerPage);
+                }}
+              >
+                <i className="ri-close-line text-2xl"></i>
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6">
+              {frequencyStatusLoading ? (
+                <div className="flex justify-center items-center h-32">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : frequencyStatusError ? (
+                <div className="text-center py-8 text-red-500">
+                  <i className="ri-error-warning-line text-4xl mb-4"></i>
+                  <p className="text-lg font-medium mb-2">Error Loading Frequency Status</p>
+                  <p className="text-sm mb-4">{frequencyStatusError}</p>
+                  <button 
+                    className="ti-btn ti-btn-primary"
+                    onClick={() => {
+                      setShowFrequencyModal(false);
+                      setFrequencyStatusTask(null);
+                      setFrequencyStatusData(null);
+                      setFrequencyStatusError(null);
+                    }}
+                  >
+                    Close
+                  </button>
+                </div>
+              ) : frequencyStatusData && frequencyStatusData.frequencyStatus.length > 0 ? (
+                <div className="space-y-6">
+                  {/* Overall Status Summary */}
+                  <div className="bg-gray-50 rounded-lg p-4 border">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-medium text-gray-700">Overall Status</h3>
+                        <p className="text-sm text-gray-500">Computed from individual periods</p>
+                      </div>
+                      <span className={`badge text-sm px-3 py-1 ${getStatusStyling(frequencyStatusData.overallStatus)}`}>
+                        {frequencyStatusData.overallStatus.charAt(0).toUpperCase() + frequencyStatusData.overallStatus.slice(1)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Period Status List */}
+                  <div className="space-y-4">
+                    <h3 className="font-medium text-gray-700 border-b pb-2">Period Status</h3>
+                    {frequencyStatusData.frequencyStatus.map((entry, index) => (
+                      <div key={index} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
+                        <div className="flex items-center justify-between mb-4">
+                          <div>
+                            <h4 className="font-medium text-gray-700">Period: {entry.period}</h4>
+                            {entry.completedAt && (
+                              <p className="text-sm text-gray-500">
+                                Completed: {new Date(entry.completedAt).toLocaleDateString()}
+                              </p>
+                            )}
+                          </div>
+                          <span className={`badge ${getStatusStyling(entry.status)}`}>
+                            {entry.status.charAt(0).toUpperCase() + entry.status.slice(1)}
+                          </span>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-end">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Status
+                            </label>
+                            <select
+                              className="form-select w-full"
+                              value={entry.status}
+                              onChange={e => handleFrequencyStatusUpdate(entry.period, e.target.value, entry.notes)}
+                              disabled={frequencyStatusUpdateLoading === entry.period}
+                            >
+                              <option value="pending">Pending</option>
+                              <option value="ongoing">Ongoing</option>
+                              <option value="completed">Completed</option>
+                              <option value="delayed">Delayed</option>
+                            </select>
+                          </div>
+                          
+                          <div className="lg:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Notes <span className="text-gray-400">(optional)</span>
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                className="form-control flex-1"
+                                placeholder="Add notes about this period..."
+                                value={entry.notes}
+                                onChange={e => {
+                                  // Update notes locally for immediate feedback
+                                  setFrequencyStatusData(prev => prev ? {
+                                    ...prev,
+                                    frequencyStatus: prev.frequencyStatus.map((fs, i) => i === index ? { ...fs, notes: e.target.value } : fs)
+                                  } : prev);
+                                }}
+                                disabled={frequencyStatusUpdateLoading === entry.period}
+                              />
+                              <button
+                                className="ti-btn ti-btn-primary"
+                                onClick={() => handleFrequencyStatusUpdate(entry.period, entry.status, entry.notes)}
+                                disabled={frequencyStatusUpdateLoading === entry.period}
+                              >
+                                {frequencyStatusUpdateLoading === entry.period ? (
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                ) : (
+                                  <>
+                                    <i className="ri-save-line mr-1"></i>
+                                    Update
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
+                    <i className="ri-file-list-line text-2xl text-primary"></i>
+                  </div>
+                  <h3 className="text-lg font-medium mb-2">No Frequency Status Data</h3>
+                  <p className="text-gray-500 mb-4">
+                    This timeline doesn't have frequency status data yet. 
+                    {frequencyStatusTask.startDate && frequencyStatusTask.endDate 
+                      ? " Contact your administrator to initialize frequency status."
+                      : " Start and end dates are required for frequency status tracking."
+                    }
+                  </p>
+                </div>
+              )}
+            </div>
+            
+            <div className="flex justify-end gap-3 p-6 border-t">
+              <button
+                className="ti-btn ti-btn-secondary"
+                onClick={() => {
+                  setShowFrequencyModal(false);
+                  setFrequencyStatusTask(null);
+                  setFrequencyStatusData(null);
+                  setFrequencyStatusError(null);
+                  // Refresh table data to ensure consistency after modal updates
+                  fetchTasks(currentPage, itemsPerPage);
+                }}
+                disabled={frequencyStatusLoading}
+              >
+                Close
               </button>
             </div>
           </div>
