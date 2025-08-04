@@ -11,6 +11,7 @@ export interface NavigationPermissions {
   teams: boolean;
   timelines: boolean;
   analytics: boolean;
+  fileManager: boolean;
 }
 
 export interface UserRole {
@@ -42,7 +43,7 @@ export const validateNavigationPermissions = (permissions: any): permissions is 
   }
 
   const requiredSettings = ['activities', 'branches', 'users', 'roles'];
-  const requiredMain = ['dashboard', 'clients', 'groups', 'teams', 'timelines', 'analytics'];
+  const requiredMain = ['dashboard', 'clients', 'groups', 'teams', 'timelines', 'analytics', 'fileManager'];
 
   // Check if settings object exists and has all required properties
   if (!permissions.settings || typeof permissions.settings !== 'object') {
@@ -284,6 +285,8 @@ export const filterMenuItems = (menuItems: any[]): any[] => {
           return hasPermission('timelines');
         case '/analytics':
           return hasPermission('analytics');
+        case '/filemanager':
+          return hasPermission('fileManager');
         default:
           return true;
       }

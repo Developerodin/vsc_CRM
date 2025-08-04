@@ -46,6 +46,8 @@ const TeamsIcon = < i className='bx bx-share-alt side-menu__icon'></i>;
 
 const TimeLineIcon = <i className="bx bx-calendar-event side-menu__icon"></i>;
 
+const FileManagerIcon = <i className="bx bx-folder side-menu__icon"></i>;
+
 const badge = (
   <span className="badge !bg-warning/10 !text-warning !py-[0.25rem] !px-[0.45rem] !text-[0.75em] ms-1">
     12
@@ -164,6 +166,15 @@ export const MenuItems: any = [
     path: "/analytics",
   },
 
+  {
+    icon: FileManagerIcon,
+    title: "File Manager",
+    type: "link",
+    active: false,
+    selected: false,
+    dirchange: false,
+    path: "/filemanager",
+  },
 
   {
     icon: NestedmenuIcon,
