@@ -51,7 +51,7 @@ const Filemanager = () => {
     const [newFolderDescription, setNewFolderDescription] = useState('');
     const [fileSearch, setFileSearch] = useState('');
     const [filePage, setFilePage] = useState(1);
-    const [fileRowsPerPage, setFileRowsPerPage] = useState(10);
+    const [fileRowsPerPage, setFileRowsPerPage] = useState(100); // Match API limit
     const [expandedFolders, setExpandedFolders] = useState<string[]>([]);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [contextMenu, setContextMenu] = useState<{
@@ -149,7 +149,8 @@ const Filemanager = () => {
     const handleFolderClick = (folderId: string) => {
         // Auto-expand parent folders to show the path to the selected folder
         expandParentFolders(folderId, folderTree);
-        loadFolderContents(folderId);
+        loadFolderContents(folderId, 1);
+        setFilePage(1);
     };
 
     // Handle item clicks (both files and folders)
@@ -314,7 +315,8 @@ const Filemanager = () => {
 
     const totalFileResults = pagination?.totalResults || filteredFiles.length;
     const totalFilePages = pagination?.totalPages || Math.ceil(totalFileResults / fileRowsPerPage);
-    const pagedFiles = filteredFiles.slice((filePage - 1) * fileRowsPerPage, filePage * fileRowsPerPage);
+    // Use server-side pagination data instead of client-side slicing
+    const pagedFiles = filteredFiles;
 
     const handleFileSelectAll = () => {
         const currentPageItemIds = pagedFiles.map(item => item.id);
@@ -453,8 +455,8 @@ const Filemanager = () => {
         setFilePage(1);
         if (query.trim()) {
             searchFiles(query);
-        } else if (currentFolder) {
-            loadFolderContents(currentFolder.id);
+        } else         if (currentFolder) {
+            loadFolderContents(currentFolder.id, 1);
         } else {
             loadDashboard();
         }
@@ -556,7 +558,7 @@ const Filemanager = () => {
             };
             const firstFolderId = findFirstFolder(folderTree);
             if (firstFolderId) {
-                loadFolderContents(firstFolderId);
+                loadFolderContents(firstFolderId, 1);
             }
         }
         // No cleanup needed
@@ -579,9 +581,9 @@ const Filemanager = () => {
                 </div>
             )}
 
-            <div className="file-manager-container p-2 gap-1 sm:!flex !block text-defaulttextcolor text-defaultsize">
+            <div className="file-manager-container p-2 gap-1 sm:!flex !block text-defaulttextcolor text-defaultsize h-[calc(100vh-8rem)]">
                 {/* Sidebar: Folders vertical card */}
-                <div className="bg-white dark:bg-bodybg shadow-md p-2 w-full max-w-xs mr-4 h-[calc(100vh-5.5rem)] overflow-y-auto rounded-lg">
+                <div className="bg-white dark:bg-bodybg shadow-md p-2 w-full max-w-xs mr-4 h-full overflow-y-auto rounded-lg">
                     {/* Folder tree header */}
                     <div className="flex items-center justify-between border-b border-defaultborder dark:border-defaultborder/10 px-5 py-2 bg-light/60 rounded-t-lg mb-2">
                         <div className="flex items-center gap-3">
@@ -665,7 +667,7 @@ const Filemanager = () => {
                 </div>
 
                 {/* Main area: Show contents of selected folder */}
-                <div className="flex-1 bg-white dark:bg-bodybg shadow-md p-0 min-h-[10rem] rounded-lg flex flex-col">
+                <div className="flex-1 bg-white dark:bg-bodybg shadow-md p-0 min-h-[10rem] rounded-lg flex flex-col h-full overflow-hidden">
                     {currentFolder ? (
                         <>
                             {/* Folder name header and upload button */}
@@ -713,7 +715,7 @@ const Filemanager = () => {
                             </div>
 
                             {/* Search, view mode, and controls */}
-                            <div className="flex flex-wrap justify-between items-center mb-4 gap-2 px-6 pt-4">
+                            <div className="flex flex-wrap justify-between items-center mb-4 gap-2 px-6 pt-4 flex-shrink-0">
                                 <div className="flex items-center gap-4">
                                     {/* View Mode Toggle */}
                                     <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
@@ -755,7 +757,7 @@ const Filemanager = () => {
                             </div>
 
                                                         {/* File/Folder Display */}
-                            <div className="px-6">
+                            <div className="px-6 flex-1 overflow-y-auto">
                                 {loading ? (
                                     <div className="flex items-center justify-center py-16">
                                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -847,16 +849,22 @@ const Filemanager = () => {
 
                             {/* Pagination */}
                             {totalFilePages > 1 && (
-                                <div className="flex justify-between items-center mt-4 px-6 pb-4">
+                                <div className="flex justify-between items-center mt-4 px-6 pb-4 flex-shrink-0">
                                     <div className="text-sm text-gray-500">
-                                        Showing {totalFileResults === 0 ? 0 : (filePage - 1) * fileRowsPerPage + 1} to {totalFileResults === 0 ? 0 : Math.min(filePage * fileRowsPerPage, totalFileResults)} of {totalFileResults} entries
+                                        Showing {totalFileResults === 0 ? 0 : (filePage - 1) * 100 + 1} to {totalFileResults === 0 ? 0 : Math.min(filePage * 100, totalFileResults)} of {totalFileResults} entries
                                     </div>
                                     <nav aria-label="Page navigation" className="">
                                         <ul className="flex flex-wrap items-center">
                                             <li className={`page-item ${filePage === 1 ? 'disabled' : ''}`}>
                                                 <button
                                                     className="page-link py-2 px-3 ml-0 leading-tight text-gray-500 bg-white rounded-l-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                                                    onClick={() => setFilePage(prev => Math.max(prev - 1, 1))}
+                                                    onClick={() => {
+                                                        const newPage = Math.max(filePage - 1, 1);
+                                                        setFilePage(newPage);
+                                                        if (currentFolder) {
+                                                            loadFolderContents(currentFolder.id, newPage);
+                                                        }
+                                                    }}
                                                     disabled={filePage === 1}
                                                 >
                                                     Previous
@@ -866,7 +874,12 @@ const Filemanager = () => {
                                                 <li key={page} className="page-item">
                                                     <button
                                                         className={`page-link py-2 px-3 leading-tight border border-gray-300 ${filePage === page ? 'bg-primary text-white hover:bg-primary-dark' : 'bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-700'}`}
-                                                        onClick={() => setFilePage(page)}
+                                                        onClick={() => {
+                                                            setFilePage(page);
+                                                            if (currentFolder) {
+                                                                loadFolderContents(currentFolder.id, page);
+                                                            }
+                                                        }}
                                                     >
                                                         {page}
                                                     </button>
@@ -875,7 +888,13 @@ const Filemanager = () => {
                                             <li className={`page-item ${filePage === totalFilePages ? 'disabled' : ''}`}>
                                                 <button
                                                     className="page-link py-2 px-3 leading-tight text-gray-500 bg-white rounded-r-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                                                    onClick={() => setFilePage(prev => Math.min(prev + 1, totalFilePages))}
+                                                    onClick={() => {
+                                                        const newPage = Math.min(filePage + 1, totalFilePages);
+                                                        setFilePage(newPage);
+                                                        if (currentFolder) {
+                                                            loadFolderContents(currentFolder.id, newPage);
+                                                        }
+                                                    }}
                                                     disabled={filePage === totalFilePages}
                                                 >
                                                     Next

@@ -67,14 +67,14 @@ export const useFileManager = () => {
   }, []);
 
   // Load folder contents
-  const loadFolderContents = useCallback(async (folderId: string) => {
+  const loadFolderContents = useCallback(async (folderId: string, page: number = 1) => {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
       
       // Get folder details and contents
       const [folder, contentsResponse] = await Promise.all([
         fileManagerService.getFolder(folderId),
-        fileManagerService.getFolderContents(folderId, { limit: 100 })
+        fileManagerService.getFolderContents(folderId, { limit: 100, page })
       ]);
 
       console.log('Loaded folder contents:', { folder, contentsResponse });
@@ -119,7 +119,7 @@ export const useFileManager = () => {
 
       // Refresh current folder contents if we're in a folder
       if (state.currentFolder) {
-        await loadFolderContents(state.currentFolder.id);
+        await loadFolderContents(state.currentFolder.id, 1);
       } else {
         // Refresh dashboard if we're at root
         await loadDashboard();
@@ -169,7 +169,7 @@ export const useFileManager = () => {
 
       // Refresh current folder contents
       if (state.currentFolder) {
-        await loadFolderContents(state.currentFolder.id);
+        await loadFolderContents(state.currentFolder.id, 1);
       } else {
         await loadDashboard();
       }
@@ -230,7 +230,7 @@ export const useFileManager = () => {
 
       // Refresh current folder contents
       if (state.currentFolder) {
-        await loadFolderContents(state.currentFolder.id);
+        await loadFolderContents(state.currentFolder.id, 1);
       } else {
         await loadDashboard();
       }
@@ -258,7 +258,7 @@ export const useFileManager = () => {
 
       // Refresh current folder contents
       if (state.currentFolder) {
-        await loadFolderContents(state.currentFolder.id);
+        await loadFolderContents(state.currentFolder.id, 1);
       } else {
         await loadDashboard();
       }
@@ -286,7 +286,7 @@ export const useFileManager = () => {
 
       // Refresh current folder contents
       if (state.currentFolder) {
-        await loadFolderContents(state.currentFolder.id);
+        await loadFolderContents(state.currentFolder.id, 1);
       } else {
         await loadDashboard();
       }
@@ -350,7 +350,7 @@ export const useFileManager = () => {
 
       // Refresh current folder contents
       if (state.currentFolder) {
-        await loadFolderContents(state.currentFolder.id);
+        await loadFolderContents(state.currentFolder.id, 1);
       }
 
       setState(prev => ({ ...prev, loading: false }));
@@ -376,7 +376,7 @@ export const useFileManager = () => {
 
       // Refresh current folder contents
       if (state.currentFolder) {
-        await loadFolderContents(state.currentFolder.id);
+        await loadFolderContents(state.currentFolder.id, 1);
       }
 
       setState(prev => ({ ...prev, loading: false }));
