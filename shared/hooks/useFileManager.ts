@@ -308,11 +308,11 @@ export const useFileManager = () => {
   }, [state.currentFolder, loadFolderContents, loadDashboard]);
 
   // Search files
-  const searchFiles = useCallback(async (query: string, type?: 'folder' | 'file') => {
+  const searchFiles = useCallback(async (query: string, type?: 'folder' | 'file', page: number = 1) => {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
       
-      const results: PaginatedResponse<Folder | FileItem> = await fileManagerService.searchFiles(query, { type, limit: 50 });
+      const results: PaginatedResponse<Folder | FileItem> = await fileManagerService.searchFiles(query, { type, limit: 50, page });
       
       console.log('Search results:', results);
       

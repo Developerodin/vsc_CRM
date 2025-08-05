@@ -454,8 +454,8 @@ const Filemanager = () => {
         setFileSearch(query);
         setFilePage(1);
         if (query.trim()) {
-            searchFiles(query);
-        } else         if (currentFolder) {
+            searchFiles(query, undefined, 1);
+        } else if (currentFolder) {
             loadFolderContents(currentFolder.id, 1);
         } else {
             loadDashboard();
@@ -861,7 +861,9 @@ const Filemanager = () => {
                                                     onClick={() => {
                                                         const newPage = Math.max(filePage - 1, 1);
                                                         setFilePage(newPage);
-                                                        if (currentFolder) {
+                                                        if (fileSearch.trim()) {
+                                                            searchFiles(fileSearch, undefined, newPage);
+                                                        } else if (currentFolder) {
                                                             loadFolderContents(currentFolder.id, newPage);
                                                         }
                                                     }}
@@ -876,7 +878,9 @@ const Filemanager = () => {
                                                         className={`page-link py-2 px-3 leading-tight border border-gray-300 ${filePage === page ? 'bg-primary text-white hover:bg-primary-dark' : 'bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-700'}`}
                                                         onClick={() => {
                                                             setFilePage(page);
-                                                            if (currentFolder) {
+                                                            if (fileSearch.trim()) {
+                                                                searchFiles(fileSearch, undefined, page);
+                                                            } else if (currentFolder) {
                                                                 loadFolderContents(currentFolder.id, page);
                                                             }
                                                         }}
@@ -891,7 +895,9 @@ const Filemanager = () => {
                                                     onClick={() => {
                                                         const newPage = Math.min(filePage + 1, totalFilePages);
                                                         setFilePage(newPage);
-                                                        if (currentFolder) {
+                                                        if (fileSearch.trim()) {
+                                                            searchFiles(fileSearch, undefined, newPage);
+                                                        } else if (currentFolder) {
                                                             loadFolderContents(currentFolder.id, newPage);
                                                         }
                                                     }}
