@@ -222,7 +222,7 @@ export const useFileManager = () => {
         try {
           await fileManagerService.deleteFileFromS3(fileKey);
         } catch (s3Error) {
-          console.warn('Failed to delete file from S3:', s3Error);
+          
         }
       }
 

@@ -1,5 +1,4 @@
 import { Base_url } from '@/app/api/config/BaseUrl';
-import Cookies from 'js-cookie';
 
 // User interface for createdBy/uploadedBy fields
 export interface User {
@@ -104,32 +103,22 @@ export interface DeleteMultipleResponse {
   totalDeleted: number;
 }
 
-// Helper function to get access token from cookies
+// Helper function to get access token from localStorage
 const getAccessToken = (): string | null => {
-  if (typeof document === 'undefined') return null; // Server-side check
+  if (typeof window === 'undefined') return null; // Server-side check
   
   try {
-    // First try js-cookie library
-    const tokenFromJsCookie = Cookies.get('accessToken');
-    if (tokenFromJsCookie) {
-      console.log('Found access token via js-cookie');
-      return tokenFromJsCookie;
+    // Get token from localStorage (as used in login)
+    const token = localStorage.getItem('token');
+    if (token) {
+      console.log('Found access token in localStorage');
+      return token;
     }
-
-    // Fallback to manual cookie parsing
-    const cookies = document.cookie.split(';');
-    for (const cookie of cookies) {
-      const [name, value] = cookie.trim().split('=');
-      if (name === 'accessToken') {
-        const token = decodeURIComponent(value);
-        console.log('Found access token via manual parsing:', token ? 'Token exists' : 'Token is empty');
-        return token;
-      }
-    }
-    console.log('No accessToken cookie found. Available cookies:', document.cookie);
+    
+    console.log('No access token found in localStorage');
     return null;
   } catch (error) {
-    console.error('Error reading access token from cookies:', error);
+    console.error('Error reading access token from localStorage:', error);
     return null;
   }
 };
@@ -161,7 +150,27 @@ class FileManagerService {
         throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
       }
 
-      return await response.json();
+      // Check if response has content before trying to parse JSON
+      const contentType = response.headers.get('content-type');
+      const contentLength = response.headers.get('content-length');
+      
+      // If no content or empty response, return empty object for DELETE operations
+      if (contentLength === '0' || !contentType?.includes('application/json')) {
+        if (options?.method === 'DELETE') {
+          return {} as T;
+        }
+      }
+
+      // Try to parse JSON, but handle empty responses gracefully
+      try {
+        return await response.json();
+      } catch (jsonError) {
+        // If JSON parsing fails but response was successful, return empty object for DELETE
+        if (options?.method === 'DELETE' && response.ok) {
+          return {} as T;
+        }
+        throw new Error(`Failed to parse JSON response: ${jsonError}`);
+      }
     } catch (error) {
       console.error('File Manager API Error:', error);
       throw error;
@@ -190,7 +199,27 @@ class FileManagerService {
         throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
       }
 
-      return await response.json();
+      // Check if response has content before trying to parse JSON
+      const contentType = response.headers.get('content-type');
+      const contentLength = response.headers.get('content-length');
+      
+      // If no content or empty response, return empty object for DELETE operations
+      if (contentLength === '0' || !contentType?.includes('application/json')) {
+        if (options?.method === 'DELETE') {
+          return {} as T;
+        }
+      }
+
+      // Try to parse JSON, but handle empty responses gracefully
+      try {
+        return await response.json();
+      } catch (jsonError) {
+        // If JSON parsing fails but response was successful, return empty object for DELETE
+        if (options?.method === 'DELETE' && response.ok) {
+          return {} as T;
+        }
+        throw new Error(`Failed to parse JSON response: ${jsonError}`);
+      }
     } catch (error) {
       console.error('Common API Error:', error);
       throw error;
