@@ -166,8 +166,8 @@ const Filemanager = () => {
     // Handle file clicks
     const handleFileClick = (fileItem: FileItem) => {
         if (fileItem.file) {
-            // Open file in new tab
-            window.open(fileItem.file.fileUrl, '_blank');
+            // Download file instead of opening in new tab
+            handleDownloadFile(fileItem);
         }
     };
 
@@ -482,18 +482,49 @@ const Filemanager = () => {
         XLSX.writeFile(wb, 'exported_file_paths.xlsx');
     };
 
+    // Enhanced download function for single file
+    const handleDownloadFile = (fileItem: FileItem) => {
+        if (!fileItem.file?.fileUrl || !fileItem.file?.fileName) {
+            console.error('File URL or name is missing');
+            return;
+        }
+
+        try {
+            // Create a more robust download approach
+            const link = document.createElement('a');
+            link.style.display = 'none'; // Hide the link
+            link.download = fileItem.file.fileName;
+            link.rel = 'noopener noreferrer';
+            
+            // Always add download parameters to force download behavior
+            const url = new URL(fileItem.file.fileUrl);
+            url.searchParams.set('download', 'true');
+            url.searchParams.set('t', Date.now().toString());
+            url.searchParams.set('filename', encodeURIComponent(fileItem.file.fileName));
+            link.href = url.toString();
+            
+            // Set additional attributes to force download
+            link.setAttribute('download', fileItem.file.fileName);
+            link.setAttribute('target', '_self'); // Force same window behavior
+            
+            // Add to DOM, click, and remove
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            console.log(`Downloading: ${fileItem.file.fileName} from ${link.href}`);
+        } catch (error) {
+            console.error('Failed to download file:', error);
+        }
+    };
+
     const handleDownloadSelected = () => {
         const selectedFiles = filteredFiles.filter(item => selectedIds.includes(item.id) && item.type === 'file');
         if (selectedFiles.length === 0) return;
+        
         selectedFiles.forEach(item => {
-            const file = (item as any).file;
-            if (file && file.fileUrl && file.fileName) {
-                const link = document.createElement('a');
-                link.href = file.fileUrl;
-                link.download = file.fileName;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+            if (item.type === 'file') {
+                handleDownloadFile(item as FileItem);
             }
         });
     };
@@ -1061,11 +1092,8 @@ const Filemanager = () => {
                             <button
                                 className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
                                 onClick={() => {
-                                    if (contextMenu.item?.type === 'file' && contextMenu.item.file) {
-                                        const link = document.createElement('a');
-                                        link.href = contextMenu.item.file.fileUrl;
-                                        link.download = contextMenu.item.file.fileName;
-                                        link.click();
+                                    if (contextMenu.item?.type === 'file') {
+                                        handleDownloadFile(contextMenu.item as FileItem);
                                     }
                                     closeContextMenu();
                                 }}
@@ -1131,11 +1159,8 @@ const Filemanager = () => {
                                 <button
                                     className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
                                     onClick={() => {
-                                        if (filePreviewModal.file?.file) {
-                                            const link = document.createElement('a');
-                                            link.href = filePreviewModal.file.file.fileUrl;
-                                            link.download = filePreviewModal.file.file.fileName;
-                                            link.click();
+                                        if (filePreviewModal.file) {
+                                            handleDownloadFile(filePreviewModal.file);
                                         }
                                     }}
                                     title="Download"
@@ -1185,12 +1210,12 @@ const Filemanager = () => {
                                         className="ti-btn ti-btn-primary"
                                         onClick={() => {
                                             if (filePreviewModal.file?.file) {
-                                                window.open(filePreviewModal.file.file.fileUrl, '_blank');
+                                                handleDownloadFile(filePreviewModal.file);
                                             }
                                         }}
                                     >
-                                        <i className="ri-external-link-line mr-2"></i>
-                                        Open File
+                                        <i className="ri-download-2-line mr-2"></i>
+                                        Download File
                                     </button>
                                 </div>
                             )}
