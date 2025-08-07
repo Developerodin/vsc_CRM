@@ -93,6 +93,16 @@ const TeamsPage = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showSkillsModal, setShowSkillsModal] = useState(false);
   const [selectedMemberSkills, setSelectedMemberSkills] = useState<Activity[]>([]);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [selectedTeamMember, setSelectedTeamMember] = useState<TeamMember | null>(null);
+  const [emailForm, setEmailForm] = useState({
+    taskTitle: '',
+    taskDescription: '',
+    assignedBy: 'Super Admin',
+    dueDate: '',
+    priority: 'medium'
+  });
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
 
   // Fetch teams from API
   const fetchTeams = async (page = 1, limit = itemsPerPage) => {
@@ -474,6 +484,59 @@ const TeamsPage = () => {
     setShowSkillsModal(true);
   };
 
+  const handleSendEmail = (teamMember: TeamMember) => {
+    setSelectedTeamMember(teamMember);
+    setEmailForm({
+      taskTitle: '',
+      taskDescription: '',
+      assignedBy: 'Super Admin',
+      dueDate: '',
+      priority: 'medium'
+    });
+    setShowEmailModal(true);
+  };
+
+  const handleEmailSubmit = async () => {
+    if (!selectedTeamMember || !emailForm.taskTitle || !emailForm.taskDescription || !emailForm.dueDate) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    setIsSendingEmail(true);
+    try {
+      const emailData = {
+        to: selectedTeamMember.email,
+        taskTitle: emailForm.taskTitle,
+        taskDescription: emailForm.taskDescription,
+        assignedBy: emailForm.assignedBy,
+        dueDate: emailForm.dueDate,
+        priority: emailForm.priority
+      };
+
+      await axios.post(`${Base_url}common-email/task-assignment`, emailData, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      toast.success('Task assignment email sent successfully');
+      setShowEmailModal(false);
+      setSelectedTeamMember(null);
+      setEmailForm({
+        taskTitle: '',
+        taskDescription: '',
+        assignedBy: 'Super Admin',
+        dueDate: '',
+        priority: 'medium'
+      });
+    } catch (error) {
+      console.error('Error sending email:', error);
+      toast.error('Failed to send email');
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
   return (
     <div className="main-content">
       <Toaster position="top-right" />
@@ -698,12 +761,21 @@ const TeamsPage = () => {
                                 <Link
                                   href={`/teams/edit/${teamMember.id}`}
                                   className="ti-btn ti-btn-primary ti-btn-sm"
+                                  title="Edit Team Member"
                                 >
                                   <i className="ri-edit-line"></i>
                                 </Link>
                                 <button
+                                  className="ti-btn ti-btn-info ti-btn-sm"
+                                  onClick={() => handleSendEmail(teamMember)}
+                                  title="Send Email"
+                                >
+                                  <i className="ri-mail-line"></i>
+                                </button>
+                                <button
                                   className="ti-btn ti-btn-danger ti-btn-sm"
                                   onClick={() => handleDelete(teamMember.id)}
+                                  title="Delete Team Member"
                                 >
                                   <i className="ri-delete-bin-line"></i>
                                 </button>
@@ -844,6 +916,129 @@ const TeamsPage = () => {
                 className="ti-btn ti-btn-secondary"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Email Modal */}
+      {showEmailModal && selectedTeamMember && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Send Task Assignment Email</h3>
+              <button
+                onClick={() => setShowEmailModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <i className="ri-close-line text-xl"></i>
+              </button>
+            </div>
+            
+            <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <strong>To:</strong> {selectedTeamMember.email}
+              </p>
+              <p className="text-sm text-blue-800">
+                <strong>Team Member:</strong> {selectedTeamMember.name}
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Task Title *
+                </label>
+                <input
+                  type="text"
+                  className="form-control w-full"
+                  placeholder="Enter task title"
+                  value={emailForm.taskTitle}
+                  onChange={(e) => setEmailForm(prev => ({ ...prev, taskTitle: e.target.value }))}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Task Description *
+                </label>
+                <textarea
+                  className="form-control w-full"
+                  rows={4}
+                  placeholder="Enter task description"
+                  value={emailForm.taskDescription}
+                  onChange={(e) => setEmailForm(prev => ({ ...prev, taskDescription: e.target.value }))}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Assigned By
+                  </label>
+                  <input
+                    type="text"
+                    className="form-control w-full"
+                    value={emailForm.assignedBy}
+                    onChange={(e) => setEmailForm(prev => ({ ...prev, assignedBy: e.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Due Date *
+                  </label>
+                  <input
+                    type="date"
+                    className="form-control w-full"
+                    value={emailForm.dueDate}
+                    onChange={(e) => setEmailForm(prev => ({ ...prev, dueDate: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Priority
+                </label>
+                <select
+                  className="form-select w-full"
+                  value={emailForm.priority}
+                  onChange={(e) => setEmailForm(prev => ({ ...prev, priority: e.target.value }))}
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                onClick={() => setShowEmailModal(false)}
+                className="ti-btn ti-btn-secondary"
+                disabled={isSendingEmail}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEmailSubmit}
+                className="ti-btn ti-btn-primary"
+                disabled={isSendingEmail}
+              >
+                {isSendingEmail ? (
+                  <>
+                    <i className="ri-loader-4-line animate-spin mr-2"></i>
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <i className="ri-mail-send-line mr-2"></i>
+                    Send Email
+                  </>
+                )}
               </button>
             </div>
           </div>
