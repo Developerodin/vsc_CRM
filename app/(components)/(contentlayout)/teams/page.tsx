@@ -642,17 +642,11 @@ const TeamsPage = () => {
                             onChange={handleSelectAll}
                           />
                         </th>
-                        <th scope="col" className="text-start">Name</th>
-                        <th scope="col" className="text-start">Email</th>
-                        <th scope="col" className="text-start">Phone</th>
+                        <th scope="col" className="text-start">Team Member</th>
                         <th scope="col" className="text-start">Branch</th>
-                        <th scope="col" className="text-start">City</th>
-                        <th scope="col" className="text-start">State</th>
-                        <th scope="col" className="text-start">Country</th>
-                        <th scope="col" className="text-start">Pin Code</th>
+                        <th scope="col" className="text-start">Address</th>
                         <th scope="col" className="text-start">Skills</th>
                         <th scope="col" className="text-start">Created Date</th>
-                        <th scope="col" className="text-start">Sort Order</th>
                         <th scope="col" className="text-start">Action</th>
                       </tr>
                     </thead>
@@ -673,14 +667,22 @@ const TeamsPage = () => {
                                 onChange={() => handleTeamSelect(teamMember.id)}
                               />
                             </td>
-                            <td>{teamMember.name}</td>
-                            <td>{teamMember.email}</td>
-                            <td>{teamMember.phone}</td>
+                            <td>
+                              <div className="flex flex-col">
+                                <div className="font-medium text-gray-900">{teamMember.name}</div>
+                                <div className="text-sm text-gray-500">{teamMember.email}</div>
+                                <div className="text-sm text-gray-500">{teamMember.phone}</div>
+                              </div>
+                            </td>
                             <td>{teamMember?.branch?.name || '-'}</td>
-                            <td>{teamMember.city}</td>
-                            <td>{teamMember.state}</td>
-                            <td>{teamMember.country}</td>
-                            <td>{teamMember.pinCode}</td>
+                            <td>
+                              <div className="flex flex-col">
+                                <div className="text-sm">{teamMember.city}</div>
+                                <div className="text-sm text-gray-500">{teamMember.state}</div>
+                                <div className="text-sm text-gray-500">{teamMember.country}</div>
+                                <div className="text-sm text-gray-500">{teamMember.pinCode}</div>
+                              </div>
+                            </td>
                             <td>
                               <button
                                 onClick={() => handleViewSkills(teamMember.skills)}
@@ -691,7 +693,6 @@ const TeamsPage = () => {
                               </button>
                             </td>
                             <td>{formatDate(teamMember.createdAt)}</td>
-                            <td>{teamMember.sortOrder}</td>
                             <td>
                               <div className="flex space-x-2">
                                 <Link
@@ -712,7 +713,7 @@ const TeamsPage = () => {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={13} className="text-center py-8">
+                          <td colSpan={7} className="text-center py-8">
                             <div className="flex flex-col items-center justify-center">
                               <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
                                 <i className="ri-folder-line text-4xl text-primary"></i>

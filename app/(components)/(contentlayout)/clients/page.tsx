@@ -93,6 +93,11 @@ const ClientsPage = () => {
         limit: limit.toString(),
         sortBy,
         ...(filters.name && { name: filters.name }),
+        ...(filters.email && { email: filters.email }),
+        ...(filters.phone && { phone: filters.phone }),
+        ...(filters.district && { district: filters.district }),
+        ...(filters.pan && { pan: filters.pan }),
+        ...(filters.fNo && { fNo: filters.fNo }),
         ...(filters.branch && { branch: filters.branch }),
       });
 
@@ -542,13 +547,18 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                     <input
                       type="text"
                       className="form-control py-2 w-full"
-                      placeholder="Search by name..."
+                      placeholder="Search by name, email, phone, district, PAN, F No..."
                       value={filters.name}
                       onChange={(e) => {
                         const value = e.target.value;
                         setFilters(prev => ({
                           ...prev,
                           name: value,
+                          email: value,
+                          phone: value,
+                          district: value,
+                          pan: value,
+                          fNo: value,
                         }));
                         setCurrentPage(1);
                       }}
