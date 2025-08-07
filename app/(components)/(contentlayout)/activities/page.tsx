@@ -10,6 +10,8 @@ interface Activity {
   id: string;
   name: string;
   sortOrder: number;
+  frequency?: string;
+  frequencyConfig?: any;
   createdAt: string;
   updatedAt: string;
 }
@@ -26,6 +28,7 @@ interface ExcelRow {
   ID?: string;
   "Activity Name": string;
   "Sort Order": number;
+  "Frequency": string;
 }
 
 const ActivitiesPage = () => {
@@ -153,7 +156,8 @@ const ActivitiesPage = () => {
           .map((activity: Activity) => ({
             ID: activity.id,
             "Activity Name": activity.name,
-            "Sort Order": activity.sortOrder
+            "Sort Order": activity.sortOrder,
+            "Frequency": activity.frequency || 'No frequency set'
           }));
         successMessage = "Selected activities exported successfully";
       } else {
@@ -171,7 +175,8 @@ const ActivitiesPage = () => {
         exportData = apiData.results.map((activity: Activity) => ({
           ID: activity.id,
           "Activity Name": activity.name,
-          "Sort Order": activity.sortOrder
+          "Sort Order": activity.sortOrder,
+          "Frequency": activity.frequency || 'No frequency set'
         }));
         successMessage = "All activities exported successfully";
       }
@@ -181,6 +186,7 @@ const ActivitiesPage = () => {
         { wch: 20 }, // ID
         { wch: 30 }, // Activity Name
         { wch: 15 }, // Sort Order
+        { wch: 20 }, // Frequency
       ];
 
       const wb = XLSX.utils.book_new();
@@ -256,6 +262,52 @@ const ActivitiesPage = () => {
   }
 };
 
+
+  // Helper function to format frequency display
+  const formatFrequencyDisplay = (activity: Activity) => {
+    if (!activity.frequency || !activity.frequencyConfig) {
+      return 'No frequency set';
+    }
+
+    const { frequency, frequencyConfig } = activity;
+    
+    switch (frequency) {
+      case 'Hourly':
+        return `Every ${frequencyConfig.hourlyInterval} hour${frequencyConfig.hourlyInterval > 1 ? 's' : ''}`;
+      
+      case 'Daily':
+        return `Daily at ${frequencyConfig.dailyTime || 'specified time'}`;
+      
+      case 'Weekly':
+        const days = frequencyConfig.weeklyDays?.length > 0 
+          ? frequencyConfig.weeklyDays.join(', ') 
+          : 'specified days';
+        const time = frequencyConfig.weeklyTime || 'specified time';
+        return `Weekly on ${days} at ${time}`;
+      
+      case 'Monthly':
+        const day = frequencyConfig.monthlyDay || 'specified day';
+        const monthTime = frequencyConfig.monthlyTime || 'specified time';
+        return `Monthly on day ${day} at ${monthTime}`;
+      
+      case 'Quarterly':
+        const months = frequencyConfig.quarterlyMonths?.length > 0 
+          ? frequencyConfig.quarterlyMonths.join(', ') 
+          : 'specified months';
+        const quarterDay = frequencyConfig.quarterlyDay || 'specified day';
+        const quarterTime = frequencyConfig.quarterlyTime || 'specified time';
+        return `Quarterly on day ${quarterDay} of ${months} at ${quarterTime}`;
+      
+      case 'Yearly':
+        const yearMonth = frequencyConfig.yearlyMonth || 'specified month';
+        const yearDate = frequencyConfig.yearlyDate || 'specified date';
+        const yearTime = frequencyConfig.yearlyTime || 'specified time';
+        return `Yearly on ${yearDate} ${yearMonth} at ${yearTime}`;
+      
+      default:
+        return 'Frequency configured';
+    }
+  };
 
   // Condensed pagination helper
   function getPagination(currentPage: number, totalPages: number) {
@@ -447,14 +499,14 @@ const ActivitiesPage = () => {
                         />
                       </th>
                       <th className="px-4 py-3">Name</th>
-                      <th className="px-4 py-3">Created At</th>
+                      <th className="px-4 py-3">Frequency</th>
                       <th className="px-4 py-3">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {isLoading ? (
                       <tr>
-                        <td colSpan={6} className="text-center py-4">
+                        <td colSpan={4} className="text-center py-4">
                           <div className="flex justify-center">
                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                           </div>
@@ -462,13 +514,13 @@ const ActivitiesPage = () => {
                       </tr>
                     ) : error ? (
                       <tr>
-                        <td colSpan={6} className="text-center text-red-500 py-4">
+                        <td colSpan={4} className="text-center text-red-500 py-4">
                           {error}
                         </td>
                       </tr>
                     ) : activities.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="text-center py-4">
+                        <td colSpan={4} className="text-center py-4">
                           No activities found
                         </td>
                       </tr>
@@ -483,9 +535,19 @@ const ActivitiesPage = () => {
                               className="form-checkbox"
                             />
                           </td>
-                          <td>{activity.name}</td>
-                          <td>{new Date(activity.createdAt).toLocaleString()}</td>
-                          <td>
+                                                     <td>{activity.name}</td>
+                           <td>
+                             <div className="text-sm">
+                               <span className={`px-2 py-1 rounded-full text-xs ${
+                                 activity.frequency 
+                                   ? 'bg-blue-100 text-blue-800' 
+                                   : 'bg-gray-100 text-gray-600'
+                               }`}>
+                                 {formatFrequencyDisplay(activity)}
+                               </span>
+                             </div>
+                           </td>
+                           <td>
                             <div className="flex space-x-2">
                               <Link
                                 href={`/activities/edit/${activity.id}`}
