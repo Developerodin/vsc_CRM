@@ -639,7 +639,7 @@ const GroupsPage = () => {
                             onChange={handleSelectAll}
                           />
                         </th>
-                        <th className="px-4 py-3">Name</th>
+                        <th className="px-4 py-3">Group Name</th>
                         <th className="px-4 py-3">Number of Clients</th>
                         <th className="px-4 py-3">Created At</th>
                         <th className="px-4 py-3">Actions</th>

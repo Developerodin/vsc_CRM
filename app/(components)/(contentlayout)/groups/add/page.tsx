@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Seo from "@/shared/layout-components/seo/seo";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -42,7 +42,7 @@ const AddGroupPage = () => {
   const { branches, selectedBranch } = useBranchContext();
   const [isLoading, setIsLoading] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
-  const [isLoadingClients, setIsLoadingClients] = useState(true);
+  const [isLoadingClients, setIsLoadingClients] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [selectedClients, setSelectedClients] = useState<Client[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -60,14 +60,14 @@ const AddGroupPage = () => {
     numberOfClients: 0,
   });
 
-  const fetchClients = async (page: number = 1) => {
+  const fetchClients = async (page: number = 1, searchQueryParam?: string) => {
     try {
       setIsLoadingClients(true);
       const queryParams = new URLSearchParams({
         page: page.toString(),
         limit: "10",
         sortBy: `${sortField}:${sortOrder}`,
-        ...(searchQuery && { name: searchQuery })
+        ...((searchQueryParam || searchQuery) && { name: searchQueryParam || searchQuery })
       });
 
       const response = await fetch(`${Base_url}clients?${queryParams}`, {
@@ -94,11 +94,43 @@ const AddGroupPage = () => {
     }
   };
 
+  // Debounced search function
+  const debouncedSearch = useCallback(
+    (() => {
+      let timeoutId: NodeJS.Timeout;
+      return (searchQuery: string) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          setCurrentPage(1);
+          fetchClients(1, searchQuery);
+        }, 500);
+      };
+    })(),
+    []
+  );
+
+  // Handle search input change
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+    if (showModal) {
+      debouncedSearch(query);
+    }
+  };
+
+  // Handle search button click
+  const handleSearchClick = () => {
+    if (showModal) {
+      setCurrentPage(1);
+      fetchClients(1, searchQuery);
+    }
+  };
+
   useEffect(() => {
     if (showModal) {
       fetchClients(currentPage);
     }
-  }, [showModal, sortField, sortOrder, searchQuery, currentPage]);
+  }, [showModal, sortField, sortOrder, currentPage]);
 
   useEffect(() => {
     setFormData(prev => ({
@@ -189,7 +221,7 @@ const AddGroupPage = () => {
 
   const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage);
-    fetchClients(newPage);
+    fetchClients(newPage, searchQuery);
   };
 
   return (
@@ -298,7 +330,13 @@ const AddGroupPage = () => {
                       <button
                         type="button"
                         className="ti-btn ti-btn-primary"
-                        onClick={() => setShowModal(true)}
+                        onClick={() => {
+                          setShowModal(true);
+                          // Reset search and pagination when opening modal
+                          setSearchQuery("");
+                          setCurrentPage(1);
+                          fetchClients(1);
+                        }}
                       >
                         Select Clients ({selectedClients.length} selected)
                       </button>
@@ -356,31 +394,47 @@ const AddGroupPage = () => {
               </button>
             </div>
 
-            <div className="p-4 border-b">
-              <div className="flex items-center space-x-4">
-                <input
-                  type="text"
-                  placeholder="Search clients..."
-                  className="form-control flex-1"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                <select
-                  className="form-select w-48"
-                  value={`${sortField}:${sortOrder}`}
-                  onChange={(e) => {
-                    const [field, order] = e.target.value.split(':');
-                    setSortField(field);
-                    setSortOrder(order);
-                  }}
-                >
-                  <option value="name:asc">Name (A-Z)</option>
-                  <option value="name:desc">Name (Z-A)</option>
-                  <option value="email:asc">Email (A-Z)</option>
-                  <option value="email:desc">Email (Z-A)</option>
-                </select>
-              </div>
-            </div>
+                         <div className="p-4 border-b bg-gray-50">
+               <div className="flex items-center space-x-4">
+                 <div className="relative flex-1">
+                   <div className="flex items-center">
+                     <i className="ri-search-line text-gray-400 text-xl mr-3"></i>
+                     <input
+                       type="text"
+                       placeholder="Search clients by name..."
+                       className="form-control py-4 pr-20 text-lg border-2 border-gray-300 focus:border-primary focus:ring-2 focus:ring-primary/20 bg-white"
+                       value={searchQuery}
+                       onChange={handleSearchChange}
+                       onKeyDown={(e) => {
+                         if (e.key === 'Enter') {
+                           handleSearchClick();
+                         }
+                       }}
+                     />
+                   </div>
+                   <button 
+                     className="absolute end-0 top-0 px-6 h-full bg-primary text-white hover:bg-primary-dark rounded-r-md"
+                     onClick={handleSearchClick}
+                   >
+                     <i className="ri-search-line text-xl"></i>
+                   </button>
+                 </div>
+                 {/* <select
+                   className="form-select w-40 text-sm border-2 border-gray-300 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                   value={`${sortField}:${sortOrder}`}
+                   onChange={(e) => {
+                     const [field, order] = e.target.value.split(':');
+                     setSortField(field);
+                     setSortOrder(order);
+                   }}
+                 >
+                   <option value="name:asc">Name (A-Z)</option>
+                   <option value="name:desc">Name (Z-A)</option>
+                   <option value="email:asc">Email (A-Z)</option>
+                   <option value="email:desc">Email (Z-A)</option>
+                 </select> */}
+               </div>
+             </div>
 
             <div className="flex-1 overflow-auto p-4">
               {isLoadingClients ? (

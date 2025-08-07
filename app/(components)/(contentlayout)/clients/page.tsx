@@ -615,13 +615,10 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                             onChange={handleSelectAll}
                           />
                         </th>
-                        <th className="px-4 py-3">Name</th>
-                        <th className="px-4 py-3">Email</th>
-                        <th className="px-4 py-3">Phone</th>
+                        <th className="px-4 py-3">Client</th>
                         <th className="px-4 py-3">District</th>
                         <th className="px-4 py-3">F No</th>
                         <th className="px-4 py-3">PAN</th>
-                        <th className="px-4 py-3">Created At</th>
                         <th className="px-4 py-3">Actions</th>
                       </tr>
                     </thead>
@@ -642,13 +639,16 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                                 onChange={() => handleClientSelect(client.id)}
                               />
                             </td>
-                            <td>{client.name}</td>
-                            <td>{client.email}</td>
-                            <td>{client.phone}</td>
+                            <td>
+                              <div className="flex flex-col">
+                                <div className="font-medium text-gray-900">{client.name}</div>
+                                <div className="text-sm text-gray-500">{client.email}</div>
+                                <div className="text-sm text-gray-500">{client.phone}</div>
+                              </div>
+                            </td>
                             <td>{client.district}</td>
                             <td>{client.fNo}</td>
                             <td>{client.pan}</td>
-                            <td>{new Date(client.createdAt).toLocaleDateString()}</td>
                             <td>
                               <div className="flex space-x-2">
                                 <Link
@@ -675,7 +675,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={9} className="text-center py-8">
+                          <td colSpan={6} className="text-center py-8">
                             <div className="flex flex-col items-center justify-center">
                               <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
                                 <i className="ri-folder-line text-4xl text-primary"></i>
