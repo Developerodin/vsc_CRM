@@ -343,7 +343,7 @@ const EditActivityPage = ({ params }: { params: { id: string } }) => {
 
                   {/* Frequency */}
                   <div>
-                    <label className="form-label">Frequency</label>
+                    <label className="form-label">Due Date Options</label>
                     <select
                       name="frequency"
                       className="form-select"
@@ -362,7 +362,7 @@ const EditActivityPage = ({ params }: { params: { id: string } }) => {
                   {/* Frequency Configuration */}
                   {formData.frequency && (
                     <div className="form-group col-span-1 md:col-span-2">
-                      <label className="form-label">Frequency Configuration</label>
+                      <label className="form-label">Due Date</label>
                       <button
                         type="button"
                         className={`w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:bg-gray-50`}

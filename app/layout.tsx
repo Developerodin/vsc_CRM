@@ -10,16 +10,18 @@ import { Initialload, BranchProvider } from "@/shared/contextapi";
 const RootLayout = ({children}:any) =>{
   const [pageloading , setpageloading] = useState(false)
     return(
-      <>
-      <Provider store={store}>
-        <BranchProvider>
-          <Initialload.Provider value={{ pageloading , setpageloading }}>
-            {children}
-          </Initialload.Provider>
-        </BranchProvider>
-      </Provider>
-      <PrelineScript/>
-      </>
+      <html lang="en">
+        <body>
+          <Provider store={store}>
+            <BranchProvider>
+              <Initialload.Provider value={{ pageloading , setpageloading }}>
+                {children}
+              </Initialload.Provider>
+            </BranchProvider>
+          </Provider>
+          <PrelineScript/>
+        </body>
+      </html>
     )
   }
   export default RootLayout

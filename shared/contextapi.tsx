@@ -143,10 +143,31 @@ export const BranchProvider = ({ children }: BranchProviderProps) => {
       setLoading(true);
       setError(null);
 
-      // Get user data from localStorage
+      // Check if this is a client session
+      const clientData = localStorage.getItem('clientData');
+      const clientToken = localStorage.getItem('clientToken');
+      
+      if (clientData && clientToken) {
+        // This is a client session, not an admin/team session
+        // Set empty state for client sessions
+        setBranches([]);
+        setSelectedBranch(null);
+        setUserRole(null);
+        setAllBranchesAccess(false);
+        setLoading(false);
+        return;
+      }
+
+      // Get user data from localStorage for admin/team sessions
       const userDataString = localStorage.getItem('user');
       if (!userDataString) {
-        throw new Error('User data not found in localStorage');
+        // No user data found, but not necessarily an error (could be logged out)
+        setBranches([]);
+        setSelectedBranch(null);
+        setUserRole(null);
+        setAllBranchesAccess(false);
+        setLoading(false);
+        return;
       }
 
       const userData: User = JSON.parse(userDataString);
@@ -217,8 +238,10 @@ export const BranchProvider = ({ children }: BranchProviderProps) => {
   // Listen for localStorage changes (when user logs in/out)
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'user' && e.newValue) {
-        // User data was updated, re-initialize context
+      if ((e.key === 'user' && e.newValue) || 
+          (e.key === 'clientData' && e.newValue) ||
+          (e.key === 'clientToken' && e.newValue)) {
+        // User data or client data was updated, re-initialize context
         fetchUserRoleAndBranches();
       }
     };
