@@ -59,7 +59,7 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
   const { branches } = useBranchContext();
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'activity'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'activity' | 'documents'>('general');
   
   // States for activities and team members
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -86,6 +86,14 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
   const [teamMemberSearchQuery, setTeamMemberSearchQuery] = useState('');
   const [filteredActivities, setFilteredActivities] = useState<Activity[]>([]);
   const [filteredTeamMembers, setFilteredTeamMembers] = useState<TeamMember[]>([]);
+  
+  // States for documents
+  const [clientDocuments, setClientDocuments] = useState<any[]>([]);
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
   
   const [formData, setFormData] = useState({
     name: '',
@@ -173,6 +181,134 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     setFilteredTeamMembers(filtered);
   }, [teamMembers, teamMemberSearchQuery]);
 
+  // Document functions
+  const handleFilesSelected = (files: FileList | null) => {
+    if (files) {
+      const newFiles = Array.from(files);
+      setUploadFiles(prev => [...prev, ...newFiles]);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const files = e.dataTransfer.files;
+    if (files) {
+      const newFiles = Array.from(files);
+      setUploadFiles(prev => [...prev, ...newFiles]);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  };
+
+  const handleRemoveUploadFile = (name: string) => {
+    setUploadFiles(prev => prev.filter(file => file.name !== name));
+  };
+
+  const fetchClientDocuments = async (clientId: string) => {
+    try {
+      setIsLoadingDocuments(true);
+      const response = await fetch(`${Base_url}file-manager/clients/${clientId}/contents`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setClientDocuments(data.results || []);
+      }
+    } catch (error) {
+      console.error('Error fetching client documents:', error);
+    } finally {
+      setIsLoadingDocuments(false);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (uploadFiles.length === 0) return;
+
+    try {
+      setIsUploading(true);
+      setUploadProgress({});
+
+      const uploadPromises = uploadFiles.map(async (file) => {
+        const uploadFormData = new FormData();
+        uploadFormData.append('file', file);
+
+        const response = await fetch(`${Base_url}common/upload`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: uploadFormData
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to upload ${file.name}`);
+        }
+
+        const uploadResult = await response.json();
+        console.log('Upload response from /common/upload:', uploadResult);
+        
+        // Extract file data from the response
+        const fileData = uploadResult.data || uploadResult;
+        
+        // Save file info to client documents
+        const fileInfo = {
+          fileName: fileData.originalName,
+          fileUrl: fileData.url,
+          fileKey: fileData.key,
+          fileSize: fileData.size,
+          mimeType: fileData.mimeType,
+          metadata: {
+            category: 'client_document',
+            description: `Document for client: ${formData.name || 'Client'}`
+          }
+        };
+
+        console.log('File info being sent to client upload endpoint:', fileInfo);
+        console.log('Client ID:', params.id);
+        console.log('Upload URL:', `${Base_url}file-manager/clients/${params.id}/upload`);
+
+        const saveResponse = await fetch(`${Base_url}file-manager/clients/${params.id}/upload`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify(fileInfo)
+        });
+
+        if (!saveResponse.ok) {
+          const errorText = await saveResponse.text();
+          console.error('Save response error:', {
+            status: saveResponse.status,
+            statusText: saveResponse.statusText,
+            error: errorText
+          });
+          throw new Error(`Failed to save file info for ${file.name}: ${errorText}`);
+        }
+
+        return saveResponse.json();
+      });
+
+      await Promise.all(uploadPromises);
+      toast.success('Files uploaded successfully');
+      setShowUploadModal(false);
+      setUploadFiles([]);
+      setUploadProgress({});
+      
+      // Refresh documents list
+      fetchClientDocuments(params.id);
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Failed to upload files');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   useEffect(() => {
     const fetchClient = async () => {
       try {
@@ -214,6 +350,9 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
         if (data.activities && data.activities.length > 0) {
           setActivityMappings(data.activities);
         }
+        
+        // Fetch client documents
+        fetchClientDocuments(params.id);
       } catch (err) {
         console.error('Error fetching client:', err);
         toast.error('Failed to fetch client details');
@@ -358,7 +497,13 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
       return;
     }
     
-    // Only submit when on activity tab
+    if (activeTab === 'activity') {
+      if (!validateForm()) return;
+      setActiveTab('documents');
+      return;
+    }
+    
+    // Only submit when on documents tab
     if (!validateForm()) return;
 
     try {
@@ -468,6 +613,17 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                     onClick={() => setActiveTab('activity')}
                   >
                     Activity Mapping
+                  </button>
+                  <button
+                    type="button"
+                    className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                      activeTab === 'documents'
+                        ? 'bg-primary text-white'
+                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                    }`}
+                    onClick={() => setActiveTab('documents')}
+                  >
+                    Documents
                   </button>
                 </div>
 
@@ -895,6 +1051,64 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                   </div>
                 )}
 
+                {/* Documents Tab */}
+                {activeTab === 'documents' && (
+                  <div className="space-y-6">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-lg font-medium text-gray-900">Client Documents</h3>
+                      <button type="button" className="ti-btn ti-btn-primary" onClick={() => setShowUploadModal(true)}>
+                        <i className="ri-upload-2-line mr-2"></i> Upload Documents
+                      </button>
+                    </div>
+                    
+                    {isLoadingDocuments ? (
+                      <div className="flex items-center justify-center py-16">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                        <span className="ml-3 text-gray-600">Loading documents...</span>
+                      </div>
+                    ) : clientDocuments.length > 0 ? (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {clientDocuments.map((doc, index) => (
+                            <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                              <div className="flex items-start justify-between">
+                                <div className="flex items-center space-x-3">
+                                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                                    <i className="ri-file-line text-primary"></i>
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-gray-900 truncate">{doc.fileName || doc.name}</p>
+                                    <p className="text-xs text-gray-500">{doc.fileSize ? `${(doc.fileSize / 1024).toFixed(1)} KB` : 'Unknown size'}</p>
+                                  </div>
+                                </div>
+                                <div className="flex space-x-1">
+                                  <button className="ti-btn ti-btn-sm ti-btn-primary" onClick={() => window.open(doc.fileUrl || doc.url, '_blank')} title="View File">
+                                    <i className="ri-eye-line"></i>
+                                  </button>
+                                  <button className="ti-btn ti-btn-sm ti-btn-success" onClick={() => { const link = document.createElement('a'); link.href = doc.fileUrl || doc.url; link.download = doc.fileName || doc.name; link.click(); }} title="Download File">
+                                    <i className="ri-download-line"></i>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-16">
+                        <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4 mx-auto">
+                          <i className="ri-folder-line text-4xl text-primary"></i>
+                        </div>
+                        <h3 className="text-xl font-medium mb-2">No Documents Found</h3>
+                        <p className="text-gray-500 text-center mb-6">Upload documents related to this client.</p>
+                        <button type="button" className="ti-btn ti-btn-primary" onClick={() => setShowUploadModal(true)}>
+                          <i className="ri-upload-2-line mr-2"></i> Upload First Document
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Form Actions */}
                 <div className="flex items-center space-x-3 mt-6">
                   <button
@@ -907,7 +1121,7 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                         Saving...
                       </>
-                    ) : activeTab === 'general' ? (
+                    ) : activeTab === 'general' || activeTab === 'activity' ? (
                       'Next'
                     ) : (
                       'Save Client'
@@ -1089,6 +1303,101 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                   </table>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Modal */}
+      {showUploadModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg w-11/12 max-w-2xl max-h-[90vh] flex flex-col">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h2 className="text-xl font-semibold">Upload Documents</h2>
+              <button
+                onClick={() => setShowUploadModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <i className="ri-close-line text-2xl"></i>
+              </button>
+            </div>
+
+            <div className="p-6 flex-1 overflow-auto">
+              {/* File Upload Area */}
+              <div
+                className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary transition-colors"
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+              >
+                <i className="ri-upload-cloud-line text-4xl text-gray-400 mb-4"></i>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Drop files here or click to browse</h3>
+                <p className="text-gray-500 mb-4">Support for PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, and other common formats</p>
+                <input
+                  type="file"
+                  multiple
+                  className="hidden"
+                  id="file-upload"
+                  onChange={(e) => handleFilesSelected(e.target.files)}
+                />
+                <label htmlFor="file-upload" className="ti-btn ti-btn-primary cursor-pointer">
+                  <i className="ri-folder-open-line mr-2"></i>
+                  Choose Files
+                </label>
+              </div>
+
+              {/* Selected Files */}
+              {uploadFiles.length > 0 && (
+                <div className="mt-6">
+                  <h4 className="text-lg font-medium text-gray-900 mb-4">Selected Files</h4>
+                  <div className="space-y-2">
+                    {uploadFiles.map((file, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <i className="ri-file-line text-primary"></i>
+                          <span className="text-sm font-medium">{file.name}</span>
+                          <span className="text-xs text-gray-500">({(file.size / 1024).toFixed(1)} KB)</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="text-red-500 hover:text-red-700"
+                          onClick={() => handleRemoveUploadFile(file.name)}
+                        >
+                          <i className="ri-delete-bin-line"></i>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t flex justify-end space-x-3">
+              <button
+                type="button"
+                className="ti-btn ti-btn-secondary"
+                onClick={() => setShowUploadModal(false)}
+                disabled={isUploading}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="ti-btn ti-btn-primary"
+                onClick={handleUpload}
+                disabled={uploadFiles.length === 0 || isUploading}
+              >
+                {isUploading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <i className="ri-upload-line mr-2"></i>
+                    Upload Files
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

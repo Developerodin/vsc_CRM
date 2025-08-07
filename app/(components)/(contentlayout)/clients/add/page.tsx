@@ -1,5 +1,5 @@
 "use client"
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Seo from '@/shared/layout-components/seo/seo';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -59,7 +59,6 @@ const AddClientPage = () => {
   const { branches, selectedBranch } = useBranchContext();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'activity'>('general');
   const [activities, setActivities] = useState<Activity[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
@@ -72,6 +71,15 @@ const AddClientPage = () => {
   const [teamMemberSearchQuery, setTeamMemberSearchQuery] = useState("");
   const [filteredActivities, setFilteredActivities] = useState<Activity[]>([]);
   const [filteredTeamMembers, setFilteredTeamMembers] = useState<TeamMember[]>([]);
+  const [activeTab, setActiveTab] = useState<'general' | 'activity' | 'documents'>('general');
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
+  const [isUploading, setIsUploading] = useState(false);
+  const [savedClientId, setSavedClientId] = useState<string | null>(null);
+  const [clientDocuments, setClientDocuments] = useState<any[]>([]);
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
+  const fileUploadRef = useRef<HTMLInputElement>(null);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -284,7 +292,49 @@ const AddClientPage = () => {
       return;
     }
     
-    // Only submit when on activity tab
+    if (activeTab === 'activity') {
+      if (!validateForm()) return;
+      
+      // Save client and get client ID
+      try {
+        setIsLoading(true);
+
+        const clientData = {
+          ...formData,
+          activities: activityMappings.filter(mapping => mapping.activity && mapping.assignedTeamMember)
+        };
+
+        const response = await fetch(`${Base_url}clients`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify(clientData)
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to create client');
+        }
+
+        const data: Client = await response.json();
+        setSavedClientId(data.id);
+        toast.success('Client created successfully');
+        setActiveTab('documents');
+        
+        // Load client documents
+        fetchClientDocuments(data.id);
+      } catch (err) {
+        console.error('Error creating client:', err);
+        toast.error(err instanceof Error ? err.message : 'Failed to create client');
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+    
+    // Only submit when on documents tab (for final save)
     if (!validateForm()) return;
 
     try {
@@ -326,6 +376,134 @@ const AddClientPage = () => {
       branch: selectedBranchId || ''
     }));
   }, [selectedBranchId]);
+
+  // Document upload functionality
+  const handleFilesSelected = (files: FileList | null) => {
+    if (!files) return;
+    const validTypes = ['image/jpeg', 'image/png', 'application/pdf', 'video/mp4', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    const filtered = Array.from(files).filter(f => validTypes.includes(f.type) || f.type.startsWith('image/') || f.type.startsWith('video/') || f.type.startsWith('audio/'));
+    setUploadFiles(prev => [...prev, ...filtered]);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    handleFilesSelected(e.dataTransfer.files);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  };
+
+  const handleRemoveUploadFile = (name: string) => {
+    setUploadFiles(prev => prev.filter(f => f.name !== name));
+  };
+
+  const fetchClientDocuments = async (clientId: string) => {
+    try {
+      setIsLoadingDocuments(true);
+      const response = await fetch(`${Base_url}file-manager/clients/${clientId}/contents`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch client documents');
+      }
+
+      const data = await response.json();
+      setClientDocuments(data.results || []);
+    } catch (error) {
+      console.error('Error fetching client documents:', error);
+      toast.error('Failed to fetch client documents');
+    } finally {
+      setIsLoadingDocuments(false);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (uploadFiles.length === 0 || !savedClientId) return;
+
+    setIsUploading(true);
+    try {
+      const uploadPromises = uploadFiles.map(async (file) => {
+        const uploadFormData = new FormData();
+        uploadFormData.append('file', file);
+
+        const response = await fetch(`${Base_url}common/upload`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: uploadFormData
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to upload ${file.name}`);
+        }
+
+        const uploadResult = await response.json();
+        console.log('Upload response from /common/upload:', uploadResult);
+        
+        // Extract file data from the response
+        const fileData = uploadResult.data || uploadResult;
+        
+        // Save file info to client documents
+        const fileInfo = {
+          fileName: fileData.originalName,
+          fileUrl: fileData.url,
+          fileKey: fileData.key,
+          fileSize: fileData.size,
+          mimeType: fileData.mimeType,
+          metadata: {
+            category: 'client_document',
+            description: `Document for client: ${formData.name}`
+          }
+        };
+
+        console.log('File info being sent to client upload endpoint:', fileInfo);
+        console.log('Client ID:', savedClientId);
+        console.log('Upload URL:', `${Base_url}file-manager/clients/${savedClientId}/upload`);
+
+        const saveResponse = await fetch(`${Base_url}file-manager/clients/${savedClientId}/upload`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify(fileInfo)
+        });
+
+        if (!saveResponse.ok) {
+          const errorText = await saveResponse.text();
+          console.error('Save response error:', {
+            status: saveResponse.status,
+            statusText: saveResponse.statusText,
+            error: errorText
+          });
+          throw new Error(`Failed to save file info for ${file.name}: ${errorText}`);
+        }
+
+        return saveResponse.json();
+      });
+
+      await Promise.all(uploadPromises);
+      toast.success('Files uploaded successfully');
+      setShowUploadModal(false);
+      setUploadFiles([]);
+      setUploadProgress({});
+      
+      // Refresh documents list
+      if (savedClientId) {
+        fetchClientDocuments(savedClientId);
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Failed to upload files');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   return (
     <div className="main-content">
@@ -383,6 +561,17 @@ const AddClientPage = () => {
                   onClick={() => setActiveTab('activity')}
                 >
                   Activity Mapping
+                </button>
+                <button
+                  type="button"
+                  className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                    activeTab === 'documents'
+                      ? 'bg-primary text-white'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                  }`}
+                  onClick={() => setActiveTab('documents')}
+                >
+                  Documents
                 </button>
               </div>
 
@@ -811,6 +1000,112 @@ const AddClientPage = () => {
                   </div>
                 )}
 
+                {activeTab === 'documents' && (
+                  <div className="space-y-6">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-lg font-medium text-gray-900">Client Documents</h3>
+                      {savedClientId && (
+                        <button
+                          type="button"
+                          className="ti-btn ti-btn-primary"
+                          onClick={() => setShowUploadModal(true)}
+                        >
+                          <i className="ri-upload-2-line mr-2"></i>
+                          Upload Documents
+                        </button>
+                      )}
+                    </div>
+
+                    {!savedClientId ? (
+                      <div className="text-center py-16">
+                        <div className="w-24 h-24 rounded-full bg-yellow-100 flex items-center justify-center mb-4 mx-auto">
+                          <i className="ri-information-line text-4xl text-yellow-600"></i>
+                        </div>
+                        <h3 className="text-xl font-medium mb-2">Client Not Saved Yet</h3>
+                        <p className="text-gray-500 text-center mb-6">
+                          Please complete the Activity Mapping tab and save the client first to upload documents.
+                        </p>
+                        <button
+                          type="button"
+                          className="ti-btn ti-btn-secondary"
+                          onClick={() => setActiveTab('activity')}
+                        >
+                          <i className="ri-arrow-left-line mr-2"></i>
+                          Back to Activity Mapping
+                        </button>
+                      </div>
+                    ) : isLoadingDocuments ? (
+                      <div className="flex items-center justify-center py-16">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                        <span className="ml-3 text-gray-600">Loading documents...</span>
+                      </div>
+                    ) : clientDocuments.length > 0 ? (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {clientDocuments.map((doc, index) => (
+                            <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                              <div className="flex items-start justify-between">
+                                <div className="flex items-center space-x-3">
+                                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                                    <i className="ri-file-line text-primary"></i>
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-gray-900 truncate">
+                                      {doc.fileName || doc.name}
+                                    </p>
+                                    <p className="text-xs text-gray-500">
+                                      {doc.fileSize ? `${(doc.fileSize / 1024).toFixed(1)} KB` : 'Unknown size'}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex space-x-1">
+                                  <button
+                                    className="ti-btn ti-btn-sm ti-btn-primary"
+                                    onClick={() => window.open(doc.fileUrl || doc.url, '_blank')}
+                                    title="View File"
+                                  >
+                                    <i className="ri-eye-line"></i>
+                                  </button>
+                                  <button
+                                    className="ti-btn ti-btn-sm ti-btn-success"
+                                    onClick={() => {
+                                      const link = document.createElement('a');
+                                      link.href = doc.fileUrl || doc.url;
+                                      link.download = doc.fileName || doc.name;
+                                      link.click();
+                                    }}
+                                    title="Download File"
+                                  >
+                                    <i className="ri-download-line"></i>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-16">
+                        <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4 mx-auto">
+                          <i className="ri-folder-line text-4xl text-primary"></i>
+                        </div>
+                        <h3 className="text-xl font-medium mb-2">No Documents Found</h3>
+                        <p className="text-gray-500 text-center mb-6">
+                          Upload documents related to this client.
+                        </p>
+                        <button
+                          type="button"
+                          className="ti-btn ti-btn-primary"
+                          onClick={() => setShowUploadModal(true)}
+                        >
+                          <i className="ri-upload-2-line mr-2"></i>
+                          Upload First Document
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Form Actions */}
                 <div className="flex items-center space-x-3 mt-8 pt-6 border-t border-gray-200">
                   <button
@@ -823,7 +1118,7 @@ const AddClientPage = () => {
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                         Saving...
                       </>
-                    ) : activeTab === 'general' ? (
+                    ) : activeTab === 'general' || activeTab === 'activity' ? (
                       'Next'
                     ) : (
                       'Save Client'
@@ -1005,6 +1300,77 @@ const AddClientPage = () => {
                   </table>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Modal */}
+      {showUploadModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white dark:bg-bodybg rounded-lg shadow-lg p-8 w-full max-w-lg relative">
+            <button
+              className="absolute top-3 right-3 ti-btn ti-btn-icon ti-btn-sm ti-btn-danger"
+              onClick={() => { setShowUploadModal(false); setUploadFiles([]); }}
+            >
+              <i className="ri-close-line"></i>
+            </button>
+            <h2 className="text-xl font-semibold mb-4 text-defaulttextcolor flex items-center">
+              <i className="ri-upload-2-line text-2xl mr-2 text-primary"></i> Upload Documents
+            </h2>
+            <div
+              className="border-2 border-dashed border-primary/40 rounded-lg p-6 mb-4 flex flex-col items-center justify-center cursor-pointer bg-light/40 hover:bg-primary/10 transition"
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onClick={() => fileUploadRef.current?.click()}
+            >
+              <input
+                ref={fileUploadRef}
+                type="file"
+                multiple
+                accept="*/*"
+                className="hidden"
+                onChange={e => handleFilesSelected(e.target.files)}
+              />
+              <i className="ri-upload-cloud-2-line text-4xl text-primary mb-2"></i>
+              <p className="text-defaulttextcolor font-medium">Drag & Drop files here or <span className="text-primary underline">browse</span></p>
+              <p className="text-xs text-gray-500 mt-1">All file types supported</p>
+            </div>
+            {uploadFiles.length > 0 && (
+              <div className="space-y-3 max-h-56 overflow-y-auto mb-2 w-full">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm text-defaulttextcolor font-medium">{uploadFiles.length} file(s) selected</span>
+                </div>
+                {uploadFiles.map(file => (
+                  <div key={file.name} className="flex items-center gap-3 bg-light rounded p-2">
+                    <div className="flex-1">
+                      <div className="font-medium text-defaulttextcolor text-sm truncate">{file.name}</div>
+                      <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                        <div
+                          className="bg-primary h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${uploadProgress[file.name] || 0}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                    <span className="text-xs text-gray-500 ml-2">{Math.round((uploadProgress[file.name] || 0))}%</span>
+                    <button
+                      className="ti-btn ti-btn-icon ti-btn-sm ti-btn-danger ml-2"
+                      onClick={() => handleRemoveUploadFile(file.name)}
+                    >
+                      <i className="ri-close-line"></i>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex justify-end mt-4">
+              <button
+                className="ti-btn ti-btn-primary"
+                disabled={uploadFiles.length === 0 || isUploading}
+                onClick={handleUpload}
+              >
+                {isUploading ? 'Uploading...' : 'Upload'}
+              </button>
             </div>
           </div>
         </div>
