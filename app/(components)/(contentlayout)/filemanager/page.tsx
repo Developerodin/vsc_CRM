@@ -210,8 +210,9 @@ const Filemanager = () => {
     };
 
     // Helper function to get user display name
-    const getUserDisplayName = (user: User | string): string => {
+    const getUserDisplayName = (user: User | string | null): string => {
         if (typeof user === 'string') return user;
+        if (!user) return 'Unknown User';
         return user.name || user.email || 'Unknown User';
     };
 
