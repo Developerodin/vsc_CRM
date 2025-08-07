@@ -122,11 +122,8 @@ const AddTimelinePage = () => {
       yearlyTime: ''
     },
     status: 'pending' as 'pending' | 'completed' | 'ongoing' | 'delayed',
-    turnover: '',
     teamMemberId: '',
-    teamMemberName: '',
-    startDate: '',
-    endDate: ''
+    teamMemberName: ''
   });
 
   // State for managing selected clients in modal
@@ -488,43 +485,7 @@ const AddTimelinePage = () => {
     return validateFrequencyConfig() ? 'text-green-600' : 'text-red-600';
   };
 
-  // Validation function for date fields
-  const validateDates = () => {
-    if (formData.startDate && formData.endDate) {
-      return new Date(formData.endDate) >= new Date(formData.startDate);
-    }
-    return true;
-  };
 
-  const getDateValidationClass = (fieldName: 'startDate' | 'endDate') => {
-    if (formData.startDate && formData.endDate) {
-      const isValid = validateDates();
-      if (!isValid) {
-        return 'border-red-500 focus:border-red-500 focus:ring-red-500';
-      }
-    }
-    return '';
-  };
-
-  const getDateValidationMessage = () => {
-    if (formData.startDate && formData.endDate && !validateDates()) {
-      return 'End date cannot be before start date';
-    }
-    return '';
-  };
-
-  // Helper function to format date to ISO format with time set to 23:59:59.000Z
-  const formatDateToISO = (dateString?: string) => {
-    if (!dateString) return undefined;
-    try {
-      const date = new Date(dateString);
-      // Set time to 23:59:59.000Z for the end of the day
-      date.setHours(23, 59, 59, 0);
-      return date.toISOString();
-    } catch (error) {
-      return undefined;
-    }
-  };
 
   // Helper function to remove empty fields from request body
   const removeEmptyFields = (obj: any) => {
@@ -557,8 +518,6 @@ const AddTimelinePage = () => {
 
     const activity = activities.find(a => a.id === formData.activityId);
     const clients = formData.clientName.join(', ');
-    const startDate = formData.startDate ? new Date(formData.startDate).toLocaleDateString('en-GB') : 'specified start date';
-    const endDate = formData.endDate ? new Date(formData.endDate).toLocaleDateString('en-GB') : 'specified end date';
 
     let frequencyText = '';
     const { frequencyConfig } = formData;
@@ -597,15 +556,7 @@ const AddTimelinePage = () => {
         frequencyText = 'at specified intervals';
     }
 
-    const dateRange = formData.startDate && formData.endDate 
-      ? `starting from ${startDate} and continuing till ${endDate}`
-      : formData.startDate 
-        ? `starting from ${startDate}`
-        : formData.endDate 
-          ? `continuing till ${endDate}`
-          : '';
-
-    return `${activity?.name} activity will be created ${frequencyText} for ${clients}${dateRange ? `, ${dateRange}` : ''}`;
+    return `${activity?.name} activity will be created ${frequencyText} for ${clients}`;
   };
 
   const includeSelectedFrequency = (frequency: string, frequencyConfig: any) => {
@@ -659,11 +610,7 @@ const AddTimelinePage = () => {
       return;
     }
     
-    // Validate that end date is not before start date
-    if (formData.startDate && formData.endDate && new Date(formData.endDate) < new Date(formData.startDate)) {
-      toast.error('End date cannot be before start date');
-      return;
-    }
+
     
     try {
       setIsLoading(true);
@@ -689,10 +636,7 @@ const AddTimelinePage = () => {
         frequency: formData.frequency,
         frequencyConfig: formData.frequencyConfig,
         status: formData.status,
-        turnover: formData.turnover ? parseFloat(formData.turnover) : undefined,
-        assignedMember: formData.teamMemberId,
-        startDate: formatDateToISO(formData.startDate),
-        endDate: formatDateToISO(formData.endDate)
+        assignedMember: formData.teamMemberId
       });
 
       const response = await fetch(`${Base_url}timelines`, {
@@ -928,20 +872,7 @@ const AddTimelinePage = () => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-                  {/* Third Row: Turnover, Assigned Member */}
-                  <div className="form-group">
-                    <label htmlFor="turnover" className="form-label">Turnover</label>
-                    <input
-                      type="text"
-                      id="turnover"
-                      name="turnover"
-                      className="form-control"
-                      placeholder="Enter turnover (e.g., 25000000)"
-                      value={formData.turnover}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-
+                  {/* Third Row: Assigned Member, Branch */}
                   <div className="form-group">
                     <label htmlFor="teamMemberId" className="form-label">Assigned Member <span className="text-red-500">*</span></label>
                     <select
@@ -960,10 +891,7 @@ const AddTimelinePage = () => {
                       ))}
                     </select>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-                  {/* Fourth Row: Branch, Start Date, End Date */}
                   <div className="form-group">
                     <label htmlFor="branch" className="form-label">Branch <span className="text-red-500">*</span></label>
                     <select
@@ -982,39 +910,7 @@ const AddTimelinePage = () => {
                       ))}
                     </select>
                   </div>
-
-                  <div className="form-group">
-                    <label htmlFor="startDate" className="form-label">Start Date</label>
-                    <input
-                      type="date"
-                      id="startDate"
-                      name="startDate"
-                      className={`form-control ${getDateValidationClass('startDate')}`}
-                      value={formData.startDate}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="endDate" className="form-label">End Date</label>
-                    <input
-                      type="date"
-                      id="endDate"
-                      name="endDate"
-                      className={`form-control ${getDateValidationClass('endDate')}`}
-                      value={formData.endDate}
-                      onChange={handleInputChange}
-                    />
-                  </div>
                 </div>
-
-                {/* Date Validation Message */}
-                {getDateValidationMessage() && (
-                  <div className="mt-2 text-red-500 text-sm">
-                    <i className="ri-error-warning-line me-1"></i>
-                    {getDateValidationMessage()}
-                  </div>
-                )}
 
                 {/* Preview Box */}
                 {generatePreviewText() && (
