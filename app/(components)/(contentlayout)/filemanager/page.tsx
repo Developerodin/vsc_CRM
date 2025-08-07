@@ -112,9 +112,9 @@ const Filemanager = () => {
     // Handle file selection
     const handleFilesSelected = (files: FileList | null) => {
         if (!files) return;
-        const validTypes = ['image/jpeg', 'image/png', 'application/pdf', 'video/mp4', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-        const filtered = Array.from(files).filter(f => validTypes.includes(f.type) || f.type.startsWith('image/') || f.type.startsWith('video/') || f.type.startsWith('audio/'));
-        setUploadFiles(prev => [...prev, ...filtered]);
+        // Accept all file types - let the server handle validation
+        const fileArray = Array.from(files);
+        setUploadFiles(prev => [...prev, ...fileArray]);
     };
 
     // Handle drag and drop
