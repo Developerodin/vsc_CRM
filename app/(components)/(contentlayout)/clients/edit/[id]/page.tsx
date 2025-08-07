@@ -95,6 +95,14 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
   
+  // Document context menu state
+  const [documentContextMenu, setDocumentContextMenu] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    document: any;
+  } | null>(null);
+  
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -165,6 +173,20 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     fetchTeamMembers();
   }, []);
 
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (documentContextMenu?.visible) {
+        closeDocumentContextMenu();
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [documentContextMenu]);
+
   // Filter activities and team members based on search
   useEffect(() => {
     const filtered = activities.filter(activity =>
@@ -223,6 +245,226 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     } finally {
       setIsLoadingDocuments(false);
     }
+  };
+
+  // Document context menu handlers
+  const handleDocumentContextMenu = (e: React.MouseEvent, document: any) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDocumentContextMenu({
+      visible: true,
+      x: e.clientX,
+      y: e.clientY,
+      document
+    });
+  };
+
+  const closeDocumentContextMenu = () => {
+    setDocumentContextMenu(null);
+  };
+
+  // Document action handlers
+  const handleViewDocument = (document: any) => {
+    const fileUrl = document.file?.fileUrl || document.fileUrl;
+    if (fileUrl) {
+      window.open(fileUrl, '_blank');
+    }
+    closeDocumentContextMenu();
+  };
+
+  const handleOpenDocumentInNewTab = (document: any) => {
+    const fileUrl = document.file?.fileUrl || document.fileUrl;
+    if (fileUrl) {
+      window.open(fileUrl, '_blank');
+    }
+    closeDocumentContextMenu();
+  };
+
+  const handleDownloadDocument = (document: any) => {
+    const fileUrl = document.file?.fileUrl || document.fileUrl;
+    const fileName = document.file?.fileName || document.fileName;
+    if (fileUrl && fileName) {
+      const link = document.createElement('a');
+      link.href = fileUrl;
+      link.download = fileName;
+      link.click();
+    }
+    closeDocumentContextMenu();
+  };
+
+  const handleCopyDocumentUrl = async (document: any) => {
+    const fileUrl = document.file?.fileUrl || document.fileUrl;
+    if (fileUrl) {
+      try {
+        await navigator.clipboard.writeText(fileUrl);
+        toast.success('File URL copied to clipboard');
+      } catch (err) {
+        console.error('Failed to copy URL:', err);
+        toast.error('Failed to copy URL');
+      }
+    }
+    closeDocumentContextMenu();
+  };
+
+  const handleDeleteDocument = async (document: any) => {
+    const fileName = document.file?.fileName || document.fileName;
+    if (confirm(`Are you sure you want to delete "${fileName}"?`)) {
+      try {
+        // You can implement delete functionality here if needed
+        toast.success('Document deleted successfully');
+        // Refresh documents list
+        fetchClientDocuments(params.id);
+      } catch (error) {
+        console.error('Failed to delete document:', error);
+        toast.error('Failed to delete document');
+      }
+    }
+    closeDocumentContextMenu();
+  };
+
+  // File type detection and icon mapping
+  const getFileIcon = (mimeType: string, fileName: string) => {
+    const extension = fileName?.split('.').pop()?.toLowerCase();
+    
+    // Image files
+    if (mimeType?.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'tiff', 'tif', 'ico', 'jfif', 'pjpeg', 'pjp'].includes(extension || '')) {
+      return 'ri-image-line text-blue-600';
+    }
+    
+    // PDF files
+    if (mimeType?.includes('pdf') || extension === 'pdf') {
+      return 'ri-file-pdf-line text-red-600';
+    }
+    
+    // Word documents
+    if (mimeType?.includes('word') || mimeType?.includes('document') || ['doc', 'docx', 'docm', 'dot', 'dotx', 'dotm'].includes(extension || '')) {
+      return 'ri-file-word-line text-blue-600';
+    }
+    
+    // Excel files
+    if (mimeType?.includes('excel') || mimeType?.includes('spreadsheet') || ['xls', 'xlsx', 'xlsm', 'xlt', 'xltx', 'xltm'].includes(extension || '')) {
+      return 'ri-file-excel-line text-green-600';
+    }
+    
+    // PowerPoint files
+    if (mimeType?.includes('powerpoint') || mimeType?.includes('presentation') || ['ppt', 'pptx', 'pptm', 'pot', 'potx', 'potm', 'pps', 'ppsx', 'ppsm'].includes(extension || '')) {
+      return 'ri-file-ppt-line text-orange-600';
+    }
+    
+    // Text files
+    if (mimeType?.startsWith('text/') || ['txt', 'md', 'log', 'rtf', 'csv', 'json', 'xml', 'html', 'htm', 'css', 'js', 'ts', 'jsx', 'tsx'].includes(extension || '')) {
+      return 'ri-file-text-line text-gray-600';
+    }
+    
+    // Video files
+    if (mimeType?.startsWith('video/') || ['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm', 'mkv', 'm4v', '3gp', 'ogv', 'mts', 'm2ts'].includes(extension || '')) {
+      return 'ri-video-line text-purple-600';
+    }
+    
+    // Audio files
+    if (mimeType?.startsWith('audio/') || ['mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a', 'opus', 'amr'].includes(extension || '')) {
+      return 'ri-volume-up-line text-pink-600';
+    }
+    
+    // Archive files
+    if (mimeType?.includes('zip') || mimeType?.includes('rar') || ['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'cab', 'iso', 'dmg'].includes(extension || '')) {
+      return 'ri-file-zip-line text-yellow-600';
+    }
+    
+    // Database files
+    if (['db', 'sqlite', 'sqlite3', 'mdb', 'accdb', 'odb'].includes(extension || '')) {
+      return 'ri-database-2-line text-indigo-600';
+    }
+    
+    // Code files
+    if (['py', 'java', 'cpp', 'c', 'cs', 'php', 'rb', 'go', 'rs', 'swift', 'kt', 'scala', 'r', 'matlab', 'sh', 'bat', 'ps1'].includes(extension || '')) {
+      return 'ri-code-s-slash-line text-cyan-600';
+    }
+    
+    // CAD files
+    if (['dwg', 'dxf', 'stl', 'obj', '3ds', 'max', 'blend', 'skp'].includes(extension || '')) {
+      return 'ri-cube-line text-teal-600';
+    }
+    
+    // Font files
+    if (['ttf', 'otf', 'woff', 'woff2', 'eot'].includes(extension || '')) {
+      return 'ri-font-size text-lime-600';
+    }
+    
+    // Default file icon
+    return 'ri-file-line text-gray-600';
+  };
+
+  const getFileColor = (mimeType: string, fileName: string) => {
+    const extension = fileName?.split('.').pop()?.toLowerCase();
+    
+    // Image files
+    if (mimeType?.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'tiff', 'tif', 'ico', 'jfif', 'pjpeg', 'pjp'].includes(extension || '')) {
+      return 'bg-blue-100 dark:bg-blue-900/30';
+    }
+    
+    // PDF files
+    if (mimeType?.includes('pdf') || extension === 'pdf') {
+      return 'bg-red-100 dark:bg-red-900/30';
+    }
+    
+    // Word documents
+    if (mimeType?.includes('word') || mimeType?.includes('document') || ['doc', 'docx', 'docm', 'dot', 'dotx', 'dotm'].includes(extension || '')) {
+      return 'bg-blue-100 dark:bg-blue-900/30';
+    }
+    
+    // Excel files
+    if (mimeType?.includes('excel') || mimeType?.includes('spreadsheet') || ['xls', 'xlsx', 'xlsm', 'xlt', 'xltx', 'xltm'].includes(extension || '')) {
+      return 'bg-green-100 dark:bg-green-900/30';
+    }
+    
+    // PowerPoint files
+    if (mimeType?.includes('powerpoint') || mimeType?.includes('presentation') || ['ppt', 'pptx', 'pptm', 'pot', 'potx', 'potm', 'pps', 'ppsx', 'ppsm'].includes(extension || '')) {
+      return 'bg-orange-100 dark:bg-orange-900/30';
+    }
+    
+    // Text files
+    if (mimeType?.startsWith('text/') || ['txt', 'md', 'log', 'rtf', 'csv', 'json', 'xml', 'html', 'htm', 'css', 'js', 'ts', 'jsx', 'tsx'].includes(extension || '')) {
+      return 'bg-gray-100 dark:bg-gray-700';
+    }
+    
+    // Video files
+    if (mimeType?.startsWith('video/') || ['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm', 'mkv', 'm4v', '3gp', 'ogv', 'mts', 'm2ts'].includes(extension || '')) {
+      return 'bg-purple-100 dark:bg-purple-900/30';
+    }
+    
+    // Audio files
+    if (mimeType?.startsWith('audio/') || ['mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a', 'opus', 'amr'].includes(extension || '')) {
+      return 'bg-pink-100 dark:bg-pink-900/30';
+    }
+    
+    // Archive files
+    if (mimeType?.includes('zip') || mimeType?.includes('rar') || ['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'cab', 'iso', 'dmg'].includes(extension || '')) {
+      return 'bg-yellow-100 dark:bg-yellow-900/30';
+    }
+    
+    // Database files
+    if (['db', 'sqlite', 'sqlite3', 'mdb', 'accdb', 'odb'].includes(extension || '')) {
+      return 'bg-indigo-100 dark:bg-indigo-900/30';
+    }
+    
+    // Code files
+    if (['py', 'java', 'cpp', 'c', 'cs', 'php', 'rb', 'go', 'rs', 'swift', 'kt', 'scala', 'r', 'matlab', 'sh', 'bat', 'ps1'].includes(extension || '')) {
+      return 'bg-cyan-100 dark:bg-cyan-900/30';
+    }
+    
+    // CAD files
+    if (['dwg', 'dxf', 'stl', 'obj', '3ds', 'max', 'blend', 'skp'].includes(extension || '')) {
+      return 'bg-teal-100 dark:bg-teal-900/30';
+    }
+    
+    // Font files
+    if (['ttf', 'otf', 'woff', 'woff2', 'eot'].includes(extension || '')) {
+      return 'bg-lime-100 dark:bg-lime-900/30';
+    }
+    
+    // Default
+    return 'bg-gray-100 dark:bg-gray-700';
   };
 
   const handleUpload = async () => {
@@ -1068,42 +1310,59 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                       </div>
                     ) : clientDocuments.length > 0 ? (
                       <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
                           {clientDocuments.map((doc, index) => (
-                            <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                              <div className="flex items-start justify-between">
-                                <div className="flex items-center space-x-3">
-                                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                                    <i className="ri-file-line text-primary"></i>
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-gray-900 truncate">{doc.fileName || doc.name}</p>
-                                    <p className="text-xs text-gray-500">{doc.fileSize ? `${(doc.fileSize / 1024).toFixed(1)} KB` : 'Unknown size'}</p>
-                                  </div>
-                                </div>
-                                <div className="flex space-x-1">
-                                  <button className="ti-btn ti-btn-sm ti-btn-primary" onClick={() => window.open(doc.fileUrl || doc.url, '_blank')} title="View File">
-                                    <i className="ri-eye-line"></i>
-                                  </button>
-                                  <button className="ti-btn ti-btn-sm ti-btn-success" onClick={() => { const link = document.createElement('a'); link.href = doc.fileUrl || doc.url; link.download = doc.fileName || doc.name; link.click(); }} title="Download File">
-                                    <i className="ri-download-line"></i>
-                                  </button>
+                            <div
+                              key={index}
+                              className="group relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-all duration-200 cursor-pointer"
+                            >
+                              {/* Selection Checkbox */}
+                              <input
+                                type="checkbox"
+                                className="absolute top-2 left-2 z-10 opacity-100 transition-opacity duration-200"
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  // Handle selection if needed
+                                }}
+                              />
+
+                              {/* Icon */}
+                              <div className="flex items-center justify-center w-16 h-16 mb-3">
+                                <div className="w-full h-full rounded-lg flex items-center justify-center bg-gray-100 dark:bg-gray-700">
+                                  <i className="ri-file-line text-2xl text-gray-600 dark:text-gray-400"></i>
                                 </div>
                               </div>
+
+                              {/* Content */}
+                              <div className="text-center">
+                                <div className="font-medium text-sm truncate">
+                                  {doc.file?.fileName || doc.fileName || 'Unknown File'}
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {doc.file?.fileSize ? `${(doc.file.fileSize / 1024).toFixed(1)} KB` : 'Unknown size'}
+                                </div>
+                              </div>
+
+                              {/* Three-dot menu */}
+                              <button
+                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDocumentContextMenu(e, doc);
+                                }}
+                                title="More options"
+                              >
+                                <i className="ri-more-2-fill text-gray-500 hover:text-primary"></i>
+                              </button>
                             </div>
                           ))}
                         </div>
                       </div>
                     ) : (
-                      <div className="text-center py-16">
-                        <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4 mx-auto">
-                          <i className="ri-folder-line text-4xl text-primary"></i>
-                        </div>
-                        <h3 className="text-xl font-medium mb-2">No Documents Found</h3>
-                        <p className="text-gray-500 text-center mb-6">Upload documents related to this client.</p>
-                        <button type="button" className="ti-btn ti-btn-primary" onClick={() => setShowUploadModal(true)}>
-                          <i className="ri-upload-2-line mr-2"></i> Upload First Document
-                        </button>
+                      <div className="text-center py-16 text-gray-500">
+                        <i className="ri-folder-open-line text-4xl mb-4 opacity-50"></i>
+                        <p className="text-lg font-medium">No files found in this folder</p>
+                        <p className="text-sm">Try uploading some files or creating a new folder</p>
                       </div>
                     )}
                   </div>
@@ -1400,6 +1659,57 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Document Context Menu */}
+      {documentContextMenu?.visible && (
+        <div 
+          className="fixed z-50 bg-white dark:bg-bodybg border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-48"
+          style={{
+            left: documentContextMenu.x,
+            top: documentContextMenu.y,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-3 py-2 text-xs text-gray-500 border-b border-gray-100 dark:border-gray-700">
+            {documentContextMenu.document.file?.fileName || documentContextMenu.document.fileName || 'Unknown File'}
+          </div>
+          <button
+            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+            onClick={() => handleViewDocument(documentContextMenu.document)}
+          >
+            <i className="ri-eye-line text-blue-600"></i>
+            View File
+          </button>
+          <button
+            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+            onClick={() => handleOpenDocumentInNewTab(documentContextMenu.document)}
+          >
+            <i className="ri-external-link-line text-green-600"></i>
+            Open in New Tab
+          </button>
+          <button
+            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+            onClick={() => handleDownloadDocument(documentContextMenu.document)}
+          >
+            <i className="ri-download-2-line text-purple-600"></i>
+            Download
+          </button>
+          <button
+            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+            onClick={() => handleCopyDocumentUrl(documentContextMenu.document)}
+          >
+            <i className="ri-link text-orange-600"></i>
+            Copy URL
+          </button>
+          <button
+            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-red-600"
+            onClick={() => handleDeleteDocument(documentContextMenu.document)}
+          >
+            <i className="ri-delete-bin-line"></i>
+            Delete File
+          </button>
         </div>
       )}
     </div>
