@@ -147,12 +147,12 @@ export const MenuItems: any = [
 
   {
     icon: TimeLineIcon,
-    title: "Timeline",
+    title: "Task Manager",
     type: "link",
     active: false,
     selected: false,
     dirchange: false,
-    path: "/timelines",
+    path: "/task-manager",
   },
 
 
