@@ -547,7 +547,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                     <input
                       type="text"
                       className="form-control py-2 w-full"
-                      placeholder="Search by name, email, phone, district, PAN, F No..."
+                      placeholder="Search by name, email, phone, city, PAN, F No..."
                       value={filters.name}
                       onChange={(e) => {
                         const value = e.target.value;
@@ -626,7 +626,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                           />
                         </th>
                         <th className="px-4 py-3">Client</th>
-                        <th className="px-4 py-3">District</th>
+                        <th className="px-4 py-3">City</th>
                         <th className="px-4 py-3">F No</th>
                         <th className="px-4 py-3">PAN</th>
                         <th className="px-4 py-3">Actions</th>
@@ -652,8 +652,14 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                             <td>
                               <div className="flex flex-col">
                                 <div className="font-medium text-gray-900">{client.name}</div>
-                                <div className="text-sm text-gray-500">{client.email}</div>
-                                <div className="text-sm text-gray-500">{client.phone}</div>
+                                <div className="text-sm text-gray-500 flex items-center">
+                                  <i className="ri-mail-line mr-1 text-gray-400"></i>
+                                  {client.email}
+                                </div>
+                                <div className="text-sm text-gray-500 flex items-center">
+                                  <i className="ri-phone-line mr-1 text-gray-400"></i>
+                                  {client.phone}
+                                </div>
                               </div>
                             </td>
                             <td>{client.district}</td>

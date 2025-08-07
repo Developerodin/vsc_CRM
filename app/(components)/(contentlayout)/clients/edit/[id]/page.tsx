@@ -59,7 +59,7 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
   const { branches } = useBranchContext();
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'activity'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'activity' | 'documents'>('general');
   
   // States for activities and team members
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -86,6 +86,22 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
   const [teamMemberSearchQuery, setTeamMemberSearchQuery] = useState('');
   const [filteredActivities, setFilteredActivities] = useState<Activity[]>([]);
   const [filteredTeamMembers, setFilteredTeamMembers] = useState<TeamMember[]>([]);
+  
+  // States for documents
+  const [clientDocuments, setClientDocuments] = useState<any[]>([]);
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
+  
+  // Document context menu state
+  const [documentContextMenu, setDocumentContextMenu] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    document: any;
+  } | null>(null);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -157,6 +173,20 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     fetchTeamMembers();
   }, []);
 
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (documentContextMenu?.visible) {
+        closeDocumentContextMenu();
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [documentContextMenu]);
+
   // Filter activities and team members based on search
   useEffect(() => {
     const filtered = activities.filter(activity =>
@@ -172,6 +202,354 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     );
     setFilteredTeamMembers(filtered);
   }, [teamMembers, teamMemberSearchQuery]);
+
+  // Document functions
+  const handleFilesSelected = (files: FileList | null) => {
+    if (files) {
+      const newFiles = Array.from(files);
+      setUploadFiles(prev => [...prev, ...newFiles]);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const files = e.dataTransfer.files;
+    if (files) {
+      const newFiles = Array.from(files);
+      setUploadFiles(prev => [...prev, ...newFiles]);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  };
+
+  const handleRemoveUploadFile = (name: string) => {
+    setUploadFiles(prev => prev.filter(file => file.name !== name));
+  };
+
+  const fetchClientDocuments = async (clientId: string) => {
+    try {
+      setIsLoadingDocuments(true);
+      const response = await fetch(`${Base_url}file-manager/clients/${clientId}/contents`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setClientDocuments(data.results || []);
+      }
+    } catch (error) {
+      console.error('Error fetching client documents:', error);
+    } finally {
+      setIsLoadingDocuments(false);
+    }
+  };
+
+  // Document context menu handlers
+  const handleDocumentContextMenu = (e: React.MouseEvent, document: any) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDocumentContextMenu({
+      visible: true,
+      x: e.clientX,
+      y: e.clientY,
+      document
+    });
+  };
+
+  const closeDocumentContextMenu = () => {
+    setDocumentContextMenu(null);
+  };
+
+  // Document action handlers
+  const handleViewDocument = (document: any) => {
+    const fileUrl = document.file?.fileUrl || document.fileUrl;
+    if (fileUrl) {
+      window.open(fileUrl, '_blank');
+    }
+    closeDocumentContextMenu();
+  };
+
+  const handleOpenDocumentInNewTab = (document: any) => {
+    const fileUrl = document.file?.fileUrl || document.fileUrl;
+    if (fileUrl) {
+      window.open(fileUrl, '_blank');
+    }
+    closeDocumentContextMenu();
+  };
+
+  const handleDownloadDocument = (document: any) => {
+    const fileUrl = document.file?.fileUrl || document.fileUrl;
+    const fileName = document.file?.fileName || document.fileName;
+    if (fileUrl && fileName) {
+      const link = document.createElement('a');
+      link.href = fileUrl;
+      link.download = fileName;
+      link.click();
+    }
+    closeDocumentContextMenu();
+  };
+
+  const handleCopyDocumentUrl = async (document: any) => {
+    const fileUrl = document.file?.fileUrl || document.fileUrl;
+    if (fileUrl) {
+      try {
+        await navigator.clipboard.writeText(fileUrl);
+        toast.success('File URL copied to clipboard');
+      } catch (err) {
+        console.error('Failed to copy URL:', err);
+        toast.error('Failed to copy URL');
+      }
+    }
+    closeDocumentContextMenu();
+  };
+
+  const handleDeleteDocument = async (document: any) => {
+    const fileName = document.file?.fileName || document.fileName;
+    if (confirm(`Are you sure you want to delete "${fileName}"?`)) {
+      try {
+        // You can implement delete functionality here if needed
+        toast.success('Document deleted successfully');
+        // Refresh documents list
+        fetchClientDocuments(params.id);
+      } catch (error) {
+        console.error('Failed to delete document:', error);
+        toast.error('Failed to delete document');
+      }
+    }
+    closeDocumentContextMenu();
+  };
+
+  // File type detection and icon mapping
+  const getFileIcon = (mimeType: string, fileName: string) => {
+    const extension = fileName?.split('.').pop()?.toLowerCase();
+    
+    // Image files
+    if (mimeType?.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'tiff', 'tif', 'ico', 'jfif', 'pjpeg', 'pjp'].includes(extension || '')) {
+      return 'ri-image-line text-blue-600';
+    }
+    
+    // PDF files
+    if (mimeType?.includes('pdf') || extension === 'pdf') {
+      return 'ri-file-pdf-line text-red-600';
+    }
+    
+    // Word documents
+    if (mimeType?.includes('word') || mimeType?.includes('document') || ['doc', 'docx', 'docm', 'dot', 'dotx', 'dotm'].includes(extension || '')) {
+      return 'ri-file-word-line text-blue-600';
+    }
+    
+    // Excel files
+    if (mimeType?.includes('excel') || mimeType?.includes('spreadsheet') || ['xls', 'xlsx', 'xlsm', 'xlt', 'xltx', 'xltm'].includes(extension || '')) {
+      return 'ri-file-excel-line text-green-600';
+    }
+    
+    // PowerPoint files
+    if (mimeType?.includes('powerpoint') || mimeType?.includes('presentation') || ['ppt', 'pptx', 'pptm', 'pot', 'potx', 'potm', 'pps', 'ppsx', 'ppsm'].includes(extension || '')) {
+      return 'ri-file-ppt-line text-orange-600';
+    }
+    
+    // Text files
+    if (mimeType?.startsWith('text/') || ['txt', 'md', 'log', 'rtf', 'csv', 'json', 'xml', 'html', 'htm', 'css', 'js', 'ts', 'jsx', 'tsx'].includes(extension || '')) {
+      return 'ri-file-text-line text-gray-600';
+    }
+    
+    // Video files
+    if (mimeType?.startsWith('video/') || ['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm', 'mkv', 'm4v', '3gp', 'ogv', 'mts', 'm2ts'].includes(extension || '')) {
+      return 'ri-video-line text-purple-600';
+    }
+    
+    // Audio files
+    if (mimeType?.startsWith('audio/') || ['mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a', 'opus', 'amr'].includes(extension || '')) {
+      return 'ri-volume-up-line text-pink-600';
+    }
+    
+    // Archive files
+    if (mimeType?.includes('zip') || mimeType?.includes('rar') || ['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'cab', 'iso', 'dmg'].includes(extension || '')) {
+      return 'ri-file-zip-line text-yellow-600';
+    }
+    
+    // Database files
+    if (['db', 'sqlite', 'sqlite3', 'mdb', 'accdb', 'odb'].includes(extension || '')) {
+      return 'ri-database-2-line text-indigo-600';
+    }
+    
+    // Code files
+    if (['py', 'java', 'cpp', 'c', 'cs', 'php', 'rb', 'go', 'rs', 'swift', 'kt', 'scala', 'r', 'matlab', 'sh', 'bat', 'ps1'].includes(extension || '')) {
+      return 'ri-code-s-slash-line text-cyan-600';
+    }
+    
+    // CAD files
+    if (['dwg', 'dxf', 'stl', 'obj', '3ds', 'max', 'blend', 'skp'].includes(extension || '')) {
+      return 'ri-cube-line text-teal-600';
+    }
+    
+    // Font files
+    if (['ttf', 'otf', 'woff', 'woff2', 'eot'].includes(extension || '')) {
+      return 'ri-font-size text-lime-600';
+    }
+    
+    // Default file icon
+    return 'ri-file-line text-gray-600';
+  };
+
+  const getFileColor = (mimeType: string, fileName: string) => {
+    const extension = fileName?.split('.').pop()?.toLowerCase();
+    
+    // Image files
+    if (mimeType?.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'tiff', 'tif', 'ico', 'jfif', 'pjpeg', 'pjp'].includes(extension || '')) {
+      return 'bg-blue-100 dark:bg-blue-900/30';
+    }
+    
+    // PDF files
+    if (mimeType?.includes('pdf') || extension === 'pdf') {
+      return 'bg-red-100 dark:bg-red-900/30';
+    }
+    
+    // Word documents
+    if (mimeType?.includes('word') || mimeType?.includes('document') || ['doc', 'docx', 'docm', 'dot', 'dotx', 'dotm'].includes(extension || '')) {
+      return 'bg-blue-100 dark:bg-blue-900/30';
+    }
+    
+    // Excel files
+    if (mimeType?.includes('excel') || mimeType?.includes('spreadsheet') || ['xls', 'xlsx', 'xlsm', 'xlt', 'xltx', 'xltm'].includes(extension || '')) {
+      return 'bg-green-100 dark:bg-green-900/30';
+    }
+    
+    // PowerPoint files
+    if (mimeType?.includes('powerpoint') || mimeType?.includes('presentation') || ['ppt', 'pptx', 'pptm', 'pot', 'potx', 'potm', 'pps', 'ppsx', 'ppsm'].includes(extension || '')) {
+      return 'bg-orange-100 dark:bg-orange-900/30';
+    }
+    
+    // Text files
+    if (mimeType?.startsWith('text/') || ['txt', 'md', 'log', 'rtf', 'csv', 'json', 'xml', 'html', 'htm', 'css', 'js', 'ts', 'jsx', 'tsx'].includes(extension || '')) {
+      return 'bg-gray-100 dark:bg-gray-700';
+    }
+    
+    // Video files
+    if (mimeType?.startsWith('video/') || ['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm', 'mkv', 'm4v', '3gp', 'ogv', 'mts', 'm2ts'].includes(extension || '')) {
+      return 'bg-purple-100 dark:bg-purple-900/30';
+    }
+    
+    // Audio files
+    if (mimeType?.startsWith('audio/') || ['mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a', 'opus', 'amr'].includes(extension || '')) {
+      return 'bg-pink-100 dark:bg-pink-900/30';
+    }
+    
+    // Archive files
+    if (mimeType?.includes('zip') || mimeType?.includes('rar') || ['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'cab', 'iso', 'dmg'].includes(extension || '')) {
+      return 'bg-yellow-100 dark:bg-yellow-900/30';
+    }
+    
+    // Database files
+    if (['db', 'sqlite', 'sqlite3', 'mdb', 'accdb', 'odb'].includes(extension || '')) {
+      return 'bg-indigo-100 dark:bg-indigo-900/30';
+    }
+    
+    // Code files
+    if (['py', 'java', 'cpp', 'c', 'cs', 'php', 'rb', 'go', 'rs', 'swift', 'kt', 'scala', 'r', 'matlab', 'sh', 'bat', 'ps1'].includes(extension || '')) {
+      return 'bg-cyan-100 dark:bg-cyan-900/30';
+    }
+    
+    // CAD files
+    if (['dwg', 'dxf', 'stl', 'obj', '3ds', 'max', 'blend', 'skp'].includes(extension || '')) {
+      return 'bg-teal-100 dark:bg-teal-900/30';
+    }
+    
+    // Font files
+    if (['ttf', 'otf', 'woff', 'woff2', 'eot'].includes(extension || '')) {
+      return 'bg-lime-100 dark:bg-lime-900/30';
+    }
+    
+    // Default
+    return 'bg-gray-100 dark:bg-gray-700';
+  };
+
+  const handleUpload = async () => {
+    if (uploadFiles.length === 0) return;
+
+    try {
+      setIsUploading(true);
+      setUploadProgress({});
+
+      const uploadPromises = uploadFiles.map(async (file) => {
+        const uploadFormData = new FormData();
+        uploadFormData.append('file', file);
+
+        const response = await fetch(`${Base_url}common/upload`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: uploadFormData
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to upload ${file.name}`);
+        }
+
+        const uploadResult = await response.json();
+        console.log('Upload response from /common/upload:', uploadResult);
+        
+        // Extract file data from the response
+        const fileData = uploadResult.data || uploadResult;
+        
+        // Save file info to client documents
+        const fileInfo = {
+          fileName: fileData.originalName,
+          fileUrl: fileData.url,
+          fileKey: fileData.key,
+          fileSize: fileData.size,
+          mimeType: fileData.mimeType,
+          metadata: {
+            category: 'client_document',
+            description: `Document for client: ${formData.name || 'Client'}`
+          }
+        };
+
+        console.log('File info being sent to client upload endpoint:', fileInfo);
+        console.log('Client ID:', params.id);
+        console.log('Upload URL:', `${Base_url}file-manager/clients/${params.id}/upload`);
+
+        const saveResponse = await fetch(`${Base_url}file-manager/clients/${params.id}/upload`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify(fileInfo)
+        });
+
+        if (!saveResponse.ok) {
+          const errorText = await saveResponse.text();
+          console.error('Save response error:', {
+            status: saveResponse.status,
+            statusText: saveResponse.statusText,
+            error: errorText
+          });
+          throw new Error(`Failed to save file info for ${file.name}: ${errorText}`);
+        }
+
+        return saveResponse.json();
+      });
+
+      await Promise.all(uploadPromises);
+      toast.success('Files uploaded successfully');
+      setShowUploadModal(false);
+      setUploadFiles([]);
+      setUploadProgress({});
+      
+      // Refresh documents list
+      fetchClientDocuments(params.id);
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Failed to upload files');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchClient = async () => {
@@ -214,6 +592,9 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
         if (data.activities && data.activities.length > 0) {
           setActivityMappings(data.activities);
         }
+        
+        // Fetch client documents
+        fetchClientDocuments(params.id);
       } catch (err) {
         console.error('Error fetching client:', err);
         toast.error('Failed to fetch client details');
@@ -358,7 +739,13 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
       return;
     }
     
-    // Only submit when on activity tab
+    if (activeTab === 'activity') {
+      if (!validateForm()) return;
+      setActiveTab('documents');
+      return;
+    }
+    
+    // Only submit when on documents tab
     if (!validateForm()) return;
 
     try {
@@ -468,6 +855,17 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                     onClick={() => setActiveTab('activity')}
                   >
                     Activity Mapping
+                  </button>
+                  <button
+                    type="button"
+                    className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                      activeTab === 'documents'
+                        ? 'bg-primary text-white'
+                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                    }`}
+                    onClick={() => setActiveTab('documents')}
+                  >
+                    Documents
                   </button>
                 </div>
 
@@ -895,6 +1293,81 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                   </div>
                 )}
 
+                {/* Documents Tab */}
+                {activeTab === 'documents' && (
+                  <div className="space-y-6">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-lg font-medium text-gray-900">Client Documents</h3>
+                      <button type="button" className="ti-btn ti-btn-primary" onClick={() => setShowUploadModal(true)}>
+                        <i className="ri-upload-2-line mr-2"></i> Upload Documents
+                      </button>
+                    </div>
+                    
+                    {isLoadingDocuments ? (
+                      <div className="flex items-center justify-center py-16">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                        <span className="ml-3 text-gray-600">Loading documents...</span>
+                      </div>
+                    ) : clientDocuments.length > 0 ? (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+                          {clientDocuments.map((doc, index) => (
+                            <div
+                              key={index}
+                              className="group relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-all duration-200 cursor-pointer"
+                            >
+                              {/* Selection Checkbox */}
+                              <input
+                                type="checkbox"
+                                className="absolute top-2 left-2 z-10 opacity-100 transition-opacity duration-200"
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  // Handle selection if needed
+                                }}
+                              />
+
+                              {/* Icon */}
+                              <div className="flex items-center justify-center w-16 h-16 mb-3">
+                                <div className="w-full h-full rounded-lg flex items-center justify-center bg-gray-100 dark:bg-gray-700">
+                                  <i className="ri-file-line text-2xl text-gray-600 dark:text-gray-400"></i>
+                                </div>
+                              </div>
+
+                              {/* Content */}
+                              <div className="text-center">
+                                <div className="font-medium text-sm truncate">
+                                  {doc.file?.fileName || doc.fileName || 'Unknown File'}
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {doc.file?.fileSize ? `${(doc.file.fileSize / 1024).toFixed(1)} KB` : 'Unknown size'}
+                                </div>
+                              </div>
+
+                              {/* Three-dot menu */}
+                              <button
+                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDocumentContextMenu(e, doc);
+                                }}
+                                title="More options"
+                              >
+                                <i className="ri-more-2-fill text-gray-500 hover:text-primary"></i>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-16 text-gray-500">
+                        <i className="ri-folder-open-line text-4xl mb-4 opacity-50"></i>
+                        <p className="text-lg font-medium">No files found in this folder</p>
+                        <p className="text-sm">Try uploading some files or creating a new folder</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Form Actions */}
                 <div className="flex items-center space-x-3 mt-6">
                   <button
@@ -907,7 +1380,7 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                         Saving...
                       </>
-                    ) : activeTab === 'general' ? (
+                    ) : activeTab === 'general' || activeTab === 'activity' ? (
                       'Next'
                     ) : (
                       'Save Client'
@@ -1091,6 +1564,152 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Upload Modal */}
+      {showUploadModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg w-11/12 max-w-2xl max-h-[90vh] flex flex-col">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h2 className="text-xl font-semibold">Upload Documents</h2>
+              <button
+                onClick={() => setShowUploadModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <i className="ri-close-line text-2xl"></i>
+              </button>
+            </div>
+
+            <div className="p-6 flex-1 overflow-auto">
+              {/* File Upload Area */}
+              <div
+                className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary transition-colors"
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+              >
+                <i className="ri-upload-cloud-line text-4xl text-gray-400 mb-4"></i>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Drop files here or click to browse</h3>
+                <p className="text-gray-500 mb-4">Support for PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, and other common formats</p>
+                <input
+                  type="file"
+                  multiple
+                  className="hidden"
+                  id="file-upload"
+                  onChange={(e) => handleFilesSelected(e.target.files)}
+                />
+                <label htmlFor="file-upload" className="ti-btn ti-btn-primary cursor-pointer">
+                  <i className="ri-folder-open-line mr-2"></i>
+                  Choose Files
+                </label>
+              </div>
+
+              {/* Selected Files */}
+              {uploadFiles.length > 0 && (
+                <div className="mt-6">
+                  <h4 className="text-lg font-medium text-gray-900 mb-4">Selected Files</h4>
+                  <div className="space-y-2">
+                    {uploadFiles.map((file, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <i className="ri-file-line text-primary"></i>
+                          <span className="text-sm font-medium">{file.name}</span>
+                          <span className="text-xs text-gray-500">({(file.size / 1024).toFixed(1)} KB)</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="text-red-500 hover:text-red-700"
+                          onClick={() => handleRemoveUploadFile(file.name)}
+                        >
+                          <i className="ri-delete-bin-line"></i>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t flex justify-end space-x-3">
+              <button
+                type="button"
+                className="ti-btn ti-btn-secondary"
+                onClick={() => setShowUploadModal(false)}
+                disabled={isUploading}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="ti-btn ti-btn-primary"
+                onClick={handleUpload}
+                disabled={uploadFiles.length === 0 || isUploading}
+              >
+                {isUploading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <i className="ri-upload-line mr-2"></i>
+                    Upload Files
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Document Context Menu */}
+      {documentContextMenu?.visible && (
+        <div 
+          className="fixed z-50 bg-white dark:bg-bodybg border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-48"
+          style={{
+            left: documentContextMenu.x,
+            top: documentContextMenu.y,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-3 py-2 text-xs text-gray-500 border-b border-gray-100 dark:border-gray-700">
+            {documentContextMenu.document.file?.fileName || documentContextMenu.document.fileName || 'Unknown File'}
+          </div>
+          <button
+            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+            onClick={() => handleViewDocument(documentContextMenu.document)}
+          >
+            <i className="ri-eye-line text-blue-600"></i>
+            View File
+          </button>
+          <button
+            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+            onClick={() => handleOpenDocumentInNewTab(documentContextMenu.document)}
+          >
+            <i className="ri-external-link-line text-green-600"></i>
+            Open in New Tab
+          </button>
+          <button
+            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+            onClick={() => handleDownloadDocument(documentContextMenu.document)}
+          >
+            <i className="ri-download-2-line text-purple-600"></i>
+            Download
+          </button>
+          <button
+            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+            onClick={() => handleCopyDocumentUrl(documentContextMenu.document)}
+          >
+            <i className="ri-link text-orange-600"></i>
+            Copy URL
+          </button>
+          <button
+            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-red-600"
+            onClick={() => handleDeleteDocument(documentContextMenu.document)}
+          >
+            <i className="ri-delete-bin-line"></i>
+            Delete File
+          </button>
         </div>
       )}
     </div>
