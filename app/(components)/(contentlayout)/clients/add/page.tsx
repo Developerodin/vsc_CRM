@@ -402,9 +402,9 @@ const AddClientPage = () => {
   // Document upload functionality
   const handleFilesSelected = (files: FileList | null) => {
     if (!files) return;
-    const validTypes = ['image/jpeg', 'image/png', 'application/pdf', 'video/mp4', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-    const filtered = Array.from(files).filter(f => validTypes.includes(f.type) || f.type.startsWith('image/') || f.type.startsWith('video/') || f.type.startsWith('audio/'));
-    setUploadFiles(prev => [...prev, ...filtered]);
+    // Accept all file types - let the server handle validation
+    const fileArray = Array.from(files);
+    setUploadFiles(prev => [...prev, ...fileArray]);
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
@@ -670,65 +670,89 @@ const AddClientPage = () => {
 
     setIsUploading(true);
     try {
-      const uploadPromises = uploadFiles.map(async (file) => {
-        const uploadFormData = new FormData();
-        uploadFormData.append('file', file);
+      // Reset progress for all files
+      const initialProgress = uploadFiles.reduce((acc, file) => {
+        acc[file.name] = 0;
+        return acc;
+      }, {} as Record<string, number>);
+      setUploadProgress(initialProgress);
 
-        const response = await fetch(`${Base_url}common/upload`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
-          body: uploadFormData
-        });
+      const uploadPromises = uploadFiles.map(async (file, index) => {
+        try {
+          // Simulate progress for first upload step
+          setUploadProgress(prev => ({ ...prev, [file.name]: 25 }));
 
-        if (!response.ok) {
-          throw new Error(`Failed to upload ${file.name}`);
-        }
+          const uploadFormData = new FormData();
+          uploadFormData.append('file', file);
 
-        const uploadResult = await response.json();
-        console.log('Upload response from /common/upload:', uploadResult);
-        
-        // Extract file data from the response
-        const fileData = uploadResult.data || uploadResult;
-        
-        // Save file info to client documents
-        const fileInfo = {
-          fileName: fileData.originalName,
-          fileUrl: fileData.url,
-          fileKey: fileData.key,
-          fileSize: fileData.size,
-          mimeType: fileData.mimeType,
-          metadata: {
-            category: 'client_document',
-            description: `Document for client: ${formData.name}`
-          }
-        };
-
-        console.log('File info being sent to client upload endpoint:', fileInfo);
-        console.log('Client ID:', savedClientId);
-        console.log('Upload URL:', `${Base_url}file-manager/clients/${savedClientId}/upload`);
-
-        const saveResponse = await fetch(`${Base_url}file-manager/clients/${savedClientId}/upload`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
-          body: JSON.stringify(fileInfo)
-        });
-
-        if (!saveResponse.ok) {
-          const errorText = await saveResponse.text();
-          console.error('Save response error:', {
-            status: saveResponse.status,
-            statusText: saveResponse.statusText,
-            error: errorText
+          const response = await fetch(`${Base_url}common/upload`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: uploadFormData
           });
-          throw new Error(`Failed to save file info for ${file.name}: ${errorText}`);
-        }
 
-        return saveResponse.json();
+          if (!response.ok) {
+            throw new Error(`Failed to upload ${file.name}`);
+          }
+
+          // Update progress to 50% after first upload
+          setUploadProgress(prev => ({ ...prev, [file.name]: 50 }));
+
+          const uploadResult = await response.json();
+          console.log('Upload response from /common/upload:', uploadResult);
+          
+          // Extract file data from the response
+          const fileData = uploadResult.data || uploadResult;
+          
+          // Save file info to client documents
+          const fileInfo = {
+            fileName: fileData.originalName,
+            fileUrl: fileData.url,
+            fileKey: fileData.key,
+            fileSize: fileData.size,
+            mimeType: fileData.mimeType,
+            metadata: {
+              category: 'client_document',
+              description: `Document for client: ${formData.name}`
+            }
+          };
+
+          console.log('File info being sent to client upload endpoint:', fileInfo);
+          console.log('Client ID:', savedClientId);
+          console.log('Upload URL:', `${Base_url}file-manager/clients/${savedClientId}/upload`);
+
+          // Update progress to 75% before saving
+          setUploadProgress(prev => ({ ...prev, [file.name]: 75 }));
+
+          const saveResponse = await fetch(`${Base_url}file-manager/clients/${savedClientId}/upload`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify(fileInfo)
+          });
+
+          if (!saveResponse.ok) {
+            const errorText = await saveResponse.text();
+            console.error('Save response error:', {
+              status: saveResponse.status,
+              statusText: saveResponse.statusText,
+              error: errorText
+            });
+            throw new Error(`Failed to save file info for ${file.name}: ${errorText}`);
+          }
+
+          // Update progress to 100% after successful save
+          setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
+
+          return saveResponse.json();
+        } catch (error) {
+          console.error(`Error uploading ${file.name}:`, error);
+          throw error;
+        }
       });
 
       await Promise.all(uploadPromises);
@@ -1556,22 +1580,24 @@ const AddClientPage = () => {
               <i className="ri-upload-2-line text-2xl mr-2 text-primary"></i> Upload Documents
             </h2>
             <div
-              className="border-2 border-dashed border-primary/40 rounded-lg p-6 mb-4 flex flex-col items-center justify-center cursor-pointer bg-light/40 hover:bg-primary/10 transition"
+              className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary transition-colors"
               onDrop={handleDrop}
               onDragOver={handleDragOver}
-              onClick={() => fileUploadRef.current?.click()}
             >
+              <i className="ri-upload-cloud-line text-4xl text-gray-400 mb-4"></i>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Drop files here or click to browse</h3>
+              <p className="text-gray-500 mb-4">Support for PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, and other common formats</p>
               <input
                 ref={fileUploadRef}
                 type="file"
                 multiple
-                accept="*/*"
                 className="hidden"
                 onChange={e => handleFilesSelected(e.target.files)}
               />
-              <i className="ri-upload-cloud-2-line text-4xl text-primary mb-2"></i>
-              <p className="text-defaulttextcolor font-medium">Drag & Drop files here or <span className="text-primary underline">browse</span></p>
-              <p className="text-xs text-gray-500 mt-1">All file types supported</p>
+              <label htmlFor="file-upload" className="ti-btn ti-btn-primary cursor-pointer" onClick={() => fileUploadRef.current?.click()}>
+                <i className="ri-folder-open-line mr-2"></i>
+                Choose Files
+              </label>
             </div>
             {uploadFiles.length > 0 && (
               <div className="space-y-3 max-h-56 overflow-y-auto mb-2 w-full">
