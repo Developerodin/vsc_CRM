@@ -1,5 +1,5 @@
 "use client"
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import axios from 'axios'
 import { Base_url } from '@/app/api/config/BaseUrl'
@@ -76,6 +76,14 @@ const ClientDashboard = () => {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [downloadingFile, setDownloadingFile] = useState<string | null>(null)
+  
+  // Filter states
+  const [searchTerm, setSearchTerm] = useState('')
+  const [fileTypeFilter, setFileTypeFilter] = useState<'all' | 'file' | 'folder'>('all')
+  const [fileCategoryFilter, setFileCategoryFilter] = useState<string>('all')
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all')
+  const [sortBy, setSortBy] = useState<'name' | 'date' | 'size' | 'type'>('name')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
 
   useEffect(() => {
     const token = localStorage.getItem('clientToken')
@@ -213,10 +221,26 @@ const ClientDashboard = () => {
   const canViewInBrowser = (mimeType: string): boolean => {
     return mimeType.startsWith('image/') || 
            mimeType.startsWith('video/') || 
-           mimeType.startsWith('audio/') || 
            mimeType.includes('pdf') || 
            mimeType.includes('text/') ||
            mimeType.includes('html')
+  }
+
+  const getFileExtension = (fileName: string): string => {
+    return fileName.split('.').pop()?.toLowerCase() || ''
+  }
+
+  const getFileCategory = (mimeType: string): string => {
+    if (mimeType.startsWith('image/')) return 'Image'
+    if (mimeType.startsWith('video/')) return 'Video'
+    if (mimeType.startsWith('audio/')) return 'Audio'
+    if (mimeType.startsWith('text/')) return 'Text'
+    if (mimeType.includes('pdf')) return 'PDF'
+    if (mimeType.includes('word') || mimeType.includes('document')) return 'Document'
+    if (mimeType.includes('spreadsheet') || mimeType.includes('excel')) return 'Spreadsheet'
+    if (mimeType.includes('presentation') || mimeType.includes('powerpoint')) return 'Presentation'
+    if (mimeType.includes('archive') || mimeType.includes('zip') || mimeType.includes('rar')) return 'Archive'
+    return 'Other'
   }
 
   const handleDownloadFile = async (file: FileItem) => {
@@ -276,6 +300,88 @@ const ClientDashboard = () => {
       setTimeout(() => setError(''), 3000)
     }
   }
+
+  // Filtered and sorted content
+  const filteredContent = useMemo(() => {
+    const filtered = folderContents.filter((item: FileManagerItem) => {
+      // Search filter
+      const searchMatch = searchTerm === '' || 
+        (item.type === 'file' && item.file && (
+          item.file.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          getFileExtension(item.file.fileName).includes(searchTerm.toLowerCase()) ||
+          getFileCategory(item.file.mimeType).toLowerCase().includes(searchTerm.toLowerCase())
+        )) ||
+        (item.type === 'folder' && item.folder?.name.toLowerCase().includes(searchTerm.toLowerCase()))
+
+      // Type filter
+      const typeMatch = fileTypeFilter === 'all' || item.type === fileTypeFilter
+
+      // File category filter
+      const categoryMatch = fileCategoryFilter === 'all' || 
+        (item.type === 'file' && item.file && getFileCategory(item.file.mimeType) === fileCategoryFilter)
+
+      // Date filter
+      let dateMatch = true
+      if (dateFilter !== 'all') {
+        const itemDate = new Date(item.updatedAt)
+        const now = new Date()
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        
+        switch (dateFilter) {
+          case 'today':
+            dateMatch = itemDate >= today
+            break
+          case 'week':
+            const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
+            dateMatch = itemDate >= weekAgo
+            break
+          case 'month':
+            const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
+            dateMatch = itemDate >= monthAgo
+            break
+        }
+      }
+
+      return searchMatch && typeMatch && categoryMatch && dateMatch
+    })
+
+    // Sorting
+    const sorted = [...filtered].sort((a: FileManagerItem, b: FileManagerItem) => {
+      let aValue: any, bValue: any
+      
+      switch (sortBy) {
+        case 'name':
+          aValue = a.type === 'file' ? a.file?.fileName : a.folder?.name
+          bValue = b.type === 'file' ? b.file?.fileName : b.folder?.name
+          break
+        case 'date':
+          aValue = new Date(a.updatedAt)
+          bValue = new Date(b.updatedAt)
+          break
+        case 'size':
+          aValue = a.type === 'file' ? a.file?.fileSize : 0
+          bValue = b.type === 'file' ? b.file?.fileSize : 0
+          break
+        case 'type':
+          aValue = a.type
+          bValue = b.type
+          break
+        default:
+          aValue = a.type === 'file' ? a.file?.fileName : a.folder?.name
+          bValue = b.type === 'file' ? b.file?.fileName : b.folder?.name
+      }
+
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return sortOrder === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue)
+      } else if (aValue instanceof Date && bValue instanceof Date) {
+        return sortOrder === 'asc' ? aValue.getTime() - bValue.getTime() : bValue.getTime() - aValue.getTime()
+      } else {
+        return sortOrder === 'asc' ? (aValue > bValue ? 1 : -1) : (aValue < bValue ? 1 : -1)
+      }
+    })
+
+    return sorted
+  }, [folderContents, searchTerm, fileTypeFilter, fileCategoryFilter, dateFilter, sortBy, sortOrder])
 
   if (!clientData) {
     return (
@@ -373,13 +479,159 @@ const ClientDashboard = () => {
              </div>
            </div>
 
+          {/* Filters and Search */}
+          <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+            <div className="space-y-4">
+              {/* Search Bar */}
+              <div className="relative">
+                <i className="ri-search-line absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                <input
+                  type="text"
+                  placeholder="Search files and folders..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Filter Controls */}
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+                {/* File Type Filter */}
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Type:</label>
+                  <select
+                    value={fileTypeFilter}
+                    onChange={(e) => setFileTypeFilter(e.target.value as 'all' | 'file' | 'folder')}
+                    className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="all">All</option>
+                    <option value="file">Files</option>
+                    <option value="folder">Folders</option>
+                  </select>
+                </div>
+
+                {/* File Category Filter */}
+                {fileTypeFilter === 'file' && (
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Category:</label>
+                    <select
+                      value={fileCategoryFilter}
+                      onChange={(e) => setFileCategoryFilter(e.target.value)}
+                      className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="all">All Categories</option>
+                      <option value="Image">Images</option>
+                      <option value="Video">Videos</option>
+                      <option value="Audio">Audio</option>
+                      <option value="Text">Text Files</option>
+                      <option value="PDF">PDFs</option>
+                      <option value="Document">Documents</option>
+                      <option value="Spreadsheet">Spreadsheets</option>
+                      <option value="Presentation">Presentations</option>
+                      <option value="Archive">Archives</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                )}
+
+                {/* Date Filter */}
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Date:</label>
+                  <select
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value as 'all' | 'today' | 'week' | 'month')}
+                    className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="all">All Time</option>
+                    <option value="today">Today</option>
+                    <option value="week">This Week</option>
+                    <option value="month">This Month</option>
+                  </select>
+                </div>
+
+                {/* Sort Options */}
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Sort by:</label>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as 'name' | 'date' | 'size' | 'type')}
+                    className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="name">Name</option>
+                    <option value="date">Date</option>
+                    <option value="size">Size</option>
+                    <option value="type">Type</option>
+                  </select>
+                  <button
+                    onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                    className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                    title={sortOrder === 'asc' ? 'Sort Descending' : 'Sort Ascending'}
+                  >
+                    <i className={`ri-sort-${sortOrder === 'asc' ? 'asc' : 'desc'}`}></i>
+                  </button>
+                </div>
+
+                {/* Results Count */}
+                <div className="ml-auto text-sm text-gray-600 dark:text-gray-400">
+                  Showing {filteredContent.length} of {folderContents.length} items
+                </div>
+
+                {/* Clear Filters */}
+                {(searchTerm || fileTypeFilter !== 'all' || fileCategoryFilter !== 'all' || dateFilter !== 'all') && (
+                  <button
+                    onClick={() => {
+                      setSearchTerm('')
+                      setFileTypeFilter('all')
+                      setFileCategoryFilter('all')
+                      setDateFilter('all')
+                      setSortBy('name')
+                      setSortOrder('asc')
+                    }}
+                    className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors"
+                  >
+                    Clear Filters
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Stats */}
+          {!loading && folderContents.length > 0 && (
+            <div className="px-4 sm:px-6 py-3 bg-gray-50 dark:bg-gray-700/30 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex flex-wrap items-center gap-4 text-xs sm:text-sm">
+                <span className="text-gray-600 dark:text-gray-400">
+                  Files: {folderContents.filter(item => item.type === 'file').length}
+                </span>
+                <span className="text-gray-600 dark:text-gray-400">
+                  Folders: {folderContents.filter(item => item.type === 'folder').length}
+                </span>
+                {(() => {
+                  const categories = folderContents
+                    .filter(item => item.type === 'file' && item.file)
+                    .reduce((acc, item) => {
+                      const category = getFileCategory(item.file!.mimeType)
+                      acc[category] = (acc[category] || 0) + 1
+                      return acc
+                    }, {} as Record<string, number>)
+                  
+                  return Object.entries(categories).map(([category, count]) => (
+                    <span key={category} className="text-gray-600 dark:text-gray-400">
+                      {category}: {count}
+                    </span>
+                  ))
+                })()}
+              </div>
+            </div>
+          )}
+
           {loading ? (
             <div className="flex items-center justify-center py-16">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
-                     ) : folderContents.length > 0 ? (
+                     ) : filteredContent.length > 0 ? (
              <div className="divide-y divide-gray-200 dark:divide-gray-700">
-               {folderContents.map((item) => (
+               {filteredContent.map((item) => (
                  <div
                    key={item._id}
                    className="flex items-center gap-2 sm:gap-4 p-3 sm:p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
@@ -447,8 +699,33 @@ const ClientDashboard = () => {
           ) : (
             <div className="text-center py-12 sm:py-16 text-gray-500 dark:text-gray-400">
               <i className="ri-folder-open-line text-3xl sm:text-4xl mb-3 sm:mb-4 opacity-50"></i>
-              <p className="text-base sm:text-lg font-medium">No files found</p>
-              <p className="text-xs sm:text-sm">Contact your administrator to upload files</p>
+              <p className="text-base sm:text-lg font-medium">
+                {searchTerm || fileTypeFilter !== 'all' || fileCategoryFilter !== 'all' || dateFilter !== 'all' 
+                  ? 'No files match your filters' 
+                  : 'No files found'
+                }
+              </p>
+              <p className="text-xs sm:text-sm">
+                {searchTerm || fileTypeFilter !== 'all' || fileCategoryFilter !== 'all' || dateFilter !== 'all'
+                  ? 'Try adjusting your search or filters'
+                  : 'Contact your administrator to upload files'
+                }
+              </p>
+              {(searchTerm || fileTypeFilter !== 'all' || fileCategoryFilter !== 'all' || dateFilter !== 'all') && (
+                <button
+                  onClick={() => {
+                    setSearchTerm('')
+                    setFileTypeFilter('all')
+                    setFileCategoryFilter('all')
+                    setDateFilter('all')
+                    setSortBy('name')
+                    setSortOrder('asc')
+                  }}
+                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                >
+                  Clear All Filters
+                </button>
+              )}
             </div>
           )}
         </div>

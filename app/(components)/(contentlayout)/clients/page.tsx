@@ -22,8 +22,27 @@ interface Client {
   dob: string;
   branch: string;
   sortOrder: number;
+  businessType: string;
+  gstNumber: string;
+  tanNumber: string;
+  cinNumber: string;
+  udyamNumber: string;
+  iecCode: string;
+  entityType: string;
   createdAt: string;
   updatedAt: string;
+}
+
+interface TaskStats {
+  pending: number;
+  ongoing: number;
+  completed: number;
+  delayed: number;
+  total: number;
+}
+
+interface ClientWithTasks extends Client {
+  taskStats: TaskStats;
 }
 
 interface ApiResponse {
@@ -49,6 +68,13 @@ interface ExcelRow {
   "PAN"?: string;
   "Date of Birth"?: string;
   "Sort Order"?: string | number;
+  "Business Type"?: string;
+  "Entity Type"?: string;
+  "GST Number"?: string;
+  "TAN Number"?: string;
+  "CIN Number"?: string;
+  "Udyam Number"?: string;
+  "IEC Code"?: string;
   "Created At"?: string;
 }
 
@@ -57,7 +83,7 @@ const ClientsPage = () => {
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [clients, setClients] = useState<Client[]>([]);
+  const [clients, setClients] = useState<ClientWithTasks[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -75,11 +101,41 @@ const ClientsPage = () => {
     country: "",
     fNo: "",
     pan: "",
-    branch: ""
+    branch: "",
+    businessType: "",
+    entityType: "",
+    gstNumber: "",
+    tanNumber: "",
+    cinNumber: "",
+    udyamNumber: "",
+    iecCode: ""
   });
+
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
 
   console.log(selectedBranchId, "selectedBranchId");
+
+  // Function to fetch task statistics for a client
+  const fetchClientTaskStats = async (clientId: string): Promise<TaskStats> => {
+    // Static mock data for now
+    const mockStats = [
+      { pending: 3, ongoing: 2, completed: 8, delayed: 1, total: 14 },
+      { pending: 1, ongoing: 4, completed: 12, delayed: 0, total: 17 },
+      { pending: 5, ongoing: 1, completed: 6, delayed: 2, total: 14 },
+      { pending: 0, ongoing: 3, completed: 15, delayed: 0, total: 18 },
+      { pending: 2, ongoing: 5, completed: 9, delayed: 1, total: 17 },
+      { pending: 4, ongoing: 2, completed: 7, delayed: 3, total: 16 },
+      { pending: 1, ongoing: 6, completed: 11, delayed: 0, total: 18 },
+      { pending: 3, ongoing: 1, completed: 13, delayed: 2, total: 19 },
+      { pending: 0, ongoing: 4, completed: 10, delayed: 1, total: 15 },
+      { pending: 2, ongoing: 3, completed: 8, delayed: 4, total: 17 }
+    ];
+    
+    // Use client ID to get consistent mock data
+    const index = parseInt(clientId.slice(-1)) || 0;
+    return mockStats[index % mockStats.length];
+  };
 
   const fetchClients = async (page = 1, limit = itemsPerPage) => {
     try {
@@ -99,6 +155,13 @@ const ClientsPage = () => {
         ...(filters.pan && { pan: filters.pan }),
         ...(filters.fNo && { fNo: filters.fNo }),
         ...(filters.branch && { branch: filters.branch }),
+        ...(filters.businessType && { businessType: filters.businessType }),
+        ...(filters.entityType && { entityType: filters.entityType }),
+        ...(filters.gstNumber && { gstNumber: filters.gstNumber }),
+        ...(filters.tanNumber && { tanNumber: filters.tanNumber }),
+        ...(filters.cinNumber && { cinNumber: filters.cinNumber }),
+        ...(filters.udyamNumber && { udyamNumber: filters.udyamNumber }),
+        ...(filters.iecCode && { iecCode: filters.iecCode }),
       });
 
       const response = await fetch(`${Base_url}clients?${queryParams}`, {
@@ -112,7 +175,16 @@ const ClientsPage = () => {
       }
 
       const data: ApiResponse = await response.json();
-      setClients(data.results);
+      
+      // Fetch task stats for each client
+      const clientsWithTasks = await Promise.all(
+        data.results.map(async (client: Client) => {
+          const taskStats = await fetchClientTaskStats(client.id);
+          return { ...client, taskStats };
+        })
+      );
+
+      setClients(clientsWithTasks);
       setTotalResults(data.totalResults);
       setTotalPages(data.totalPages);
     } catch (err) {
@@ -213,6 +285,13 @@ const ClientsPage = () => {
             "PAN": client.pan,
             "Date of Birth": client.dob,
             "Sort Order": client.sortOrder,
+            "Business Type": client.businessType,
+            "Entity Type": client.entityType,
+            "GST Number": client.gstNumber,
+            "TAN Number": client.tanNumber,
+            "CIN Number": client.cinNumber,
+            "Udyam Number": client.udyamNumber,
+            "IEC Code": client.iecCode,
           }));
       } else {
         // Export all clients
@@ -236,7 +315,14 @@ const ClientsPage = () => {
           "F No": client.fNo,
           "PAN": client.pan,
           "Date of Birth": client.dob,
-          "Sort Order": client.sortOrder
+          "Sort Order": client.sortOrder,
+          "Business Type": client.businessType,
+          "Entity Type": client.entityType,
+          "GST Number": client.gstNumber,
+          "TAN Number": client.tanNumber,
+          "CIN Number": client.cinNumber,
+          "Udyam Number": client.udyamNumber,
+          "IEC Code": client.iecCode,
         }));
       }
 
@@ -256,6 +342,13 @@ const ClientsPage = () => {
         { wch: 15 }, // PAN
         { wch: 15 }, // Date of Birth
         { wch: 10 }, // Sort Order
+        { wch: 25 }, // Business Type
+        { wch: 20 }, // Entity Type
+        { wch: 20 }, // GST Number
+        { wch: 20 }, // TAN Number
+        { wch: 20 }, // CIN Number
+        { wch: 20 }, // Udyam Number
+        { wch: 20 }, // IEC Code
       ];
 
       const wb = XLSX.utils.book_new();
@@ -361,7 +454,14 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
               pan: row["PAN"]?.toString().trim() || "",
               dob: convertDateFormat(row["Date of Birth"]?.toString() || ""),
               branch: row["Branch"]?.toString().trim() || "",
-              sortOrder: parseInt(row["Sort Order"]?.toString() || "1")
+              sortOrder: parseInt(row["Sort Order"]?.toString() || "1"),
+              businessType: row["Business Type"]?.toString().trim() || "",
+              entityType: row["Entity Type"]?.toString().trim() || "",
+              gstNumber: row["GST Number"]?.toString().trim() || "",
+              tanNumber: row["TAN Number"]?.toString().trim() || "",
+              cinNumber: row["CIN Number"]?.toString().trim() || "",
+              udyamNumber: row["Udyam Number"]?.toString().trim() || "",
+              iecCode: row["IEC Code"]?.toString().trim() || ""
             };
 
             let clientId = row["ID"];
@@ -451,6 +551,48 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     }
     return pages;
   }
+
+  // Function to render task status badges
+  const renderTaskStatus = (taskStats: TaskStats) => {
+    if (taskStats.total === 0) {
+      return (
+        <div className="text-center text-gray-400 text-xs">
+          <i className="ri-task-line mr-1"></i>
+          No tasks
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-1">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-gray-600">Total: {taskStats.total}</span>
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {taskStats.pending > 0 && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-warning text-black">
+              {taskStats.pending} Pending
+            </span>
+          )}
+          {taskStats.ongoing > 0 && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary text-black">
+              {taskStats.ongoing} Ongoing
+            </span>
+          )}
+          {taskStats.completed > 0 && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success text-black">
+              {taskStats.completed} Completed
+            </span>
+          )}
+          {taskStats.delayed > 0 && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-danger text-black">
+              {taskStats.delayed} Delayed
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="main-content">
@@ -565,6 +707,22 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                     />
                   </div>
 
+                  {/* Filter button */}
+                  <button
+                    className={`ti-btn py-2 w-full sm:w-auto ${
+                      showAdvancedFilters ? 'ti-btn-primary' : 'ti-btn-secondary'
+                    }`}
+                    onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                  >
+                    <i className={`ri-filter-${showAdvancedFilters ? 'fill' : 'line'} me-2`}></i>
+                    Filters
+                    {Object.values(filters).some(f => f !== "" && f !== filters.name) && (
+                      <span className="ml-2 bg-primary text-white text-xs rounded-full px-2 py-1">
+                        {Object.values(filters).filter(f => f !== "" && f !== filters.name).length}
+                      </span>
+                    )}
+                  </button>
+
                   {/* Sort dropdown */}
                   <select
                     className="form-select py-2 w-full sm:w-auto"
@@ -592,7 +750,14 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         country: "",
                         fNo: "",
                         pan: "",
-                        branch: ""
+                        branch: "",
+                        businessType: "",
+                        entityType: "",
+                        gstNumber: "",
+                        tanNumber: "",
+                        cinNumber: "",
+                        udyamNumber: "",
+                        iecCode: ""
                       });
                       setSortBy("name:asc");
                     }}
@@ -602,6 +767,364 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                   </button>
                 </div>
               </div>
+
+              {/* Advanced Filters Panel */}
+              {showAdvancedFilters && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {/* Business Type Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Business Type
+                      </label>
+                      <select
+                        className="form-select w-full"
+                        value={filters.businessType}
+                        onChange={(e) => {
+                          setFilters(prev => ({ ...prev, businessType: e.target.value }));
+                          setCurrentPage(1);
+                        }}
+                      >
+                        <option value="">All Business Types</option>
+                        <option value="Aviation">Aviation</option>
+                        <option value="Banking">Banking</option>
+                        <option value="Chemicals, Petrochemicals">Chemicals, Petrochemicals</option>
+                        <option value="Coal">Coal</option>
+                        <option value="Construction">Construction</option>
+                        <option value="Consultancy Services">Consultancy Services</option>
+                        <option value="Co-operatives">Co-operatives</option>
+                        <option value="Education">Education</option>
+                        <option value="Information Technology">Information Technology</option>
+                        <option value="Insurance">Insurance</option>
+                        <option value="Manufacturing">Manufacturing</option>
+                        <option value="Mining">Mining</option>
+                        <option value="Non Banking Financial Companies">Non Banking Financial Companies</option>
+                        <option value="Non Government Organisation">Non Government Organisation</option>
+                        <option value="Oil & Gas">Oil & Gas</option>
+                        <option value="Power">Power</option>
+                        <option value="Shipping">Shipping</option>
+                        <option value="Steel">Steel</option>
+                        <option value="Tele-Communication">Tele-Communication</option>
+                        <option value="Tourism">Tourism</option>
+                        <option value="Trading">Trading</option>
+                        <option value="Transport other than Shipping & Aviation">Transport other than Shipping & Aviation</option>
+                      </select>
+                    </div>
+
+                    {/* Entity Type Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Entity Type
+                      </label>
+                      <select
+                        className="form-select w-full"
+                        value={filters.entityType}
+                        onChange={(e) => {
+                          setFilters(prev => ({ ...prev, entityType: e.target.value }));
+                          setCurrentPage(1);
+                        }}
+                      >
+                        <option value="">All Entity Types</option>
+                        <option value="Proprietorship">Proprietorship</option>
+                        <option value="Partnership">Partnership</option>
+                        <option value="Private Limited">Private Limited</option>
+                        <option value="Public Limited">Public Limited</option>
+                        <option value="LLP">LLP</option>
+                        <option value="Sole Proprietorship">Sole Proprietorship</option>
+                        <option value="HUF">HUF</option>
+                        <option value="Trust">Trust</option>
+                        <option value="Society">Society</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+
+                    {/* GST Number Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        GST Number
+                      </label>
+                      <input
+                        type="text"
+                        className="form-control w-full"
+                        placeholder="Enter GST number"
+                        value={filters.gstNumber}
+                        onChange={(e) => {
+                          setFilters(prev => ({ ...prev, gstNumber: e.target.value }));
+                          setCurrentPage(1);
+                        }}
+                      />
+                    </div>
+
+                    {/* TAN Number Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        TAN Number
+                      </label>
+                      <input
+                        type="text"
+                        className="form-control w-full"
+                        placeholder="Enter TAN number"
+                        value={filters.tanNumber}
+                        onChange={(e) => {
+                          setFilters(prev => ({ ...prev, tanNumber: e.target.value }));
+                          setCurrentPage(1);
+                        }}
+                      />
+                    </div>
+
+                    {/* CIN Number Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        CIN Number
+                      </label>
+                      <input
+                        type="text"
+                        className="form-control w-full"
+                        placeholder="Enter CIN number"
+                        value={filters.cinNumber}
+                        onChange={(e) => {
+                          setFilters(prev => ({ ...prev, cinNumber: e.target.value }));
+                          setCurrentPage(1);
+                        }}
+                      />
+                    </div>
+
+                    {/* Udyam Number Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Udyam Number
+                      </label>
+                      <input
+                        type="text"
+                        className="form-control w-full"
+                        placeholder="Enter Udyam number"
+                        value={filters.udyamNumber}
+                        onChange={(e) => {
+                          setFilters(prev => ({ ...prev, udyamNumber: e.target.value }));
+                          setCurrentPage(1);
+                        }}
+                      />
+                    </div>
+
+                    {/* IEC Code Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        IEC Code
+                      </label>
+                      <input
+                        type="text"
+                        className="form-control w-full"
+                        placeholder="Enter IEC code"
+                        value={filters.iecCode}
+                        onChange={(e) => {
+                          setFilters(prev => ({ ...prev, iecCode: e.target.value }));
+                          setCurrentPage(1);
+                        }}
+                      />
+                    </div>
+
+                    {/* State Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        State
+                      </label>
+                      <input
+                        type="text"
+                        className="form-control w-full"
+                        placeholder="Enter state"
+                        value={filters.state}
+                        onChange={(e) => {
+                          setFilters(prev => ({ ...prev, state: e.target.value }));
+                          setCurrentPage(1);
+                        }}
+                      />
+                    </div>
+
+                    {/* Country Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Country
+                      </label>
+                      <input
+                        type="text"
+                        className="form-control w-full"
+                        placeholder="Enter country"
+                        value={filters.country}
+                        onChange={(e) => {
+                          setFilters(prev => ({ ...prev, country: e.target.value }));
+                          setCurrentPage(1);
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Filter Actions */}
+                  <div className="flex justify-end mt-4 pt-4 border-t border-gray-200">
+                    <button
+                      className="ti-btn ti-btn-secondary me-2"
+                      onClick={() => {
+                        setFilters(prev => ({
+                          ...prev,
+                          businessType: "",
+                          entityType: "",
+                          gstNumber: "",
+                          tanNumber: "",
+                          cinNumber: "",
+                          udyamNumber: "",
+                          iecCode: "",
+                          state: "",
+                          country: ""
+                        }));
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <i className="ri-filter-off-line me-2"></i>
+                      Clear Filters
+                    </button>
+                    <button
+                      className="ti-btn ti-btn-primary"
+                      onClick={() => setShowAdvancedFilters(false)}
+                    >
+                      <i className="ri-check-line me-2"></i>
+                      Apply Filters
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Active Filters Summary */}
+              {Object.values(filters).some(f => f !== "" && f !== filters.name) && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <i className="ri-filter-3-fill text-blue-600 mr-2"></i>
+                      <span className="text-sm font-medium text-blue-800">Active Filters:</span>
+                    </div>
+                    <button
+                      className="text-blue-600 hover:text-blue-800 text-sm"
+                      onClick={() => {
+                        setFilters(prev => ({
+                          ...prev,
+                          businessType: "",
+                          entityType: "",
+                          gstNumber: "",
+                          tanNumber: "",
+                          cinNumber: "",
+                          udyamNumber: "",
+                          iecCode: "",
+                          state: "",
+                          country: ""
+                        }));
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <i className="ri-close-line mr-1"></i>
+                      Clear All
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {filters.businessType && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        Business Type: {filters.businessType}
+                        <button
+                          className="ml-1 text-blue-600 hover:text-blue-800"
+                          onClick={() => setFilters(prev => ({ ...prev, businessType: "" }))}
+                        >
+                          <i className="ri-close-line"></i>
+                        </button>
+                      </span>
+                    )}
+                    {filters.entityType && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        Entity Type: {filters.entityType}
+                        <button
+                          className="ml-1 text-blue-600 hover:text-blue-800"
+                          onClick={() => setFilters(prev => ({ ...prev, entityType: "" }))}
+                        >
+                          <i className="ri-close-line"></i>
+                        </button>
+                      </span>
+                    )}
+                    {filters.gstNumber && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        GST: {filters.gstNumber}
+                        <button
+                          className="ml-1 text-blue-600 hover:text-blue-800"
+                          onClick={() => setFilters(prev => ({ ...prev, gstNumber: "" }))}
+                        >
+                          <i className="ri-close-line"></i>
+                        </button>
+                      </span>
+                    )}
+                    {filters.tanNumber && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        TAN: {filters.tanNumber}
+                        <button
+                          className="ml-1 text-blue-600 hover:text-blue-800"
+                          onClick={() => setFilters(prev => ({ ...prev, tanNumber: "" }))}
+                        >
+                          <i className="ri-close-line"></i>
+                        </button>
+                      </span>
+                    )}
+                    {filters.cinNumber && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        CIN: {filters.cinNumber}
+                        <button
+                          className="ml-1 text-blue-600 hover:text-blue-800"
+                          onClick={() => setFilters(prev => ({ ...prev, cinNumber: "" }))}
+                        >
+                          <i className="ri-close-line"></i>
+                        </button>
+                      </span>
+                    )}
+                    {filters.udyamNumber && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        Udyam: {filters.udyamNumber}
+                        <button
+                          className="ml-1 text-blue-600 hover:text-blue-800"
+                          onClick={() => setFilters(prev => ({ ...prev, udyamNumber: "" }))}
+                        >
+                          <i className="ri-close-line"></i>
+                        </button>
+                      </span>
+                    )}
+                    {filters.iecCode && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        IEC: {filters.iecCode}
+                        <button
+                          className="ml-1 text-blue-600 hover:text-blue-800"
+                          onClick={() => setFilters(prev => ({ ...prev, iecCode: "" }))}
+                        >
+                          <i className="ri-close-line"></i>
+                        </button>
+                      </span>
+                    )}
+                    {filters.state && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        State: {filters.state}
+                        <button
+                          className="ml-1 text-blue-600 hover:text-blue-800"
+                          onClick={() => setFilters(prev => ({ ...prev, state: "" }))}
+                        >
+                          <i className="ri-close-line"></i>
+                        </button>
+                      </span>
+                    )}
+                    {filters.country && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        Country: {filters.country}
+                        <button
+                          className="ml-1 text-blue-600 hover:text-blue-800"
+                          onClick={() => setFilters(prev => ({ ...prev, country: "" }))}
+                        >
+                          <i className="ri-close-line"></i>
+                        </button>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {isLoading ? (
                 <div className="flex items-center justify-center py-8">
@@ -627,14 +1150,17 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         </th>
                         <th className="px-4 py-3">Client</th>
                         <th className="px-4 py-3">City</th>
+                        <th className="px-4 py-3">Business Type</th>
+                        <th className="px-4 py-3">Entity Type</th>
                         <th className="px-4 py-3">F No</th>
                         <th className="px-4 py-3">PAN</th>
+                        <th className="px-4 py-3">Task Status</th>
                         <th className="px-4 py-3">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {clients.length > 0 ? (
-                        clients.map((client: Client, index: number) => (
+                        clients.map((client: ClientWithTasks, index: number) => (
                           <tr
                             key={client.id}
                             className={`border-b border-gray-200 ${
@@ -663,8 +1189,25 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                               </div>
                             </td>
                             <td>{client.district}</td>
+                            <td>
+                              <span className={`px-2 py-1 text-xs rounded-full ${
+                                client.businessType ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
+                              }`}>
+                                {client.businessType || 'N/A'}
+                              </span>
+                            </td>
+                            <td>
+                              <span className={`px-2 py-1 text-xs rounded-full ${
+                                client.entityType ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                              }`}>
+                                {client.entityType || 'N/A'}
+                              </span>
+                            </td>
                             <td>{client.fNo}</td>
                             <td>{client.pan}</td>
+                            <td className="px-4 py-3">
+                              {renderTaskStatus(client.taskStats)}
+                            </td>
                             <td>
                               <div className="flex space-x-2">
                                 <Link
@@ -691,7 +1234,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={6} className="text-center py-8">
+                          <td colSpan={9} className="text-center py-8">
                             <div className="flex flex-col items-center justify-center">
                               <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
                                 <i className="ri-folder-line text-4xl text-primary"></i>

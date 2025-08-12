@@ -372,12 +372,12 @@ const Header = ({ local_varaiable, ThemeChanger }:any) => {
               <div className="header-element">
                 <div className="horizontal-logo">
                   <Link href="/dashboard" className="header-logo">
-                    <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/images/brand-logos/logo.png`} alt="logo" className="desktop-logo" />
-                    <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/images/brand-logos/logo.png`} alt="logo" className="toggle-logo" />
-                    <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/images/brand-logos/logo.png`} alt="logo" className="desktop-dark" />
-                    <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/images/brand-logos/logo.png`} alt="logo" className="toggle-dark" />
-                    <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/images/brand-logos/logo.png`} alt="logo" className="desktop-white" />
-                    <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/images/brand-logos/logo.png`} alt="logo" className="toggle-white" />
+                    <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/logo/vsc-logo1.png`} alt="VSC Logo" className="desktop-logo" />
+                    <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/logo/vsc-logo1.png`} alt="VSC Logo" className="toggle-logo" />
+                    <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/logo/vsc-logo1.png`} alt="VSC Logo" className="desktop-dark" />
+                    <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/logo/vsc-logo1.png`} alt="VSC Logo" className="toggle-dark" />
+                    <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/logo/vsc-logo1.png`} alt="VSC Logo" className="desktop-white" />
+                    <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/logo/vsc-logo1.png`} alt="VSC Logo" className="toggle-white" />
                   </Link>
                 </div>
               </div>

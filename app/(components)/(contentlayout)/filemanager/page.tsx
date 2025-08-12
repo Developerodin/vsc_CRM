@@ -63,10 +63,14 @@ const Filemanager = () => {
         itemType: 'file' | 'folder';
         item?: Folder | FileItem;
     } | null>(null);
-    const [filePreviewModal, setFilePreviewModal] = useState<{
+    // File preview modal state removed - private files don't need preview
+
+    // Email modal state
+    const [emailModal, setEmailModal] = useState<{
         visible: boolean;
         file: FileItem | null;
-    }>({ visible: false, file: null });
+        email: string;
+    }>({ visible: false, file: null, email: '' });
 
     // Handle responsive behavior
     const handleResize = () => {
@@ -530,17 +534,6 @@ const Filemanager = () => {
                 handleDownloadFile(item as FileItem);
             }
         });
-    };
-
-    // Copy file URL to clipboard
-    const copyFileUrl = async (fileUrl: string) => {
-        try {
-            await navigator.clipboard.writeText(fileUrl);
-            // You can add a toast notification here if you have a toast system
-            console.log('File URL copied to clipboard');
-        } catch (err) {
-            console.error('Failed to copy URL:', err);
-        }
     };
 
     // Auto-select first folder on mount or when folderTree changes
@@ -1096,28 +1089,6 @@ const Filemanager = () => {
                             <button
                                 className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
                                 onClick={() => {
-                                    setFilePreviewModal({ visible: true, file: contextMenu.item as FileItem });
-                                    closeContextMenu();
-                                }}
-                            >
-                                <i className="ri-eye-line text-blue-600"></i>
-                                View File
-                            </button>
-                            <button
-                                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
-                                onClick={() => {
-                                    if (contextMenu.item?.type === 'file' && contextMenu.item.file) {
-                                        window.open(contextMenu.item.file.fileUrl, '_blank');
-                                    }
-                                    closeContextMenu();
-                                }}
-                            >
-                                <i className="ri-external-link-line text-green-600"></i>
-                                Open in New Tab
-                            </button>
-                            <button
-                                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
-                                onClick={() => {
                                     if (contextMenu.item?.type === 'file') {
                                         handleDownloadFile(contextMenu.item as FileItem);
                                     }
@@ -1130,14 +1101,14 @@ const Filemanager = () => {
                             <button
                                 className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
                                 onClick={() => {
-                                    if (contextMenu.item?.type === 'file' && contextMenu.item.file) {
-                                        copyFileUrl(contextMenu.item.file.fileUrl);
+                                    if (contextMenu.item?.type === 'file') {
+                                        setEmailModal({ visible: true, file: contextMenu.item as FileItem, email: '' });
                                     }
                                     closeContextMenu();
                                 }}
                             >
-                                <i className="ri-link text-orange-600"></i>
-                                Copy URL
+                                <i className="ri-mail-line text-blue-600"></i>
+                                Send to Email
                             </button>
                         </>
                     )}
@@ -1156,95 +1127,65 @@ const Filemanager = () => {
                 </div>
             )}
 
-            {/* File Preview Modal */}
-            {filePreviewModal.visible && filePreviewModal.file && (
+            {/* File Preview Modal removed - private files don't need preview functionality */}
+
+            {/* Email Modal */}
+            {emailModal.visible && emailModal.file && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-                    <div className="bg-white dark:bg-bodybg rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+                    <div className="bg-white dark:bg-bodybg rounded-lg shadow-xl max-w-md w-full mx-4">
                         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
                             <div className="flex items-center gap-3">
-                                <i className={`text-xl ${getFileIcon(filePreviewModal.file.file?.mimeType || '')}`}></i>
+                                <i className={`text-xl ${getFileIcon(emailModal.file.file?.mimeType || '')}`}></i>
                                 <div>
-                                    <h3 className="font-semibold text-lg">{filePreviewModal.file.file?.fileName}</h3>
-                                    <p className="text-sm text-gray-500">
-                                        {formatFileSize(filePreviewModal.file.file?.fileSize || 0)} • {filePreviewModal.file.file?.mimeType}
-                                    </p>
+                                    <h3 className="font-semibold text-lg">Send File to Email</h3>
+                                    <p className="text-sm text-gray-500">{emailModal.file.file?.fileName}</p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-                                    onClick={() => {
-                                        if (filePreviewModal.file?.file) {
-                                            window.open(filePreviewModal.file.file.fileUrl, '_blank');
-                                        }
-                                    }}
-                                    title="Open in new tab"
-                                >
-                                    <i className="ri-external-link-line"></i>
-                                </button>
-                                <button
-                                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-                                    onClick={() => {
-                                        if (filePreviewModal.file) {
-                                            handleDownloadFile(filePreviewModal.file);
-                                        }
-                                    }}
-                                    title="Download"
-                                >
-                                    <i className="ri-download-2-line"></i>
-                                </button>
-                                <button
-                                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-                                    onClick={() => setFilePreviewModal({ visible: false, file: null })}
-                                    title="Close"
-                                >
-                                    <i className="ri-close-line"></i>
-                                </button>
-                            </div>
+                            <button
+                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                                onClick={() => setEmailModal({ visible: false, file: null, email: '' })}
+                                title="Close"
+                            >
+                                <i className="ri-close-line"></i>
+                            </button>
                         </div>
-                        <div className="p-6 overflow-auto max-h-[calc(90vh-80px)]">
-                            {filePreviewModal.file.file?.mimeType?.startsWith('image/') ? (
-                                <img 
-                                    src={filePreviewModal.file.file.fileUrl} 
-                                    alt={filePreviewModal.file.file.fileName}
-                                    className="max-w-full h-auto mx-auto"
+                        <div className="p-6">
+                            <div className="mb-4">
+                                <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Email Address
+                                </label>
+                                <input
+                                    type="email"
+                                    id="email"
+                                    className="form-control w-full"
+                                    placeholder="Enter email address"
+                                    value={emailModal.email}
+                                    onChange={(e) => setEmailModal(prev => ({ ...prev, email: e.target.value }))}
+                                    autoFocus
                                 />
-                            ) : filePreviewModal.file.file?.mimeType?.startsWith('video/') ? (
-                                <video 
-                                    src={filePreviewModal.file.file.fileUrl} 
-                                    controls 
-                                    className="max-w-full h-auto mx-auto"
-                                />
-                            ) : filePreviewModal.file.file?.mimeType?.startsWith('audio/') ? (
-                                <audio 
-                                    src={filePreviewModal.file.file.fileUrl} 
-                                    controls 
-                                    className="w-full"
-                                />
-                            ) : filePreviewModal.file.file?.mimeType?.includes('pdf') ? (
-                                <iframe 
-                                    src={filePreviewModal.file.file.fileUrl} 
-                                    className="w-full h-[70vh] border-0"
-                                    title={filePreviewModal.file.file.fileName}
-                                />
-                            ) : (
-                                <div className="text-center py-16">
-                                    <i className="ri-file-line text-6xl text-gray-400 mb-4"></i>
-                                    <p className="text-lg font-medium text-gray-600">Preview not available</p>
-                                    <p className="text-sm text-gray-500 mb-4">This file type cannot be previewed</p>
-                                    <button
-                                        className="ti-btn ti-btn-primary"
-                                        onClick={() => {
-                                            if (filePreviewModal.file?.file) {
-                                                handleDownloadFile(filePreviewModal.file);
-                                            }
-                                        }}
-                                    >
-                                        <i className="ri-download-2-line mr-2"></i>
-                                        Download File
-                                    </button>
-                                </div>
-                            )}
+                            </div>
+                            <div className="flex justify-end gap-2">
+                                <button 
+                                    className="ti-btn ti-btn-light" 
+                                    onClick={() => setEmailModal({ visible: false, file: null, email: '' })}
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    className="ti-btn ti-btn-primary" 
+                                    onClick={() => {
+                                        // TODO: Implement email sending functionality
+                                        if (emailModal.file) {
+                                            console.log('Sending file to email:', emailModal.email);
+                                            alert(`File "${emailModal.file.file?.fileName}" will be sent to ${emailModal.email}`);
+                                        }
+                                        setEmailModal({ visible: false, file: null, email: '' });
+                                    }}
+                                    disabled={!emailModal.email.trim() || !emailModal.email.includes('@')}
+                                >
+                                    Send File
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { toast, Toaster } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { Base_url } from "@/app/api/config/BaseUrl";
+import { useGroupFilters, GroupWithTasks } from "./hooks/useGroupFilters";
+import { AdvancedFiltersPanel, ActiveFiltersSummary, SearchAndFilterControls } from "./components";
 
 interface Client {
   id: string;
@@ -43,6 +45,11 @@ interface ExcelRow {
   "Group Name": string;
   "Sort Order"?: number;
   "ID"?: string;
+  "Total Tasks"?: number;
+  "Pending"?: number;
+  "Completed"?: number;
+  "Delayed"?: number;
+  "Ongoing"?: number;
 }
 
 const GroupsPage = () => {
@@ -52,7 +59,7 @@ const GroupsPage = () => {
     name: "",
   });
   const [currentPage, setCurrentPage] = useState(1);
-  const [groups, setGroups] = useState<Group[]>([]);
+  const [groups, setGroups] = useState<GroupWithTasks[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -62,13 +69,46 @@ const GroupsPage = () => {
   const [sortBy, setSortBy] = useState<string>("name:asc");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showClientModal, setShowClientModal] = useState(false);
-  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<GroupWithTasks | null>(null);
   const [availableClients, setAvailableClients] = useState<Client[]>([]);
   const [isLoadingClients, setIsLoadingClients] = useState(false);
   const [clientSearchQuery, setClientSearchQuery] = useState("");
   const [clientCurrentPage, setClientCurrentPage] = useState(1);
   const [clientTotalPages, setClientTotalPages] = useState(1);
   const [clientTotalResults, setClientTotalResults] = useState(0);
+
+  // Use the custom hook for filters
+  const {
+    showAdvancedFilters,
+    setShowAdvancedFilters,
+    advancedFilters,
+    hasActiveAdvancedFilters,
+    applyAdvancedFilters,
+    clearAdvancedFilters,
+    updateFilter,
+    updateTaskStatusFilter
+  } = useGroupFilters();
+
+  // Mock task stats for groups
+  const generateMockTaskStats = (groupId: string) => {
+    // Generate consistent mock data based on group ID
+    const seed = groupId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const total = 10 + (seed % 20); // 10-29 tasks
+    
+    // Calculate percentages that ensure they don't exceed 100%
+    const pendingPercent = Math.min(0.3, 0.2 + (seed % 3) * 0.05); // Max 30%
+    const completedPercent = Math.min(0.4, 0.3 + (seed % 4) * 0.05); // Max 40%
+    const delayedPercent = Math.min(0.2, 0.1 + (seed % 2) * 0.05); // Max 20%
+    
+    const pending = Math.floor(total * pendingPercent);
+    const completed = Math.floor(total * completedPercent);
+    const delayed = Math.floor(total * delayedPercent);
+    
+    // Ensure ongoing is never negative
+    const ongoing = Math.max(0, total - pending - completed - delayed);
+    
+    return { total, pending, completed, delayed, ongoing };
+  };
 
   const fetchGroups = async (page = 1, limit = itemsPerPage) => {
     try {
@@ -91,9 +131,19 @@ const GroupsPage = () => {
       }
 
       const data: ApiResponse = await response.json();
-      setGroups(data.results);
-      setTotalResults(data.totalResults);
-      setTotalPages(data.totalPages);
+      
+      // Add mock task stats to each group
+      const groupsWithTasks: GroupWithTasks[] = data.results.map(group => ({
+        ...group,
+        taskStats: generateMockTaskStats(group.id)
+      }));
+      
+      // Apply advanced filters if any are active
+      const filteredGroups = applyAdvancedFilters(groupsWithTasks);
+      
+      setGroups(filteredGroups);
+      setTotalResults(filteredGroups.length);
+      setTotalPages(Math.ceil(filteredGroups.length / itemsPerPage));
     } catch (err) {
       console.error('Error fetching groups:', err);
       setError('Failed to fetch groups');
@@ -104,7 +154,7 @@ const GroupsPage = () => {
 
   useEffect(() => {
     fetchGroups(currentPage, itemsPerPage);
-  }, [currentPage, itemsPerPage, filters, sortBy]);
+  }, [currentPage, itemsPerPage, filters, sortBy, advancedFilters]);
 
   const handleSelectAll = () => {
     if (selectAll) {
@@ -182,13 +232,18 @@ const GroupsPage = () => {
       if (selectedGroups.length > 0) {
         exportData = groups
           .filter(group => selectedGroups.includes(group.id))
-          .map((group: Group) => ({
+          .map((group: GroupWithTasks) => ({
             ID: group.id,
             "Group Name": group.name,
             "Number Of Clients": group.numberOfClients,
             "Created Date": new Date(group.createdAt).toLocaleDateString(),
             "Sort Order": group.sortOrder,
-            "Client IDs": group.clients?.map(client => client.id).join(',') || ''
+            "Client IDs": group.clients?.map(client => client.id).join(',') || '',
+            "Total Tasks": group.taskStats.total,
+            "Pending": group.taskStats.pending,
+            "Completed": group.taskStats.completed,
+            "Delayed": group.taskStats.delayed,
+            "Ongoing": group.taskStats.ongoing
           }));
         successMessage = "Selected groups exported successfully";
       } else {
@@ -210,7 +265,12 @@ const GroupsPage = () => {
           "Number Of Clients": group.numberOfClients,
           "Created Date": new Date(group.createdAt).toLocaleDateString(),
           "Sort Order": group.sortOrder,
-          "Client IDs": group.clients?.map(client => client.id).join(',') || ''
+          "Client IDs": group.clients?.map(client => client.id).join(',') || '',
+          "Total Tasks": generateMockTaskStats(group.id).total,
+          "Pending": generateMockTaskStats(group.id).pending,
+          "Completed": generateMockTaskStats(group.id).completed,
+          "Delayed": generateMockTaskStats(group.id).delayed,
+          "Ongoing": generateMockTaskStats(group.id).ongoing
         }));
         successMessage = "All groups exported successfully";
       }
@@ -225,6 +285,11 @@ const GroupsPage = () => {
         { wch: 20 }, // Created Date
         { wch: 10 }, // Sort Order
         { wch: 50 }, // Client IDs
+        { wch: 10 }, // Total Tasks
+        { wch: 10 }, // Pending
+        { wch: 10 }, // Completed
+        { wch: 10 }, // Delayed
+        { wch: 10 }, // Ongoing
       ];
 
       const wb = XLSX.utils.book_new();
@@ -283,7 +348,24 @@ const GroupsPage = () => {
             name: row["Group Name"].toString().trim(),
             sortOrder: parseInt(row["Sort Order"]?.toString() || "1"),
             numberOfClients: existingGroup?.clients?.length || 0,
-            clients: existingGroup?.clients?.map((client: Client) => client.id) || []
+            clients: existingGroup?.clients?.map((client: Client) => client.id) || [],
+            // Use imported task stats if available, otherwise generate mock data
+            taskStats: (() => {
+              const total = parseInt(row["Total Tasks"]?.toString() || "0") || generateMockTaskStats(row["ID"] || row["Group Name"]).total;
+              const pending = parseInt(row["Pending"]?.toString() || "0") || generateMockTaskStats(row["ID"] || row["Group Name"]).pending;
+              const completed = parseInt(row["Completed"]?.toString() || "0") || generateMockTaskStats(row["ID"] || row["Group Name"]).completed;
+              const delayed = parseInt(row["Delayed"]?.toString() || "0") || generateMockTaskStats(row["ID"] || row["Group Name"]).delayed;
+              
+              // Ensure ongoing is never negative by adjusting other values if needed
+              let ongoing = parseInt(row["Ongoing"]?.toString() || "0") || generateMockTaskStats(row["ID"] || row["Group Name"]).ongoing;
+              
+              // If the sum exceeds total, recalculate ongoing to prevent negative values
+              if (pending + completed + delayed + ongoing > total) {
+                ongoing = Math.max(0, total - pending - completed - delayed);
+              }
+              
+              return { total, pending, completed, delayed, ongoing };
+            })()
           };
 
           return {
@@ -395,7 +477,7 @@ const GroupsPage = () => {
     }
   }, [clientSearchQuery, clientCurrentPage, showClientModal, selectedGroup]);
 
-  const handleViewClients = async (group: Group) => {
+  const handleViewClients = async (group: GroupWithTasks) => {
     setSelectedGroup(group);
     setShowClientModal(true);
     setClientCurrentPage(1);
@@ -474,6 +556,14 @@ const GroupsPage = () => {
     return pages;
   }
 
+  // Reset all filters and sorting
+  const handleReset = () => {
+    setFilters({ name: "" });
+    setSortBy("name:asc");
+    clearAdvancedFilters();
+    setCurrentPage(1);
+  };
+
   return (
     <div className="main-content">
       <Toaster position="top-right" />
@@ -544,78 +634,52 @@ const GroupsPage = () => {
           {/* Content Box */}
           <div className="box">
             <div className="box-body">
-              {/* Search Bar and Filters */}
-              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
-                {/* Rows per page selector */}
-                <div className="flex items-center w-full lg:w-auto">
-                  <label className="mr-2 text-sm text-gray-600 whitespace-nowrap">Rows per page:</label>
-                  <select
-                    className="form-select w-auto text-sm"
-                    value={itemsPerPage}
-                    onChange={(e) => {
-                      setItemsPerPage(Number(e.target.value));
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <option value={10}>10</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                    <option value={500}>500</option>
-                    <option value={1000}>1000</option>
-                  </select>
-                </div>
+              {/* Search and Filter Controls */}
+              <SearchAndFilterControls
+                filters={filters}
+                sortBy={sortBy}
+                itemsPerPage={itemsPerPage}
+                showAdvancedFilters={showAdvancedFilters}
+                hasActiveAdvancedFilters={hasActiveAdvancedFilters()}
+                onFilterChange={(value) => {
+                  setFilters(prev => ({ ...prev, name: value }));
+                  setCurrentPage(1);
+                }}
+                onSortChange={setSortBy}
+                onItemsPerPageChange={(value) => {
+                  setItemsPerPage(value);
+                  setCurrentPage(1);
+                }}
+                onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                onReset={handleReset}
+              />
 
-                {/* Search and filters */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
-                  {/* Search bar */}
-                  <div className="relative flex-grow sm:max-w-xs">
-                    <input
-                      type="text"
-                      className="form-control py-2 w-full"
-                      placeholder="Search by name..."
-                      value={filters.name}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setFilters(prev => ({
-                          ...prev,
-                          name: value,
-                        }));
-                        setCurrentPage(1);
-                      }}
-                    />
-                  </div>
+              {/* Advanced Filters Panel */}
+              <AdvancedFiltersPanel
+                showAdvancedFilters={showAdvancedFilters}
+                advancedFilters={advancedFilters}
+                onUpdateFilter={(key, value) => {
+                  updateFilter(key, value);
+                  setCurrentPage(1);
+                }}
+                onUpdateTaskStatusFilter={(status, value) => {
+                  updateTaskStatusFilter(status, value);
+                  setCurrentPage(1);
+                }}
+                onClearFilters={() => {
+                  clearAdvancedFilters();
+                  setCurrentPage(1);
+                }}
+              />
 
-                  {/* Sort dropdown */}
-                  <select
-                    className="form-select py-2 w-full sm:w-auto"
-                    value={sortBy}
-                    onChange={(e) => {
-                      setSortBy(e.target.value);
-                    }}
-                  >
-                    <option value="name:asc">Name (A-Z)</option>
-                    <option value="name:desc">Name (Z-A)</option>
-                    <option value="createdAt:desc">Newest First</option>
-                    <option value="createdAt:asc">Oldest First</option>
-                    <option value="sortOrder:asc">Sort Order (Low-High)</option>
-                    <option value="sortOrder:desc">Sort Order (High-Low)</option>
-                  </select>
-
-                  {/* Reset button */}
-                  <button
-                    className="ti-btn ti-btn-secondary py-2 w-full sm:w-auto"
-                    onClick={() => {
-                      setFilters({
-                        name: ""
-                      });
-                      setSortBy("name:asc");
-                    }}
-                  >
-                    <i className="ri-refresh-line me-2"></i>
-                    Reset
-                  </button>
-                </div>
-              </div>
+              {/* Active Filters Summary */}
+              <ActiveFiltersSummary
+                advancedFilters={advancedFilters}
+                onClearAll={() => {
+                  clearAdvancedFilters();
+                  setCurrentPage(1);
+                }}
+              />
 
               {isLoading ? (
                 <div className="flex items-center justify-center py-8">
@@ -642,12 +706,13 @@ const GroupsPage = () => {
                         <th className="px-4 py-3">Group Name</th>
                         <th className="px-4 py-3">Number of Clients</th>
                         <th className="px-4 py-3">Created At</th>
+                        <th className="px-4 py-3">Tasks</th>
                         <th className="px-4 py-3">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {groups.length > 0 ? (
-                        groups.map((group: Group, index: number) => (
+                        groups.map((group: GroupWithTasks, index: number) => (
                           <tr
                             key={group.id}
                             className={`border-b border-gray-200 ${
@@ -665,6 +730,25 @@ const GroupsPage = () => {
                             <td>{group.name}</td>
                             <td>{group.numberOfClients}</td>
                             <td>{new Date(group.createdAt).toLocaleDateString()}</td>
+                                               <td>
+                     <div className="flex flex-wrap gap-1">
+                       <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                         <i className="ri-task-line mr-1"></i>{group.taskStats.total}
+                       </span>
+                       <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
+                         <i className="ri-time-line mr-1"></i>{group.taskStats.pending}
+                       </span>
+                       <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                         <i className="ri-check-line mr-1"></i>{group.taskStats.completed}
+                       </span>
+                       <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
+                         <i className="ri-time-line mr-1"></i>{group.taskStats.delayed}
+                       </span>
+                       <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+                         <i className="ri-play-line mr-1"></i>{group.taskStats.ongoing}
+                       </span>
+                     </div>
+                   </td>
                             <td>
                               <div className="flex space-x-2">
                                 <button
@@ -691,7 +775,7 @@ const GroupsPage = () => {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={6} className="text-center py-8">
+                          <td colSpan={7} className="text-center py-8">
                             <div className="flex flex-col items-center justify-center">
                               <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
                                 <i className="ri-folder-line text-4xl text-primary"></i>
