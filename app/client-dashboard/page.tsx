@@ -396,11 +396,11 @@ const ClientDashboard = () => {
       {/* Header */}
       <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4">
-          <h1 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Client Portal</h1>
+          <h1 className="text-lg sm:text-xl font-semibold text-gray-600 dark:text-gray-300"> Welcome, {clientData.name}</h1>
           <div className="flex items-center gap-2 sm:gap-4">
-            <span className="hidden sm:block text-sm text-gray-600 dark:text-gray-300">
+            {/* <span className="hidden sm:block text-sm text-gray-600 dark:text-gray-300">
               Welcome, {clientData.name}
-            </span>
+            </span> */}
             <span className="sm:hidden text-xs text-gray-600 dark:text-gray-300">
               {clientData.name}
             </span>
@@ -663,7 +663,7 @@ const ClientDashboard = () => {
                    {/* Actions */}
                    {item.type === 'file' && item.file && (
                      <div className="flex items-center gap-1 sm:gap-2">
-                       {canViewInBrowser(item.file.mimeType) && (
+                       {/* {canViewInBrowser(item.file.mimeType) && (
                          <button
                            onClick={() => handleViewFile(item.file!)}
                            className="p-1.5 sm:px-3 sm:py-1 text-xs sm:text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
@@ -672,7 +672,7 @@ const ClientDashboard = () => {
                            <i className="ri-eye-line"></i>
                            <span className="hidden sm:inline ml-1">View</span>
                          </button>
-                       )}
+                       )} */}
                        <button
                          onClick={() => handleDownloadFile(item.file!)}
                          disabled={downloadingFile === item.file?.fileName}

@@ -295,11 +295,7 @@ export default function ClientLogin() {
                   </>
                 )}
                 
-                <div className="text-center mt-6">
-                  <p className="text-[0.75rem] text-[#8c9097] dark:text-white/50">
-                    Admin login? <Link href="/" className="text-primary">Click here</Link>
-                  </p>
-                </div>
+               
               </div>
             </div>
           </div>
