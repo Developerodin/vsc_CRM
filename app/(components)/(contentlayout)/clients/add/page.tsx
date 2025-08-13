@@ -317,7 +317,15 @@ const AddClientPage = () => {
     if (activeTab === 'activity') {
       if (!validateForm()) return;
       
-      // Save client and get client ID
+      // Check if client already exists to prevent duplicate creation
+      if (savedClientId) {
+        // Client already exists, just move to documents tab
+        toast.success('Client already exists. Moving to documents tab.');
+        setActiveTab('documents');
+        return;
+      }
+      
+      // Save client and get client ID (only if not already saved)
       try {
         setIsLoading(true);
 
@@ -356,39 +364,15 @@ const AddClientPage = () => {
       return;
     }
     
-    // Only submit when on documents tab (for final save)
-    if (!validateForm()) return;
-
-    try {
-      setIsLoading(true);
-
-      const clientData = {
-        ...formData,
-        activities: activityMappings.filter(mapping => mapping.activity && mapping.assignedTeamMember)
-      };
-
-      const response = await fetch(`${Base_url}clients`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(clientData)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create client');
+    // On documents tab, don't create client again - just show success and redirect
+    if (activeTab === 'documents') {
+      if (savedClientId) {
+        toast.success('Client and documents saved successfully!');
+        router.push('/clients');
+      } else {
+        toast.error('Client not found. Please go back to Activity Mapping and try again.');
       }
-
-      const data: Client = await response.json();
-      toast.success('Client created successfully');
-      router.push('/clients');
-    } catch (err) {
-      console.error('Error creating client:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to create client');
-    } finally {
-      setIsLoading(false);
+      return;
     }
   };
 
@@ -1189,6 +1173,21 @@ const AddClientPage = () => {
 
                 {activeTab === 'activity' && (
                   <div className="space-y-6">
+                    {/* Show client creation status if already created */}
+                    {savedClientId && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                        <div className="flex items-center">
+                          <i className="ri-information-line text-blue-600 text-xl mr-3"></i>
+                          <div>
+                            <h4 className="text-blue-800 font-medium">Client Already Created!</h4>
+                            <p className="text-blue-700 text-sm mt-1">
+                              This client has been saved. You can now proceed to the Documents tab to upload files.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex justify-end">
                       <button
                         type="button"
@@ -1302,89 +1301,127 @@ const AddClientPage = () => {
                           Back to Activity Mapping
                         </button>
                       </div>
-                    ) : isLoadingDocuments ? (
-                      <div className="flex items-center justify-center py-16">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                        <span className="ml-3 text-gray-600">Loading documents...</span>
-                      </div>
-                    ) : clientDocuments.length > 0 ? (
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
-                          {clientDocuments.map((doc, index) => (
-                            <div
-                              key={index}
-                              className="group relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-all duration-200 cursor-pointer"
-                            >
-                              {/* Selection Checkbox */}
-                              <input
-                                type="checkbox"
-                                className="absolute top-2 left-2 z-10 opacity-100 transition-opacity duration-200"
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  // Handle selection if needed
-                                }}
-                              />
-
-                              {/* Icon */}
-                              <div className="flex items-center justify-center w-16 h-16 mb-3">
-                                <div className={`w-full h-full rounded-lg flex items-center justify-center ${getFileColor(doc.file?.mimeType || '', doc.file?.fileName || doc.fileName || '')}`}>
-                                  <i className={`text-2xl ${getFileIcon(doc.file?.mimeType || '', doc.file?.fileName || doc.fileName || '')}`}></i>
-                                </div>
-                              </div>
-
-                              {/* Content */}
-                              <div className="text-center">
-                                <div className="font-medium text-sm truncate">
-                                  {doc.file?.fileName || doc.fileName || 'Unknown File'}
-                                </div>
-                                <div className="text-xs text-gray-500 mt-1">
-                                  {doc.file?.fileSize ? `${(doc.file.fileSize / 1024).toFixed(1)} KB` : 'Unknown size'}
-                                </div>
-                              </div>
-
-                              {/* Three-dot menu */}
-                              <button
-                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDocumentContextMenu(e, doc);
-                                }}
-                                title="More options"
-                              >
-                                <i className="ri-more-2-fill text-gray-500 hover:text-primary"></i>
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
                     ) : (
-                      <div className="text-center py-16 text-gray-500">
-                        <i className="ri-folder-open-line text-4xl mb-4 opacity-50"></i>
-                        <p className="text-lg font-medium">No files found in this folder</p>
-                        <p className="text-sm">Try uploading some files or creating a new folder</p>
-                      </div>
+                      <>
+                        {/* Success message for saved client */}
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                          <div className="flex items-center">
+                            <i className="ri-check-circle-line text-green-600 text-xl mr-3"></i>
+                            <div>
+                              <h4 className="text-green-800 font-medium">Client Created Successfully!</h4>
+                              <p className="text-green-700 text-sm mt-1">
+                                You can now upload documents for this client. Click "Save & Complete" when you're done.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {isLoadingDocuments ? (
+                          <div className="flex items-center justify-center py-16">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                            <span className="ml-3 text-gray-600">Loading documents...</span>
+                          </div>
+                        ) : clientDocuments.length > 0 ? (
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+                              {clientDocuments.map((doc, index) => (
+                                <div
+                                  key={index}
+                                  className="group relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-all duration-200 cursor-pointer"
+                                >
+                                  {/* Selection Checkbox */}
+                                  <input
+                                    type="checkbox"
+                                    className="absolute top-2 left-2 z-10 opacity-100 transition-opacity duration-200"
+                                    onChange={(e) => {
+                                      e.stopPropagation();
+                                      // Handle selection if needed
+                                    }}
+                                  />
+
+                                  {/* Icon */}
+                                  <div className="flex items-center justify-center w-16 h-16 mb-3">
+                                    <div className={`w-full h-full rounded-lg flex items-center justify-center ${getFileColor(doc.file?.mimeType || '', doc.file?.fileName || doc.fileName || '')}`}>
+                                      <i className={`text-2xl ${getFileIcon(doc.file?.mimeType || '', doc.file?.fileName || doc.fileName || '')}`}></i>
+                                    </div>
+                                  </div>
+
+                                  {/* Content */}
+                                  <div className="text-center">
+                                    <div className="font-medium text-sm truncate">
+                                      {doc.file?.fileName || doc.fileName || 'Unknown File'}
+                                    </div>
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      {doc.file?.fileSize ? `${(doc.file.fileSize / 1024).toFixed(1)} KB` : 'Unknown size'}
+                                    </div>
+                                  </div>
+
+                                  {/* Three-dot menu */}
+                                  <button
+                                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDocumentContextMenu(e, doc);
+                                    }}
+                                    title="More options"
+                                  >
+                                    <i className="ri-more-2-fill text-gray-500 hover:text-primary"></i>
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-center py-16 text-gray-500">
+                            <i className="ri-folder-open-line text-4xl mb-4 opacity-50"></i>
+                            <p className="text-lg font-medium">No documents uploaded yet</p>
+                            <p className="text-sm">Click "Upload Documents" to add files for this client</p>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
 
                 {/* Form Actions */}
                 <div className="flex items-center space-x-3 mt-8 pt-6 border-t border-gray-200">
-                  <button
-                    type="submit"
-                    className="ti-btn ti-btn-primary"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Saving...
-                      </>
-                    ) : activeTab === 'general' || activeTab === 'activity' ? (
-                      'Next'
-                    ) : (
-                      'Save Client'
-                    )}
-                  </button>
+                  {activeTab === 'documents' ? (
+                    // On documents tab, show Save & Complete button
+                    <button
+                      type="button"
+                      className="ti-btn ti-btn-primary"
+                      onClick={() => {
+                        if (savedClientId) {
+                          toast.success('Client and documents saved successfully!');
+                          router.push('/clients');
+                        } else {
+                          toast.error('Client not found. Please go back to Activity Mapping and try again.');
+                        }
+                      }}
+                    >
+                      <i className="ri-check-line mr-2"></i>
+                      Save & Complete
+                    </button>
+                  ) : (
+                    // On other tabs, show Next button
+                    <button
+                      type="submit"
+                      className="ti-btn ti-btn-primary"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Saving...
+                        </>
+                      ) : activeTab === 'activity' && savedClientId ? (
+                        'Go to Documents'
+                      ) : (
+                        'Next'
+                      )}
+                    </button>
+                  )}
+                  
                   <button
                     type="button"
                     className="ti-btn ti-btn-secondary"
