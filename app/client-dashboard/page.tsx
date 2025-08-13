@@ -1,5 +1,5 @@
 "use client"
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useState, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import axios from 'axios'
 import { Base_url } from '@/app/api/config/BaseUrl'
@@ -72,10 +72,12 @@ const ClientDashboard = () => {
   const [clientData, setClientData] = useState<ClientData | null>(null)
   const [folderContents, setFolderContents] = useState<FileManagerItem[]>([])
   const [clientFolder, setClientFolder] = useState<any>(null)
+  const [clientEmail, setClientEmail] = useState<string>('') // New state for client email from API
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [downloadingFile, setDownloadingFile] = useState<string | null>(null)
+  const [sendingEmail, setSendingEmail] = useState<string | null>(null)
   
   // Filter states
   const [searchTerm, setSearchTerm] = useState('')
@@ -98,19 +100,19 @@ const ClientDashboard = () => {
       const client = JSON.parse(clientDataStr)
       console.log('Client data loaded:', client)
       setClientData(client)
+      
+      // Load contents immediately after setting client data (only once)
+      if (client) {
+        // We'll call this in a separate useEffect to avoid dependency issues
+      }
     } catch (error) {
       console.error('Error parsing client data:', error)
       router.push('/client-login')
     }
   }, [router])
 
-  useEffect(() => {
-    if (clientData) {
-      loadClientContents()
-    }
-  }, [clientData])
-
-  const loadClientContents = async () => {
+  // Define loadClientContents function before using it in useEffect
+  const loadClientContents = useCallback(async () => {
     if (!clientData) return
     
     setLoading(true)
@@ -162,6 +164,20 @@ const ClientDashboard = () => {
       const responseData: FileManagerResponse = response.data
       setFolderContents(responseData.results || [])
       setClientFolder(responseData.clientFolder)
+      
+      // Update client data with the latest information from API (including email)
+      if (responseData.client) {
+        // Don't update clientData to prevent infinite loop
+        // setClientData(prev => ({
+        //   ...prev,
+        //   ...responseData.client
+        // }))
+        
+        // Only update the client email separately to ensure we always have it
+        setClientEmail(responseData.client.email)
+        console.log('Client data from API:', responseData.client)
+        console.log('Client email set to:', responseData.client.email)
+      }
     } catch (error: any) {
       console.error('Error loading contents:', error)
       console.error('Error response:', error.response?.data)
@@ -180,7 +196,14 @@ const ClientDashboard = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [clientData])
+
+  // Separate useEffect to load contents after clientData is set
+  useEffect(() => {
+    if (clientData && clientData.id) {
+      loadClientContents()
+    }
+  }, [clientData?.id]) // Remove loadClientContents from dependencies
 
   const handleLogout = async () => {
     try {
@@ -301,6 +324,66 @@ const ClientDashboard = () => {
     }
   }
 
+  // Send file to client email
+  const sendFileToEmail = async (file: FileItem) => {
+    // Use the dedicated client email state that gets updated from the API
+    console.log('Client email state:', clientEmail)
+    console.log('Client data when sending email:', clientData)
+    
+
+    setSendingEmail(file.fileName)
+    try {
+      const requestBody = {
+        to: clientEmail,
+        subject: `File: ${file.fileName}`,
+        text: `Please find the attached file: ${file.fileName}`,
+        description: `File sent from Client Dashboard: ${file.fileName}`,
+        attachments: [
+          {
+            url: file.fileUrl,
+            filename: file.fileName,
+            contentType: file.mimeType
+          }
+        ]
+      }
+
+      console.log('Sending email with data:', requestBody)
+      console.log('Email will be sent to:', clientEmail)
+
+      const response = await fetch(`${Base_url}common-email/send-with-attachments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      })
+
+      console.log('Response status:', response.status)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('API Error Response:', errorText)
+        throw new Error(`Failed to send email: ${response.status} - ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log('Email sent successfully:', result)
+      
+      setSuccess(`File "${file.fileName}" sent to ${clientEmail} successfully!`)
+      setTimeout(() => {
+        setSuccess('')
+        setSendingEmail(null)
+      }, 5000)
+    } catch (error) {
+      console.error('Failed to send email:', error)
+      setError(`Failed to send email: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      setTimeout(() => {
+        setError('')
+        setSendingEmail(null)
+      }, 5000)
+    }
+  }
+
   // Filtered and sorted content
   const filteredContent = useMemo(() => {
     const filtered = folderContents.filter((item: FileManagerItem) => {
@@ -396,11 +479,16 @@ const ClientDashboard = () => {
       {/* Header */}
       <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4">
-          <h1 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">Client Portal</h1>
+          <div>
+            <h1 className="text-lg sm:text-xl font-semibold text-gray-600 dark:text-gray-300">Welcome, {clientData.name}</h1>
+            {/* <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Files will be sent to: {clientEmail || 'Loading...'}
+            </p> */}
+          </div>
           <div className="flex items-center gap-2 sm:gap-4">
-            <span className="hidden sm:block text-sm text-gray-600 dark:text-gray-300">
+            {/* <span className="hidden sm:block text-sm text-gray-600 dark:text-gray-300">
               Welcome, {clientData.name}
-            </span>
+            </span> */}
             <span className="sm:hidden text-xs text-gray-600 dark:text-gray-300">
               {clientData.name}
             </span>
@@ -663,7 +751,7 @@ const ClientDashboard = () => {
                    {/* Actions */}
                    {item.type === 'file' && item.file && (
                      <div className="flex items-center gap-1 sm:gap-2">
-                       {canViewInBrowser(item.file.mimeType) && (
+                       {/* {canViewInBrowser(item.file.mimeType) && (
                          <button
                            onClick={() => handleViewFile(item.file!)}
                            className="p-1.5 sm:px-3 sm:py-1 text-xs sm:text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
@@ -672,7 +760,25 @@ const ClientDashboard = () => {
                            <i className="ri-eye-line"></i>
                            <span className="hidden sm:inline ml-1">View</span>
                          </button>
-                       )}
+                       )} */}
+                       <button
+                         onClick={() => sendFileToEmail(item.file!)}
+                         disabled={sendingEmail === item.file?.fileName}
+                         className="p-1.5 sm:px-3 sm:py-1 text-xs sm:text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50"
+                         title="Send file to client email"
+                       >
+                         {sendingEmail === item.file?.fileName ? (
+                           <>
+                             <i className="ri-loader-4-line animate-spin"></i>
+                             <span className="hidden sm:inline ml-1">Sending...</span>
+                           </>
+                         ) : (
+                           <>
+                             <i className="ri-mail-line"></i>
+                             <span className="hidden sm:inline ml-1">Email</span>
+                           </>
+                         )}
+                       </button>
                        <button
                          onClick={() => handleDownloadFile(item.file!)}
                          disabled={downloadingFile === item.file?.fileName}
@@ -687,7 +793,7 @@ const ClientDashboard = () => {
                          ) : (
                            <>
                              <i className="ri-download-line"></i>
-                             <span className="hidden sm:inline ml-1">Download</span>
+                             <span className="inline ml-1">Download</span>
                            </>
                          )}
                        </button>

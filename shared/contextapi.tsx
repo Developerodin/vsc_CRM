@@ -203,7 +203,7 @@ export const BranchProvider = ({ children }: BranchProviderProps) => {
         if (!branchesResponse.ok) {
           throw new Error('Failed to fetch branches');
         }
-
+        console.log("branchesResponse",branchesResponse);
         const branchesData = await branchesResponse.json();
         setBranches(branchesData.results || []);
       } else {

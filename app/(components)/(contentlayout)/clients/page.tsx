@@ -29,8 +29,16 @@ interface Client {
   udyamNumber: string;
   iecCode: string;
   entityType: string;
+  activities?: ActivityMapping[];
   createdAt: string;
   updatedAt: string;
+}
+
+interface ActivityMapping {
+  activity: string;
+  assignedTeamMember: string;
+  assignedDate?: string;
+  notes: string;
 }
 
 interface TaskStats {
@@ -75,6 +83,9 @@ interface ExcelRow {
   "CIN Number"?: string;
   "Udyam Number"?: string;
   "IEC Code"?: string;
+  "Activity Name"?: string;
+  "Team Member Name"?: string;
+  "Activity Notes"?: string;
   "Created At"?: string;
 }
 
@@ -292,6 +303,9 @@ const ClientsPage = () => {
             "CIN Number": client.cinNumber,
             "Udyam Number": client.udyamNumber,
             "IEC Code": client.iecCode,
+            "Activity Name": client.activities && client.activities.length > 0 ? client.activities[0].activity : "",
+            "Team Member Name": client.activities && client.activities.length > 0 ? client.activities[0].assignedTeamMember : "",
+            "Activity Notes": client.activities && client.activities.length > 0 ? client.activities[0].notes : "",
           }));
       } else {
         // Export all clients
@@ -323,6 +337,9 @@ const ClientsPage = () => {
           "CIN Number": client.cinNumber,
           "Udyam Number": client.udyamNumber,
           "IEC Code": client.iecCode,
+          "Activity Name": client.activities && client.activities.length > 0 ? client.activities[0].activity : "",
+          "Team Member Name": client.activities && client.activities.length > 0 ? client.activities[0].assignedTeamMember : "",
+          "Activity Notes": client.activities && client.activities.length > 0 ? client.activities[0].notes : "",
         }));
       }
 
@@ -349,13 +366,16 @@ const ClientsPage = () => {
         { wch: 20 }, // CIN Number
         { wch: 20 }, // Udyam Number
         { wch: 20 }, // IEC Code
+        { wch: 25 }, // Activity Name
+        { wch: 25 }, // Team Member Name
+        { wch: 30 }, // Activity Notes
       ];
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Clients");
       const fileName = `clients_${new Date().toISOString().split("T")[0]}.xlsx`;
       XLSX.writeFile(wb, fileName);
-      toast.success(selectedClients.length > 0 ? "Selected clients exported successfully" : "All clients exported successfully");
+      toast.success(selectedClients.length > 0 ? "Selected clients exported successfully with activity fields" : "All clients exported successfully with activity fields");
     } catch (error) {
       console.error("Error exporting clients:", error);
       toast.error("Failed to export clients");
@@ -369,6 +389,15 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
 
   setImportProgress(0);
   const loadingToast = toast.loading("Importing clients...");
+
+  // Excel structure:
+  // - First row should contain headers exactly as defined in ExcelRow interface
+  // - ID column: Leave empty for new clients, include ID for updates
+  // - Activity fields: 
+  //   * "Activity Name" should contain the Activity ID (MongoDB ObjectId)
+  //   * "Team Member Name" should contain the Team Member ID (MongoDB ObjectId)
+  //   * "Activity Notes" should contain the activity notes text
+  // - All other fields: Standard client information
 
   try {
     const reader = new FileReader();
@@ -391,6 +420,10 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
         if (!jsonData.length) {
           throw new Error("No data found in the Excel sheet");
         }
+
+        // Debug: Log the first few rows to see the structure
+        console.log('First 3 rows from Excel:', jsonData.slice(0, 3));
+        console.log('Excel column names:', Object.keys(jsonData[0] || {}));
 
         // Fetch all clients for upsert by name
         const allResponse = await fetch(`${Base_url}clients?limit=1000`, {
@@ -464,6 +497,21 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
               iecCode: row["IEC Code"]?.toString().trim() || ""
             };
 
+            // Handle activity mapping if provided
+            const activityMapping = {
+              activity: row["Activity Name"]?.toString().trim() || "",
+              assignedTeamMember: row["Team Member Name"]?.toString().trim() || "",
+              notes: row["Activity Notes"]?.toString().trim() || ""
+            };
+
+            // Validate MongoDB ObjectId format for activity and team member IDs
+            const isValidObjectId = (id: string) => /^[0-9a-fA-F]{24}$/.test(id);
+            
+            const hasValidActivityIds = activityMapping.activity && 
+                                      activityMapping.assignedTeamMember && 
+                                      isValidObjectId(activityMapping.activity) && 
+                                      isValidObjectId(activityMapping.assignedTeamMember);
+
             let clientId = row["ID"];
             if (!clientId) {
               // Try to find by name (case-insensitive)
@@ -475,9 +523,23 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
               if (found) clientId = found.id;
             }
 
+            // Debug logging for activity mapping
+            console.log('Row activity data:', {
+              activityId: activityMapping.activity,
+              teamMemberId: activityMapping.assignedTeamMember,
+              notes: activityMapping.notes,
+              hasActivity: !!activityMapping.activity,
+              hasTeamMember: !!activityMapping.assignedTeamMember,
+              isValidActivityId: isValidObjectId(activityMapping.activity),
+              isValidTeamMemberId: isValidObjectId(activityMapping.assignedTeamMember),
+              hasValidActivityIds,
+              willIncludeActivities: hasValidActivityIds
+            });
+
             return {
               ...(clientId && { id: clientId }),
-              ...clientData
+              ...clientData,
+              activities: hasValidActivityIds ? [activityMapping] : []
             };
           } catch (error) {
             console.error(`Error processing row ${index + 1}:`, error);
@@ -485,6 +547,10 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
             throw new Error(`Error processing row ${index + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`);
           }
         });
+
+        // Debug logging for the final data being sent
+        console.log('Final clients data being sent to API:', clients);
+        console.log('Sample client with activities:', clients.find(c => c.activities && c.activities.length > 0));
 
         // Single API call instead of multiple requests
         const response = await fetch(`${Base_url}clients/bulk-import`, {
@@ -510,7 +576,8 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
           toast.error(`Import completed with ${result.errors.length} errors`);
           console.log('Import errors:', result.errors);
         } else {
-          toast.success(`Import completed: ${result.created} added, ${result.updated} updated`);
+          const activityCount = result.activitiesCreated || 0;
+          toast.success(`Import completed: ${result.created} clients added, ${result.updated} clients updated${activityCount > 0 ? `, ${activityCount} activities mapped` : ''}`);
         }
 
         // Refresh the clients list
@@ -1216,12 +1283,12 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                                 >
                                   <i className="ri-edit-line"></i>
                                 </Link>
-                                <button
+                                {/* <button
                                   className="ti-btn ti-btn-success ti-btn-sm"
                                   title="View Files"
                                 >
                                   <i className="ri-folder-line"></i>
-                                </button>
+                                </button> */}
                                 <button
                                   className="ti-btn ti-btn-danger ti-btn-sm"
                                   onClick={() => handleDelete(client.id)}

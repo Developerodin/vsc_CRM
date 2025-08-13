@@ -8,6 +8,7 @@ import { useFileManager } from '@/shared/hooks/useFileManager';
 import { Folder, FileItem, User } from '@/shared/services/fileManagerService';
 import * as XLSX from 'xlsx';
 import HelpIcon from '@/shared/components/HelpIcon';
+import { Base_url } from '@/app/api/config/BaseUrl';
 
 const Filemanager = () => {
     const {
@@ -70,7 +71,84 @@ const Filemanager = () => {
         visible: boolean;
         file: FileItem | null;
         email: string;
-    }>({ visible: false, file: null, email: '' });
+        loading: boolean;
+    }>({ visible: false, file: null, email: '', loading: false });
+
+    // Toast notification state
+    const [toast, setToast] = useState<{
+        visible: boolean;
+        type: 'success' | 'error';
+        message: string;
+    }>({ visible: false, type: 'success', message: '' });
+
+    // Show toast notification
+    const showToast = (type: 'success' | 'error', message: string) => {
+        setToast({ visible: true, type, message });
+        setTimeout(() => setToast({ visible: false, type: 'success', message: '' }), 5000);
+    };
+
+    // Email service function
+    const sendFileToEmail = async (email: string, file: FileItem) => {
+        try {
+            // Validate required fields
+            if (!email || !email.trim()) {
+                throw new Error('Email address is required');
+            }
+            if (!file || !file.file) {
+                throw new Error('File information is missing');
+            }
+            if (!file.file.fileName || !file.file.fileUrl || !file.file.mimeType) {
+                throw new Error('File details are incomplete');
+            }
+
+            const requestBody = {
+                to: email.trim(),
+                
+                subject: `File: ${file.file.fileName}`,
+                text: `Please find the attached file: ${file.file.fileName}`,
+                description: `File sent from File Manager: ${file.file.fileName}`,
+                attachments: [
+                    {
+                        url: file.file.fileUrl,
+                        filename: file.file.fileName,
+                        contentType: file.file.mimeType
+                    }
+                ]
+            };
+
+            console.log('Sending email with data:', requestBody);
+
+            const response = await fetch(`${Base_url}common-email/send-with-attachments`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestBody)
+            });
+
+            console.log('Response status:', response.status);
+            console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('API Error Response:', errorText);
+                throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+            }
+
+            const result = await response.json();
+            console.log('Email sent successfully:', result);
+            return result;
+        } catch (error) {
+            console.error('Failed to send email:', error);
+            throw error;
+        }
+    };
+
+    // Email validation
+    const isValidEmail = (email: string): boolean => {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+    };
 
     // Handle responsive behavior
     const handleResize = () => {
@@ -288,7 +366,7 @@ const Filemanager = () => {
         
         // Debug: Log the structure of items
         if (files.length > 0) {
-            console.log('File contents structure:', files[0]);
+            console.log('File contents structure:=>>', files[0]);
         }
         
         // Filter out invalid items (files with null file data, folders with null folder data)
@@ -569,6 +647,26 @@ const Filemanager = () => {
                     <div className="flex items-center justify-between">
                         <span>{error}</span>
                         <button onClick={clearError} className="ml-4 text-red-500 hover:text-red-700">
+                            <i className="ri-close-line"></i>
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Toast Notification */}
+            {toast.visible && (
+                <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded shadow-lg transition-all duration-300 ${
+                    toast.type === 'success' 
+                        ? 'bg-green-100 border border-green-400 text-green-700' 
+                        : 'bg-red-100 border border-red-400 text-red-700'
+                }`}>
+                    <div className="flex items-center gap-2">
+                        <i className={`text-lg ${toast.type === 'success' ? 'ri-check-circle-line' : 'ri-error-warning-line'}`}></i>
+                        <span>{toast.message}</span>
+                        <button 
+                            onClick={() => setToast({ visible: false, type: 'success', message: '' })} 
+                            className="ml-2 text-gray-500 hover:text-gray-700"
+                        >
                             <i className="ri-close-line"></i>
                         </button>
                     </div>
@@ -1102,7 +1200,7 @@ const Filemanager = () => {
                                 className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
                                 onClick={() => {
                                     if (contextMenu.item?.type === 'file') {
-                                        setEmailModal({ visible: true, file: contextMenu.item as FileItem, email: '' });
+                                        setEmailModal({ visible: true, file: contextMenu.item as FileItem, email: '', loading: false });
                                     }
                                     closeContextMenu();
                                 }}
@@ -1143,48 +1241,113 @@ const Filemanager = () => {
                             </div>
                             <button
                                 className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-                                onClick={() => setEmailModal({ visible: false, file: null, email: '' })}
+                                onClick={() => setEmailModal({ visible: false, file: null, email: '', loading: false })}
                                 title="Close"
                             >
                                 <i className="ri-close-line"></i>
                             </button>
                         </div>
                         <div className="p-6">
+                            {/* File Details */}
+                            <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <i className={`text-2xl ${getFileIcon(emailModal.file.file?.mimeType || '')}`}></i>
+                                    <div className="flex-1">
+                                        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                                            {emailModal.file.file?.fileName}
+                                        </p>
+                                        <p className="text-xs text-gray-500">
+                                            {formatFileSize(emailModal.file.file?.fileSize || 0)} • {emailModal.file.file?.mimeType}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            
                             <div className="mb-4">
                                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Email Address
+                                    Email Address <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="email"
                                     id="email"
-                                    className="form-control w-full"
+                                    className={`form-control w-full ${
+                                        emailModal.email && !isValidEmail(emailModal.email) 
+                                            ? 'border-red-500 focus:border-red-500' 
+                                            : ''
+                                    }`}
                                     placeholder="Enter email address"
                                     value={emailModal.email}
                                     onChange={(e) => setEmailModal(prev => ({ ...prev, email: e.target.value }))}
                                     autoFocus
                                 />
+                                {emailModal.email && !isValidEmail(emailModal.email) && (
+                                    <p className="text-red-500 text-xs mt-1">Please enter a valid email address</p>
+                                )}
+                                {emailModal.email && isValidEmail(emailModal.email) && (
+                                    <p className="text-green-500 text-xs mt-1">✓ Valid email address</p>
+                                )}
+                            </div>
+                            
+                            {/* Email Preview */}
+                            <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                                <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">Email Preview:</h4>
+                                <div className="text-xs text-blue-800 dark:text-blue-200 space-y-1">
+                                    <p><strong>To:</strong> {emailModal.email || 'user@example.com'}</p>
+                                    <p><strong>Subject:</strong> File: {emailModal.file.file?.fileName}</p>
+                                    <p><strong>Message:</strong> Please find the attached file: {emailModal.file.file?.fileName}</p>
+                                    <p><strong>Attachment:</strong> {emailModal.file.file?.fileName} ({formatFileSize(emailModal.file.file?.fileSize || 0)})</p>
+                                </div>
                             </div>
                             <div className="flex justify-end gap-2">
                                 <button 
                                     className="ti-btn ti-btn-light" 
-                                    onClick={() => setEmailModal({ visible: false, file: null, email: '' })}
+                                    onClick={() => setEmailModal({ visible: false, file: null, email: '', loading: false })}
                                 >
                                     Cancel
                                 </button>
-                                <button 
-                                    className="ti-btn ti-btn-primary" 
-                                    onClick={() => {
-                                        // TODO: Implement email sending functionality
-                                        if (emailModal.file) {
-                                            console.log('Sending file to email:', emailModal.email);
-                                            alert(`File "${emailModal.file.file?.fileName}" will be sent to ${emailModal.email}`);
-                                        }
-                                        setEmailModal({ visible: false, file: null, email: '' });
-                                    }}
-                                    disabled={!emailModal.email.trim() || !emailModal.email.includes('@')}
-                                >
-                                    Send File
-                                </button>
+                                                                    <button 
+                                        className="ti-btn ti-btn-primary" 
+                                        onClick={() => {
+                                            const currentFile = emailModal.file;
+                                            if (!currentFile) return; // Guard clause for null check
+                                            
+                                            // Additional validation before sending
+                                            if (!emailModal.email.trim()) {
+                                                showToast('error', 'Please enter an email address');
+                                                return;
+                                            }
+                                            if (!isValidEmail(emailModal.email)) {
+                                                showToast('error', 'Please enter a valid email address');
+                                                return;
+                                            }
+                                            if (!currentFile.file?.fileName || !currentFile.file?.fileUrl || !currentFile.file?.mimeType) {
+                                                showToast('error', 'File information is incomplete');
+                                                return;
+                                            }
+                                            
+                                            setEmailModal(prev => ({ ...prev, loading: true }));
+                                            sendFileToEmail(emailModal.email, currentFile)
+                                                .then(result => {
+                                                    showToast('success', `File "${currentFile.file?.fileName}" sent to ${emailModal.email} successfully!`);
+                                                    setEmailModal({ visible: false, file: null, email: '', loading: false });
+                                                })
+                                                .catch(error => {
+                                                    showToast('error', `Failed to send email: ${error.message}`);
+                                                    console.error('Email sending failed:', error);
+                                                    setEmailModal(prev => ({ ...prev, loading: false }));
+                                                });
+                                        }}
+                                        disabled={!emailModal.email.trim() || !isValidEmail(emailModal.email) || emailModal.loading}
+                                    >
+                                        {emailModal.loading ? (
+                                            <div className="flex items-center gap-2">
+                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                                Sending...
+                                            </div>
+                                        ) : (
+                                            'Send File'
+                                        )}
+                                    </button>
                             </div>
                         </div>
                     </div>
