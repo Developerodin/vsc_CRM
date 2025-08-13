@@ -222,15 +222,15 @@ const TimelinesPage = () => {
           .filter(timeline => selectedTimelines.includes(timeline.id))
           .map((timeline: Timeline) => ({
             ID: timeline.id,
-            "Activity ID": timeline.activity.id,
-            "Activity Name": timeline.activity.name,
-            "Client ID": timeline.client.id,
-            "Client Name": timeline.client.name,
-            "Client Email": timeline.client.email,
+            "Activity ID": timeline.activity?.id || "",
+            "Activity Name": timeline.activity?.name || "",
+            "Client ID": timeline.client?.id || "",
+            "Client Name": timeline.client?.name || "",
+            "Client Email": timeline.client?.email || "",
             "Frequency": timeline.frequency,
             "Turnover": timeline.turnover?.toString() || "",
-            "Team Member ID": timeline.assignedMember.id,
-            "Team Member Name": timeline.assignedMember.name,
+            "Team Member ID": timeline.assignedMember?.id || "",
+            "Team Member Name": timeline.assignedMember?.name || "",
             "Start Date": timeline.startDate || "",
             "End Date": timeline.endDate || "",
             "Status": timeline.status
@@ -250,15 +250,15 @@ const TimelinesPage = () => {
         const apiData: ApiResponse = await response.json();
         exportData = apiData.results.map((timeline: Timeline) => ({
           ID: timeline.id,
-          "Activity ID": timeline.activity.id,
-          "Activity Name": timeline.activity.name,
-          "Client ID": timeline.client.id,
-          "Client Name": timeline.client.name,
-          "Client Email": timeline.client.email,
+          "Activity ID": timeline.activity?.id || "",
+          "Activity Name": timeline.activity?.name || "",
+          "Client ID": timeline.client?.id || "",
+          "Client Name": timeline.client?.name || "",
+          "Client Email": timeline.client?.email || "",
           "Frequency": timeline.frequency,
           "Turnover": timeline.turnover?.toString() || "",
-          "Team Member ID": timeline.assignedMember.id,
-          "Team Member Name": timeline.assignedMember.name,
+          "Team Member ID": timeline.assignedMember?.id || "",
+          "Team Member Name": timeline.assignedMember?.name || "",
           "Start Date": timeline.startDate || "",
           "End Date": timeline.endDate || "",
           "Status": timeline.status
@@ -462,7 +462,7 @@ const TimelinesPage = () => {
                     <div>
                       <span className="text-sm font-medium text-warning">Pending</span>
                       <p className="text-2xl font-bold text-warning">
-                        {timelines.filter(t => t.status === 'pending').length}
+                        {timelines.filter(t => t?.status === 'pending').length}
                       </p>
                     </div>
                     <div className="bg-warning/20 p-3 rounded-full">
@@ -480,7 +480,7 @@ const TimelinesPage = () => {
                     <div>
                       <span className="text-sm font-medium text-primary">Ongoing</span>
                       <p className="text-2xl font-bold text-primary">
-                        {timelines.filter(t => t.status === 'ongoing').length}
+                        {timelines.filter(t => t?.status === 'ongoing').length}
                       </p>
                     </div>
                     <div className="bg-primary/20 p-3 rounded-full">
@@ -498,7 +498,7 @@ const TimelinesPage = () => {
                     <div>
                       <span className="text-sm font-medium text-success">Completed</span>
                       <p className="text-2xl font-bold text-success">
-                        {timelines.filter(t => t.status === 'completed').length}
+                        {timelines.filter(t => t?.status === 'completed').length}
                       </p>
                     </div>
                     <div className="bg-success/20 p-3 rounded-full">
@@ -516,7 +516,7 @@ const TimelinesPage = () => {
                     <div>
                       <span className="text-sm font-medium text-danger">Delayed</span>
                       <p className="text-2xl font-bold text-danger">
-                        {timelines.filter(t => t.status === 'delayed').length}
+                        {timelines.filter(t => t?.status === 'delayed').length}
                       </p>
                     </div>
                     <div className="bg-danger/20 p-3 rounded-full">
@@ -681,12 +681,12 @@ const TimelinesPage = () => {
                               className="form-checkbox"
                             />
                           </td>
-                          <td>{timeline.activity.name}</td>
-                          <td>{timeline.client.name}</td>
-                          <td>{timeline.client.email}</td>
+                          <td>{timeline.activity?.name || "-"}</td>
+                          <td>{timeline.client?.name || "-"}</td>
+                          <td>{timeline.client?.email || "-"}</td>
                           <td>{timeline.frequency}</td>
                           <td>{timeline.turnover || "-"}</td>
-                          <td>{timeline.assignedMember.name}</td>
+                          <td>{timeline.assignedMember?.name || "-"}</td>
                           <td>{timeline.startDate ? new Date(timeline.startDate).toISOString().split('T')[0] : "-"}</td>
                           <td>{timeline.endDate ? new Date(timeline.endDate).toISOString().split('T')[0] : "-"}</td>
                           <td>
