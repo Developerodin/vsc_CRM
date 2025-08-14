@@ -312,7 +312,7 @@ export const useFileManager = () => {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
       
-      const results: PaginatedResponse<Folder | FileItem> = await fileManagerService.searchFiles(query, { type, limit: 50, page });
+      const results: PaginatedResponse<Folder | FileItem> = await fileManagerService.searchFiles(query, { type, limit: 100, page });
       
       console.log('Search results:', results);
       

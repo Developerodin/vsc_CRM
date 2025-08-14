@@ -17,7 +17,7 @@ interface Client {
   district: string;
   state: string;
   country: string;
-  fNo: string;
+
   pan: string;
   dob: string;
   branch: string;
@@ -72,7 +72,7 @@ interface ExcelRow {
   "Client State"?: string;
   "Client Country"?: string;
   "Branch"?: string;
-  "F No"?: string;
+
   "PAN"?: string;
   "Date of Birth"?: string;
   "Sort Order"?: string | number;
@@ -110,7 +110,6 @@ const ClientsPage = () => {
     district: "",
     state: "",
     country: "",
-    fNo: "",
     pan: "",
     branch: "",
     businessType: "",
@@ -164,7 +163,7 @@ const ClientsPage = () => {
         ...(filters.phone && { phone: filters.phone }),
         ...(filters.district && { district: filters.district }),
         ...(filters.pan && { pan: filters.pan }),
-        ...(filters.fNo && { fNo: filters.fNo }),
+
         ...(filters.branch && { branch: filters.branch }),
         ...(filters.businessType && { businessType: filters.businessType }),
         ...(filters.entityType && { entityType: filters.entityType }),
@@ -292,7 +291,7 @@ const ClientsPage = () => {
             "Client State": client.state,
             "Client Country": client.country,
             "Branch": client.branch,
-            "F No": client.fNo,
+
             "PAN": client.pan,
             "Date of Birth": client.dob,
             "Sort Order": client.sortOrder,
@@ -326,7 +325,7 @@ const ClientsPage = () => {
           "Client State": client.state,
           "Client Country": client.country,
           "Branch": client.branch,
-          "F No": client.fNo,
+          
           "PAN": client.pan,
           "Date of Birth": client.dob,
           "Sort Order": client.sortOrder,
@@ -355,7 +354,7 @@ const ClientsPage = () => {
         { wch: 20 }, // State
         { wch: 20 }, // Country
         { wch: 30 }, // Branch ID
-        { wch: 15 }, // F No
+
         { wch: 15 }, // PAN
         { wch: 15 }, // Date of Birth
         { wch: 10 }, // Sort Order
@@ -483,7 +482,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
               district: (row["Client District"]?.toString() || "").trim(),
               state: (row["Client State"]?.toString() || "").trim(),
               country: (row["Client Country"]?.toString() || "").trim(),
-              fNo: row["F No"]?.toString().trim() || "",
+
               pan: row["PAN"]?.toString().trim() || "",
               dob: convertDateFormat(row["Date of Birth"]?.toString() || ""),
               branch: row["Branch"]?.toString().trim() || "",
@@ -756,21 +755,20 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                     <input
                       type="text"
                       className="form-control py-2 w-full"
-                      placeholder="Search by name, email, phone, city, PAN, F No..."
+                      placeholder="Search by name, email, phone, city, PAN..."
                       value={filters.name}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setFilters(prev => ({
-                          ...prev,
-                          name: value,
-                          email: value,
-                          phone: value,
-                          district: value,
-                          pan: value,
-                          fNo: value,
-                        }));
-                        setCurrentPage(1);
-                      }}
+                                              onChange={(e) => {
+                          const value = e.target.value;
+                          setFilters(prev => ({
+                            ...prev,
+                            name: value,
+                            email: value,
+                            phone: value,
+                            district: value,
+                            pan: value,
+                          }));
+                          setCurrentPage(1);
+                        }}
                     />
                   </div>
 
@@ -807,27 +805,26 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                   {/* Reset button */}
                   <button
                     className="ti-btn ti-btn-secondary py-2 w-full sm:w-auto"
-                    onClick={() => {
-                      setFilters({
-                        name: "",
-                        email: "",
-                        phone: "",
-                        district: "",
-                        state: "",
-                        country: "",
-                        fNo: "",
-                        pan: "",
-                        branch: "",
-                        businessType: "",
-                        entityType: "",
-                        gstNumber: "",
-                        tanNumber: "",
-                        cinNumber: "",
-                        udyamNumber: "",
-                        iecCode: ""
-                      });
-                      setSortBy("name:asc");
-                    }}
+                                          onClick={() => {
+                        setFilters({
+                          name: "",
+                          email: "",
+                          phone: "",
+                          district: "",
+                          state: "",
+                          country: "",
+                          pan: "",
+                          branch: "",
+                          businessType: "",
+                          entityType: "",
+                          gstNumber: "",
+                          tanNumber: "",
+                          cinNumber: "",
+                          udyamNumber: "",
+                          iecCode: ""
+                        });
+                        setSortBy("name:asc");
+                      }}
                   >
                     <i className="ri-refresh-line me-2"></i>
                     Reset
@@ -1219,7 +1216,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         <th className="px-4 py-3">City</th>
                         <th className="px-4 py-3">Business Type</th>
                         <th className="px-4 py-3">Entity Type</th>
-                        <th className="px-4 py-3">F No</th>
+
                         <th className="px-4 py-3">PAN</th>
                         <th className="px-4 py-3">Task Status</th>
                         <th className="px-4 py-3">Actions</th>
@@ -1270,7 +1267,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                                 {client.entityType || 'N/A'}
                               </span>
                             </td>
-                            <td>{client.fNo}</td>
+
                             <td>{client.pan}</td>
                             <td className="px-4 py-3">
                               {renderTaskStatus(client.taskStats)}
@@ -1301,7 +1298,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={9} className="text-center py-8">
+                          <td colSpan={8} className="text-center py-8">
                             <div className="flex flex-col items-center justify-center">
                               <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
                                 <i className="ri-folder-line text-4xl text-primary"></i>

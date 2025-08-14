@@ -449,9 +449,7 @@ const AddGroupPage = () => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Select
                         </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              F.No
-                            </th>
+
 
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Name
@@ -479,9 +477,7 @@ const AddGroupPage = () => {
                               onChange={() => handleClientSelect(client)}
                             />
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {client.fNo}
-                          </td>
+
                           <td className="px-6 py-4 whitespace-nowrap">
                             {client.name}
                           </td>

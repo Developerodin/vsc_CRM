@@ -535,6 +535,48 @@ const GroupsPage = () => {
     }
   };
 
+  // Function to render task status badges (exact copy from clients page)
+  const renderTaskStatus = (taskStats: any) => {
+    if (taskStats.total === 0) {
+      return (
+        <div className="text-center text-gray-400 text-xs">
+          <i className="ri-task-line mr-1"></i>
+          No tasks
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-1">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-gray-600">Total: {taskStats.total}</span>
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {taskStats.pending > 0 && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-warning text-black">
+              {taskStats.pending} Pending
+            </span>
+          )}
+          {taskStats.ongoing > 0 && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary text-black">
+              {taskStats.ongoing} Ongoing
+            </span>
+          )}
+          {taskStats.completed > 0 && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success text-black">
+              {taskStats.completed} Completed
+            </span>
+          )}
+          {taskStats.delayed > 0 && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-danger text-black">
+              {taskStats.delayed} Delayed
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   // Condensed pagination helper
   function getPagination(currentPage: number, totalPages: number) {
     const pages = [];
@@ -730,25 +772,9 @@ const GroupsPage = () => {
                             <td>{group.name}</td>
                             <td>{group.numberOfClients}</td>
                             <td>{new Date(group.createdAt).toLocaleDateString()}</td>
-                                               <td>
-                     <div className="flex flex-wrap gap-1">
-                       <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                         <i className="ri-task-line mr-1"></i>{group.taskStats.total}
-                       </span>
-                       <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
-                         <i className="ri-time-line mr-1"></i>{group.taskStats.pending}
-                       </span>
-                       <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                         <i className="ri-check-line mr-1"></i>{group.taskStats.completed}
-                       </span>
-                       <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
-                         <i className="ri-time-line mr-1"></i>{group.taskStats.delayed}
-                       </span>
-                       <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
-                         <i className="ri-play-line mr-1"></i>{group.taskStats.ongoing}
-                       </span>
-                     </div>
-                   </td>
+                                               <td className="px-4 py-3">
+                              {renderTaskStatus(group.taskStats)}
+                            </td>
                             <td>
                               <div className="flex space-x-2">
                                 <button

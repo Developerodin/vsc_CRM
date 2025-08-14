@@ -1053,19 +1053,7 @@ const AddClientPage = () => {
                       </select>
                     </div>
 
-                    {/* F No */}
-                    <div className="form-group">
-                      <label htmlFor="fNo" className="form-label">F No</label>
-                      <input
-                        type="text"
-                        id="fNo"
-                        name="fNo"
-                        className="form-control"
-                        placeholder="Enter F No (optional)"
-                        value={formData.fNo}
-                        onChange={handleInputChange}
-                      />
-                    </div>
+
 
                     {/* PAN */}
                     <div className="form-group">

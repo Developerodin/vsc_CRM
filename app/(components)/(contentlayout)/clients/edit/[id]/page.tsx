@@ -103,6 +103,12 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     document: any;
   } | null>(null);
   
+  // Email sending state
+  const [sendingEmail, setSendingEmail] = useState<string | null>(null);
+  
+  // Download operation state
+  const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
+  
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -263,51 +269,59 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     setDocumentContextMenu(null);
   };
 
-  // Document action handlers
-  const handleViewDocument = (document: any) => {
-    const fileUrl = document.file?.fileUrl || document.fileUrl;
-    if (fileUrl) {
-      window.open(fileUrl, '_blank');
-    }
-    closeDocumentContextMenu();
-  };
 
-  const handleOpenDocumentInNewTab = (document: any) => {
-    const fileUrl = document.file?.fileUrl || document.fileUrl;
-    if (fileUrl) {
-      window.open(fileUrl, '_blank');
-    }
-    closeDocumentContextMenu();
-  };
 
-  const handleDownloadDocument = (document: any) => {
-    const fileUrl = document.file?.fileUrl || document.fileUrl;
-    const fileName = document.file?.fileName || document.fileName;
-    if (fileUrl && fileName) {
+  const handleDownloadDocument = (docItem: any) => {
+    const fileUrl = docItem.file?.fileUrl || docItem.fileUrl;
+    const fileName = docItem.file?.fileName || docItem.fileName;
+    
+    if (!fileUrl || !fileName) {
+      console.error('File URL or name is missing');
+      toast.error('File information is missing');
+      return;
+    }
+
+    setDownloadingFile(fileName);
+    
+    try {
+      // Create a more robust download approach (exact copy from file manager)
       const link = document.createElement('a');
-      link.href = fileUrl;
+      link.style.display = 'none'; // Hide the link
       link.download = fileName;
+      link.rel = 'noopener noreferrer';
+      
+      // Always add download parameters to force download behavior
+      const url = new URL(fileUrl);
+      url.searchParams.set('download', 'true');
+      url.searchParams.set('t', Date.now().toString());
+      url.searchParams.set('filename', encodeURIComponent(fileName));
+      link.href = url.toString();
+      
+      // Set additional attributes to force download
+      link.setAttribute('download', fileName);
+      link.setAttribute('target', '_self'); // Force same window behavior
+      
+      // Add to DOM, click, and remove
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
+      
+      console.log(`Downloading: ${fileName} from ${link.href}`);
+      toast.success(`Downloading ${fileName}`);
+    } catch (error) {
+      console.error('Failed to download file:', error);
+      toast.error('Failed to download file');
+    } finally {
+      setDownloadingFile(null);
     }
+    
     closeDocumentContextMenu();
   };
 
-  const handleCopyDocumentUrl = async (document: any) => {
-    const fileUrl = document.file?.fileUrl || document.fileUrl;
-    if (fileUrl) {
-      try {
-        await navigator.clipboard.writeText(fileUrl);
-        toast.success('File URL copied to clipboard');
-      } catch (err) {
-        console.error('Failed to copy URL:', err);
-        toast.error('Failed to copy URL');
-      }
-    }
-    closeDocumentContextMenu();
-  };
 
-  const handleDeleteDocument = async (document: any) => {
-    const fileName = document.file?.fileName || document.fileName;
+
+  const handleDeleteDocument = async (docItem: any) => {
+    const fileName = docItem.file?.fileName || docItem.fileName;
     if (confirm(`Are you sure you want to delete "${fileName}"?`)) {
       try {
         // You can implement delete functionality here if needed
@@ -320,6 +334,62 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
       }
     }
     closeDocumentContextMenu();
+  };
+
+  // Send file to client email
+  const sendFileToEmail = async (docItem: any) => {
+    if (!formData.email) {
+      toast.error('Client email not found. Please fill in the client email first.');
+      closeDocumentContextMenu();
+      return;
+    }
+
+    setSendingEmail(docItem.file?.fileName || docItem.fileName);
+    try {
+      const requestBody = {
+        to: formData.email,
+        subject: `File: ${docItem.file?.fileName || docItem.fileName}`,
+        text: `Please find the attached file: ${docItem.file?.fileName || docItem.fileName}`,
+        description: `File sent from Client Edit Page: ${docItem.file?.fileName || docItem.fileName}`,
+        attachments: [
+          {
+            url: docItem.file?.fileUrl || docItem.fileUrl,
+            filename: docItem.file?.fileName || docItem.fileName,
+            contentType: docItem.file?.mimeType || docItem.mimeType || 'application/octet-stream'
+          }
+        ]
+      };
+
+      console.log('Sending email with data:', requestBody);
+      console.log('Email will be sent to:', formData.email);
+
+      const response = await fetch(`${Base_url}common-email/send-with-attachments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      console.log('Response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error Response:', errorText);
+        throw new Error(`Failed to send email: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('Email sent successfully:', result);
+      
+      toast.success(`File "${docItem.file?.fileName || docItem.fileName}" sent to ${formData.email} successfully!`);
+      closeDocumentContextMenu();
+    } catch (error) {
+      console.error('Failed to send email:', error);
+      toast.error(`Failed to send email: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setSendingEmail(null);
+    }
   };
 
   // File type detection and icon mapping
@@ -1095,19 +1165,7 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                       </select>
                     </div>
 
-                    {/* F No */}
-                    <div className="form-group">
-                      <label htmlFor="fNo" className="form-label">F No</label>
-                      <input
-                        type="text"
-                        id="fNo"
-                        name="fNo"
-                        className="form-control"
-                        placeholder="Enter F No (optional)"
-                        value={formData.fNo}
-                        onChange={handleInputChange}
-                      />
-                    </div>
+
 
                     {/* PAN */}
                     <div className="form-group">
@@ -1297,7 +1355,14 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                 {activeTab === 'documents' && (
                   <div className="space-y-6">
                     <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-medium text-gray-900">Client Documents</h3>
+                      <div>
+                        <h3 className="text-lg font-medium text-gray-900">Client Documents</h3>
+                        {formData.email && (
+                          <p className="text-sm text-gray-500 mt-1">
+                            Files will be sent to: {formData.email}
+                          </p>
+                        )}
+                      </div>
                       <button type="button" className="ti-btn ti-btn-primary" onClick={() => setShowUploadModal(true)}>
                         <i className="ri-upload-2-line mr-2"></i> Upload Documents
                       </button>
@@ -1675,34 +1740,24 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
           <div className="px-3 py-2 text-xs text-gray-500 border-b border-gray-100 dark:border-gray-700">
             {documentContextMenu.document.file?.fileName || documentContextMenu.document.fileName || 'Unknown File'}
           </div>
+
           <button
-            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
-            onClick={() => handleViewDocument(documentContextMenu.document)}
-          >
-            <i className="ri-eye-line text-blue-600"></i>
-            View File
-          </button>
-          <button
-            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
-            onClick={() => handleOpenDocumentInNewTab(documentContextMenu.document)}
-          >
-            <i className="ri-external-link-line text-green-600"></i>
-            Open in New Tab
-          </button>
-          <button
-            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 disabled:opacity-50"
             onClick={() => handleDownloadDocument(documentContextMenu.document)}
+            disabled={downloadingFile === (documentContextMenu.document.file?.fileName || documentContextMenu.document.fileName)}
           >
-            <i className="ri-download-2-line text-purple-600"></i>
-            Download
+            <i className={`${downloadingFile === (documentContextMenu.document.file?.fileName || documentContextMenu.document.fileName) ? 'ri-loader-4-line animate-spin' : 'ri-download-2-line'} text-purple-600`}></i>
+            {downloadingFile === (documentContextMenu.document.file?.fileName || documentContextMenu.document.fileName) ? 'Downloading...' : 'Download'}
           </button>
           <button
-            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
-            onClick={() => handleCopyDocumentUrl(documentContextMenu.document)}
+            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 disabled:opacity-50"
+            onClick={() => sendFileToEmail(documentContextMenu.document)}
+            disabled={sendingEmail === (documentContextMenu.document.file?.fileName || documentContextMenu.document.fileName)}
           >
-            <i className="ri-link text-orange-600"></i>
-            Copy URL
+            <i className={`${sendingEmail === (documentContextMenu.document.file?.fileName || documentContextMenu.document.fileName) ? 'ri-loader-4-line animate-spin' : 'ri-mail-line'} text-green-600`}></i>
+            {sendingEmail === (documentContextMenu.document.file?.fileName || documentContextMenu.document.fileName) ? 'Sending...' : 'Send to Email'}
           </button>
+
           <button
             className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-red-600"
             onClick={() => handleDeleteDocument(documentContextMenu.document)}
