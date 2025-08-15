@@ -104,6 +104,13 @@ const TasksPage = () => {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isUpdatingTask, setIsUpdatingTask] = useState(false);
   
+  // Quick edit modal state
+  const [showQuickEditModal, setShowQuickEditModal] = useState(false);
+  const [quickEditTask, setQuickEditTask] = useState<Task | null>(null);
+  const [quickEditStatus, setQuickEditStatus] = useState("");
+  const [quickEditRemarks, setQuickEditRemarks] = useState("");
+  const [isUpdatingQuickEdit, setIsUpdatingQuickEdit] = useState(false);
+  
   // Task statistics
   const [taskStats, setTaskStats] = useState<TaskStatistics | null>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
@@ -132,6 +139,66 @@ const TasksPage = () => {
     const value = e.target.value;
     setSearchInputValue(value);
     debouncedSearch(value);
+  };
+
+  // Quick edit functions
+  const openQuickEditModal = (task: Task) => {
+    setQuickEditTask(task);
+    setQuickEditStatus(task.status);
+    setQuickEditRemarks(task.remarks || "");
+    setShowQuickEditModal(true);
+  };
+
+  const closeQuickEditModal = () => {
+    setShowQuickEditModal(false);
+    setQuickEditTask(null);
+    setQuickEditStatus("");
+    setQuickEditRemarks("");
+  };
+
+  const handleQuickEditSubmit = async () => {
+    if (!quickEditTask) return;
+
+    setIsUpdatingQuickEdit(true);
+    try {
+      const response = await fetch(`${Base_url}tasks/${quickEditTask.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          status: quickEditStatus,
+          remarks: quickEditRemarks,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const updatedTask = await response.json();
+      
+      // Update the task in the local state
+      setTasks(prevTasks => 
+        prevTasks.map(task => 
+          task.id === quickEditTask.id 
+            ? { ...task, status: quickEditStatus as Task['status'], remarks: quickEditRemarks }
+            : task
+        )
+      );
+
+      closeQuickEditModal();
+      toast.success('Task updated successfully!');
+      
+      // Refresh task statistics
+      await fetchTaskStats();
+    } catch (error) {
+      console.error('Error updating task:', error);
+      toast.error('Failed to update task');
+    } finally {
+      setIsUpdatingQuickEdit(false);
+    }
   };
 
   // Fetch tasks using the new API
@@ -664,11 +731,19 @@ const TasksPage = () => {
                   </td>
                   <td>{task.branch?.name || "-"}</td>
                   <td>
-                    <span className={`badge ${getStatusStyling(task.status)}`}>
+                    <span 
+                      className={`badge ${getStatusStyling(task.status)} cursor-pointer hover:opacity-80 transition-opacity`}
+                      onClick={() => openQuickEditModal(task)}
+                      title="Click to edit status and remarks"
+                    >
                       {task.status.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                     </span>
                   </td>
-                  <td className="max-w-xs truncate" title={task.remarks || "-"}>
+                  <td 
+                    className="max-w-xs truncate cursor-pointer hover:bg-gray-50 transition-colors px-2 py-1 rounded" 
+                    title={`${task.remarks || "No remarks"} - Click to edit`}
+                    onClick={() => openQuickEditModal(task)}
+                  >
                     {task.remarks || "-"}
                   </td>
                 </tr>
@@ -762,6 +837,98 @@ const TasksPage = () => {
           onUpdateStatus={updateTaskStatus}
           isUpdating={isUpdatingTask}
         />
+      )}
+
+      {/* Quick Edit Modal */}
+      {showQuickEditModal && quickEditTask && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Quick Edit Task
+              </h3>
+              <button
+                onClick={closeQuickEditModal}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <i className="ri-close-line text-xl"></i>
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Task Info */}
+              <div className="text-sm text-gray-600 mb-4">
+                <p><strong>Task:</strong> {quickEditTask.teamMember?.name || "No team member"}</p>
+                <p><strong>Priority:</strong> {quickEditTask.priority}</p>
+              </div>
+
+              {/* Status Field */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Status <span className="text-red-500">*</span>
+                </label>
+                <select
+                  className="form-select w-full"
+                  value={quickEditStatus}
+                  onChange={(e) => setQuickEditStatus(e.target.value)}
+                  required
+                >
+                  <option value="">Select Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="ongoing">Ongoing</option>
+                  <option value="completed">Completed</option>
+                  <option value="on_hold">On Hold</option>
+                  <option value="cancelled">Cancelled</option>
+                  <option value="delayed">Delayed</option>
+                </select>
+              </div>
+
+              {/* Remarks Field */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Remarks
+                </label>
+                <textarea
+                  className="form-control w-full"
+                  rows={4}
+                  placeholder="Enter task remarks..."
+                  value={quickEditRemarks}
+                  onChange={(e) => setQuickEditRemarks(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-3 p-6 border-t bg-gray-50">
+              <button
+                type="button"
+                onClick={closeQuickEditModal}
+                className="ti-btn ti-btn-secondary"
+                disabled={isUpdatingQuickEdit}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleQuickEditSubmit}
+                className="ti-btn ti-btn-primary"
+                disabled={isUpdatingQuickEdit || !quickEditStatus}
+              >
+                {isUpdatingQuickEdit ? (
+                  <>
+                    <i className="ti-spinner animate-spin me-2"></i>
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <i className="ri-save-line me-2"></i>
+                    Update Task
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
