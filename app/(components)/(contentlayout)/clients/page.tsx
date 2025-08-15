@@ -102,6 +102,7 @@ const ClientsPage = () => {
   const [importProgress, setImportProgress] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState<string>("name:asc");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState({
     name: "",
     email: "",
@@ -157,11 +158,14 @@ const ClientsPage = () => {
         page: page.toString(),
         limit: limit.toString(),
         sortBy,
-        ...(filters.name && { name: filters.name }),
-        ...(filters.email && { email: filters.email }),
-        ...(filters.phone && { phone: filters.phone }),
-        ...(filters.district && { district: filters.district }),
-        ...(filters.pan && { pan: filters.pan }),
+        // Global search parameter
+        ...(searchQuery && { search: searchQuery }),
+        // Individual field filters (only if not using global search)
+        ...(!searchQuery && filters.name && { name: filters.name }),
+        ...(!searchQuery && filters.email && { email: filters.email }),
+        ...(!searchQuery && filters.phone && { phone: filters.phone }),
+        ...(!searchQuery && filters.district && { district: filters.district }),
+        ...(!searchQuery && filters.pan && { pan: filters.pan }),
 
         ...(filters.branch && { branch: filters.branch }),
         ...(filters.businessType && { businessType: filters.businessType }),
@@ -207,7 +211,7 @@ const ClientsPage = () => {
 
   useEffect(() => {
     fetchClients(currentPage, itemsPerPage);
-  }, [currentPage, sortBy, filters, itemsPerPage]);
+  }, [currentPage, sortBy, filters, itemsPerPage, searchQuery]);
 
   const handleSelectAll = () => {
     if (selectAll) {
@@ -746,20 +750,15 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                       type="text"
                       className="form-control py-2 w-full"
                       placeholder="Search by name, email, phone, city, PAN..."
-                      value={filters.name}
+                      value={searchQuery}
                       onChange={(e) => {
-                        const value = e.target.value;
-                        setFilters(prev => ({
-                          ...prev,
-                          name: value,
-                          email: value,
-                          phone: value,
-                          district: value,
-                          pan: value,
-                        }));
+                        setSearchQuery(e.target.value);
                         setCurrentPage(1);
                       }}
                     />
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                      <i className="ri-search-line text-gray-400"></i>
+                    </div>
                   </div>
 
                   {/* Filter button */}
@@ -771,9 +770,9 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                   >
                     <i className={`ri-filter-${showAdvancedFilters ? 'fill' : 'line'} me-2`}></i>
                     Filters
-                    {Object.values(filters).some(f => f !== "" && f !== filters.name) && (
+                    {Object.values(filters).some(f => f !== "") && (
                       <span className="ml-2 bg-primary text-white text-xs rounded-full px-2 py-1">
-                        {Object.values(filters).filter(f => f !== "" && f !== filters.name).length}
+                        {Object.values(filters).filter(f => f !== "").length}
                       </span>
                     )}
                   </button>
@@ -796,6 +795,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                   <button
                     className="ti-btn ti-btn-secondary py-2 w-full sm:w-auto"
                     onClick={() => {
+                      setSearchQuery("");
                       setFilters({
                         name: "",
                         email: "",
@@ -1047,7 +1047,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
               )}
 
               {/* Active Filters Summary */}
-              {Object.values(filters).some(f => f !== "" && f !== filters.name) && (
+              {(searchQuery || Object.values(filters).some(f => f !== "")) && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
@@ -1057,6 +1057,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                     <button
                       className="text-blue-600 hover:text-blue-800 text-sm"
                       onClick={() => {
+                        setSearchQuery("");
                         setFilters(prev => ({
                           ...prev,
                           businessType: "",
@@ -1077,6 +1078,17 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-2 mt-2">
+                    {searchQuery && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        Search: "{searchQuery}"
+                        <button
+                          className="ml-1 text-green-600 hover:text-green-800"
+                          onClick={() => setSearchQuery("")}
+                        >
+                          <i className="ri-close-line"></i>
+                        </button>
+                      </span>
+                    )}
                     {filters.businessType && (
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                         Business Type: {filters.businessType}
