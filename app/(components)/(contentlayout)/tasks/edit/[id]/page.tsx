@@ -369,8 +369,8 @@ const EditTaskPage = () => {
         throw new Error('Failed to fetch timelines');
       }
 
-      const data = await response.json();
-      setTimelines(data.results || []);
+        const data = await response.json();
+        setTimelines(data.results || []);
       const totalResults = data.totalResults || data.total || 0;
       const limit = 10;
       setTimelineTotalPages(Math.max(1, Math.ceil(totalResults / limit)));
@@ -819,7 +819,7 @@ const EditTaskPage = () => {
                     {selectedTimelines.length > 0 && (
                       <span className="text-sm text-gray-500">
                         {selectedTimelines.length} timeline{selectedTimelines.length !== 1 ? 's' : ''} selected
-                      </span>
+                        </span>
                     )}
                   </div>
                   {selectedTimelines.length > 0 && (
@@ -841,8 +841,8 @@ const EditTaskPage = () => {
                             <i className="ri-close-line"></i>
                           </button>
                         </span>
-                      ))}
-                    </div>
+                    ))}
+                  </div>
                   )}
                 </div>
 

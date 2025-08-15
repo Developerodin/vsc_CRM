@@ -1,10 +1,12 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Seo from "@/shared/layout-components/seo/seo";
 import { toast, Toaster } from "react-hot-toast";
 import { Base_url } from '@/app/api/config/BaseUrl';
 import axios from "axios";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
+
 
 // Task interface based on the new API documentation
 interface Task {
@@ -71,9 +73,13 @@ interface TaskStatistics {
   critical: number;
 }
 
+
+
 const TasksPage = () => {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const status = searchParams.get('status');
+  const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -81,7 +87,7 @@ const TasksPage = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalResults, setTotalResults] = useState(0);
   const [sortBy, setSortBy] = useState<string>("createdAt:desc");
-  const [itemsPerPage, setItemsPerPage] = useState(12);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [searchInputValue, setSearchInputValue] = useState("");
   const [filters, setFilters] = useState({
     status: status || "",
@@ -101,18 +107,52 @@ const TasksPage = () => {
   // Task statistics
   const [taskStats, setTaskStats] = useState<TaskStatistics | null>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
+  
+
+
+  // Debounced search function for the main search input
+  const debouncedSearch = useCallback(
+    (() => {
+      let timeoutId: NodeJS.Timeout;
+      return (searchValue: string) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          setFilters(prev => ({
+            ...prev,
+            teamMember: searchValue
+          }));
+          setCurrentPage(1);
+        }, 500);
+      };
+    })(),
+    []
+  );
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchInputValue(value);
+    debouncedSearch(value);
+  };
 
   // Fetch tasks using the new API
   const fetchTasks = async (page = 1, limit = itemsPerPage) => {
     setIsLoading(true);
     setError(null);
     try {
+      // Filter out empty values
+      const cleanFilters = Object.fromEntries(
+        Object.entries(filters).filter(([key, value]) => value !== "" && value !== "false")
+      );
+
       const queryParams = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),
-        ...filters,
+        ...cleanFilters,
         ...(sortBy && { sortBy })
       });
+
+      console.log('Fetching tasks with URL:', `${Base_url}tasks?${queryParams}`);
+      console.log('Filters:', filters);
 
       const response = await axios.get(`${Base_url}tasks?${queryParams}`, {
         headers: {
@@ -120,11 +160,17 @@ const TasksPage = () => {
         }
       });
 
+      console.log('API Response:', response.data);
+
       const data: ApiResponse = response.data;
       setTasks(data.results);
       setTotalPages(data.totalPages);
       setTotalResults(data.totalResults);
+      
+      console.log('Tasks set:', data.results);
+      console.log('Total results:', data.totalResults);
     } catch (err) {
+      console.error('Error fetching tasks:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch tasks');
       toast.error('Failed to fetch tasks');
     } finally {
@@ -188,43 +234,53 @@ const TasksPage = () => {
     }
   };
 
-  // Get priority styling
-  const getPriorityStyling = (priority: string) => {
-    switch (priority) {
-      case 'critical':
-        return 'bg-red-100 text-red-800 border-red-200';
-      case 'urgent':
-        return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'high':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'medium':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'low':
-        return 'bg-green-100 text-green-800 border-green-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+  // Selection handlers
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelectedTasks(tasks.map(task => task.id));
+    } else {
+      setSelectedTasks([]);
     }
   };
 
-  // Get status styling
-  const getStatusStyling = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-success text-white';
-      case 'ongoing':
-        return 'bg-primary text-white';
-      case 'delayed':
-        return 'bg-danger text-white';
-      case 'on_hold':
-        return 'bg-warning text-white';
-      case 'cancelled':
-        return 'bg-secondary text-white';
-      case 'pending':
-        return 'bg-info text-white';
-      default:
-        return 'bg-gray-500 text-white';
+  const handleSelectTask = (taskId: string) => {
+    setSelectedTasks(prev =>
+      prev.includes(taskId)
+        ? prev.filter(id => id !== taskId)
+        : [...prev, taskId]
+    );
+  };
+
+
+
+  const handleDeleteSelected = async () => {
+    if (!confirm('Are you sure you want to delete selected tasks?')) return;
+
+    try {
+      await Promise.all(
+        selectedTasks.map(taskId =>
+          fetch(`${Base_url}tasks/${taskId}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          })
+        )
+      );
+
+      toast.success('Selected tasks deleted successfully');
+      setSelectedTasks([]);
+      fetchTasks();
+    } catch (err) {
+      toast.error('Failed to delete some tasks');
     }
   };
+
+
+
+
+
+
 
   // Format date
   const formatDate = (dateString: string) => {
@@ -248,6 +304,38 @@ const TasksPage = () => {
     return { text: `${diffDays} days left`, color: 'text-green-600' };
   };
 
+  // Pagination utility
+  function getPagination(currentPage: number, totalPages: number) {
+    const pages = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (currentPage > 4) pages.push("...");
+      for (
+        let i = Math.max(2, currentPage - 2);
+        i <= Math.min(totalPages - 1, currentPage + 2);
+        i++
+      ) {
+        pages.push(i);
+      }
+      if (currentPage < totalPages - 3) pages.push("...");
+      pages.push(totalPages);
+    }
+    return pages;
+  }
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'critical': return 'bg-red-500';
+      case 'urgent': return 'bg-orange-500';
+      case 'high': return 'bg-yellow-500';
+      case 'medium': return 'bg-blue-500';
+      case 'low': return 'bg-green-500';
+      default: return 'bg-gray-500';
+    }
+  };
+
   useEffect(() => {
     fetchTasks(currentPage, itemsPerPage);
   }, [currentPage, sortBy, filters, itemsPerPage]);
@@ -261,315 +349,407 @@ const TasksPage = () => {
       <Toaster position="top-right" />
       <Seo title="Tasks" />
 
-      <div className="grid grid-cols-12 gap-6 mt-7">
-        <div className="col-span-12">
-          <div className="box">
-            <div className="box-body">
-              {/* Task Statistics Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-sm font-medium text-blue-600">Total Tasks</span>
-                      <p className="text-2xl font-bold text-blue-700">
-                        {isLoadingStats ? '...' : taskStats?.total || 0}
-                      </p>
-                    </div>
-                    <div className="bg-blue-200 p-3 rounded-full">
-                      <i className="ri-task-line text-blue-600 text-xl"></i>
-                    </div>
-                  </div>
-                </div>
+      {/* Page Header */}
+      <div className="box !bg-transparent border-0 shadow-none mb-6">
+        <div className="box-header flex justify-between items-center">
+          <h1 className="box-title text-2xl font-semibold">Task Management</h1>
+          <div className="box-tools flex items-center space-x-2">
+            {selectedTasks.length > 0 && (
+              <button
+                type="button"
+                className="ti-btn ti-btn-danger"
+                onClick={handleDeleteSelected}
+              >
+                <i className="ri-delete-bin-line me-2"></i>
+                Delete Selected ({selectedTasks.length})
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
 
-                <div 
-                  className="bg-gradient-to-br from-warning-50 to-warning-100 border border-warning-200 rounded-lg p-4 cursor-pointer hover:bg-warning-100 transition-colors"
-                  onClick={() => setFilters({ ...filters, status: 'pending' })}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-sm font-medium text-warning-600">Pending</span>
-                      <p className="text-2xl font-bold text-warning-700">
-                        {isLoadingStats ? '...' : taskStats?.pending || 0}
-                      </p>
-                    </div>
-                    <div className="bg-warning-200 p-3 rounded-full">
-                      <i className="ri-time-line text-warning-600 text-xl"></i>
-                    </div>
-                  </div>
-                </div>
+      {/* Status Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        {/* Pending Card */}
+        <div 
+          className="bg-warning/10 border border-warning/20 rounded-lg p-4 cursor-pointer hover:bg-warning/20 transition-colors"
+          onClick={() => setFilters({ ...filters, status: 'pending' })}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-sm font-medium text-warning">Pending</span>
+              <p className="text-2xl font-bold text-warning">
+                {tasks.filter(t => t?.status === 'pending').length}
+              </p>
+            </div>
+            <div className="bg-warning/20 p-3 rounded-full">
+              <i className="ri-time-line text-warning text-xl"></i>
+            </div>
+          </div>
+        </div>
 
-                <div 
-                  className="bg-gradient-to-br from-primary-50 to-primary-100 border border-primary-200 rounded-lg p-4 cursor-pointer hover:bg-primary-100 transition-colors"
-                  onClick={() => setFilters({ ...filters, status: 'ongoing' })}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-sm font-medium text-primary-600">Ongoing</span>
-                      <p className="text-2xl font-bold text-primary-700">
-                        {isLoadingStats ? '...' : taskStats?.ongoing || 0}
-                      </p>
-                    </div>
-                    <div className="bg-primary-200 p-3 rounded-full">
-                      <i className="ri-loader-4-line text-primary-600 text-xl"></i>
-                    </div>
-                  </div>
-                </div>
+        {/* Ongoing Card */}
+        <div 
+          className="bg-primary/10 border border-primary/20 rounded-lg p-4 cursor-pointer hover:bg-primary/20 transition-colors"
+          onClick={() => setFilters({ ...filters, status: 'ongoing' })}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-sm font-medium text-primary">Ongoing</span>
+              <p className="text-2xl font-bold text-primary">
+                {tasks.filter(t => t?.status === 'ongoing').length}
+              </p>
+            </div>
+            <div className="bg-primary/20 p-3 rounded-full">
+              <i className="ri-loader-4-line text-primary text-xl"></i>
+            </div>
+          </div>
+        </div>
 
-                <div 
-                  className="bg-gradient-to-br from-success-50 to-success-100 border border-success-200 rounded-lg p-4 cursor-pointer hover:bg-success-100 transition-colors"
-                  onClick={() => setFilters({ ...filters, status: 'completed' })}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-sm font-medium text-success-600">Completed</span>
-                      <p className="text-2xl font-bold text-success-700">
-                        {isLoadingStats ? '...' : taskStats?.completed || 0}
-                      </p>
-                    </div>
-                    <div className="bg-success-200 p-3 rounded-full">
-                      <i className="ri-check-line text-success-600 text-xl"></i>
-                    </div>
-                  </div>
-                </div>
-              </div>
+        {/* Completed Card */}
+        <div 
+          className="bg-success/10 border border-success/20 rounded-lg p-4 cursor-pointer hover:bg-success/20 transition-colors"
+          onClick={() => setFilters({ ...filters, status: 'completed' })}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-sm font-medium text-success">Completed</span>
+              <p className="text-2xl font-bold text-success">
+                {tasks.filter(t => t?.status === 'completed').length}
+              </p>
+            </div>
+            <div className="bg-success/20 p-3 rounded-full">
+              <i className="ri-check-line text-success text-xl"></i>
+            </div>
+          </div>
+        </div>
 
-              {/* Search and Filters */}
-              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
-                <div className="flex items-center w-full lg:w-auto">
-                  <label className="mr-2 text-sm text-gray-600 whitespace-nowrap">Tasks per page:</label>
-                  <select
-                    className="form-select w-auto text-sm"
-                    value={itemsPerPage}
-                    onChange={(e) => {
-                      setItemsPerPage(Number(e.target.value));
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <option value={12}>12</option>
-                    <option value={24}>24</option>
-                    <option value={48}>48</option>
-                  </select>
-                </div>
+        {/* On Hold Card */}
+        <div 
+          className="bg-warning/10 border border-warning/20 rounded-lg p-4 cursor-pointer hover:bg-warning/20 transition-colors"
+          onClick={() => setFilters({ ...filters, status: 'on_hold' })}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-sm font-medium text-warning">On Hold</span>
+              <p className="text-2xl font-bold text-warning">
+                {tasks.filter(t => t?.status === 'on_hold').length}
+              </p>
+            </div>
+            <div className="bg-warning/20 p-3 rounded-full">
+              <i className="ri-pause-line text-warning text-xl"></i>
+            </div>
+          </div>
+        </div>
 
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
-                  <select
-                    className="form-select py-2 w-full sm:w-auto"
-                    value={filters.priority}
-                    onChange={(e) => {
-                      setFilters(prev => ({ ...prev, priority: e.target.value }));
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <option value="">All Priorities</option>
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="urgent">Urgent</option>
-                    <option value="critical">Critical</option>
-                  </select>
-
-                  <select
-                    className="form-select py-2 w-full sm:w-auto"
-                    value={filters.status}
-                    onChange={(e) => {
-                      setFilters(prev => ({ ...prev, status: e.target.value }));
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <option value="">All Statuses</option>
-                    <option value="pending">Pending</option>
-                    <option value="ongoing">Ongoing</option>
-                    <option value="completed">Completed</option>
-                    <option value="on_hold">On Hold</option>
-                    <option value="cancelled">Cancelled</option>
-                    <option value="delayed">Delayed</option>
-                  </select>
-
-                  <input
-                    type="date"
-                    className="form-control py-2 w-full sm:w-auto"
-                    value={filters.startDate}
-                    onChange={e => {
-                      setFilters(prev => ({ ...prev, startDate: e.target.value }));
-                      setCurrentPage(1);
-                    }}
-                    placeholder="Start Date"
-                  />
-                  <input
-                    type="date"
-                    className="form-control py-2 w-full sm:w-auto"
-                    value={filters.endDate}
-                    onChange={e => {
-                      setFilters(prev => ({ ...prev, endDate: e.target.value }));
-                      setCurrentPage(1);
-                    }}
-                    placeholder="End Date"
-                  />
-
-                  <div className="relative flex-grow sm:max-w-xs">
-                    <input
-                      type="text"
-                      className="form-control py-2 w-full"
-                      placeholder="Search tasks..."
-                      value={searchInputValue}
-                      onChange={(e) => setSearchInputValue(e.target.value)}
-                    />
-                  </div>
-
-                  <select
-                    className="form-select py-2 w-full sm:w-auto"
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                  >
-                    <option value="createdAt:desc">Newest First</option>
-                    <option value="createdAt:asc">Oldest First</option>
-                    <option value="endDate:asc">Due Date (Earliest)</option>
-                    <option value="endDate:desc">Due Date (Latest)</option>
-                    <option value="priority:desc">Priority (High to Low)</option>
-                    <option value="priority:asc">Priority (Low to High)</option>
-                  </select>
-
-                  <button
-                    className="ti-btn ti-btn-secondary py-2 w-full sm:w-auto"
-                    onClick={() => {
-                      setSearchInputValue("");
-                      setFilters({
-                        status: "",
-                        priority: "",
-                        branch: "",
-                        teamMember: "",
-                        startDate: "",
-                        endDate: "",
-                        today: "false",
-                      });
-                      setSortBy("createdAt:desc");
-                    }}
-                  >
-                    <i className="ri-refresh-line me-2"></i>
-                    Reset
-                  </button>
-                </div>
-              </div>
-
-              {/* Tasks Grid */}
-              {isLoading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {Array.from({ length: itemsPerPage }).map((_, i) => (
-                    <div key={i} className="animate-pulse">
-                      <div className="bg-white border border-gray-200 rounded-lg p-4 h-64">
-                        <div className="h-4 bg-gray-200 rounded mb-3"></div>
-                        <div className="h-3 bg-gray-200 rounded mb-2"></div>
-                        <div className="h-3 bg-gray-200 rounded mb-4"></div>
-                        <div className="h-20 bg-gray-200 rounded mb-4"></div>
-                        <div className="h-6 bg-gray-200 rounded"></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : error ? (
-                <div className="text-center py-8 text-red-500">
-                  <i className="ri-error-warning-line text-4xl mb-4"></i>
-                  <p className="text-lg font-medium mb-2">Error Loading Tasks</p>
-                  <p className="text-sm">{error}</p>
-                </div>
-              ) : tasks.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
-                    <i className="ri-task-line text-4xl text-primary"></i>
-                  </div>
-                  <h3 className="text-xl font-medium mb-2">No Tasks Found</h3>
-                  <p className="text-gray-500">Try adjusting your filters or search criteria</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {tasks.map((task) => (
-                    <div
-                      key={task.id}
-                      className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-lg transition-shadow cursor-pointer group relative"
-                      onClick={() => {
-                        setSelectedTask(task);
-                        setShowTaskModal(true);
-                      }}
-                    >
-                      {/* Task Header */}
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-gray-900 truncate group-hover:text-primary transition-colors">
-                            {task.teamMember.name}
-                          </h3>
-                          <p className="text-sm text-gray-500 truncate">
-                            {task.branch.name}
-                          </p>
-                        </div>
-                        <div className="flex flex-col items-end gap-1">
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getPriorityStyling(task.priority)}`}>
-                            {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-                          </span>
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusStyling(task.status)}`}>
-                            {task.status.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Task Details */}
-                      <div className="space-y-2 mb-4">
-                        <div className="flex items-center text-sm text-gray-600">
-                          <i className="ri-calendar-line mr-2 text-gray-400"></i>
-                          <span className="truncate">
-                            {formatDate(task.startDate)} - {formatDate(task.endDate)}
-                          </span>
-                        </div>
-                        
-                        {task.assignedBy && (
-                          <div className="flex items-center text-sm text-gray-600">
-                            <i className="ri-user-line mr-2 text-gray-400"></i>
-                            <span className="truncate">Assigned by {task.assignedBy.name}</span>
-                          </div>
-                        )}
-
-                        {task.timeline && task.timeline.length > 0 && (
-                          <div className="flex items-center text-sm text-gray-600">
-                            <i className="ri-time-line mr-2 text-gray-400"></i>
-                            <span className="truncate">{task.timeline.length} timeline(s)</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Task Remarks */}
-                      {task.remarks && (
-                        <div className="mb-4">
-                          <p className="text-sm text-gray-700 line-clamp-2 bg-gray-50 p-2 rounded">
-                            {task.remarks}
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Task Footer */}
-                      <div className="flex items-center justify-between">
-                        <div className="text-sm">
-                          <span className={`font-medium ${getDaysRemaining(task.endDate).color}`}>
-                            {getDaysRemaining(task.endDate).text}
-                          </span>
-                        </div>
-                        <div className="text-xs text-gray-400">
-                          {formatDate(task.createdAt)}
-                        </div>
-                      </div>
-
-                      {/* Hover Actions */}
-                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-5 transition-all duration-200 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
-                        <div className="bg-white rounded-lg shadow-lg p-2">
-                          <i className="ri-eye-line text-primary text-lg"></i>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+        {/* Delayed Card */}
+        <div 
+          className="bg-danger/10 border border-danger/20 rounded-lg p-4 cursor-pointer hover:bg-danger/20 transition-colors"
+          onClick={() => setFilters({ ...filters, status: 'delayed' })}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-sm font-medium text-danger">Delayed</span>
+              <p className="text-2xl font-bold text-danger">
+                {tasks.filter(t => t?.status === 'delayed').length}
+              </p>
+            </div>
+            <div className="bg-danger/20 p-3 rounded-full">
+              <i className="ri-error-warning-line text-danger text-xl"></i>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Simple Filters Row */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
+        <div className="flex items-center w-full lg:w-auto">
+          <label className="mr-2 text-sm text-gray-600 whitespace-nowrap">Rows per page:</label>
+          <select
+            className="form-select w-auto text-sm"
+            value={itemsPerPage}
+            onChange={(e) => {
+              setItemsPerPage(Number(e.target.value));
+              setCurrentPage(1);
+            }}
+          >
+            <option value={10}>10</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+            <option value={500}>500</option>
+            <option value={1000}>1000</option>
+          </select>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+          <div className="relative flex-grow sm:max-w-xs">
+            <input
+              type="text"
+              className="form-control py-2 w-full"
+              placeholder="Search tasks..."
+              value={searchInputValue}
+              onChange={handleSearchChange}
+            />
+          </div>
+
+          <select
+            className="form-select py-2 w-full sm:w-auto"
+            value={filters.status}
+            onChange={(e) => {
+              setFilters(prev => ({ ...prev, status: e.target.value }));
+              setCurrentPage(1);
+            }}
+          >
+            <option value="">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="ongoing">Ongoing</option>
+            <option value="completed">Completed</option>
+            <option value="on_hold">On Hold</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="delayed">Delayed</option>
+          </select>
+
+          <select
+            className="form-select py-2 w-full sm:w-auto"
+            value={filters.priority}
+            onChange={(e) => {
+              setFilters(prev => ({ ...prev, priority: e.target.value }));
+              setCurrentPage(1);
+            }}
+          >
+            <option value="">All Priority</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+            <option value="urgent">Urgent</option>
+            <option value="critical">Critical</option>
+          </select>
+
+          <input
+            type="date"
+            className="form-control py-2 w-full sm:w-auto"
+            placeholder="Start Date"
+            value={filters.startDate}
+            onChange={(e) => {
+              setFilters(prev => ({ ...prev, startDate: e.target.value }));
+              setCurrentPage(1);
+            }}
+            title="Start Date From"
+          />
+
+          <input
+            type="date"
+            className="form-control py-2 w-full sm:w-auto"
+            placeholder="End Date"
+            value={filters.endDate}
+            onChange={(e) => {
+              setFilters(prev => ({ ...prev, endDate: e.target.value }));
+              setCurrentPage(1);
+            }}
+            title="End Date Until"
+          />
+
+          <select
+            className="form-select py-2 w-full sm:w-32"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+          >
+            <option value="createdAt:desc">Newest First</option>
+            <option value="createdAt:asc">Oldest First</option>
+            <option value="endDate:asc">End Date (Earliest-Latest)</option>
+            <option value="endDate:desc">End Date (Latest-Earliest)</option>
+            <option value="priority:desc">Priority (High-Low)</option>
+            <option value="priority:asc">Priority (Low-High)</option>
+          </select>
+
+          <button
+            className="ti-btn ti-btn-secondary py-2 w-full sm:w-auto"
+            onClick={() => {
+              setSearchInputValue("");
+              setFilters({
+                status: "",
+                priority: "",
+                branch: "",
+                teamMember: "",
+                startDate: "",
+                endDate: "",
+                today: "false",
+              });
+              setSortBy("createdAt:desc");
+              setCurrentPage(1);
+            }}
+          >
+            <i className="ri-refresh-line me-2"></i>
+            Reset
+          </button>
+        </div>
+      </div>
+
+      {/* Tasks Table */}
+      <div className="table-responsive">
+        <table className="table whitespace-nowrap table-bordered">
+          <thead>
+            <tr>
+              <th className="px-4 py-3">
+                <input
+                  type="checkbox"
+                  className="form-checkbox"
+                  checked={selectedTasks.length === tasks.length}
+                  onChange={handleSelectAll}
+                />
+              </th>
+              <th className="px-4 py-3">Team Member</th>
+              <th className="px-4 py-3">Start Date</th>
+              <th className="px-4 py-3">End Date</th>
+              <th className="px-4 py-3">Priority</th>
+              <th className="px-4 py-3">Branch</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Remarks</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr>
+                <td colSpan={8} className="text-center py-4">
+                  <div className="flex justify-center">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                  </div>
+                </td>
+              </tr>
+            ) : error ? (
+              <tr>
+                <td colSpan={8} className="text-center text-red-500 py-4">
+                  {error}
+                </td>
+              </tr>
+            ) : tasks.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="text-center py-8">
+                  <div className="flex flex-col items-center justify-center">
+                    <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
+                      <i className="ri-task-line text-4xl text-primary"></i>
+                    </div>
+                    <h3 className="text-xl font-medium mb-2">
+                      No Tasks Found
+                    </h3>
+                    <p className="text-gray-500 text-center mb-6">
+                      No tasks found matching your criteria.
+                    </p>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              tasks.map((task) => (
+                <tr key={task.id}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={selectedTasks.includes(task.id)}
+                      onChange={() => handleSelectTask(task.id)}
+                      className="form-checkbox"
+                    />
+                  </td>
+                  <td>
+                    <div>
+                      <div className="font-medium">{task.teamMember?.name || "-"}</div>
+                      <div className="text-sm text-gray-500">{task.teamMember?.email || "-"}</div>
+                    </div>
+                  </td>
+                  <td>{task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : "-"}</td>
+                  <td>{task.endDate ? new Date(task.endDate).toISOString().split('T')[0] : "-"}</td>
+                  <td>
+                    <span className={`badge ${getPriorityColor(task.priority)} text-white`}>
+                      {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                    </span>
+                  </td>
+                  <td>{task.branch?.name || "-"}</td>
+                  <td>
+                    <span className={`badge ${getStatusStyling(task.status)}`}>
+                      {task.status.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                    </span>
+                  </td>
+                  <td className="max-w-xs truncate" title={task.remarks || "-"}>
+                    {task.remarks || "-"}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      {!isLoading && !error && (
+        <div className="flex justify-between items-center mt-4">
+          <div className="text-sm text-gray-500">
+            Showing{" "}
+            {totalResults === 0
+              ? 0
+              : (currentPage - 1) * itemsPerPage + 1}{" "}
+            to{" "}
+            {totalResults === 0
+              ? 0
+              : Math.min(currentPage * itemsPerPage, totalResults)}{" "}
+            of {totalResults} entries
+          </div>
+          <nav aria-label="Page navigation" className="">
+            <ul className="flex flex-wrap items-center">
+              <li
+                className={`page-item ${
+                  currentPage === 1 ? "disabled" : ""
+                }`}
+              >
+                <button
+                  className="page-link py-2 px-3 ml-0 leading-tight text-gray-500 bg-white rounded-l-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(prev - 1, 1))
+                  }
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </button>
+              </li>
+              {getPagination(currentPage, totalPages).map((page, idx) =>
+                page === "..." ? (
+                  <li key={"ellipsis-" + idx} className="page-item">
+                    <span className="px-3">...</span>
+                  </li>
+                ) : (
+                  <li key={page} className="page-item">
+                    <button
+                      className={`page-link py-2 px-3 leading-tight border border-gray-300 ${
+                        currentPage === page
+                          ? "bg-primary text-white hover:bg-primary-dark"
+                          : "bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                      }`}
+                      onClick={() => setCurrentPage(Number(page))}
+                    >
+                      {page}
+                    </button>
+                  </li>
+                )
+              )}
+              <li
+                className={`page-item ${
+                  currentPage === totalPages ? "disabled" : ""
+                }`}
+              >
+                <button
+                  className="page-link py-2 px-3 leading-tight text-gray-500 bg-white rounded-r-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
+                  onClick={() =>
+                    setCurrentPage((prev) =>
+                      Math.min(prev + 1, totalPages)
+                    )
+                  }
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </button>
+              </li>
+            </ul>
+          </nav>
+        </div>
+      )}
 
       {/* Task Details Modal */}
       {showTaskModal && selectedTask && (
@@ -817,7 +997,7 @@ const TaskDetailsModal = ({
   );
 };
 
-// Helper function for status styling (moved outside component)
+// Helper functions for styling (moved outside component)
 const getStatusStyling = (status: string) => {
   switch (status) {
     case 'completed':
@@ -834,6 +1014,23 @@ const getStatusStyling = (status: string) => {
       return 'bg-info text-white';
     default:
       return 'bg-gray-500 text-white';
+  }
+};
+
+const getPriorityStyling = (priority: string) => {
+  switch (priority) {
+    case 'critical':
+      return 'bg-red-100 text-red-800 border-red-200';
+    case 'urgent':
+      return 'bg-orange-100 text-orange-800 border-orange-200';
+    case 'high':
+      return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    case 'medium':
+      return 'bg-blue-100 text-blue-800 border-blue-200';
+    case 'low':
+      return 'bg-green-100 text-green-800 border-green-200';
+    default:
+      return 'bg-gray-100 text-gray-800 border-gray-200';
   }
 };
 

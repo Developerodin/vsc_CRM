@@ -163,8 +163,8 @@ const AddTaskPage = () => {
         throw new Error('Failed to fetch timelines');
       }
 
-      const data = await response.json();
-      setTimelines(data.results || []);
+        const data = await response.json();
+        setTimelines(data.results || []);
       const totalResults = data.totalResults || data.total || 0;
       const limit = 10;
       setTimelineTotalPages(Math.max(1, Math.ceil(totalResults / limit)));
@@ -365,8 +365,8 @@ const AddTaskPage = () => {
       setAttachments(prev => [...prev, ...successfulUploads]);
       
       // Update form data
-      setFormData(prev => ({
-        ...prev,
+    setFormData(prev => ({
+      ...prev,
         attachments: [...prev.attachments, ...successfulUploads]
       }));
 
@@ -615,8 +615,8 @@ const AddTaskPage = () => {
                             <i className="ri-close-line"></i>
                           </button>
                         </span>
-                      ))}
-                    </div>
+                    ))}
+                  </div>
                   )}
                 </div>
 
