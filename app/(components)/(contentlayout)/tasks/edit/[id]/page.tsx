@@ -57,12 +57,20 @@ interface Branch {
 
 interface Timeline {
   id: string;
+  title: string;
+  description: string;
   activity: {
+    id: string;
     name: string;
   };
   client: {
+    id: string;
     name: string;
   };
+  status: string;
+  priority: string;
+  startDate: string;
+  endDate: string;
 }
 
 const EditTaskPage = () => {
@@ -76,6 +84,19 @@ const EditTaskPage = () => {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [timelines, setTimelines] = useState<Timeline[]>([]);
+  const [selectedTimelines, setSelectedTimelines] = useState<Timeline[]>([]);
+  const [showTimelineModal, setShowTimelineModal] = useState(false);
+  const [isLoadingTimelines, setIsLoadingTimelines] = useState(false);
+  const [timelineSearchQuery, setTimelineSearchQuery] = useState("");
+  const [timelineCurrentPage, setTimelineCurrentPage] = useState(1);
+  const [timelineTotalPages, setTimelineTotalPages] = useState(1);
+  const [selectedTeamMember, setSelectedTeamMember] = useState<TeamMember | null>(null);
+  const [showTeamMemberModal, setShowTeamMemberModal] = useState(false);
+  const [isLoadingTeamMembers, setIsLoadingTeamMembers] = useState(false);
+  const [teamMemberSearchQuery, setTeamMemberSearchQuery] = useState("");
+  const [teamMemberCurrentPage, setTeamMemberCurrentPage] = useState(1);
+  const [teamMemberTotalPages, setTeamMemberTotalPages] = useState(1);
+  const [allTeamMembers, setAllTeamMembers] = useState<TeamMember[]>([]);
   const [formData, setFormData] = useState({
     teamMember: "",
     startDate: "",
@@ -94,7 +115,6 @@ const EditTaskPage = () => {
       fetchTask();
       fetchTeamMembers();
       fetchBranches();
-      fetchTimelines();
     }
   }, [taskId]);
 
@@ -112,6 +132,126 @@ const EditTaskPage = () => {
       
       const taskData: Task = await response.json();
       setTask(taskData);
+      
+      // Fetch full timeline details for currently selected timelines
+      if (taskData.timeline && taskData.timeline.length > 0) {
+        try {
+          // Fetch full details for each timeline
+          const timelinePromises = taskData.timeline.map(async (timelineRef) => {
+            try {
+              const response = await fetch(`${Base_url}timelines/${timelineRef.id}`, {
+                headers: {
+                  'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+              });
+              
+              if (response.ok) {
+                const fullTimeline = await response.json();
+                return fullTimeline;
+              } else {
+                // If individual timeline fetch fails, fetch activity and client names
+                const [activityResponse, clientResponse] = await Promise.allSettled([
+                  fetch(`${Base_url}activities/${timelineRef.activity}`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                  }),
+                  fetch(`${Base_url}clients/${timelineRef.client}`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                  })
+                ]);
+
+                const activityName = activityResponse.status === 'fulfilled' && activityResponse.value.ok
+                  ? (await activityResponse.value.json()).name || 'Unknown Activity'
+                  : 'Unknown Activity';
+                  
+                const clientName = clientResponse.status === 'fulfilled' && clientResponse.value.ok
+                  ? (await clientResponse.value.json()).name || 'Unknown Client'
+                  : 'Unknown Client';
+
+                return {
+                  id: timelineRef.id,
+                  title: `${activityName} - ${clientName}`,
+                  description: '',
+                  activity: { id: timelineRef.activity, name: activityName },
+                  client: { id: timelineRef.client, name: clientName },
+                  status: timelineRef.status,
+                  priority: 'medium',
+                  startDate: '',
+                  endDate: ''
+                };
+              }
+            } catch (error) {
+              console.error(`Error fetching timeline ${timelineRef.id}:`, error);
+              // Return basic timeline object as fallback - try to fetch activity and client names
+              try {
+                const [activityResponse, clientResponse] = await Promise.allSettled([
+                  fetch(`${Base_url}activities/${timelineRef.activity}`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                  }),
+                  fetch(`${Base_url}clients/${timelineRef.client}`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                  })
+                ]);
+
+                const activityName = activityResponse.status === 'fulfilled' && activityResponse.value.ok
+                  ? (await activityResponse.value.json()).name || 'Unknown Activity'
+                  : 'Unknown Activity';
+                  
+                const clientName = clientResponse.status === 'fulfilled' && clientResponse.value.ok
+                  ? (await clientResponse.value.json()).name || 'Unknown Client'
+                  : 'Unknown Client';
+
+                return {
+                  id: timelineRef.id,
+                  title: `${activityName} - ${clientName}`,
+                  description: '',
+                  activity: { id: timelineRef.activity, name: activityName },
+                  client: { id: timelineRef.client, name: clientName },
+                  status: timelineRef.status,
+                  priority: 'medium',
+                  startDate: '',
+                  endDate: ''
+                };
+              } catch (fallbackError) {
+                return {
+                  id: timelineRef.id,
+                  title: `Timeline ${timelineRef.id.slice(-6)}`,
+                  description: '',
+                  activity: { id: timelineRef.activity, name: 'Unknown Activity' },
+                  client: { id: timelineRef.client, name: 'Unknown Client' },
+                  status: timelineRef.status,
+                  priority: 'medium',
+                  startDate: '',
+                  endDate: ''
+                };
+              }
+            }
+          });
+          
+          const fullTimelines = await Promise.all(timelinePromises);
+          setSelectedTimelines(fullTimelines.filter(Boolean)); // Filter out any null/undefined results
+        } catch (error) {
+          console.error('Error fetching timeline details:', error);
+          // Final fallback: create basic timeline objects from the data we have
+          const basicTimelines = taskData.timeline.map(t => ({
+            id: t.id,
+            title: `Timeline ${t.id.slice(-6)}`,
+            description: '',
+            activity: { id: t.activity, name: 'Unknown Activity' },
+            client: { id: t.client, name: 'Unknown Client' },
+            status: t.status,
+            priority: 'medium',
+            startDate: '',
+            endDate: ''
+          }));
+          setSelectedTimelines(basicTimelines);
+        }
+      }
+
+      // Set selected team member
+      if (taskData.teamMember) {
+        setSelectedTeamMember(taskData.teamMember);
+      }
+      
       setFormData({
         teamMember: taskData.teamMember?.id || "",
         startDate: taskData.startDate ? new Date(taskData.startDate).toISOString().split('T')[0] : "",
@@ -148,6 +288,40 @@ const EditTaskPage = () => {
     }
   };
 
+  const fetchTeamMembersModal = async (page: number = 1, searchQueryParam?: string) => {
+    try {
+      setIsLoadingTeamMembers(true);
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: "10",
+        sortBy: "name:asc",
+        ...((searchQueryParam || teamMemberSearchQuery) && { search: searchQueryParam || teamMemberSearchQuery })
+      });
+
+      const response = await fetch(`${Base_url}team-members?${queryParams}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch team members');
+      }
+
+      const data = await response.json();
+      setAllTeamMembers(data.results || []);
+      const totalResults = data.totalResults || data.total || 0;
+      const limit = 10;
+      setTeamMemberTotalPages(Math.max(1, Math.ceil(totalResults / limit)));
+      setTeamMemberCurrentPage(page);
+    } catch (err) {
+      console.error('Error fetching team members:', err);
+      toast.error('Failed to fetch team members');
+    } finally {
+      setIsLoadingTeamMembers(false);
+    }
+  };
+
   const fetchBranches = async () => {
     try {
       const response = await fetch(`${Base_url}branches`, {
@@ -164,19 +338,37 @@ const EditTaskPage = () => {
     }
   };
 
-  const fetchTimelines = async () => {
+  const fetchTimelines = async (page: number = 1, searchQueryParam?: string) => {
     try {
-      const response = await fetch(`${Base_url}timelines`, {
+      setIsLoadingTimelines(true);
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: "10",
+        sortBy: "title:asc",
+        ...((searchQueryParam || timelineSearchQuery) && { search: searchQueryParam || timelineSearchQuery })
+      });
+
+      const response = await fetch(`${Base_url}timelines?${queryParams}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
-      if (response.ok) {
-        const data = await response.json();
-        setTimelines(data.results || []);
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch timelines');
       }
-    } catch (error) {
-      console.error('Error fetching timelines:', error);
+
+      const data = await response.json();
+      setTimelines(data.results || []);
+      const totalResults = data.totalResults || data.total || 0;
+      const limit = 10;
+      setTimelineTotalPages(Math.max(1, Math.ceil(totalResults / limit)));
+      setTimelineCurrentPage(page);
+    } catch (err) {
+      console.error('Error fetching timelines:', err);
+      toast.error('Failed to fetch timelines');
+    } finally {
+      setIsLoadingTimelines(false);
     }
   };
 
@@ -188,14 +380,109 @@ const EditTaskPage = () => {
     }));
   };
 
-  const handleTimelineChange = (timelineId: string) => {
+  const handleTimelineSelect = (timeline: Timeline) => {
+    setSelectedTimelines(prev => {
+      const isSelected = prev.some(t => t.id === timeline.id);
+      if (isSelected) {
+        return prev.filter(t => t.id !== timeline.id);
+      } else {
+        return [...prev, timeline];
+      }
+    });
+  };
+
+  const handleTimelineModalSubmit = () => {
     setFormData(prev => ({
       ...prev,
-      timeline: prev.timeline.includes(timelineId)
-        ? prev.timeline.filter(id => id !== timelineId)
-        : [...prev.timeline, timelineId]
+      timeline: selectedTimelines.map(timeline => timeline.id)
     }));
+    setShowTimelineModal(false);
   };
+
+  const handleTimelineSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    setTimelineSearchQuery(query);
+    if (showTimelineModal) {
+      debouncedTimelineSearch(query);
+    }
+  };
+
+  const handleTimelineSearchClick = () => {
+    if (showTimelineModal) {
+      setTimelineCurrentPage(1);
+      fetchTimelines(1, timelineSearchQuery);
+    }
+  };
+
+  const handleTimelinePageChange = (newPage: number) => {
+    setTimelineCurrentPage(newPage);
+    fetchTimelines(newPage, timelineSearchQuery);
+  };
+
+  // Debounced search function for timelines
+  const debouncedTimelineSearch = React.useCallback(
+    (() => {
+      let timeoutId: NodeJS.Timeout;
+      return (searchQuery: string) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          setTimelineCurrentPage(1);
+          fetchTimelines(1, searchQuery);
+        }, 500);
+      };
+    })(),
+    []
+  );
+
+  // Team member selection handlers
+  const handleTeamMemberSelect = (teamMember: TeamMember) => {
+    setSelectedTeamMember(teamMember);
+  };
+
+  const handleTeamMemberModalSubmit = () => {
+    if (selectedTeamMember) {
+      setFormData(prev => ({
+        ...prev,
+        teamMember: selectedTeamMember.id
+      }));
+    }
+    setShowTeamMemberModal(false);
+  };
+
+  const handleTeamMemberSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    setTeamMemberSearchQuery(query);
+    if (showTeamMemberModal) {
+      debouncedTeamMemberSearch(query);
+    }
+  };
+
+  const handleTeamMemberSearchClick = () => {
+    if (showTeamMemberModal) {
+      setTeamMemberCurrentPage(1);
+      fetchTeamMembersModal(1, teamMemberSearchQuery);
+    }
+  };
+
+  const handleTeamMemberPageChange = (newPage: number) => {
+    setTeamMemberCurrentPage(newPage);
+    fetchTeamMembersModal(newPage, teamMemberSearchQuery);
+  };
+
+  // Debounced search function for team members
+  const debouncedTeamMemberSearch = React.useCallback(
+    (() => {
+      let timeoutId: NodeJS.Timeout;
+      return (searchQuery: string) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          setTeamMemberCurrentPage(1);
+          fetchTeamMembersModal(1, searchQuery);
+        }, 500);
+      };
+    })(),
+    []
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -276,20 +563,45 @@ const EditTaskPage = () => {
                   {/* Team Member */}
                   <div>
                     <label className="form-label">Team Member <span className="text-red-500">*</span></label>
-                    <select
-                      name="teamMember"
-                      value={formData.teamMember}
-                      onChange={handleInputChange}
-                      className="form-select"
-                      required
-                    >
-                      <option value="">Select Team Member</option>
-                      {teamMembers.map(member => (
-                        <option key={member.id} value={member.id}>
-                          {member.name} ({member.email})
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex items-center space-x-4">
+                      <button
+                        type="button"
+                        className="ti-btn ti-btn-primary"
+                        onClick={() => {
+                          setShowTeamMemberModal(true);
+                          setTeamMemberSearchQuery("");
+                          setTeamMemberCurrentPage(1);
+                          fetchTeamMembersModal(1);
+                        }}
+                      >
+                        {selectedTeamMember ? selectedTeamMember.name : "Select Team Member"}
+                      </button>
+                      {selectedTeamMember && (
+                        <span className="text-sm text-gray-500">
+                          {selectedTeamMember.email}
+                        </span>
+                      )}
+                    </div>
+                    {selectedTeamMember && (
+                      <div className="mt-2">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-green-100 text-green-800">
+                          {selectedTeamMember.name} ({selectedTeamMember.email})
+                          <button
+                            type="button"
+                            className="ml-2 text-green-600 hover:text-green-800"
+                            onClick={() => {
+                              setSelectedTeamMember(null);
+                              setFormData(prev => ({
+                                ...prev,
+                                teamMember: ""
+                              }));
+                            }}
+                          >
+                            <i className="ri-close-line"></i>
+                          </button>
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Branch */}
@@ -373,24 +685,50 @@ const EditTaskPage = () => {
                   </div>
                 </div>
 
-                {/* Timelines */}
+                {/* Related Timelines */}
                 <div>
                   <label className="form-label">Related Timelines</label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
-                    {timelines.map(timeline => (
-                      <label key={timeline.id} className="flex items-center space-x-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={formData.timeline.includes(timeline.id)}
-                          onChange={() => handleTimelineChange(timeline.id)}
-                          className="form-checkbox"
-                        />
-                        <span className="text-sm">
-                          {timeline.activity.name} - {timeline.client.name}
-                        </span>
-                      </label>
-                    ))}
+                  <div className="flex items-center space-x-4">
+                    <button
+                      type="button"
+                      className="ti-btn ti-btn-primary"
+                      onClick={() => {
+                        setShowTimelineModal(true);
+                        setTimelineSearchQuery("");
+                        setTimelineCurrentPage(1);
+                        fetchTimelines(1);
+                      }}
+                    >
+                      Select Timelines ({selectedTimelines.length} selected)
+                    </button>
+                    {selectedTimelines.length > 0 && (
+                      <span className="text-sm text-gray-500">
+                        {selectedTimelines.length} timeline{selectedTimelines.length !== 1 ? 's' : ''} selected
+                      </span>
+                    )}
                   </div>
+                  {selectedTimelines.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {selectedTimelines.map(timeline => (
+                        <span key={timeline.id} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800">
+                          {timeline.title || `${timeline.activity?.name || 'Unknown Activity'} - ${timeline.client?.name || 'Unknown Client'}`}
+                          <button
+                            type="button"
+                            className="ml-2 text-blue-600 hover:text-blue-800"
+                            onClick={() => {
+                              setSelectedTimelines(prev => prev.filter(t => t.id !== timeline.id));
+                              setFormData(prev => ({
+                                ...prev,
+                                timeline: prev.timeline.filter(id => id !== timeline.id)
+                              }));
+                            }}
+                          >
+                            <i className="ri-close-line"></i>
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Remarks */}
@@ -436,6 +774,297 @@ const EditTaskPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Timeline Selection Modal */}
+      {showTimelineModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg w-11/12 max-w-6xl max-h-[90vh] flex flex-col">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h2 className="text-xl font-semibold">Select Timelines</h2>
+              <button
+                onClick={() => setShowTimelineModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <i className="ri-close-line text-2xl"></i>
+              </button>
+            </div>
+
+            <div className="p-4 border-b bg-gray-50">
+              <div className="flex items-center space-x-4">
+                <div className="relative flex-1">
+                  <div className="flex items-center">
+                    <i className="ri-search-line text-gray-400 text-xl mr-3"></i>
+                    <input
+                      type="text"
+                      placeholder="Search timelines by title, activity, or client..."
+                      className="form-control py-4 pr-20 text-lg border-2 border-gray-300 focus:border-primary focus:ring-2 focus:ring-primary/20 bg-white"
+                      value={timelineSearchQuery}
+                      onChange={handleTimelineSearchChange}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleTimelineSearchClick();
+                        }
+                      }}
+                    />
+                  </div>
+                  <button 
+                    className="absolute end-0 top-0 px-6 h-full bg-primary text-white hover:bg-primary-dark rounded-r-md"
+                    onClick={handleTimelineSearchClick}
+                  >
+                    <i className="ri-search-line text-xl"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-auto p-4">
+              {isLoadingTimelines ? (
+                <div className="flex items-center justify-center h-32">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Select
+                        </th>
+
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Activity
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Client
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Priority
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {timelines.map((timeline) => (
+                        <tr key={timeline.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <input
+                              type="checkbox"
+                              className="form-checkbox h-5 w-5 text-primary"
+                              checked={selectedTimelines.some(t => t.id === timeline.id)}
+                              onChange={() => handleTimelineSelect(timeline)}
+                            />
+                          </td>
+
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{timeline.activity?.name || 'Unknown Activity'}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{timeline.client?.name || 'Unknown Client'}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              timeline.status === 'completed' ? 'bg-green-100 text-green-800' :
+                              timeline.status === 'ongoing' ? 'bg-blue-100 text-blue-800' :
+                              timeline.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {timeline.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              timeline.priority === 'high' ? 'bg-red-100 text-red-800' :
+                              timeline.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-green-100 text-green-800'
+                            }`}>
+                              {timeline.priority}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t flex justify-between items-center">
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => handleTimelinePageChange(Math.max(timelineCurrentPage - 1, 1))}
+                  disabled={timelineCurrentPage === 1}
+                  className="ti-btn ti-btn-secondary"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-gray-500">
+                  {timelineTotalPages > 0 ? (
+                    `Page ${timelineCurrentPage} of ${timelineTotalPages}`
+                  ) : (
+                    "No pages"
+                  )}
+                </span>
+                <button
+                  onClick={() => handleTimelinePageChange(Math.min(timelineCurrentPage + 1, timelineTotalPages))}
+                  disabled={timelineCurrentPage === timelineTotalPages || timelineTotalPages === 0}
+                  className="ti-btn ti-btn-secondary"
+                >
+                  Next
+                </button>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setShowTimelineModal(false)}
+                  className="ti-btn ti-btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleTimelineModalSubmit}
+                  className="ti-btn ti-btn-primary"
+                >
+                  Select ({selectedTimelines.length})
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Team Member Selection Modal */}
+      {showTeamMemberModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg w-11/12 max-w-4xl max-h-[90vh] flex flex-col">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h2 className="text-xl font-semibold">Select Team Member</h2>
+              <button
+                onClick={() => setShowTeamMemberModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <i className="ri-close-line text-2xl"></i>
+              </button>
+            </div>
+
+            <div className="p-4 border-b bg-gray-50">
+              <div className="flex items-center space-x-4">
+                <div className="relative flex-1">
+                  <div className="flex items-center">
+                    <i className="ri-search-line text-gray-400 text-xl mr-3"></i>
+                    <input
+                      type="text"
+                      placeholder="Search team members by name or email..."
+                      className="form-control py-4 pr-20 text-lg border-2 border-gray-300 focus:border-primary focus:ring-2 focus:ring-primary/20 bg-white"
+                      value={teamMemberSearchQuery}
+                      onChange={handleTeamMemberSearchChange}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleTeamMemberSearchClick();
+                        }
+                      }}
+                    />
+                  </div>
+                  <button 
+                    className="absolute end-0 top-0 px-6 h-full bg-primary text-white hover:bg-primary-dark rounded-r-md"
+                    onClick={handleTeamMemberSearchClick}
+                  >
+                    <i className="ri-search-line text-xl"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-auto p-4">
+              {isLoadingTeamMembers ? (
+                <div className="flex items-center justify-center h-32">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Select
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Name
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Email
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {allTeamMembers.map((teamMember) => (
+                        <tr key={teamMember.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <input
+                              type="radio"
+                              name="teamMemberSelection"
+                              className="form-radio h-5 w-5 text-primary"
+                              checked={selectedTeamMember?.id === teamMember.id}
+                              onChange={() => handleTeamMemberSelect(teamMember)}
+                            />
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">{teamMember.name}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{teamMember.email}</div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t flex justify-between items-center">
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => handleTeamMemberPageChange(Math.max(teamMemberCurrentPage - 1, 1))}
+                  disabled={teamMemberCurrentPage === 1}
+                  className="ti-btn ti-btn-secondary"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-gray-500">
+                  {teamMemberTotalPages > 0 ? (
+                    `Page ${teamMemberCurrentPage} of ${teamMemberTotalPages}`
+                  ) : (
+                    "No pages"
+                  )}
+                </span>
+                <button
+                  onClick={() => handleTeamMemberPageChange(Math.min(teamMemberCurrentPage + 1, teamMemberTotalPages))}
+                  disabled={teamMemberCurrentPage === teamMemberTotalPages || teamMemberTotalPages === 0}
+                  className="ti-btn ti-btn-secondary"
+                >
+                  Next
+                </button>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setShowTeamMemberModal(false)}
+                  className="ti-btn ti-btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleTeamMemberModalSubmit}
+                  className="ti-btn ti-btn-primary"
+                  disabled={!selectedTeamMember}
+                >
+                  Select {selectedTeamMember ? `(${selectedTeamMember.name})` : ""}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
