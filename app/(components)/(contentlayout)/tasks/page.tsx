@@ -592,29 +592,71 @@ const TasksPage = () => {
             <option value="critical">Critical</option>
           </select>
 
-          <input
-            type="date"
-            className="form-control py-2 w-full sm:w-auto"
-            placeholder="Start Date"
-            value={filters.startDate}
-            onChange={(e) => {
-              setFilters(prev => ({ ...prev, startDate: e.target.value }));
-              setCurrentPage(1);
-            }}
-            title="Start Date From"
-          />
+          <div className="relative">
+            <input
+              ref={(el) => {
+                if (el) {
+                  el.startDateRef = el;
+                }
+              }}
+              type="date"
+              className={`form-control py-2 w-full sm:w-auto ${!filters.startDate ? 'text-transparent' : ''}`}
+              value={filters.startDate}
+              onChange={(e) => {
+                setFilters(prev => ({ ...prev, startDate: e.target.value }));
+                setCurrentPage(1);
+              }}
+              title="Start Date From"
+              style={!filters.startDate ? { color: 'transparent' } : {}}
+            />
+            {!filters.startDate && (
+              <div 
+                className="absolute inset-0 flex items-center px-3 text-gray-500 bg-white cursor-pointer"
+                onClick={(e) => {
+                  const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                  if (input) {
+                    input.focus();
+                    input.showPicker();
+                  }
+                }}
+              >
+                Start Date
+              </div>
+            )}
+          </div>
 
-          <input
-            type="date"
-            className="form-control py-2 w-full sm:w-auto"
-            placeholder="End Date"
-            value={filters.endDate}
-            onChange={(e) => {
-              setFilters(prev => ({ ...prev, endDate: e.target.value }));
-              setCurrentPage(1);
-            }}
-            title="End Date Until"
-          />
+          <div className="relative">
+            <input
+              ref={(el) => {
+                if (el) {
+                  el.endDateRef = el;
+                }
+              }}
+              type="date"
+              className={`form-control py-2 w-full sm:w-auto ${!filters.endDate ? 'text-transparent' : ''}`}
+              value={filters.endDate}
+              onChange={(e) => {
+                setFilters(prev => ({ ...prev, endDate: e.target.value }));
+                setCurrentPage(1);
+              }}
+              title="End Date Until"
+              style={!filters.endDate ? { color: 'transparent' } : {}}
+            />
+            {!filters.endDate && (
+              <div 
+                className="absolute inset-0 flex items-center px-3 text-gray-500 bg-white cursor-pointer"
+                onClick={(e) => {
+                  const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                  if (input) {
+                    input.focus();
+                    input.showPicker();
+                  }
+                }}
+              >
+                End Date
+              </div>
+            )}
+          </div>
 
           <select
             className="form-select py-2 w-full sm:w-32"
