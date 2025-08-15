@@ -97,6 +97,10 @@ const EditTaskPage = () => {
   const [teamMemberCurrentPage, setTeamMemberCurrentPage] = useState(1);
   const [teamMemberTotalPages, setTeamMemberTotalPages] = useState(1);
   const [allTeamMembers, setAllTeamMembers] = useState<TeamMember[]>([]);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const [attachments, setAttachments] = useState<Array<{fileName: string, fileUrl: string}>>([]);
   const [formData, setFormData] = useState({
     teamMember: "",
     startDate: "",
@@ -107,7 +111,8 @@ const EditTaskPage = () => {
     timeline: [] as string[],
     remarks: "",
     status: "pending",
-    metadata: {}
+    metadata: {},
+    attachments: [] as Array<{fileName: string, fileUrl: string}>
   });
 
   useEffect(() => {
@@ -251,6 +256,11 @@ const EditTaskPage = () => {
       if (taskData.teamMember) {
         setSelectedTeamMember(taskData.teamMember);
       }
+
+      // Set existing attachments
+      if (taskData.attachments) {
+        setAttachments(taskData.attachments);
+      }
       
       setFormData({
         teamMember: taskData.teamMember?.id || "",
@@ -262,7 +272,8 @@ const EditTaskPage = () => {
         timeline: taskData.timeline?.map(t => t.id) || [],
         remarks: taskData.remarks || "",
         status: taskData.status,
-        metadata: taskData.metadata || {}
+        metadata: taskData.metadata || {},
+        attachments: taskData.attachments || []
       });
     } catch (error) {
       toast.error('Failed to fetch task');
@@ -483,6 +494,110 @@ const EditTaskPage = () => {
     })(),
     []
   );
+
+  // File upload handlers
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const newFiles = Array.from(e.target.files);
+      setUploadFiles(prev => [...prev, ...newFiles]);
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setUploadFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUpload = async () => {
+    if (uploadFiles.length === 0) return;
+
+    setIsUploading(true);
+    try {
+      // Reset progress for all files
+      const initialProgress = uploadFiles.reduce((acc, file) => {
+        acc[file.name] = 0;
+        return acc;
+      }, {} as Record<string, number>);
+      setUploadProgress(initialProgress);
+
+      const uploadPromises = uploadFiles.map(async (file) => {
+        try {
+          // Simulate progress for first upload step
+          setUploadProgress(prev => ({ ...prev, [file.name]: 25 }));
+
+          const uploadFormData = new FormData();
+          uploadFormData.append('file', file);
+
+          const response = await fetch(`${Base_url}common/upload`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: uploadFormData
+          });
+
+          if (!response.ok) {
+            throw new Error(`Failed to upload ${file.name}`);
+          }
+
+          // Update progress to 50% after upload
+          setUploadProgress(prev => ({ ...prev, [file.name]: 50 }));
+
+          const uploadResult = await response.json();
+          console.log('Upload response from /common/upload:', uploadResult);
+          
+          // Extract file data from the response
+          const fileData = uploadResult.data || uploadResult;
+          
+          const attachmentData = {
+            fileName: fileData.originalName || file.name,
+            fileUrl: fileData.url
+          };
+
+          // Update progress to 100%
+          setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
+
+          return attachmentData;
+        } catch (error) {
+          console.error(`Error uploading ${file.name}:`, error);
+          toast.error(`Failed to upload ${file.name}`);
+          return null;
+        }
+      });
+
+      const uploadResults = await Promise.all(uploadPromises);
+      const successfulUploads = uploadResults.filter(Boolean) as Array<{fileName: string, fileUrl: string}>;
+      
+      // Add to attachments
+      setAttachments(prev => [...prev, ...successfulUploads]);
+      
+      // Update form data
+      setFormData(prev => ({
+        ...prev,
+        attachments: [...prev.attachments, ...successfulUploads]
+      }));
+
+      // Clear uploaded files
+      setUploadFiles([]);
+      setUploadProgress({});
+      toast.success(`Successfully uploaded ${successfulUploads.length} file(s)`);
+    } catch (error) {
+      console.error('Error during upload:', error);
+      toast.error('Failed to upload files');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => {
+      const newAttachments = prev.filter((_, i) => i !== index);
+      setFormData(prevFormData => ({
+        ...prevFormData,
+        attachments: newAttachments
+      }));
+      return newAttachments;
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -742,6 +857,115 @@ const EditTaskPage = () => {
                     className="form-control"
                     placeholder="Enter task details, notes, or instructions..."
                   />
+                </div>
+
+                {/* Attachments */}
+                <div>
+                  <label className="form-label">Attachments</label>
+                  
+                  {/* File Upload Section */}
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-4">
+                      <input
+                        type="file"
+                        multiple
+                        onChange={handleFileSelect}
+                        className="form-control"
+                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt,.xlsx,.xls"
+                      />
+                      {uploadFiles.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleUpload}
+                          disabled={isUploading}
+                          className="ti-btn ti-btn-primary"
+                        >
+                          {isUploading ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                              Uploading...
+                            </>
+                          ) : (
+                            `Upload ${uploadFiles.length} file(s)`
+                          )}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Files to Upload */}
+                    {uploadFiles.length > 0 && (
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <h4 className="text-sm font-medium text-gray-700 mb-3">Files to Upload:</h4>
+                        <div className="space-y-2">
+                          {uploadFiles.map((file, index) => (
+                            <div key={`${file.name}-${index}`} className="flex items-center justify-between p-2 bg-white rounded border">
+                              <div className="flex items-center space-x-3">
+                                <i className="ri-file-text-line text-gray-500"></i>
+                                <div>
+                                  <div className="text-sm font-medium">{file.name}</div>
+                                  <div className="text-xs text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</div>
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                {uploadProgress[file.name] !== undefined && (
+                                  <div className="w-20">
+                                    <div className="bg-gray-200 rounded-full h-2">
+                                      <div 
+                                        className="bg-primary h-2 rounded-full transition-all duration-300"
+                                        style={{ width: `${uploadProgress[file.name]}%` }}
+                                      ></div>
+                                    </div>
+                                  </div>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => removeFile(index)}
+                                  className="text-red-500 hover:text-red-700"
+                                  disabled={isUploading}
+                                >
+                                  <i className="ri-close-line"></i>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Uploaded Attachments */}
+                    {attachments.length > 0 && (
+                      <div className="bg-green-50 p-4 rounded-lg">
+                        <h4 className="text-sm font-medium text-green-700 mb-3">Uploaded Attachments:</h4>
+                        <div className="space-y-2">
+                          {attachments.map((attachment, index) => (
+                            <div key={`${attachment.fileName}-${index}`} className="flex items-center justify-between p-2 bg-white rounded border border-green-200">
+                              <div className="flex items-center space-x-3">
+                                <i className="ri-file-check-line text-green-500"></i>
+                                <div>
+                                  <div className="text-sm font-medium">{attachment.fileName}</div>
+                                  <a 
+                                    href={attachment.fileUrl} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-blue-600 hover:underline"
+                                  >
+                                    View File
+                                  </a>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeAttachment(index)}
+                                className="text-red-500 hover:text-red-700"
+                              >
+                                <i className="ri-close-line"></i>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Form Actions */}
