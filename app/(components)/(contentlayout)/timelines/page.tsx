@@ -5,6 +5,7 @@ import Link from "next/link";
 import { toast, Toaster } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { Base_url } from '@/app/api/config/BaseUrl';
+import TaskManagement from './components/TaskManagement';
 
 interface Timeline {
   id: string;
@@ -67,6 +68,7 @@ interface ExcelRow {
 }
 
 const TimelinesPage = () => {
+  const [activeTab, setActiveTab] = useState<'timelines' | 'tasks'>('timelines');
   const [selectedTimelines, setSelectedTimelines] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [timelines, setTimelines] = useState<Timeline[]>([]);
@@ -385,9 +387,9 @@ const TimelinesPage = () => {
           {/* Page Header */}
           <div className="box !bg-transparent border-0 shadow-none">
             <div className="box-header flex justify-between items-center">
-              <h1 className="box-title text-2xl font-semibold">Timelines</h1>
+              <h1 className="box-title text-2xl font-semibold">Timelines & Tasks</h1>
               <div className="box-tools flex items-center space-x-2">
-              {selectedTimelines.length > 0 && (
+                {activeTab === 'timelines' && selectedTimelines.length > 0 && (
                   <button
                     type="button"
                     className="ti-btn ti-btn-danger"
@@ -397,54 +399,87 @@ const TimelinesPage = () => {
                     Delete Selected ({selectedTimelines.length})
                   </button>
                 )}
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleImport}
-                  accept=".xlsx,.xls"
-                  className="hidden"
-                />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="ti-btn ti-btn-success"
-                >
-                  <i className="ri-download-2-line me-2"></i>
-                  Import
-                </button>
-                {importProgress !== null && (
-                  <div className="w-40 h-3 bg-gray-200 rounded-full overflow-hidden flex items-center ml-2">
-                    <div
-                      className="bg-primary h-full transition-all duration-200"
-                      style={{ width: `${importProgress}%` }}
-                    ></div>
-                    <span className="ml-2 text-xs text-gray-700">
-                      {importProgress}%
-                    </span>
-                  </div>
+                {activeTab === 'timelines' && (
+                  <>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleImport}
+                      accept=".xlsx,.xls"
+                      className="hidden"
+                    />
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="ti-btn ti-btn-success"
+                    >
+                      <i className="ri-download-2-line me-2"></i>
+                      Import
+                    </button>
+                    {importProgress !== null && (
+                      <div className="w-40 h-3 bg-gray-200 rounded-full overflow-hidden flex items-center ml-2">
+                        <div
+                          className="bg-primary h-full transition-all duration-200"
+                          style={{ width: `${importProgress}%` }}
+                        ></div>
+                        <span className="ml-2 text-xs text-gray-700">
+                          {importProgress}%
+                        </span>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      className="ti-btn ti-btn-primary"
+                      onClick={handleExport}
+                    >
+                      <i className="ri-upload-2-line me-2"></i> Export
+                    </button>
+                    <Link
+                      href="/timelines/add"
+                      className="ti-btn ti-btn-primary"
+                    >
+                      <i className="ri-add-line me-2"></i>
+                      Add New Timeline
+                    </Link>
+                  </>
                 )}
-                <button
-                  type="button"
-                  className="ti-btn ti-btn-primary"
-                  onClick={handleExport}
-                >
-                  <i className="ri-upload-2-line me-2"></i> Export
-                </button>
-                <Link
-                  href="/timelines/add"
-                  className="ti-btn ti-btn-primary"
-                >
-                  <i className="ri-add-line me-2"></i>
-                  Add New Timeline
-                </Link>
               </div>
             </div>
           </div>
 
+          {/* Tab Navigation */}
+          <div className="box !bg-transparent border-0 shadow-none mb-6">
+            <div className="flex border-b border-gray-200">
+              <button
+                onClick={() => setActiveTab('timelines')}
+                className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'timelines'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <i className="ri-time-line me-2"></i>
+                Timelines
+              </button>
+              <button
+                onClick={() => setActiveTab('tasks')}
+                className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'tasks'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <i className="ri-task-line me-2"></i>
+                Task Management
+              </button>
+            </div>
+          </div>
+
           {/* Content Box */}
-          <div className="box">
-            <div className="box-body">
-              {/* Status Summary Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {activeTab === 'timelines' ? (
+            <div className="box">
+              <div className="box-body">
+                {/* Status Summary Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 {/* Pending Card */}
                 <div 
                   className="bg-warning/10 border border-warning/20 rounded-lg p-4 cursor-pointer hover:bg-warning/20 transition-colors"
@@ -790,6 +825,9 @@ const TimelinesPage = () => {
               )}
             </div>
           </div>
+        ) : (
+          <TaskManagement />
+        )}
         </div>
       </div>
     </div>

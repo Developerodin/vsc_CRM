@@ -6,368 +6,103 @@ import { Base_url } from '@/app/api/config/BaseUrl';
 import axios from "axios";
 import { useSearchParams } from "next/navigation";
 
-interface UdinEntry {
-  fieldName: string;
-  udin: string;
-  frequency: 'Hourly' | 'Daily' | 'Weekly' | 'Monthly' | 'Quarterly' | 'Yearly';
-  _id?: string; // Optional field that comes from API response
-}
-
-interface Timeline {
+// Task interface based on the new API documentation
+interface Task {
   id: string;
-  activity: {
+  teamMember: {
     id: string;
     name: string;
+    email: string;
+    phone?: string;
   };
-  client: {
+  startDate: string;
+  endDate: string;
+  priority: 'low' | 'medium' | 'high' | 'urgent' | 'critical';
+  branch: {
+    id: string;
+    name: string;
+    location: string;
+  };
+  assignedBy?: {
     id: string;
     name: string;
     email: string;
   };
-  status: 'pending' | 'completed' | 'ongoing' | 'delayed';
-  frequency: 'Hourly' | 'Daily' | 'Weekly' | 'Monthly' | 'Quarterly' | 'Yearly';
-  frequencyConfig: {
-    hourlyInterval: number;
-    dailyTime: string;
-    weeklyDays: string[];
-    weeklyTime: string;
-    monthlyDay: number;
-    monthlyTime: string;
-    quarterlyMonths: string[];
-    quarterlyDay: number;
-    quarterlyTime: string;
-    yearlyMonth: string[];
-    yearlyDate: number;
-    yearlyTime: string;
-  };
-  udin?: string | UdinEntry[];
-  turnover?: number;
-  assignedMember: {
+  timeline?: Array<{
     id: string;
-    name: string;
-  };
-  startDate?: string;
-  endDate?: string;
+    activity: string;
+    client: string;
+    status: string;
+  }>;
+  remarks?: string;
+  status: 'pending' | 'ongoing' | 'completed' | 'on_hold' | 'cancelled' | 'delayed';
+  metadata?: Record<string, any>;
+  attachments?: Array<{
+    fileName: string;
+    fileUrl: string;
+    uploadedAt: string;
+  }>;
   createdAt: string;
   updatedAt: string;
 }
 
 interface ApiResponse {
-  results: Timeline[];
+  results: Task[];
   page: number;
   limit: number;
   totalPages: number;
   totalResults: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
 }
 
-// --- Frequency Status Types & API Helpers ---
-
-interface FrequencyStatusEntry {
-  period: string;
-  status: 'pending' | 'completed' | 'delayed' | 'ongoing';
-  completedAt: string | null;
-  notes: string;
-}
-
-interface FrequencyStatusResponse {
-  timelineId: string;
-  frequency: string;
-  overallStatus: string;
-  frequencyStatus: FrequencyStatusEntry[];
-}
-
-interface FrequencyStatusStats {
+interface TaskStatistics {
+  total: number;
   pending: number;
   ongoing: number;
-  delayed: number;
   completed: number;
-  total: number;
+  onHold: number;
+  cancelled: number;
+  delayed: number;
+  low: number;
+  medium: number;
+  high: number;
+  urgent: number;
+  critical: number;
 }
-
-const getFrequencyStatus = async (timelineId: string): Promise<FrequencyStatusResponse> => {
-  const response = await fetch(`${Base_url}timelines/${timelineId}/frequency-status`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      'Content-Type': 'application/json',
-    },
-  });
-  if (!response.ok) throw new Error('Failed to fetch frequency status');
-  return response.json();
-};
-
-const updateFrequencyStatus = async (
-  timelineId: string,
-  period: string,
-  statusData: { status: string; notes?: string }
-) => {
-  // Always send notes as string - use default if empty
-  const cleanStatusData: { status: string; notes: string } = { 
-    status: statusData.status,
-    notes: statusData.notes && statusData.notes.trim() !== '' 
-      ? statusData.notes.trim() 
-      : `Status updated to ${statusData.status} on ${new Date().toLocaleDateString()}`
-  };
-  
-  // Debug: Log what we're sending
-  console.log('PATCH Request Body:', JSON.stringify(cleanStatusData, null, 2));
-  
-  const response = await fetch(`${Base_url}timelines/${timelineId}/frequency-status/${period}`, {
-    method: 'PATCH',
-    headers: {
-      'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(cleanStatusData),
-  });
-  if (!response.ok) throw new Error('Failed to update frequency status');
-  return response.json();
-};
 
 const TasksPage = () => {
   const searchParams = useSearchParams();
   const status = searchParams.get('status');
   const [currentPage, setCurrentPage] = useState(1);
-  const [tasks, setTasks] = useState<Timeline[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalPages, setTotalPages] = useState(1);
   const [totalResults, setTotalResults] = useState(0);
-  const [sortBy, setSortBy] = useState<string>("activityName:asc");
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [sortBy, setSortBy] = useState<string>("createdAt:desc");
+  const [itemsPerPage, setItemsPerPage] = useState(12);
   const [searchInputValue, setSearchInputValue] = useState("");
   const [filters, setFilters] = useState({
-    activityName: "",
     status: status || "",
+    priority: "",
+    branch: "",
+    teamMember: "",
     startDate: "",
     endDate: "",
     today: "false",
   });
-  const [showModal, setShowModal] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<Timeline | null>(null);
   
-  // New state for status update confirmation modal
-  const [showStatusModal, setShowStatusModal] = useState(false);
-  const [statusUpdateData, setStatusUpdateData] = useState<{
-    taskId: string;
-    oldStatus: string;
-    newStatus: string;
-    taskName: string;
-  } | null>(null);
-  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  // Task modal state
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [isUpdatingTask, setIsUpdatingTask] = useState(false);
+  
+  // Task statistics
+  const [taskStats, setTaskStats] = useState<TaskStatistics | null>(null);
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
 
-  // New state for UDIN edit modal
-  const [showUdinModal, setShowUdinModal] = useState(false);
-  const [selectedTaskForUdin, setSelectedTaskForUdin] = useState<Timeline | null>(null);
-  const [udinEntries, setUdinEntries] = useState<UdinEntry[]>([]);
-  const [isLoadingUdin, setIsLoadingUdin] = useState(false);
-  const [isSavingUdin, setIsSavingUdin] = useState(false);
-
-  // --- Frequency Status Modal State ---
-  const [showFrequencyModal, setShowFrequencyModal] = useState(false);
-  const [frequencyStatusLoading, setFrequencyStatusLoading] = useState(false);
-  const [frequencyStatusData, setFrequencyStatusData] = useState<FrequencyStatusResponse | null>(null);
-  const [frequencyStatusError, setFrequencyStatusError] = useState<string | null>(null);
-  const [frequencyStatusTask, setFrequencyStatusTask] = useState<Timeline | null>(null);
-  const [frequencyStatusUpdateLoading, setFrequencyStatusUpdateLoading] = useState<string | null>(null); // period being updated
-
-  // --- Frequency Status Stats State ---
-  const [frequencyStatusStats, setFrequencyStatusStats] = useState<FrequencyStatusStats | null>(null);
-  const [isLoadingFrequencyStats, setIsLoadingFrequencyStats] = useState(false);
-
-  // Function to fetch UDIN data for a task
-  const fetchUdinData = async (taskId: string) => {
-    setIsLoadingUdin(true);
-    try {
-      const response = await axios.get(`${Base_url}timelines/${taskId}/udin`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      const data = response.data;
-      setUdinEntries(data.udin || []);
-    } catch (err) {
-      console.error('Error fetching UDIN data:', err);
-      setUdinEntries([]);
-      toast.error('Failed to fetch UDIN data');
-    } finally {
-      setIsLoadingUdin(false);
-    }
-  };
-
-  // Function to handle UDIN edit button click
-  const handleUdinEditClick = async (task: Timeline) => {
-    setSelectedTaskForUdin(task);
-    setShowUdinModal(true);
-    await fetchUdinData(task.id);
-  };
-
-  // Function to add new UDIN entry
-  const addUdinEntry = (frequency: 'Hourly' | 'Daily' | 'Weekly' | 'Monthly' | 'Quarterly' | 'Yearly') => {
-    if (frequency === 'Weekly' || frequency === 'Yearly' || frequency === 'Quarterly') {
-    setUdinEntries(prev => [...prev, {
-        fieldName: '',
-        udin: '',
-        frequency: frequency
-      }]);
-    } else {
-      setUdinEntries(prev => [...prev, {
-        fieldName: 'All',
-        udin: '',
-        frequency: frequency
-      }]);
-    }
-  };
-
-  // Function to remove UDIN entry
-  const removeUdinEntry = (index: number) => {
-    setUdinEntries(prev => prev.filter((_, i) => i !== index));
-  };
-
-  // Function to update UDIN entry
-  const updateUdinEntry = (index: number, field: keyof UdinEntry, value: string) => {
-    setUdinEntries(prev => prev.map((entry, i) => 
-      i === index ? { ...entry, [field]: value } : entry
-    ));
-  };
-
-  // Function to save UDIN data
-  const saveUdinData = async () => {
-    if (!selectedTaskForUdin) return;
-
-    // Validate entries and clean them (remove _id fields)
-    const validEntries = udinEntries.filter(entry => {
-      // For Weekly, Yearly, Quarterly - both fieldName and udin are required
-      if (entry.frequency === 'Weekly' || entry.frequency === 'Yearly' || entry.frequency === 'Quarterly') {
-        return entry.fieldName.trim() && entry.udin.trim();
-      }
-      // For Hourly, Daily, Monthly - only udin is required
-      return entry.udin.trim();
-    }).map(entry => {
-      // Remove _id field and any other unwanted fields, keep only the required ones
-      const { _id, ...cleanEntry } = entry;
-      return cleanEntry;
-    });
-
-    setIsSavingUdin(true);
-    try {
-      await axios.patch(`${Base_url}timelines/${selectedTaskForUdin.id}/udin`, {
-        udin: validEntries
-      }, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      // Update the task in local state
-      setTasks(prevTasks => 
-        prevTasks.map(task => 
-          task.id === selectedTaskForUdin.id 
-            ? { ...task, udin: validEntries }
-            : task
-        )
-      );
-
-      toast.success('UDIN data updated successfully');
-      setShowUdinModal(false);
-      setSelectedTaskForUdin(null);
-      setUdinEntries([]);
-      
-      // Refresh the table data to ensure consistency
-      fetchTasks(currentPage, itemsPerPage);
-    } catch (err) {
-      toast.error('Failed to update UDIN data');
-      console.error('Error updating UDIN data:', err);
-    } finally {
-      setIsSavingUdin(false);
-    }
-  };
-
-  // Open frequency status modal and load data
-  const handleFrequencyStatusClick = async (task: Timeline) => {
-    setFrequencyStatusTask(task);
-    setShowFrequencyModal(true);
-    setFrequencyStatusLoading(true);
-    setFrequencyStatusError(null);
-    try {
-      const data = await getFrequencyStatus(task.id);
-      setFrequencyStatusData(data);
-    } catch (err: any) {
-      setFrequencyStatusError(err.message || 'Failed to load frequency status');
-      setFrequencyStatusData(null);
-    } finally {
-      setFrequencyStatusLoading(false);
-    }
-  };
-
-  // Update frequency status for a period
-  const handleFrequencyStatusUpdate = async (period: string, newStatus: string, notes: string = '') => {
-    if (!frequencyStatusTask) return;
-    setFrequencyStatusUpdateLoading(period);
-    try {
-      // Only include notes if not empty
-      const statusData: { status: string; notes?: string } = { status: newStatus };
-      if (notes && notes.trim() !== '') statusData.notes = notes;
-      await updateFrequencyStatus(frequencyStatusTask.id, period, statusData);
-      // Reload frequency status
-      const data = await getFrequencyStatus(frequencyStatusTask.id);
-      setFrequencyStatusData(data);
-      
-      // Update the task in local state with new overall status
-      setTasks(prevTasks => 
-        prevTasks.map(task => 
-          task.id === frequencyStatusTask.id 
-            ? { ...task, status: data.overallStatus as 'pending' | 'completed' | 'ongoing' | 'delayed' }
-            : task
-        )
-      );
-      
-      toast.success(`Status for period ${period} updated to ${newStatus}`);
-
-      // Refresh frequency status stats on current page
-      await fetchFrequencyStatusStats();
-
-      // Refresh frequency status stats on dashboard
-      if (typeof window !== 'undefined' && (window as any).refreshFrequencyStatusStats) {
-        try {
-          await (window as any).refreshFrequencyStatusStats();
-        } catch (err) {
-          console.error('Error refreshing frequency status stats:', err);
-        }
-      }
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to update frequency status');
-    } finally {
-      setFrequencyStatusUpdateLoading(null);
-    }
-  };
-
-  // Debounced search function
-  const debouncedSearch = useCallback(
-    (() => {
-      let timeoutId: NodeJS.Timeout;
-      return (searchValue: string) => {
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-          setFilters(prev => ({
-            ...prev,
-            activityName: searchValue
-          }));
-          setCurrentPage(1);
-        }, 500);
-      };
-    })(),
-    []
-  );
-
-  // Handle search input change
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setSearchInputValue(value); // Update input immediately
-    debouncedSearch(value); // Debounce the API call
-  };
-
+  // Fetch tasks using the new API
   const fetchTasks = async (page = 1, limit = itemsPerPage) => {
     setIsLoading(true);
     setError(null);
@@ -379,14 +114,13 @@ const TasksPage = () => {
         ...(sortBy && { sortBy })
       });
 
-      const response = await axios.get(`${Base_url}timelines?${queryParams}`, {
+      const response = await axios.get(`${Base_url}tasks?${queryParams}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
 
       const data: ApiResponse = response.data;
-      console.log(data.results);
       setTasks(data.results);
       setTotalPages(data.totalPages);
       setTotalResults(data.totalResults);
@@ -398,51 +132,34 @@ const TasksPage = () => {
     }
   };
 
-  // Fetch frequency status stats
-  const fetchFrequencyStatusStats = async () => {
-    setIsLoadingFrequencyStats(true);
+  // Fetch task statistics
+  const fetchTaskStats = async () => {
+    setIsLoadingStats(true);
     try {
-      const response = await axios.get(`${Base_url}timelines/frequency-status-stats`, {
+      const response = await axios.get(`${Base_url}tasks/statistics`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
-      setFrequencyStatusStats(response.data);
+      setTaskStats(response.data);
     } catch (err) {
-      console.error('Error fetching frequency status stats:', err);
-      toast.error('Failed to load frequency status stats');
-      setFrequencyStatusStats(null);
+      console.error('Error fetching task statistics:', err);
+      toast.error('Failed to load task statistics');
     } finally {
-      setIsLoadingFrequencyStats(false);
+      setIsLoadingStats(false);
     }
   };
 
-  // Function to handle status button click
-  const handleStatusButtonClick = (taskId: string, currentStatus: string, taskName: string) => {
-    setStatusUpdateData({
-      taskId,
-      oldStatus: currentStatus,
-      newStatus: currentStatus,
-      taskName
-    });
-    setShowStatusModal(true);
-  };
-
-  // Function to handle status selection in modal
-  const handleStatusSelection = (newStatus: string) => {
-    if (!statusUpdateData) return;
-    setStatusUpdateData(prev => prev ? { ...prev, newStatus } : null);
-  };
-
-  // Function to confirm status update
-  const confirmStatusUpdate = async () => {
-    if (!statusUpdateData) return;
-
-    setIsUpdatingStatus(true);
+  // Update task status
+  const updateTaskStatus = async (taskId: string, newStatus: string, remarks?: string) => {
+    setIsUpdatingTask(true);
     try {
-      await axios.patch(`${Base_url}timelines/${statusUpdateData.taskId}`, {
-        status: statusUpdateData.newStatus
-      }, {
+      const updateData: any = { status: newStatus };
+      if (remarks && remarks.trim() !== '') {
+        updateData.remarks = remarks.trim();
+      }
+
+      await axios.patch(`${Base_url}tasks/${taskId}`, updateData, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -451,80 +168,93 @@ const TasksPage = () => {
       // Update the task in local state
       setTasks(prevTasks => 
         prevTasks.map(task => 
-          task.id === statusUpdateData.taskId 
-            ? { ...task, status: statusUpdateData.newStatus as 'pending' | 'completed' | 'ongoing' | 'delayed' }
+          task.id === taskId 
+            ? { ...task, status: newStatus as Task['status'], remarks: remarks || task.remarks }
             : task
         )
       );
 
-      toast.success(`Task status updated from ${statusUpdateData.oldStatus} to ${statusUpdateData.newStatus}`);
-      setShowStatusModal(false);
-      setStatusUpdateData(null);
+      toast.success(`Task status updated to ${newStatus}`);
+      setShowTaskModal(false);
+      setSelectedTask(null);
 
-      // Refresh frequency status stats on current page
-      await fetchFrequencyStatusStats();
-
-      // Refresh frequency status stats on dashboard
-      if (typeof window !== 'undefined' && (window as any).refreshFrequencyStatusStats) {
-        try {
-          await (window as any).refreshFrequencyStatusStats();
-        } catch (err) {
-          console.error('Error refreshing frequency status stats:', err);
-        }
-      }
+      // Refresh statistics
+      await fetchTaskStats();
     } catch (err) {
       toast.error('Failed to update task status');
       console.error('Error updating task status:', err);
     } finally {
-      setIsUpdatingStatus(false);
+      setIsUpdatingTask(false);
     }
   };
 
-  // Function to get status styling
+  // Get priority styling
+  const getPriorityStyling = (priority: string) => {
+    switch (priority) {
+      case 'critical':
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 'urgent':
+        return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'high':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'medium':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'low':
+        return 'bg-green-100 text-green-800 border-green-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  // Get status styling
   const getStatusStyling = (status: string) => {
     switch (status) {
       case 'completed':
-        return 'bg-success text-black';
+        return 'bg-success text-white';
       case 'ongoing':
-        return 'bg-primary text-black';
+        return 'bg-primary text-white';
       case 'delayed':
-        return 'bg-danger text-black';
+        return 'bg-danger text-white';
+      case 'on_hold':
+        return 'bg-warning text-white';
+      case 'cancelled':
+        return 'bg-secondary text-white';
       case 'pending':
-        return 'bg-warning text-black';
+        return 'bg-info text-white';
       default:
-        return 'bg-warning text-black';
+        return 'bg-gray-500 text-white';
     }
+  };
+
+  // Format date
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  // Get days remaining
+  const getDaysRemaining = (endDate: string) => {
+    const today = new Date();
+    const end = new Date(endDate);
+    const diffTime = end.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) return { text: 'Overdue', color: 'text-red-600' };
+    if (diffDays === 0) return { text: 'Due today', color: 'text-orange-600' };
+    if (diffDays <= 3) return { text: `${diffDays} days left`, color: 'text-yellow-600' };
+    return { text: `${diffDays} days left`, color: 'text-green-600' };
   };
 
   useEffect(() => {
     fetchTasks(currentPage, itemsPerPage);
   }, [currentPage, sortBy, filters, itemsPerPage]);
 
-  // Fetch frequency status stats on component mount
   useEffect(() => {
-    fetchFrequencyStatusStats();
+    fetchTaskStats();
   }, []);
-
-  // Condensed pagination helper
-  function getPagination(currentPage: number, totalPages: number) {
-    const pages = [];
-    if (totalPages <= 7) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i);
-    } else {
-      pages.push(1);
-      if (currentPage > 4) pages.push("...");
-      for (
-        let i = Math.max(2, currentPage - 2);
-        i <= Math.min(totalPages - 1, currentPage + 2);
-        i++
-      ) {
-        pages.push(i);
-      }
-      if (currentPage < totalPages - 3) pages.push("...");
-      pages.push(totalPages);
-    }
-    return pages;
-  }
 
   return (
     <div className="main-content">
@@ -533,225 +263,80 @@ const TasksPage = () => {
 
       <div className="grid grid-cols-12 gap-6 mt-7">
         <div className="col-span-12">
-          {/* Content Box */}
           <div className="box">
             <div className="box-body">
-              {/* Status Summary Cards */}
+              {/* Task Statistics Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                {/* Pending Card */}
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-sm font-medium text-blue-600">Total Tasks</span>
+                      <p className="text-2xl font-bold text-blue-700">
+                        {isLoadingStats ? '...' : taskStats?.total || 0}
+                      </p>
+                    </div>
+                    <div className="bg-blue-200 p-3 rounded-full">
+                      <i className="ri-task-line text-blue-600 text-xl"></i>
+                    </div>
+                  </div>
+                </div>
+
                 <div 
-                  className="bg-warning/10 border border-warning/20 rounded-lg p-4 cursor-pointer hover:bg-warning/20 transition-colors"
+                  className="bg-gradient-to-br from-warning-50 to-warning-100 border border-warning-200 rounded-lg p-4 cursor-pointer hover:bg-warning-100 transition-colors"
                   onClick={() => setFilters({ ...filters, status: 'pending' })}
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="text-sm font-medium text-warning">Pending</span>
-                      <p className="text-2xl font-bold text-warning">
-                        {tasks.filter(t => t.status === 'pending').length}
+                      <span className="text-sm font-medium text-warning-600">Pending</span>
+                      <p className="text-2xl font-bold text-warning-700">
+                        {isLoadingStats ? '...' : taskStats?.pending || 0}
                       </p>
                     </div>
-                    <div className="bg-warning/20 p-3 rounded-full">
-                      <i className="ri-time-line text-warning text-xl"></i>
+                    <div className="bg-warning-200 p-3 rounded-full">
+                      <i className="ri-time-line text-warning-600 text-xl"></i>
                     </div>
                   </div>
                 </div>
 
-                {/* Ongoing Card */}
                 <div 
-                  className="bg-primary/10 border border-primary/20 rounded-lg p-4 cursor-pointer hover:bg-primary/20 transition-colors"
+                  className="bg-gradient-to-br from-primary-50 to-primary-100 border border-primary-200 rounded-lg p-4 cursor-pointer hover:bg-primary-100 transition-colors"
                   onClick={() => setFilters({ ...filters, status: 'ongoing' })}
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="text-sm font-medium text-primary">Ongoing</span>
-                      <p className="text-2xl font-bold text-primary">
-                        {tasks.filter(t => t.status === 'ongoing').length}
+                      <span className="text-sm font-medium text-primary-600">Ongoing</span>
+                      <p className="text-2xl font-bold text-primary-700">
+                        {isLoadingStats ? '...' : taskStats?.ongoing || 0}
                       </p>
                     </div>
-                    <div className="bg-primary/20 p-3 rounded-full">
-                      <i className="ri-loader-4-line text-primary text-xl"></i>
+                    <div className="bg-primary-200 p-3 rounded-full">
+                      <i className="ri-loader-4-line text-primary-600 text-xl"></i>
                     </div>
                   </div>
                 </div>
 
-                {/* Completed Card */}
                 <div 
-                  className="bg-success/10 border border-success/20 rounded-lg p-4 cursor-pointer hover:bg-success/20 transition-colors"
+                  className="bg-gradient-to-br from-success-50 to-success-100 border border-success-200 rounded-lg p-4 cursor-pointer hover:bg-success-100 transition-colors"
                   onClick={() => setFilters({ ...filters, status: 'completed' })}
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="text-sm font-medium text-success">Completed</span>
-                      <p className="text-2xl font-bold text-success">
-                        {tasks.filter(t => t.status === 'completed').length}
+                      <span className="text-sm font-medium text-success-600">Completed</span>
+                      <p className="text-2xl font-bold text-success-700">
+                        {isLoadingStats ? '...' : taskStats?.completed || 0}
                       </p>
                     </div>
-                    <div className="bg-success/20 p-3 rounded-full">
-                      <i className="ri-check-line text-success text-xl"></i>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Delayed Card */}
-                <div 
-                  className="bg-danger/10 border border-danger/20 rounded-lg p-4 cursor-pointer hover:bg-danger/20 transition-colors"
-                  onClick={() => setFilters({ ...filters, status: 'delayed' })}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-sm font-medium text-danger">Delayed</span>
-                      <p className="text-2xl font-bold text-danger">
-                        {tasks.filter(t => t.status === 'delayed').length}
-                      </p>
-                    </div>
-                    <div className="bg-danger/20 p-3 rounded-full">
-                      <i className="ri-error-warning-line text-danger text-xl"></i>
+                    <div className="bg-success-200 p-3 rounded-full">
+                      <i className="ri-check-line text-success-600 text-xl"></i>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Frequency Status Stats Cards */}
-              <div className="mb-6">
-                <div className="box">
-                  <div className="box-header justify-between">
-                    <div className="box-title">
-                      Frequency Status Statistics
-                    </div>
-                  </div>
-                  <div className="box-body">
-                    {isLoadingFrequencyStats ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {[1, 2, 3, 4].map((i) => (
-                          <div key={i} className="animate-pulse">
-                            <div className="h-24 bg-gray-200 rounded-lg"></div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : frequencyStatusStats ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {/* Pending Card */}
-                        <div className="bg-gradient-to-br from-warning/10 to-warning/5 border border-warning/20 rounded-lg p-4 hover:shadow-md transition-shadow">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center">
-                              <div className="w-3 h-3 rounded-full mr-2 bg-warning"></div>
-                              <h3 className="font-semibold text-gray-800 text-sm">Pending</h3>
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {frequencyStatusStats.total} total
-                            </div>
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs text-gray-600">Count:</span>
-                              <span className="text-sm font-medium text-warning">{frequencyStatusStats.pending}</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs text-gray-600">Percentage:</span>
-                              <span className="text-sm font-semibold text-warning">
-                                {frequencyStatusStats.total > 0 ? ((frequencyStatusStats.pending / frequencyStatusStats.total) * 100).toFixed(1) : 0}%
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Ongoing Card */}
-                        <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-lg p-4 hover:shadow-md transition-shadow">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center">
-                              <div className="w-3 h-3 rounded-full mr-2 bg-primary"></div>
-                              <h3 className="font-semibold text-gray-800 text-sm">Ongoing</h3>
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {frequencyStatusStats.total} total
-                            </div>
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs text-gray-600">Count:</span>
-                              <span className="text-sm font-medium text-primary">{frequencyStatusStats.ongoing}</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs text-gray-600">Percentage:</span>
-                              <span className="text-sm font-semibold text-primary">
-                                {frequencyStatusStats.total > 0 ? ((frequencyStatusStats.ongoing / frequencyStatusStats.total) * 100).toFixed(1) : 0}%
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Completed Card */}
-                        <div className="bg-gradient-to-br from-success/10 to-success/5 border border-success/20 rounded-lg p-4 hover:shadow-md transition-shadow">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center">
-                              <div className="w-3 h-3 rounded-full mr-2 bg-success"></div>
-                              <h3 className="font-semibold text-gray-800 text-sm">Completed</h3>
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {frequencyStatusStats.total} total
-                            </div>
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs text-gray-600">Count:</span>
-                              <span className="text-sm font-medium text-success">{frequencyStatusStats.completed}</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs text-gray-600">Percentage:</span>
-                              <span className="text-sm font-semibold text-success">
-                                {frequencyStatusStats.total > 0 ? ((frequencyStatusStats.completed / frequencyStatusStats.total) * 100).toFixed(1) : 0}%
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Delayed Card */}
-                        <div className="bg-gradient-to-br from-danger/10 to-danger/5 border border-danger/20 rounded-lg p-4 hover:shadow-md transition-shadow">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center">
-                              <div className="w-3 h-3 rounded-full mr-2 bg-danger"></div>
-                              <h3 className="font-semibold text-gray-800 text-sm">Delayed</h3>
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {frequencyStatusStats.total} total
-                            </div>
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs text-gray-600">Count:</span>
-                              <span className="text-sm font-medium text-danger">{frequencyStatusStats.delayed}</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs text-gray-600">Percentage:</span>
-                              <span className="text-sm font-semibold text-danger">
-                                {frequencyStatusStats.total > 0 ? ((frequencyStatusStats.delayed / frequencyStatusStats.total) * 100).toFixed(1) : 0}%
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center mx-auto mb-4">
-                          <i className="ri-bar-chart-line text-2xl text-gray-400"></i>
-                        </div>
-                        <h3 className="text-lg font-medium text-gray-600 mb-2">No Frequency Status Data</h3>
-                        <p className="text-sm text-gray-500">Frequency status statistics are not available.</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Search and Sort */}
-              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
-                {/* Rows per page selector */}
+              {/* Search and Filters */}
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
                 <div className="flex items-center w-full lg:w-auto">
-                  <label className="mr-2 text-sm text-gray-600 whitespace-nowrap">Rows per page:</label>
+                  <label className="mr-2 text-sm text-gray-600 whitespace-nowrap">Tasks per page:</label>
                   <select
                     className="form-select w-auto text-sm"
                     value={itemsPerPage}
@@ -760,28 +345,46 @@ const TasksPage = () => {
                       setCurrentPage(1);
                     }}
                   >
-                    <option value={10}>10</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                    <option value={500}>500</option>
-                    <option value={1000}>1000</option>
+                    <option value={12}>12</option>
+                    <option value={24}>24</option>
+                    <option value={48}>48</option>
                   </select>
                 </div>
 
-                {/* Search and filters */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
-                  {/* Today Button */}
-                  <button
-                    className="ti-btn ti-btn-primary py-2 w-full sm:w-auto"
-                    onClick={() => {
-                      setFilters(prev => ({ ...prev, today: prev.today === "false" ? "true" : "false" }));
+                  <select
+                    className="form-select py-2 w-full sm:w-auto"
+                    value={filters.priority}
+                    onChange={(e) => {
+                      setFilters(prev => ({ ...prev, priority: e.target.value }));
                       setCurrentPage(1);
                     }}
                   >
-                    <i className="ri-calendar-todo-line me-2"></i>
-                    Today
-                  </button>
-                  {/* Start Date Filter */}
+                    <option value="">All Priorities</option>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                    <option value="critical">Critical</option>
+                  </select>
+
+                  <select
+                    className="form-select py-2 w-full sm:w-auto"
+                    value={filters.status}
+                    onChange={(e) => {
+                      setFilters(prev => ({ ...prev, status: e.target.value }));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="ongoing">Ongoing</option>
+                    <option value="completed">Completed</option>
+                    <option value="on_hold">On Hold</option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="delayed">Delayed</option>
+                  </select>
+
                   <input
                     type="date"
                     className="form-control py-2 w-full sm:w-auto"
@@ -792,7 +395,6 @@ const TasksPage = () => {
                     }}
                     placeholder="Start Date"
                   />
-                  {/* End Date Filter */}
                   <input
                     type="date"
                     className="form-control py-2 w-full sm:w-auto"
@@ -803,42 +405,44 @@ const TasksPage = () => {
                     }}
                     placeholder="End Date"
                   />
-                  {/* Search bar */}
+
                   <div className="relative flex-grow sm:max-w-xs">
                     <input
                       type="text"
                       className="form-control py-2 w-full"
-                      placeholder="Search by activity name..."
+                      placeholder="Search tasks..."
                       value={searchInputValue}
-                      onChange={handleSearchChange}
+                      onChange={(e) => setSearchInputValue(e.target.value)}
                     />
                   </div>
-                  {/* Sort dropdown */}
+
                   <select
                     className="form-select py-2 w-full sm:w-auto"
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
                   >
-                    <option value="activityName:asc">Activity Name (A-Z)</option>
-                    <option value="activityName:desc">Activity Name (Z-A)</option>
                     <option value="createdAt:desc">Newest First</option>
                     <option value="createdAt:asc">Oldest First</option>
-                    <option value="endDate:asc">End Date (Earliest-Latest)</option>
-                    <option value="endDate:desc">End Date (Latest-Earliest)</option>
+                    <option value="endDate:asc">Due Date (Earliest)</option>
+                    <option value="endDate:desc">Due Date (Latest)</option>
+                    <option value="priority:desc">Priority (High to Low)</option>
+                    <option value="priority:asc">Priority (Low to High)</option>
                   </select>
-                  {/* Reset button */}
+
                   <button
                     className="ti-btn ti-btn-secondary py-2 w-full sm:w-auto"
                     onClick={() => {
                       setSearchInputValue("");
                       setFilters({
-                        activityName: "",
                         status: "",
+                        priority: "",
+                        branch: "",
+                        teamMember: "",
                         startDate: "",
                         endDate: "",
                         today: "false",
                       });
-                      setSortBy("activityName:asc");
+                      setSortBy("createdAt:desc");
                     }}
                   >
                     <i className="ri-refresh-line me-2"></i>
@@ -847,457 +451,115 @@ const TasksPage = () => {
                 </div>
               </div>
 
-              {/* Tasks Table */}
-              <div className="table-responsive">
-                <table className="table whitespace-nowrap table-bordered">
-                  <thead>
-                    <tr>
-                      <th className="px-4 py-3">Activity</th>
-                      <th className="px-4 py-3">Client Name</th>
-                      <th className="px-4 py-3">Client Email</th>
-                      <th className="px-4 py-3">Frequency</th>
-                      <th className="px-4 py-3">UDIN</th>
-                      <th className="px-4 py-3">Turnover</th>
-                      <th className="px-4 py-3">Assigned Member</th>
-                      <th className="px-4 py-3">Start Date</th>
-                      <th className="px-4 py-3">End Date</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">View</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {isLoading ? (
-                      <tr>
-                        <td colSpan={6} className="text-center py-4">
-                          <div className="flex justify-center">
-                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : error ? (
-                      <tr>
-                        <td colSpan={6} className="text-center text-red-500 py-4">
-                          {error}
-                        </td>
-                      </tr>
-                    ) : tasks.length === 0 ? (
-                      <tr>
-                        <td colSpan={12} className="text-center py-8">
-                          <div className="flex flex-col items-center justify-center">
-                            <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
-                              <i className="ri-time-line text-4xl text-primary"></i>
-                            </div>
-                            <h3 className="text-xl font-medium mb-2">
-                              No Tasks Found
-                            </h3>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : (
-                      tasks.map((timeline) => (
-                        <tr key={timeline.id}>
-                          <td>{timeline.activity.name}</td>
-                          <td>{timeline.client.name}</td>
-                          <td>{timeline.client.email}</td>
-                          <td>{timeline.frequency}</td>
-                          <td>
-                            <button
-                              className="w-full text-left hover:bg-primary/10 hover:text-primary transition-colors duration-200 rounded px-2 py-1 group relative"
-                              onClick={() => handleUdinEditClick(timeline)}
-                              title="Click to edit UDIN"
-                            >
-                              <span className="flex items-center gap-2">
-                                <span className="truncate">{formatUdinDisplay(timeline.udin)}</span>
-                                <i className="ri-edit-line text-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-primary ml-auto"></i>
-                              </span>
-                              <div className="absolute inset-0 border border-transparent group-hover:border-primary/30 rounded transition-colors duration-200 pointer-events-none"></div>
-                            </button>
-                          </td>
-                          <td>{timeline.turnover || "-"}</td>
-                          <td>{timeline.assignedMember.name}</td>
-                          <td>{timeline.startDate ? new Date(timeline.startDate).toISOString().split('T')[0] : "-"}</td>
-                          <td>{timeline.endDate ? new Date(timeline.endDate).toISOString().split('T')[0] : "-"}</td>
-                          <td>
-                            <button
-                              className={`badge border-0 cursor-pointer ${getStatusStyling(timeline.status)}`}
-                              onClick={() => handleFrequencyStatusClick(timeline)}
-                              title="View & update frequency status"
-                            >
-                              {timeline.status.charAt(0).toUpperCase() + timeline.status.slice(1)}
-                            </button>
-                          </td>
-                          <td>
-                            <button
-                              className="ti-btn ti-btn-secondary ti-btn-sm"
-                              title="View Details"
-                              onClick={() => {
-                                setSelectedTask(timeline);
-                                setShowModal(true);
-                              }}
-                            >
-                              <i className="ri-eye-line"></i>
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Pagination */}
-              {!isLoading && !error && (
-                <div className="flex justify-between items-center mt-4">
-                  <div className="text-sm text-gray-500">
-                    Showing{" "}
-                    {totalResults === 0
-                      ? 0
-                      : (currentPage - 1) * itemsPerPage + 1}{" "}
-                    to{" "}
-                    {totalResults === 0
-                      ? 0
-                      : Math.min(currentPage * itemsPerPage, totalResults)}{" "}
-                    of {totalResults} entries
-                  </div>
-                  <nav aria-label="Page navigation" className="">
-                    <ul className="flex flex-wrap items-center">
-                      <li
-                        className={`page-item ${
-                          currentPage === 1 ? "disabled" : ""
-                        }`}
-                      >
-                        <button
-                          className="page-link py-2 px-3 ml-0 leading-tight text-gray-500 bg-white rounded-l-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                          onClick={() =>
-                            setCurrentPage((prev) => Math.max(prev - 1, 1))
-                          }
-                          disabled={currentPage === 1}
-                        >
-                          Previous
-                        </button>
-                      </li>
-                      {getPagination(currentPage, totalPages).map((page, idx) =>
-                        page === "..." ? (
-                          <li key={"ellipsis-" + idx} className="page-item">
-                            <span className="px-3">...</span>
-                          </li>
-                        ) : (
-                          <li key={page} className="page-item">
-                            <button
-                              className={`page-link py-2 px-3 leading-tight border border-gray-300 ${
-                                currentPage === page
-                                  ? "bg-primary text-white hover:bg-primary-dark"
-                                  : "bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                              }`}
-                              onClick={() => setCurrentPage(Number(page))}
-                            >
-                              {page}
-                            </button>
-                          </li>
-                        )
-                      )}
-                      <li
-                        className={`page-item ${
-                          currentPage === totalPages ? "disabled" : ""
-                        }`}
-                      >
-                        <button
-                          className="page-link py-2 px-3 leading-tight text-gray-500 bg-white rounded-r-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                          onClick={() =>
-                            setCurrentPage((prev) =>
-                              Math.min(prev + 1, totalPages)
-                            )
-                          }
-                          disabled={currentPage === totalPages}
-                        >
-                          Next
-                        </button>
-                      </li>
-                    </ul>
-                  </nav>
+              {/* Tasks Grid */}
+              {isLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {Array.from({ length: itemsPerPage }).map((_, i) => (
+                    <div key={i} className="animate-pulse">
+                      <div className="bg-white border border-gray-200 rounded-lg p-4 h-64">
+                        <div className="h-4 bg-gray-200 rounded mb-3"></div>
+                        <div className="h-3 bg-gray-200 rounded mb-2"></div>
+                        <div className="h-3 bg-gray-200 rounded mb-4"></div>
+                        <div className="h-20 bg-gray-200 rounded mb-4"></div>
+                        <div className="h-6 bg-gray-200 rounded"></div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      {/* Task Details Modal */}
-      {showModal && selectedTask && (
-        <TaskDetailsModal task={selectedTask} onClose={() => setShowModal(false)} />
-      )}
-      
-      {/* Status Update Modal */}
-      {showStatusModal && statusUpdateData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6 relative">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-800">Update Task Status</h2>
-              <button 
-                className="text-gray-500 hover:text-gray-700"
-                onClick={() => {
-                  setShowStatusModal(false);
-                  setStatusUpdateData(null);
-                }}
-              >
-                <i className="ri-close-line text-2xl"></i>
-              </button>
-            </div>
-            
-            <div className="mb-6">
-              <p className="text-gray-600 mb-4">
-                Select new status for task <strong>"{statusUpdateData.taskName}"</strong>
-              </p>
-              
-              <div className="space-y-3 mb-6">
-                <label className="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="status"
-                    value="pending"
-                    checked={statusUpdateData.newStatus === 'pending'}
-                    className="mr-3"
-                    onChange={() => handleStatusSelection('pending')}
-                  />
-                  <span className="text-sm">Pending</span>
-                </label>
-                
-                <label className="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="status"
-                    value="ongoing"
-                    checked={statusUpdateData.newStatus === 'ongoing'}
-                    className="mr-3"
-                    onChange={() => handleStatusSelection('ongoing')}
-                  />
-                  <span className="text-sm">Ongoing</span>
-                </label>
-                
-                <label className="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="status"
-                    value="completed"
-                    checked={statusUpdateData.newStatus === 'completed'}
-                    className="mr-3"
-                    onChange={() => handleStatusSelection('completed')}
-                  />
-                  <span className="text-sm">Completed</span>
-                </label>
-                
-                <label className="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="status"
-                    value="delayed"
-                    checked={statusUpdateData.newStatus === 'delayed'}
-                    className="mr-3"
-                    onChange={() => handleStatusSelection('delayed')}
-                  />
-                  <span className="text-sm">Delayed</span>
-                </label>
-              </div>
-
-              {/* Status change preview */}
-              {statusUpdateData.oldStatus !== statusUpdateData.newStatus && (
-                <div className="mb-6">
-                  <p className="text-gray-600 mb-3">Status will change from:</p>
-                  
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg mb-3">
-                    <span className="text-sm text-gray-600">Current Status:</span>
-                    <span className={`badge ${getStatusStyling(statusUpdateData.oldStatus)}`}>
-                      {statusUpdateData.oldStatus[0].toUpperCase() + statusUpdateData.oldStatus.slice(1)}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center justify-center my-3">
-                    <i className="ri-arrow-down-line text-gray-400 text-xl"></i>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span className="text-sm text-gray-600">New Status:</span>
-                    <span className={`badge ${getStatusStyling(statusUpdateData.newStatus)}`}>
-                      {statusUpdateData.newStatus[0].toUpperCase() + statusUpdateData.newStatus.slice(1)}
-                    </span>
-                  </div>
+              ) : error ? (
+                <div className="text-center py-8 text-red-500">
+                  <i className="ri-error-warning-line text-4xl mb-4"></i>
+                  <p className="text-lg font-medium mb-2">Error Loading Tasks</p>
+                  <p className="text-sm">{error}</p>
                 </div>
-              )}
-            </div>
-            
-            <div className="flex justify-end gap-3">
-              <button
-                className="ti-btn ti-btn-secondary"
-                onClick={() => {
-                  setShowStatusModal(false);
-                  setStatusUpdateData(null);
-                }}
-                disabled={isUpdatingStatus}
-              >
-                Cancel
-              </button>
-              <button
-                className="ti-btn ti-btn-primary"
-                onClick={confirmStatusUpdate}
-                disabled={isUpdatingStatus || statusUpdateData.oldStatus === statusUpdateData.newStatus}
-              >
-                {isUpdatingStatus ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Updating...
-                  </>
-                ) : (
-                  'Update Status'
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* UDIN Edit Modal */}
-      {showUdinModal && selectedTaskForUdin && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between p-6 border-b">
-              <h2 className="text-xl font-bold text-gray-800 truncate flex-1 mr-6">
-                Edit UDIN - {selectedTaskForUdin.activity.name}
-              </h2>
-              <div className="flex items-center gap-4 flex-shrink-0">
-                <button
-                  className="ti-btn ti-btn-primary px-3 py-1.5 text-sm"
-                  onClick={() => addUdinEntry(selectedTaskForUdin.frequency)}
-                  disabled={isLoadingUdin || 
-                    // For Daily, Monthly, Hourly - disable if any entries exist
-                    (['Daily', 'Monthly', 'Hourly'].includes(selectedTaskForUdin.frequency) && udinEntries.length > 0) ||
-                    // For Weekly, Yearly, Quarterly - disable if no available options
-                    (['Weekly', 'Yearly', 'Quarterly'].includes(selectedTaskForUdin.frequency) && 
-                     getFieldOptions(selectedTaskForUdin.frequency, selectedTaskForUdin, udinEntries).length === 0)
-                  }
-                  title={
-                    ['Daily', 'Monthly', 'Hourly'].includes(selectedTaskForUdin.frequency) && udinEntries.length > 0
-                      ? `${selectedTaskForUdin.frequency} frequency can only have one UDIN entry`
-                      : ['Weekly', 'Yearly', 'Quarterly'].includes(selectedTaskForUdin.frequency) && 
-                        getFieldOptions(selectedTaskForUdin.frequency, selectedTaskForUdin, udinEntries).length === 0
-                      ? `All ${selectedTaskForUdin.frequency === 'Weekly' ? 'days' : selectedTaskForUdin.frequency === 'Yearly' ? 'months' : 'quarters'} already have UDINs assigned`
-                      : 'Add new UDIN entry'
-                  }
-                >
-                  <i className="ri-add-line me-1"></i>
-                  Add Entry
-                </button>
-                <button 
-                  className="text-gray-500 hover:text-gray-700 flex-shrink-0 p-1"
-                  onClick={() => {
-                    setShowUdinModal(false);
-                    setSelectedTaskForUdin(null);
-                    setUdinEntries([]);
-                  }}
-                >
-                  <i className="ri-close-line text-2xl"></i>
-                </button>
-              </div>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto p-6">
-              {isLoadingUdin ? (
-                <div className="flex justify-center items-center h-32">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                </div>
-              ) : udinEntries.length === 0 ? (
+              ) : tasks.length === 0 ? (
                 <div className="text-center py-8">
-                  <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
-                    <i className="ri-file-list-line text-2xl text-primary"></i>
+                  <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
+                    <i className="ri-task-line text-4xl text-primary"></i>
                   </div>
-                  <h3 className="text-lg font-medium mb-2">No UDIN Entries</h3>
-                  {(['Daily', 'Monthly', 'Hourly'].includes(selectedTaskForUdin.frequency) && udinEntries.length > 0) ? (
-                    <p className="text-amber-600 mb-4">
-                      <i className="ri-information-line mr-1"></i>
-                      {selectedTaskForUdin.frequency} frequency can only have one UDIN entry
-                    </p>
-                  ) : (['Weekly', 'Yearly', 'Quarterly'].includes(selectedTaskForUdin.frequency) && 
-                       getFieldOptions(selectedTaskForUdin.frequency, selectedTaskForUdin, udinEntries).length === 0) ? (
-                    <p className="text-amber-600 mb-4">
-                      <i className="ri-information-line mr-1"></i>
-                      All {selectedTaskForUdin.frequency === 'Weekly' ? 'days' : selectedTaskForUdin.frequency === 'Yearly' ? 'months' : 'quarters'} already have UDINs assigned
-                    </p>
-                  ) : (
-                    <p className="text-gray-500 mb-4">Click "Add Entry" to start adding UDIN data</p>
-                  )}
-                  <button
-                    className="ti-btn ti-btn-primary"
-                    onClick={() => addUdinEntry(selectedTaskForUdin.frequency)}
-                    disabled={
-                      // For Daily, Monthly, Hourly - disable if any entries exist
-                      (['Daily', 'Monthly', 'Hourly'].includes(selectedTaskForUdin.frequency) && udinEntries.length > 0) ||
-                      // For Weekly, Yearly, Quarterly - disable if no available options
-                      (['Weekly', 'Yearly', 'Quarterly'].includes(selectedTaskForUdin.frequency) && 
-                       getFieldOptions(selectedTaskForUdin.frequency, selectedTaskForUdin, udinEntries).length === 0)
-                    }
-                    title={
-                      ['Daily', 'Monthly', 'Hourly'].includes(selectedTaskForUdin.frequency) && udinEntries.length > 0
-                        ? `${selectedTaskForUdin.frequency} frequency can only have one UDIN entry`
-                        : ['Weekly', 'Yearly', 'Quarterly'].includes(selectedTaskForUdin.frequency) && 
-                          getFieldOptions(selectedTaskForUdin.frequency, selectedTaskForUdin, udinEntries).length === 0
-                        ? `All ${selectedTaskForUdin.frequency === 'Weekly' ? 'days' : selectedTaskForUdin.frequency === 'Yearly' ? 'months' : 'quarters'} already have UDINs assigned`
-                        : 'Add first UDIN entry'
-                    }
-                  >
-                    <i className="ri-add-line me-2"></i>
-                    Add First Entry
-                  </button>
+                  <h3 className="text-xl font-medium mb-2">No Tasks Found</h3>
+                  <p className="text-gray-500">Try adjusting your filters or search criteria</p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {udinEntries.map((entry, index) => (
-                    <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-medium text-gray-700">Entry {index + 1}</h4>
-                        <button
-                          className="ti-btn ti-btn-danger ti-btn-xs"
-                          onClick={() => removeUdinEntry(index)}
-                        >
-                          <i className="ri-delete-bin-line"></i>
-                        </button>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {tasks.map((task) => (
+                    <div
+                      key={task.id}
+                      className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-lg transition-shadow cursor-pointer group relative"
+                      onClick={() => {
+                        setSelectedTask(task);
+                        setShowTaskModal(true);
+                      }}
+                    >
+                      {/* Task Header */}
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-gray-900 truncate group-hover:text-primary transition-colors">
+                            {task.teamMember.name}
+                          </h3>
+                          <p className="text-sm text-gray-500 truncate">
+                            {task.branch.name}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getPriorityStyling(task.priority)}`}>
+                            {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                          </span>
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusStyling(task.status)}`}>
+                            {task.status.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                          </span>
+                        </div>
                       </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Show field selection only for Weekly, Yearly, Quarterly */}
-                        {(entry.frequency === 'Weekly' || entry.frequency === 'Yearly' || entry.frequency === 'Quarterly') && (
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              {entry.frequency === 'Weekly' ? 'Day' : entry.frequency === 'Yearly' ? 'Month' : 'Quarter'} <span className="text-red-500">*</span>
-                            </label>
-                            <select
-                              className="form-select"
-                              value={entry.fieldName}
-                              onChange={(e) => updateUdinEntry(index, 'fieldName', e.target.value)}
-                            >
-                              <option value="">Select {entry.frequency === 'Weekly' ? 'Day' : entry.frequency === 'Yearly' ? 'Month' : 'Quarter'}</option>
-                              {getFieldOptions(entry.frequency, selectedTaskForUdin, udinEntries, index).map((option) => (
-                                <option key={option} value={option}>{option}</option>
-                              ))}
-                            </select>
-                            {getFieldOptions(entry.frequency, selectedTaskForUdin, udinEntries, index).length === 0 && (
-                              <p className="text-sm text-amber-600 mt-1">
-                                <i className="ri-information-line mr-1"></i>
-                                All {entry.frequency === 'Weekly' ? 'days' : entry.frequency === 'Yearly' ? 'months' : 'quarters'} already have UDINs assigned
-                              </p>
-                            )}
+
+                      {/* Task Details */}
+                      <div className="space-y-2 mb-4">
+                        <div className="flex items-center text-sm text-gray-600">
+                          <i className="ri-calendar-line mr-2 text-gray-400"></i>
+                          <span className="truncate">
+                            {formatDate(task.startDate)} - {formatDate(task.endDate)}
+                          </span>
+                        </div>
+                        
+                        {task.assignedBy && (
+                          <div className="flex items-center text-sm text-gray-600">
+                            <i className="ri-user-line mr-2 text-gray-400"></i>
+                            <span className="truncate">Assigned by {task.assignedBy.name}</span>
                           </div>
                         )}
-                        
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            UDIN <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            className="form-control"
-                            placeholder="e.g., UDIN-2024-001234"
-                            value={entry.udin}
-                            onChange={(e) => updateUdinEntry(index, 'udin', e.target.value)}
-                          />
+
+                        {task.timeline && task.timeline.length > 0 && (
+                          <div className="flex items-center text-sm text-gray-600">
+                            <i className="ri-time-line mr-2 text-gray-400"></i>
+                            <span className="truncate">{task.timeline.length} timeline(s)</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Task Remarks */}
+                      {task.remarks && (
+                        <div className="mb-4">
+                          <p className="text-sm text-gray-700 line-clamp-2 bg-gray-50 p-2 rounded">
+                            {task.remarks}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Task Footer */}
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm">
+                          <span className={`font-medium ${getDaysRemaining(task.endDate).color}`}>
+                            {getDaysRemaining(task.endDate).text}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          {formatDate(task.createdAt)}
+                        </div>
+                      </div>
+
+                      {/* Hover Actions */}
+                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-5 transition-all duration-200 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
+                        <div className="bg-white rounded-lg shadow-lg p-2">
+                          <i className="ri-eye-line text-primary text-lg"></i>
                         </div>
                       </div>
                     </div>
@@ -1305,344 +567,274 @@ const TasksPage = () => {
                 </div>
               )}
             </div>
-            
-            <div className="flex justify-end gap-3 p-6 border-t">
-              <button
-                className="ti-btn ti-btn-secondary"
-                onClick={() => {
-                  setShowUdinModal(false);
-                  setSelectedTaskForUdin(null);
-                  setUdinEntries([]);
-                }}
-                disabled={isSavingUdin}
-              >
-                Cancel
-              </button>
-              <button
-                className="ti-btn ti-btn-primary"
-                onClick={saveUdinData}
-                disabled={isSavingUdin}
-              >
-                {isSavingUdin ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Saving...
-                  </>
-                ) : (
-                  'Save Changes'
-                )}
-              </button>
-            </div>
           </div>
         </div>
+      </div>
+
+      {/* Task Details Modal */}
+      {showTaskModal && selectedTask && (
+        <TaskDetailsModal 
+          task={selectedTask} 
+          onClose={() => {
+            setShowTaskModal(false);
+            setSelectedTask(null);
+          }}
+          onUpdateStatus={updateTaskStatus}
+          isUpdating={isUpdatingTask}
+        />
       )}
+    </div>
+  );
+};
 
-      {/* Frequency Status Modal */}
-      {showFrequencyModal && frequencyStatusTask && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between p-6 border-b">
-              <div className="flex-1 mr-6">
-                <h2 className="text-xl font-bold text-gray-800 truncate">
-                  Frequency Status - {frequencyStatusTask.activity.name}
-                </h2>
-                <p className="text-sm text-gray-500 mt-1">
-                  Client: {frequencyStatusTask.client.name} | Frequency: {frequencyStatusTask.frequency}
-                </p>
-              </div>
-              <button 
-                className="text-gray-500 hover:text-gray-700 flex-shrink-0 p-1"
-                onClick={() => {
-                  setShowFrequencyModal(false);
-                  setFrequencyStatusTask(null);
-                  setFrequencyStatusData(null);
-                  setFrequencyStatusError(null);
-                  // Refresh table data to ensure consistency after modal updates
-                  fetchTasks(currentPage, itemsPerPage);
-                }}
-              >
-                <i className="ri-close-line text-2xl"></i>
-              </button>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto p-6">
-              {frequencyStatusLoading ? (
-                <div className="flex justify-center items-center h-32">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                </div>
-              ) : frequencyStatusError ? (
-                <div className="text-center py-8 text-red-500">
-                  <i className="ri-error-warning-line text-4xl mb-4"></i>
-                  <p className="text-lg font-medium mb-2">Error Loading Frequency Status</p>
-                  <p className="text-sm mb-4">{frequencyStatusError}</p>
-                  <button 
-                    className="ti-btn ti-btn-primary"
-                    onClick={() => {
-                      setShowFrequencyModal(false);
-                      setFrequencyStatusTask(null);
-                      setFrequencyStatusData(null);
-                      setFrequencyStatusError(null);
-                    }}
-                  >
-                    Close
-                  </button>
-                </div>
-              ) : frequencyStatusData && frequencyStatusData.frequencyStatus.length > 0 ? (
-                <div className="space-y-6">
-                  {/* Overall Status Summary */}
-                  <div className="bg-gray-50 rounded-lg p-4 border">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-medium text-gray-700">Overall Status</h3>
-                        <p className="text-sm text-gray-500">Computed from individual periods</p>
-                      </div>
-                      <span className={`badge text-sm px-3 py-1 ${getStatusStyling(frequencyStatusData.overallStatus)}`}>
-                        {frequencyStatusData.overallStatus.charAt(0).toUpperCase() + frequencyStatusData.overallStatus.slice(1)}
-                      </span>
-                    </div>
+// Task Details Modal Component
+const TaskDetailsModal = ({ 
+  task, 
+  onClose, 
+  onUpdateStatus, 
+  isUpdating 
+}: { 
+  task: Task; 
+  onClose: () => void; 
+  onUpdateStatus: (taskId: string, status: string, remarks?: string) => Promise<void>;
+  isUpdating: boolean;
+}) => {
+  const [selectedStatus, setSelectedStatus] = useState(task.status);
+  const [remarks, setRemarks] = useState(task.remarks || '');
+
+  const handleStatusUpdate = async () => {
+    if (selectedStatus !== task.status || remarks !== (task.remarks || '')) {
+      await onUpdateStatus(task.id, selectedStatus, remarks);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+      <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-6 border-b">
+          <div className="flex-1 mr-6">
+            <h2 className="text-xl font-bold text-gray-800">Task Details</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              {task.teamMember.name} • {task.branch.name}
+            </p>
+          </div>
+          <button 
+            className="text-gray-500 hover:text-gray-700 flex-shrink-0 p-1"
+            onClick={onClose}
+          >
+            <i className="ri-close-line text-2xl"></i>
+          </button>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left Column - Task Info */}
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-medium text-gray-700 mb-2">Task Information</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Team Member:</span>
+                    <span className="font-medium">{task.teamMember.name}</span>
                   </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Email:</span>
+                    <span className="font-medium">{task.teamMember.email}</span>
+                  </div>
+                  {task.teamMember.phone && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Phone:</span>
+                      <span className="font-medium">{task.teamMember.phone}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Branch:</span>
+                    <span className="font-medium">{task.branch.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Location:</span>
+                    <span className="font-medium">{task.branch.location}</span>
+                  </div>
+                </div>
+              </div>
 
-                  {/* Period Status List */}
-                  <div className="space-y-4">
-                    <h3 className="font-medium text-gray-700 border-b pb-2">Period Status</h3>
-                    {frequencyStatusData.frequencyStatus.map((entry, index) => (
-                      <div key={index} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
-                        <div className="flex items-center justify-between mb-4">
-                          <div>
-                            <h4 className="font-medium text-gray-700">Period: {entry.period}</h4>
-                            {entry.completedAt && (
-                              <p className="text-sm text-gray-500">
-                                Completed: {new Date(entry.completedAt).toLocaleDateString()}
-                              </p>
-                            )}
-                          </div>
-                          <span className={`badge ${getStatusStyling(entry.status)}`}>
-                            {entry.status.charAt(0).toUpperCase() + entry.status.slice(1)}
-                          </span>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-end">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Status
-                            </label>
-                            <select
-                              className="form-select w-full"
-                              value={entry.status}
-                              onChange={e => handleFrequencyStatusUpdate(entry.period, e.target.value, entry.notes)}
-                              disabled={frequencyStatusUpdateLoading === entry.period}
-                            >
-                              <option value="pending">Pending</option>
-                              <option value="ongoing">Ongoing</option>
-                              <option value="completed">Completed</option>
-                              <option value="delayed">Delayed</option>
-                            </select>
-                          </div>
-                          
-                          <div className="lg:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Notes <span className="text-gray-400">(optional)</span>
-                            </label>
-                            <div className="flex gap-2">
-                              <input
-                                type="text"
-                                className="form-control flex-1"
-                                placeholder="Add notes about this period..."
-                                value={entry.notes}
-                                onChange={e => {
-                                  // Update notes locally for immediate feedback
-                                  setFrequencyStatusData(prev => prev ? {
-                                    ...prev,
-                                    frequencyStatus: prev.frequencyStatus.map((fs, i) => i === index ? { ...fs, notes: e.target.value } : fs)
-                                  } : prev);
-                                }}
-                                disabled={frequencyStatusUpdateLoading === entry.period}
-                              />
-                              <button
-                                className="ti-btn ti-btn-primary"
-                                onClick={() => handleFrequencyStatusUpdate(entry.period, entry.status, entry.notes)}
-                                disabled={frequencyStatusUpdateLoading === entry.period}
-                              >
-                                {frequencyStatusUpdateLoading === entry.period ? (
-                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                ) : (
-                                  <>
-                                    <i className="ri-save-line mr-1"></i>
-                                    Update
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
+              <div>
+                <h3 className="font-medium text-gray-700 mb-2">Timeline Information</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Start Date:</span>
+                    <span className="font-medium">{new Date(task.startDate).toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">End Date:</span>
+                    <span className="font-medium">{new Date(task.endDate).toLocaleDateString()}</span>
+                  </div>
+                  {task.assignedBy && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Assigned By:</span>
+                      <span className="font-medium">{task.assignedBy.name}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {task.timeline && task.timeline.length > 0 && (
+                <div>
+                  <h3 className="font-medium text-gray-700 mb-2">Related Timelines</h3>
+                  <div className="space-y-2">
+                    {task.timeline.map((tl, index) => (
+                      <div key={index} className="bg-gray-50 p-2 rounded text-sm">
+                        <div className="font-medium">{tl.activity}</div>
+                        <div className="text-gray-500">{tl.client}</div>
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusStyling(tl.status)}`}>
+                          {tl.status}
+                        </span>
                       </div>
                     ))}
                   </div>
                 </div>
-              ) : (
-                <div className="text-center py-8">
-                  <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
-                    <i className="ri-file-list-line text-2xl text-primary"></i>
+              )}
+            </div>
+
+            {/* Right Column - Status Update */}
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-medium text-gray-700 mb-2">Current Status</h3>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusStyling(task.status)}`}>
+                    {task.status.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                  </span>
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getPriorityStyling(task.priority)}`}>
+                    {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="font-medium text-gray-700 mb-2">Update Status</h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      New Status
+                    </label>
+                    <select
+                      className="form-select w-full"
+                      value={selectedStatus}
+                      onChange={(e) => setSelectedStatus(e.target.value as Task['status'])}
+                      disabled={isUpdating}
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="ongoing">Ongoing</option>
+                      <option value="completed">Completed</option>
+                      <option value="on_hold">On Hold</option>
+                      <option value="cancelled">Cancelled</option>
+                      <option value="delayed">Delayed</option>
+                    </select>
                   </div>
-                  <h3 className="text-lg font-medium mb-2">No Frequency Status Data</h3>
-                  <p className="text-gray-500 mb-4">
-                    This timeline doesn't have frequency status data yet. 
-                    {frequencyStatusTask.startDate && frequencyStatusTask.endDate 
-                      ? " Contact your administrator to initialize frequency status."
-                      : " Start and end dates are required for frequency status tracking."
-                    }
-                  </p>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Remarks
+                    </label>
+                    <textarea
+                      className="form-control w-full"
+                      rows={3}
+                      placeholder="Add any additional notes or remarks..."
+                      value={remarks}
+                      onChange={(e) => setRemarks(e.target.value)}
+                      disabled={isUpdating}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {task.attachments && task.attachments.length > 0 && (
+                <div>
+                  <h3 className="font-medium text-gray-700 mb-2">Attachments</h3>
+                  <div className="space-y-2">
+                    {task.attachments.map((attachment, index) => (
+                      <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                        <div className="flex items-center gap-2">
+                          <i className="ri-file-line text-gray-400"></i>
+                          <span className="text-sm font-medium">{attachment.fileName}</span>
+                        </div>
+                        <a
+                          href={attachment.fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:text-primary-dark text-sm"
+                        >
+                          <i className="ri-external-link-line"></i>
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {task.metadata && Object.keys(task.metadata).length > 0 && (
+                <div>
+                  <h3 className="font-medium text-gray-700 mb-2">Additional Information</h3>
+                  <div className="bg-gray-50 p-3 rounded text-sm">
+                    {Object.entries(task.metadata).map(([key, value]) => (
+                      <div key={key} className="flex justify-between mb-1">
+                        <span className="text-gray-500 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                        <span className="font-medium">{String(value)}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
-            
-            <div className="flex justify-end gap-3 p-6 border-t">
-              <button
-                className="ti-btn ti-btn-secondary"
-                onClick={() => {
-                  setShowFrequencyModal(false);
-                  setFrequencyStatusTask(null);
-                  setFrequencyStatusData(null);
-                  setFrequencyStatusError(null);
-                  // Refresh table data to ensure consistency after modal updates
-                  fetchTasks(currentPage, itemsPerPage);
-                }}
-                disabled={frequencyStatusLoading}
-              >
-                Close
-              </button>
-            </div>
           </div>
         </div>
-      )}
-    </div>
-  );
-};
-
-// Function to format UDIN display (moved outside component for reuse)
-const formatUdinDisplay = (udin: string | UdinEntry[] | undefined) => {
-  if (!udin) return "-";
-  if (typeof udin === 'string') return udin;
-  if (Array.isArray(udin)) {
-    if (udin.length === 0) return "-";
-    if (udin.length === 1) return udin[0].udin;
-    return `${udin.length} entries`;
-  }
-  return "-";
-};
-
-// Function to get available field options based on frequency and timeline config
-const getFieldOptions = (frequency: string, timeline: Timeline, existingEntries: UdinEntry[] = [], currentEntryIndex?: number) => {
-  let allOptions: string[] = [];
-  
-  switch (frequency) {
-    case 'Weekly':
-      allOptions = timeline.frequencyConfig.weeklyDays || [];
-      break;
-    case 'Yearly':
-      allOptions = timeline.frequencyConfig.yearlyMonth || [];
-      break;
-    case 'Quarterly':
-      allOptions = timeline.frequencyConfig.quarterlyMonths || [];
-      break;
-    default:
-      return [];
-  }
-  
-  // Filter out options that already have UDINs associated with them
-  // But include the current entry's fieldName if it exists (for editing)
-  const usedOptions = existingEntries
-    .filter((entry, index) => 
-      entry.frequency === frequency && 
-      entry.fieldName && 
-      index !== currentEntryIndex // Don't count the current entry as "used"
-    )
-    .map(entry => entry.fieldName);
-  
-  return allOptions.filter(option => !usedOptions.includes(option));
-};
-
-// Modal for viewing task details
-const TaskDetailsModal = ({ task, onClose }: { task: Timeline, onClose: () => void }) => {
-  if (!task) return null;
-
-  // Statement with date details
-  const startDateStr = task.startDate ? new Date(task.startDate).toLocaleDateString() : null;
-  const endDateStr = task.endDate ? new Date(task.endDate).toLocaleDateString() : null;
-  
-  let statement = `Task for ${task.client.name} regarding ${task.activity.name} is assigned to ${task.assignedMember.name} with status '${task.status}'`;
-  
-  if (startDateStr && endDateStr) {
-    statement += ` from ${startDateStr} continuing until ${endDateStr}`;
-  } else if (startDateStr) {
-    statement += ` starting from ${startDateStr}`;
-  } else if (endDateStr) {
-    statement += ` continuing until ${endDateStr}`;
-  }
-  
-  statement += '.';
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-      <div className="bg-white rounded-lg shadow-lg max-w-lg w-full p-6 relative">
-        <button className="absolute top-2 right-2 text-gray-500 hover:text-gray-700" onClick={onClose}>
-          <i className="ri-close-line text-2xl"></i>
-        </button>
-        <h2 className="text-xl font-bold mb-4">Task Details</h2>
-        <div className="space-y-2 text-sm">
-          <div><strong>Activity:</strong> {task.activity.name}</div>
-          <div><strong>Client Name:</strong> {task.client.name}</div>
-          <div><strong>Client Email:</strong> {task.client.email}</div>
-          <div><strong>Frequency:</strong> {task.frequency}</div>
-          {/* Frequency Configuration Details */}
-          <div>
-            <strong>Frequency Configuration:</strong>
-            {task.frequency === 'Hourly' && (
-              <div><strong>Interval:</strong> Every {task.frequencyConfig.hourlyInterval} hour(s)</div>
+        
+        <div className="flex justify-end gap-3 p-6 border-t">
+          <button
+            className="ti-btn ti-btn-secondary"
+            onClick={onClose}
+            disabled={isUpdating}
+          >
+            Cancel
+          </button>
+          <button
+            className="ti-btn ti-btn-primary"
+            onClick={handleStatusUpdate}
+            disabled={isUpdating || (selectedStatus === task.status && remarks === (task.remarks || ''))}
+          >
+            {isUpdating ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Updating...
+              </>
+            ) : (
+              'Update Task'
             )}
-            {task.frequency === 'Daily' && (
-              <div><strong>Time:</strong> {task.frequencyConfig.dailyTime}</div>
-            )}
-            {task.frequency === 'Weekly' && (
-              <div>
-                <div><strong>Days:</strong> {task.frequencyConfig.weeklyDays.join(', ')}</div>
-                <div><strong>Time:</strong> {task.frequencyConfig.weeklyTime}</div>
-              </div>
-            )}
-            {task.frequency === 'Monthly' && (
-              <div>
-                <div><strong>Day:</strong> {task.frequencyConfig.monthlyDay}</div>
-                <div><strong>Time:</strong> {task.frequencyConfig.monthlyTime}</div>
-              </div>
-            )}
-            {task.frequency === 'Quarterly' && (
-              <div>
-                <div><strong>Months:</strong> {task.frequencyConfig.quarterlyMonths.join(', ')}</div>
-                <div><strong>Day:</strong> {task.frequencyConfig.quarterlyDay}</div>
-                <div><strong>Time:</strong> {task.frequencyConfig.quarterlyTime}</div>
-              </div>
-            )}
-            {task.frequency === 'Yearly' && (
-              <div>
-                <div><strong>Months:</strong> {task.frequencyConfig.yearlyMonth.join(', ')}</div>
-                <div><strong>Date:</strong> {task.frequencyConfig.yearlyDate}</div>
-                <div><strong>Time:</strong> {task.frequencyConfig.yearlyTime}</div>
-              </div>
-            )}
-          </div>
-          <div><strong>UDIN:</strong> {formatUdinDisplay(task.udin)}</div>
-          <div><strong>Turnover:</strong> {task.turnover || '-'}</div>
-          <div><strong>Assigned Member:</strong> {task.assignedMember.name}</div>
-          <div><strong>Start Date:</strong> {task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : '-'}</div>
-          <div><strong>End Date:</strong> {task.endDate ? new Date(task.endDate).toISOString().split('T')[0] : '-'}</div>
-          <div><strong>Status:</strong> {task.status}</div>
-        </div>
-        <div className="mt-4 p-3 bg-primary/10 border border-primary/20 rounded text-primary text-sm">
-          <i className="ri-information-line mr-2"></i>{statement}
+          </button>
         </div>
       </div>
     </div>
   );
+};
+
+// Helper function for status styling (moved outside component)
+const getStatusStyling = (status: string) => {
+  switch (status) {
+    case 'completed':
+      return 'bg-success text-white';
+    case 'ongoing':
+      return 'bg-primary text-white';
+    case 'delayed':
+      return 'bg-danger text-white';
+    case 'on_hold':
+      return 'bg-warning text-white';
+    case 'cancelled':
+      return 'bg-secondary text-white';
+    case 'pending':
+      return 'bg-info text-white';
+    default:
+      return 'bg-gray-500 text-white';
+  }
 };
 
 export default TasksPage;
