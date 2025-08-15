@@ -5,7 +5,7 @@ import React, { useEffect, useState, useRef, useMemo, Fragment } from 'react'
 import PerfectScrollbar from 'react-perfect-scrollbar';
 import 'react-perfect-scrollbar/dist/css/styles.min.css';
 import { useFileManager } from '@/shared/hooks/useFileManager';
-import { Folder, FileItem, User } from '@/shared/services/fileManagerService';
+import { Folder, FileItem, User, fileManagerService } from '@/shared/services/fileManagerService';
 import * as XLSX from 'xlsx';
 import HelpIcon from '@/shared/components/HelpIcon';
 import { Base_url } from '@/app/api/config/BaseUrl';
@@ -73,6 +73,25 @@ const Filemanager = () => {
         email: string;
         loading: boolean;
     }>({ visible: false, file: null, email: '', loading: false });
+
+    // Search modal state
+    const [searchModal, setSearchModal] = useState<{
+        visible: boolean;
+        query: string;
+        results: (Folder | FileItem)[];
+        loading: boolean;
+        page: number;
+        totalPages: number;
+        totalResults: number;
+    }>({
+        visible: false,
+        query: '',
+        results: [],
+        loading: false,
+        page: 1,
+        totalPages: 0,
+        totalResults: 0
+    });
 
     // Toast notification state
     const [toast, setToast] = useState<{
@@ -532,12 +551,16 @@ const Filemanager = () => {
         }
     };
 
-    // Search handler
+    // Enhanced Search handler with subfolder support
     const handleSearch = (query: string) => {
         setFileSearch(query);
         setFilePage(1);
         if (query.trim()) {
-            searchFiles(query, undefined, 1);
+            // Use enhanced search with subfolder support by default
+            searchFiles(query, {
+                includeSubfolders: true, // Enable path-based searching
+                page: 1
+            });
         } else if (currentFolder) {
             loadFolderContents(currentFolder.id, 1);
         } else {
@@ -565,6 +588,93 @@ const Filemanager = () => {
         XLSX.utils.book_append_sheet(wb, ws, 'Exported Files');
         // Generate and trigger download
         XLSX.writeFile(wb, 'exported_file_paths.xlsx');
+    };
+
+    // Search modal functions
+    const openSearchModal = () => {
+        setSearchModal({
+            visible: true,
+            query: '',
+            results: [],
+            loading: false,
+            page: 1,
+            totalPages: 0,
+            totalResults: 0
+        });
+    };
+
+    const closeSearchModal = () => {
+        setSearchModal({
+            visible: false,
+            query: '',
+            results: [],
+            loading: false,
+            page: 1,
+            totalPages: 0,
+            totalResults: 0
+        });
+    };
+
+    const handleSearchClients = async (query: string, page: number = 1) => {
+        if (!query.trim()) {
+            setSearchModal(prev => ({ ...prev, results: [], totalPages: 0, totalResults: 0 }));
+            return;
+        }
+
+        try {
+            setSearchModal(prev => ({ ...prev, loading: true }));
+            
+            const results = await fileManagerService.searchClients(query, {
+                limit: 10,
+                page: page
+            });
+
+            setSearchModal(prev => ({
+                ...prev,
+                results: results.results,
+                loading: false,
+                page: results.page,
+                totalPages: results.totalPages,
+                totalResults: results.totalResults
+            }));
+        } catch (error) {
+            console.error('Failed to search clients:', error);
+            setSearchModal(prev => ({ 
+                ...prev, 
+                loading: false, 
+                results: [],
+                totalPages: 0,
+                totalResults: 0
+            }));
+            showToast('error', 'Failed to search clients');
+        }
+    };
+
+    const handleSearchQueryChange = (query: string) => {
+        setSearchModal(prev => ({ ...prev, query }));
+        if (query.trim()) {
+            handleSearchClients(query, 1);
+        } else {
+            setSearchModal(prev => ({ ...prev, results: [], totalPages: 0, totalResults: 0 }));
+        }
+    };
+
+    const handleSearchPageChange = (page: number) => {
+        if (searchModal.query.trim()) {
+            handleSearchClients(searchModal.query, page);
+        }
+    };
+
+    const handleSelectSearchResult = (item: Folder | FileItem) => {
+        if (item.type === 'folder') {
+            // Navigate to the selected folder and expand the folder tree to show its location
+            handleFolderClick(item.id);
+            closeSearchModal();
+        } else {
+            // If it's a file, maybe download it or show details
+            handleDownloadFile(item as FileItem);
+            closeSearchModal();
+        }
     };
 
     // Enhanced download function for single file
@@ -698,7 +808,7 @@ const Filemanager = () => {
                                     <li><strong>Delete Items:</strong> Remove files and folders that are no longer needed</li>
                                     <li><strong>Download Files:</strong> Download individual files or bulk download selected files</li>
                                     <li><strong>Export Paths:</strong> Export file paths for selected items</li>
-                                    <li><strong>Search Files:</strong> Find specific files using the search functionality</li>
+                                    <li><strong>Enhanced Search:</strong> Find files, folders, and paths using advanced search functionality</li>
                                     <li><strong>Preview Files:</strong> Preview file contents before downloading</li>
                                   </ul>
 
@@ -718,12 +828,22 @@ const Filemanager = () => {
                                     <li><strong>Created By:</strong> User who created the file or folder</li>
                                   </ul>
 
+                                  <h4 className="font-semibold mb-2">Search Capabilities:</h4>
+                                  {/* <ul className="list-disc list-inside mb-4 space-y-1">
+                                    <li><strong>Enhanced Search (Default):</strong> Searches file names, folder names, folder paths, and descriptions including subfolders</li>
+                                    <li><strong>Deep Recursive Search:</strong> Comprehensive search through ALL nested subfolders with combined results</li>
+                                    <li><strong>Subfolder Only Search:</strong> Specifically searches for subfolders by name or path</li>
+                                    <li><strong>Type Filters:</strong> Filter search results to show only folders or only files</li>
+                                    <li><strong>Path Search:</strong> Search using folder paths like '/Clients/ClientName' to find specific locations</li>
+                                  </ul> */}
+
                                   <h4 className="font-semibold mb-2">Tips:</h4>
                                   <ul className="list-disc list-inside space-y-1">
                                     <li>Use drag and drop to upload files directly to folders</li>
                                     <li>Right-click on files for context menu options</li>
                                     <li>Select multiple files for bulk operations</li>
-                                    <li>Use the search function to quickly find files</li>
+                                    <li>Use the enhanced search to find files, folders, and paths across subfolders</li>
+                                    <li>Click the filter icon next to search for advanced search options (recursive, subfolder-only, type filters)</li>
                                     <li>Organize files in folders for better management</li>
                                   </ul>
                                 </div>
@@ -833,18 +953,85 @@ const Filemanager = () => {
                                     </span>
                                 </div>
                                 
-                                {/* Search */}
-                                <div className="relative w-full max-w-xs">
-                                    <input
-                                        type="text"
-                                        className="form-control py-3 pr-10"
-                                        placeholder="Search by file name..."
-                                        value={fileSearch}
-                                        onChange={e => handleSearch(e.target.value)}
-                                    />
-                                    <button className="absolute end-0 top-0 px-4 h-full">
-                                        <i className="ri-search-line text-lg"></i>
-                                    </button>
+                                {/* Search Modal Trigger */}
+                                <div className="flex items-center gap-2">
+                                    <div className="relative flex-1 max-w-xs">
+                                        <input
+                                            type="text"
+                                            className="form-control py-3 pr-10 cursor-pointer"
+                                            placeholder="Search client subfolders..."
+                                            value=""
+                                            readOnly
+                                            onClick={openSearchModal}
+                                        />
+                                        <button 
+                                            className="absolute end-0 top-0 px-4 h-full"
+                                            onClick={openSearchModal}
+                                        >
+                                            <i className="ri-search-line text-lg"></i>
+                                        </button>
+                                    </div>
+                                    
+                                    {/* Old Search Mode Dropdown - Replaced with Modal */}
+                                    {/* <div className="dropdown">
+                                        <button 
+                                            className="btn btn-outline-primary dropdown-toggle" 
+                                            type="button" 
+                                            data-bs-toggle="dropdown" 
+                                            aria-expanded="false"
+                                            title="Search Options"
+                                        >
+                                            <i className="ri-filter-3-line"></i>
+                                        </button>
+                                        <ul className="dropdown-menu">
+                                            <li>
+                                                <button 
+                                                    className="dropdown-item" 
+                                                    onClick={() => fileSearch.trim() && searchFiles(fileSearch, { includeSubfolders: true, page: 1 })}
+                                                >
+                                                    <i className="ri-search-line me-2"></i>
+                                                    Enhanced Search (Default)
+                                                </button>
+                                            </li>
+                                            <li>
+                                                <button 
+                                                    className="dropdown-item" 
+                                                    onClick={() => fileSearch.trim() && searchFiles(fileSearch, { recursive: true, page: 1 })}
+                                                >
+                                                    <i className="ri-search-2-line me-2"></i>
+                                                    Deep Recursive Search
+                                                </button>
+                                            </li>
+                                            <li>
+                                                <button 
+                                                    className="dropdown-item" 
+                                                    onClick={() => fileSearch.trim() && searchFiles(fileSearch, { subfolders: true, page: 1 })}
+                                                >
+                                                    <i className="ri-folder-search-line me-2"></i>
+                                                    Subfolder Only Search
+                                                </button>
+                                            </li>
+                                            <li><hr className="dropdown-divider" /></li>
+                                            <li>
+                                                <button 
+                                                    className="dropdown-item" 
+                                                    onClick={() => fileSearch.trim() && searchFiles(fileSearch, { type: 'folder', includeSubfolders: true, page: 1 })}
+                                                >
+                                                    <i className="ri-folder-line me-2"></i>
+                                                    Folders Only
+                                                </button>
+                                            </li>
+                                            <li>
+                                                <button 
+                                                    className="dropdown-item" 
+                                                    onClick={() => fileSearch.trim() && searchFiles(fileSearch, { type: 'file', includeSubfolders: true, page: 1 })}
+                                                >
+                                                    <i className="ri-file-line me-2"></i>
+                                                    Files Only
+                                                </button>
+                                            </li>
+                                        </ul>
+                                    </div> */}
                                 </div>
                             </div>
 
@@ -954,7 +1141,7 @@ const Filemanager = () => {
                                                         const newPage = Math.max(filePage - 1, 1);
                                                         setFilePage(newPage);
                                                         if (fileSearch.trim()) {
-                                                            searchFiles(fileSearch, undefined, newPage);
+                                                            searchFiles(fileSearch, { includeSubfolders: true, page: newPage });
                                                         } else if (currentFolder) {
                                                             loadFolderContents(currentFolder.id, newPage);
                                                         }
@@ -971,7 +1158,7 @@ const Filemanager = () => {
                                                         onClick={() => {
                                                             setFilePage(page);
                                                             if (fileSearch.trim()) {
-                                                                searchFiles(fileSearch, undefined, page);
+                                                                searchFiles(fileSearch, { includeSubfolders: true, page: page });
                                                             } else if (currentFolder) {
                                                                 loadFolderContents(currentFolder.id, page);
                                                             }
@@ -988,7 +1175,7 @@ const Filemanager = () => {
                                                         const newPage = Math.min(filePage + 1, totalFilePages);
                                                         setFilePage(newPage);
                                                         if (fileSearch.trim()) {
-                                                            searchFiles(fileSearch, undefined, newPage);
+                                                            searchFiles(fileSearch, { includeSubfolders: true, page: newPage });
                                                         } else if (currentFolder) {
                                                             loadFolderContents(currentFolder.id, newPage);
                                                         }
@@ -1305,9 +1492,9 @@ const Filemanager = () => {
                                 >
                                     Cancel
                                 </button>
-                                                                    <button 
-                                        className="ti-btn ti-btn-primary" 
-                                        onClick={() => {
+                                <button 
+                                    className="ti-btn ti-btn-primary" 
+                                    onClick={() => {
                                             const currentFile = emailModal.file;
                                             if (!currentFile) return; // Guard clause for null check
                                             
@@ -1347,8 +1534,158 @@ const Filemanager = () => {
                                         ) : (
                                             'Send File'
                                         )}
-                                    </button>
+                                </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Search Modal */}
+            {searchModal.visible && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+                    <div className="bg-white dark:bg-bodybg rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
+                        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+                            <div className="flex items-center gap-3">
+                                <i className="ri-search-line text-xl text-primary"></i>
+                                <div>
+                                    <h3 className="font-semibold text-lg">Search Client Subfolders</h3>
+                                    <p className="text-sm text-gray-500">Find and navigate to client folders</p>
+                                </div>
+                            </div>
+                            <button
+                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                                onClick={closeSearchModal}
+                                title="Close"
+                            >
+                                <i className="ri-close-line"></i>
+                            </button>
+                        </div>
+
+                        <div className="p-6">
+                            {/* Search Input */}
+                            <div className="mb-4">
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        className="form-control py-3 pr-10 w-full"
+                                        placeholder="Type client name..."
+                                        value={searchModal.query}
+                                        onChange={(e) => handleSearchQueryChange(e.target.value)}
+                                        autoFocus
+                                    />
+                                    <div className="absolute end-0 top-0 px-4 h-full flex items-center">
+                                        {searchModal.loading ? (
+                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                                        ) : (
+                                            <i className="ri-search-line text-lg text-gray-400"></i>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Search Results */}
+                            <div className="border border-gray-200 dark:border-gray-700 rounded-lg max-h-96 overflow-y-auto">
+                                {searchModal.loading && (
+                                    <div className="flex items-center justify-center py-8">
+                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                                        <span className="ml-3 text-gray-600">Searching...</span>
+                                    </div>
+                                )}
+
+                                {!searchModal.loading && searchModal.query && searchModal.results.length === 0 && (
+                                    <div className="flex flex-col items-center justify-center py-8 text-gray-500">
+                                        <i className="ri-search-line text-3xl mb-2"></i>
+                                        <p>No results found for "{searchModal.query}"</p>
+                                        <p className="text-sm">Try searching with different keywords</p>
+                                    </div>
+                                )}
+
+                                {!searchModal.loading && !searchModal.query && (
+                                    <div className="flex flex-col items-center justify-center py-8 text-gray-500">
+                                        <i className="ri-search-2-line text-3xl mb-2"></i>
+                                        <p>Start typing to search for client folders</p>
+                                    </div>
+                                )}
+
+                                {searchModal.results.length > 0 && (
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 p-4">
+                                        {searchModal.results.map((item) => (
+                                            <div
+                                                key={item.id}
+                                                className="group relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-all duration-200 cursor-pointer"
+                                                onClick={() => handleSelectSearchResult(item)}
+                                            >
+                                                {/* Icon - Exactly like main grid view */}
+                                                <div className="flex items-center justify-center w-16 h-16 mb-3">
+                                                    <div className="w-full h-full rounded-lg flex items-center justify-center bg-blue-100 dark:bg-blue-900/30">
+                                                        <i className="ri-folder-2-line text-2xl text-blue-600 dark:text-blue-400"></i>
+                                                    </div>
+                                                </div>
+
+                                                {/* Content - Exactly like main grid view */}
+                                                <div className="flex-1 min-w-0 text-center">
+                                                    <div className="font-medium text-sm truncate">
+                                                        {item.type === 'folder' ? (item.folder?.name || (item as any).name) : item.file?.fileName}
+                                                    </div>
+                                                    <div className="text-xs text-gray-500 mt-1">
+                                                        Folder
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Pagination */}
+                            {searchModal.totalPages > 1 && (
+                                <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                                    <div className="text-sm text-gray-600">
+                                        Showing {searchModal.results.length === 0 ? 0 : (searchModal.page - 1) * 10 + 1} to {Math.min(searchModal.page * 10, searchModal.totalResults)} of {searchModal.totalResults} results
+                                    </div>
+                                    <nav aria-label="Search pagination">
+                                        <ul className="flex items-center gap-1">
+                                            <li>
+                                                <button
+                                                    className="px-3 py-2 text-sm leading-tight text-gray-500 bg-white border border-gray-300 rounded-l-lg hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700"
+                                                    onClick={() => handleSearchPageChange(searchModal.page - 1)}
+                                                    disabled={searchModal.page === 1}
+                                                >
+                                                    Previous
+                                                </button>
+                                            </li>
+                                            {Array.from({ length: Math.min(5, searchModal.totalPages) }, (_, i) => {
+                                                const pageNum = searchModal.page - 2 + i;
+                                                if (pageNum < 1 || pageNum > searchModal.totalPages) return null;
+                                                return (
+                                                    <li key={pageNum}>
+                                                        <button
+                                                            className={`px-3 py-2 text-sm leading-tight border ${
+                                                                searchModal.page === pageNum
+                                                                    ? 'bg-primary text-white border-primary'
+                                                                    : 'text-gray-500 bg-white border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700'
+                                                            }`}
+                                                            onClick={() => handleSearchPageChange(pageNum)}
+                                                        >
+                                                            {pageNum}
+                                                        </button>
+                                                    </li>
+                                                );
+                                            })}
+                                            <li>
+                                                <button
+                                                    className="px-3 py-2 text-sm leading-tight text-gray-500 bg-white border border-gray-300 rounded-r-lg hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700"
+                                                    onClick={() => handleSearchPageChange(searchModal.page + 1)}
+                                                    disabled={searchModal.page === searchModal.totalPages}
+                                                >
+                                                    Next
+                                                </button>
+                                            </li>
+                                        </ul>
+                                    </nav>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

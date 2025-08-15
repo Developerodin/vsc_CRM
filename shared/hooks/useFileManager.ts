@@ -307,14 +307,56 @@ export const useFileManager = () => {
     }
   }, [state.currentFolder, loadFolderContents, loadDashboard]);
 
-  // Search files
-  const searchFiles = useCallback(async (query: string, type?: 'folder' | 'file', page: number = 1) => {
+  // Enhanced Search - with subfolder support
+  const searchFiles = useCallback(async (query: string, options?: {
+    type?: 'folder' | 'file';
+    includeSubfolders?: boolean;
+    recursive?: boolean;
+    subfolders?: boolean;
+    page?: number;
+  }) => {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
       
-      const results: PaginatedResponse<Folder | FileItem> = await fileManagerService.searchFiles(query, { type, limit: 100, page });
+      const searchOptions = {
+        type: options?.type,
+        limit: 100,
+        page: options?.page || 1,
+        includeSubfolders: options?.includeSubfolders,
+        recursive: options?.recursive,
+        subfolders: options?.subfolders
+      };
+
+      let results: PaginatedResponse<Folder | FileItem>;
+
+      if (options?.recursive) {
+        // Use recursive search for comprehensive results
+        results = await fileManagerService.searchItemsRecursive({
+          query,
+          type: options.type
+        }, { 
+          limit: searchOptions.limit, 
+          page: searchOptions.page 
+        });
+      } else if (options?.subfolders) {
+        // Use subfolder-specific search
+        results = await fileManagerService.searchSubfoldersByName(query, {
+          limit: searchOptions.limit,
+          page: searchOptions.page
+        });
+      } else {
+        // Use enhanced basic search (includes path search if includeSubfolders is true)
+        results = await fileManagerService.searchItems({
+          query,
+          type: options?.type,
+          includeSubfolders: options?.includeSubfolders
+        }, {
+          limit: searchOptions.limit,
+          page: searchOptions.page
+        });
+      }
       
-      console.log('Search results:', results);
+      console.log('Enhanced search results:', results);
       
       setState(prev => ({ 
         ...prev, 
@@ -338,6 +380,11 @@ export const useFileManager = () => {
       }));
     }
   }, []);
+
+  // Legacy search function for backward compatibility
+  const searchFilesLegacy = useCallback(async (query: string, type?: 'folder' | 'file', page: number = 1) => {
+    return searchFiles(query, { type, page, includeSubfolders: true });
+  }, [searchFiles]);
 
   // Update file
   const updateFile = useCallback(async (fileId: string, data: any) => {
@@ -451,6 +498,7 @@ export const useFileManager = () => {
     deleteFolder,
     deleteMultipleItems,
     searchFiles,
+    searchFilesLegacy,
     updateFile,
     updateFolder,
     toggleItemSelection,

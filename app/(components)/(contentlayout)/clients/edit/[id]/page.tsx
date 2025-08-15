@@ -49,8 +49,6 @@ interface TeamMember {
 
 interface ActivityMapping {
   activity: string;
-  assignedTeamMember: string;
-  assignedDate: string;
   notes: string;
 }
 
@@ -71,8 +69,6 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
   const [activityMappings, setActivityMappings] = useState<ActivityMapping[]>([
     {
       activity: '',
-      assignedTeamMember: '',
-      assignedDate: '',
       notes: ''
     }
   ]);
@@ -699,8 +695,6 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
       ...activityMappings,
       {
         activity: '',
-        assignedTeamMember: '',
-        assignedDate: '',
         notes: ''
       }
     ]);
@@ -791,10 +785,6 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
         toast.error(`Please select an activity for mapping ${i + 1}`);
         return false;
       }
-      if (!mapping.assignedTeamMember) {
-        toast.error(`Please select a team member for mapping ${i + 1}`);
-        return false;
-      }
     }
 
     return true;
@@ -810,25 +800,15 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     }
     
     if (activeTab === 'activity') {
-      if (!validateForm()) return;
-      setActiveTab('documents');
-      return;
-    }
-    
-    // Only submit when on documents tab
     if (!validateForm()) return;
 
     try {
       setIsSubmitting(true);
 
-      // Filter out empty mappings and prepare activities data
-      const activities = activityMappings
-        .filter(mapping => mapping.activity && mapping.assignedTeamMember)
-        .map(mapping => ({
-          activity: mapping.activity,
-          assignedTeamMember: mapping.assignedTeamMember,
-          notes: mapping.notes
-        }));
+        const clientData = {
+          ...formData,
+          activities: activityMappings.filter(mapping => mapping.activity)
+        };
 
       const response = await fetch(`${Base_url}clients/${params.id}`, {
         method: 'PATCH',
@@ -836,10 +816,7 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({
-          ...formData,
-          activities
-        })
+          body: JSON.stringify(clientData)
       });
 
       if (!response.ok) {
@@ -847,14 +824,25 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
         throw new Error(errorData.message || 'Failed to update client');
       }
 
-      const data: Client = await response.json();
       toast.success('Client updated successfully');
-      router.push('/clients');
+        setActiveTab('documents');
+        
+        // Load client documents
+        fetchClientDocuments(params.id);
     } catch (err) {
       console.error('Error updating client:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to update client');
     } finally {
       setIsSubmitting(false);
+      }
+      return;
+    }
+    
+    // On documents tab, show success and redirect
+    if (activeTab === 'documents') {
+      toast.success('Client and documents updated successfully!');
+      router.push('/clients');
+      return;
     }
   };
 
@@ -1286,7 +1274,7 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
 
                     {activityMappings.map((mapping, index) => (
                       <div key={index} className="border border-gray-200 rounded-lg p-4">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {/* Activity */}
                           <div className="form-group">
                           <label className="form-label">Activity <span className="text-red-500">*</span></label>
@@ -1298,23 +1286,6 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                               >
                                 <span className="truncate">
                                   {activities.find(a => a.id === mapping.activity)?.name || "Select Activity"}
-                                </span>
-                                <i className="ri-arrow-down-s-line text-gray-400"></i>
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Team Member */}
-                          <div className="form-group">
-                            <label className="form-label">Team Member <span className="text-red-500">*</span></label>
-                            <div className="relative">
-                              <button
-                                type="button"
-                                className={`w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:bg-gray-50`}
-                                onClick={() => openTeamMemberModal(index)}
-                              >
-                                <span className="truncate">
-                                  {teamMembers.find(m => m.id === mapping.assignedTeamMember)?.name || "Select Team Member"}
                                 </span>
                                 <i className="ri-arrow-down-s-line text-gray-400"></i>
                               </button>
@@ -1356,7 +1327,7 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                   <div className="space-y-6">
                     <div className="flex justify-between items-center">
                       <div>
-                        <h3 className="text-lg font-medium text-gray-900">Client Documents</h3>
+                      <h3 className="text-lg font-medium text-gray-900">Client Documents</h3>
                         {formData.email && (
                           <p className="text-sm text-gray-500 mt-1">
                             Files will be sent to: {formData.email}

@@ -40,17 +40,8 @@ interface Activity {
   description?: string;
 }
 
-interface TeamMember {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-}
-
 interface ActivityMapping {
   activity: string;
-  assignedTeamMember: string;
-  assignedDate: string;
   notes: string;
 }
 
@@ -60,17 +51,11 @@ const AddClientPage = () => {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [activities, setActivities] = useState<Activity[]>([]);
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
-  const [isLoadingTeamMembers, setIsLoadingTeamMembers] = useState(false);
   const [showActivityModal, setShowActivityModal] = useState(false);
-  const [showTeamMemberModal, setShowTeamMemberModal] = useState(false);
   const [selectedActivityIndex, setSelectedActivityIndex] = useState<number>(-1);
-  const [selectedTeamMemberIndex, setSelectedTeamMemberIndex] = useState<number>(-1);
   const [activitySearchQuery, setActivitySearchQuery] = useState("");
-  const [teamMemberSearchQuery, setTeamMemberSearchQuery] = useState("");
   const [filteredActivities, setFilteredActivities] = useState<Activity[]>([]);
-  const [filteredTeamMembers, setFilteredTeamMembers] = useState<TeamMember[]>([]);
   const [activeTab, setActiveTab] = useState<'general' | 'activity' | 'documents'>('general');
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
@@ -115,13 +100,11 @@ const AddClientPage = () => {
   const [activityMappings, setActivityMappings] = useState<ActivityMapping[]>([
     {
       activity: '',
-      assignedTeamMember: '',
-      assignedDate: '',
       notes: ''
     }
   ]);
 
-  // Fetch activities and team members
+  // Fetch activities
   useEffect(() => {
     const fetchActivities = async () => {
       try {
@@ -143,45 +126,16 @@ const AddClientPage = () => {
       }
     };
 
-    const fetchTeamMembers = async () => {
-      try {
-        setIsLoadingTeamMembers(true);
-        const response = await fetch(`${Base_url}team-members?limit=1000`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setTeamMembers(data.results || []);
-          setFilteredTeamMembers(data.results || []);
-        }
-      } catch (error) {
-        console.error('Error fetching team members:', error);
-      } finally {
-        setIsLoadingTeamMembers(false);
-      }
-    };
-
     fetchActivities();
-    fetchTeamMembers();
   }, []);
 
-  // Filter activities and team members based on search
+  // Filter activities based on search
   useEffect(() => {
     const filtered = activities.filter(activity =>
       activity.name.toLowerCase().includes(activitySearchQuery.toLowerCase())
     );
     setFilteredActivities(filtered);
   }, [activities, activitySearchQuery]);
-
-  useEffect(() => {
-    const filtered = teamMembers.filter(member =>
-      member.name.toLowerCase().includes(teamMemberSearchQuery.toLowerCase()) ||
-      member.email.toLowerCase().includes(teamMemberSearchQuery.toLowerCase())
-    );
-    setFilteredTeamMembers(filtered);
-  }, [teamMembers, teamMemberSearchQuery]);
 
   // Close context menu when clicking outside
   useEffect(() => {
@@ -219,8 +173,6 @@ const AddClientPage = () => {
       ...activityMappings,
       {
         activity: '',
-        assignedTeamMember: '',
-        assignedDate: '',
         notes: ''
       }
     ]);
@@ -237,12 +189,6 @@ const AddClientPage = () => {
     setShowActivityModal(true);
   };
 
-  const openTeamMemberModal = (index: number) => {
-    setSelectedTeamMemberIndex(index);
-    setTeamMemberSearchQuery("");
-    setShowTeamMemberModal(true);
-  };
-
   const selectActivity = (activity: Activity) => {
     if (selectedActivityIndex >= 0) {
       const updatedMappings = [...activityMappings];
@@ -254,19 +200,6 @@ const AddClientPage = () => {
     }
     setShowActivityModal(false);
     setSelectedActivityIndex(-1);
-  };
-
-  const selectTeamMember = (member: TeamMember) => {
-    if (selectedTeamMemberIndex >= 0) {
-      const updatedMappings = [...activityMappings];
-      updatedMappings[selectedTeamMemberIndex] = {
-        ...updatedMappings[selectedTeamMemberIndex],
-        assignedTeamMember: member.id
-      };
-      setActivityMappings(updatedMappings);
-    }
-    setShowTeamMemberModal(false);
-    setSelectedTeamMemberIndex(-1);
   };
 
   const validateForm = () => {
@@ -331,7 +264,7 @@ const AddClientPage = () => {
 
         const clientData = {
           ...formData,
-          activities: activityMappings.filter(mapping => mapping.activity && mapping.assignedTeamMember)
+          activities: activityMappings.filter(mapping => mapping.activity)
         };
 
         const response = await fetch(`${Base_url}clients`, {
@@ -368,7 +301,7 @@ const AddClientPage = () => {
     if (activeTab === 'documents') {
       if (savedClientId) {
         toast.success('Client and documents saved successfully!');
-        router.push('/clients');
+      router.push('/clients');
       } else {
         toast.error('Client not found. Please go back to Activity Mapping and try again.');
       }
@@ -1202,7 +1135,7 @@ const AddClientPage = () => {
                             )}
                           </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {/* Activity */}
                                                             <div className="form-group">
                                                             <label className="form-label">Activity<span className="text-red-500">*</span></label>
@@ -1214,23 +1147,6 @@ const AddClientPage = () => {
                                 >
                                   <span className="truncate">
                                     {activities.find(a => a.id === mapping.activity)?.name || "Select Activity"}
-                                  </span>
-                                  <i className="ri-arrow-down-s-line text-gray-400"></i>
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Team Member */}
-                            <div className="form-group">
-                              <label className="form-label">Team Member <span className="text-red-500">*</span></label>
-                              <div className="relative">
-                                <button
-                                  type="button"
-                                  className={`w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:bg-gray-50`}
-                                  onClick={() => openTeamMemberModal(index)}
-                                >
-                                  <span className="truncate">
-                                    {teamMembers.find(m => m.id === mapping.assignedTeamMember)?.name || "Select Team Member"}
                                   </span>
                                   <i className="ri-arrow-down-s-line text-gray-400"></i>
                                 </button>
@@ -1305,66 +1221,66 @@ const AddClientPage = () => {
                         </div>
 
                         {isLoadingDocuments ? (
-                          <div className="flex items-center justify-center py-16">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                            <span className="ml-3 text-gray-600">Loading documents...</span>
-                          </div>
-                        ) : clientDocuments.length > 0 ? (
-                          <div className="space-y-4">
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
-                              {clientDocuments.map((doc, index) => (
-                                <div
-                                  key={index}
-                                  className="group relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-all duration-200 cursor-pointer"
-                                >
-                                  {/* Selection Checkbox */}
-                                  <input
-                                    type="checkbox"
-                                    className="absolute top-2 left-2 z-10 opacity-100 transition-opacity duration-200"
-                                    onChange={(e) => {
-                                      e.stopPropagation();
-                                      // Handle selection if needed
-                                    }}
-                                  />
+                      <div className="flex items-center justify-center py-16">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                        <span className="ml-3 text-gray-600">Loading documents...</span>
+                      </div>
+                    ) : clientDocuments.length > 0 ? (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+                          {clientDocuments.map((doc, index) => (
+                            <div
+                              key={index}
+                              className="group relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-all duration-200 cursor-pointer"
+                            >
+                              {/* Selection Checkbox */}
+                              <input
+                                type="checkbox"
+                                className="absolute top-2 left-2 z-10 opacity-100 transition-opacity duration-200"
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  // Handle selection if needed
+                                }}
+                              />
 
-                                  {/* Icon */}
-                                  <div className="flex items-center justify-center w-16 h-16 mb-3">
-                                    <div className={`w-full h-full rounded-lg flex items-center justify-center ${getFileColor(doc.file?.mimeType || '', doc.file?.fileName || doc.fileName || '')}`}>
-                                      <i className={`text-2xl ${getFileIcon(doc.file?.mimeType || '', doc.file?.fileName || doc.fileName || '')}`}></i>
-                                    </div>
-                                  </div>
-
-                                  {/* Content */}
-                                  <div className="text-center">
-                                    <div className="font-medium text-sm truncate">
-                                      {doc.file?.fileName || doc.fileName || 'Unknown File'}
-                                    </div>
-                                    <div className="text-xs text-gray-500 mt-1">
-                                      {doc.file?.fileSize ? `${(doc.file.fileSize / 1024).toFixed(1)} KB` : 'Unknown size'}
-                                    </div>
-                                  </div>
-
-                                  {/* Three-dot menu */}
-                                  <button
-                                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDocumentContextMenu(e, doc);
-                                    }}
-                                    title="More options"
-                                  >
-                                    <i className="ri-more-2-fill text-gray-500 hover:text-primary"></i>
-                                  </button>
+                              {/* Icon */}
+                              <div className="flex items-center justify-center w-16 h-16 mb-3">
+                                <div className={`w-full h-full rounded-lg flex items-center justify-center ${getFileColor(doc.file?.mimeType || '', doc.file?.fileName || doc.fileName || '')}`}>
+                                  <i className={`text-2xl ${getFileIcon(doc.file?.mimeType || '', doc.file?.fileName || doc.fileName || '')}`}></i>
                                 </div>
-                              ))}
+                              </div>
+
+                              {/* Content */}
+                              <div className="text-center">
+                                <div className="font-medium text-sm truncate">
+                                  {doc.file?.fileName || doc.fileName || 'Unknown File'}
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {doc.file?.fileSize ? `${(doc.file.fileSize / 1024).toFixed(1)} KB` : 'Unknown size'}
+                                </div>
+                              </div>
+
+                              {/* Three-dot menu */}
+                              <button
+                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDocumentContextMenu(e, doc);
+                                }}
+                                title="More options"
+                              >
+                                <i className="ri-more-2-fill text-gray-500 hover:text-primary"></i>
+                              </button>
                             </div>
-                          </div>
-                        ) : (
-                          <div className="text-center py-16 text-gray-500">
-                            <i className="ri-folder-open-line text-4xl mb-4 opacity-50"></i>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-16 text-gray-500">
+                        <i className="ri-folder-open-line text-4xl mb-4 opacity-50"></i>
                             <p className="text-lg font-medium">No documents uploaded yet</p>
                             <p className="text-sm">Click "Upload Documents" to add files for this client</p>
-                          </div>
+                      </div>
                         )}
                       </>
                     )}
@@ -1392,22 +1308,22 @@ const AddClientPage = () => {
                     </button>
                   ) : (
                     // On other tabs, show Next button
-                    <button
-                      type="submit"
-                      className="ti-btn ti-btn-primary"
-                      disabled={isLoading}
-                    >
-                      {isLoading ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Saving...
-                        </>
+                  <button
+                    type="submit"
+                    className="ti-btn ti-btn-primary"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Saving...
+                      </>
                       ) : activeTab === 'activity' && savedClientId ? (
                         'Go to Documents'
-                      ) : (
+                    ) : (
                         'Next'
-                      )}
-                    </button>
+                    )}
+                  </button>
                   )}
                   
                   <button
@@ -1469,9 +1385,6 @@ const AddClientPage = () => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Activity Name
                         </th>
-                        {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Description
-                        </th> */}
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Action
                         </th>
@@ -1483,98 +1396,9 @@ const AddClientPage = () => {
                           <td className="px-6 py-4 whitespace-nowrap">
                             {activity.name}
                           </td>
-                          {/* <td className="px-6 py-4 whitespace-nowrap">
-                            {activity.description || '-'}
-                          </td> */}
                           <td className="px-6 py-4 whitespace-nowrap">
                             <button
                               onClick={() => selectActivity(activity)}
-                              className="ti-btn ti-btn-primary"
-                            >
-                              Select
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Team Member Selection Modal */}
-      {showTeamMemberModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg w-11/12 max-w-4xl max-h-[90vh] flex flex-col">
-            <div className="p-4 border-b flex justify-between items-center">
-              <h2 className="text-xl font-semibold">Select Team Member</h2>
-              <button
-                onClick={() => setShowTeamMemberModal(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <i className="ri-close-line text-2xl"></i>
-              </button>
-            </div>
-
-            <div className="p-4 border-b bg-gray-50">
-              <div className="flex items-center space-x-4">
-                <div className="relative flex-1">
-                  <div className="flex items-center">
-                    <i className="ri-search-line text-gray-400 text-xl mr-3"></i>
-                    <input
-                      type="text"
-                      placeholder="Search team members..."
-                      className="form-control py-4 pr-20 text-lg border-2 border-gray-300 focus:border-primary focus:ring-2 focus:ring-primary/20 bg-white"
-                      value={teamMemberSearchQuery}
-                      onChange={(e) => setTeamMemberSearchQuery(e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-auto p-4">
-              {isLoadingTeamMembers ? (
-                <div className="flex items-center justify-center h-32">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Name
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Email
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Phone
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Action
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredTeamMembers.map((member) => (
-                        <tr key={member.id} className="hover:bg-gray-50 cursor-pointer">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {member.name}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {member.email}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {member.phone}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <button
-                              onClick={() => selectTeamMember(member)}
                               className="ti-btn ti-btn-primary"
                             >
                               Select

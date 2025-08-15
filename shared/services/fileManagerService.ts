@@ -259,13 +259,16 @@ class FileManagerService {
     return result;
   }
 
-  // Search - Updated to return paginated response
+  // Enhanced Search - Updated to support subfolder and recursive search
   async searchFiles(query: string, params?: {
     type?: 'folder' | 'file';
     userId?: string;
     sortBy?: string;
     limit?: number;
     page?: number;
+    includeSubfolders?: boolean;
+    recursive?: boolean;
+    subfolders?: boolean;
   }): Promise<PaginatedResponse<Folder | FileItem>> {
     const searchParams = new URLSearchParams({ query });
     if (params?.type) searchParams.append('type', params.type);
@@ -273,9 +276,98 @@ class FileManagerService {
     if (params?.sortBy) searchParams.append('sortBy', params.sortBy);
     if (params?.limit) searchParams.append('limit', params.limit.toString());
     if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.includeSubfolders) searchParams.append('includeSubfolders', 'true');
+    if (params?.recursive) searchParams.append('recursive', 'true');
+    if (params?.subfolders) searchParams.append('subfolders', 'true');
 
     const result = await this.makeRequest<PaginatedResponse<Folder | FileItem>>(`/search?${searchParams.toString()}`);
-    console.log('Search API response:', result);
+    console.log('Enhanced Search API response:', result);
+    return result;
+  }
+
+  // Enhanced Basic Search - searches in folder paths and descriptions
+  async searchItems(searchParams: {
+    query: string;
+    type?: 'folder' | 'file';
+    userId?: string;
+    includeSubfolders?: boolean;
+  }, options?: {
+    sortBy?: string;
+    limit?: number;
+    page?: number;
+  }): Promise<PaginatedResponse<Folder | FileItem>> {
+    const params = new URLSearchParams({ query: searchParams.query });
+    if (searchParams.type) params.append('type', searchParams.type);
+    if (searchParams.userId) params.append('userId', searchParams.userId);
+    if (searchParams.includeSubfolders) params.append('includeSubfolders', 'true');
+    if (options?.sortBy) params.append('sortBy', options.sortBy);
+    if (options?.limit) params.append('limit', options.limit.toString());
+    if (options?.page) params.append('page', options.page.toString());
+
+    const result = await this.makeRequest<PaginatedResponse<Folder | FileItem>>(`/search?${params.toString()}`);
+    console.log('Enhanced Basic Search API response:', result);
+    return result;
+  }
+
+  // Recursive Search - searches through ALL subfolders
+  async searchItemsRecursive(searchParams: {
+    query: string;
+    type?: 'folder' | 'file';
+    userId?: string;
+  }, options?: {
+    sortBy?: string;
+    limit?: number;
+    page?: number;
+  }): Promise<PaginatedResponse<Folder | FileItem>> {
+    const params = new URLSearchParams({ 
+      query: searchParams.query,
+      recursive: 'true'
+    });
+    if (searchParams.type) params.append('type', searchParams.type);
+    if (searchParams.userId) params.append('userId', searchParams.userId);
+    if (options?.sortBy) params.append('sortBy', options.sortBy);
+    if (options?.limit) params.append('limit', options.limit.toString());
+    if (options?.page) params.append('page', options.page.toString());
+
+    const result = await this.makeRequest<PaginatedResponse<Folder | FileItem>>(`/search?${params.toString()}`);
+    console.log('Recursive Search API response:', result);
+    return result;
+  }
+
+  // Subfolder-Specific Search - optimized for finding subfolders
+  async searchSubfoldersByName(query: string, options?: {
+    parentFolder?: string;
+    userId?: string;
+    sortBy?: string;
+    limit?: number;
+    page?: number;
+  }): Promise<PaginatedResponse<Folder | FileItem>> {
+    const params = new URLSearchParams({ 
+      query,
+      subfolders: 'true'
+    });
+    if (options?.parentFolder) params.append('parentFolder', options.parentFolder);
+    if (options?.userId) params.append('userId', options.userId);
+    if (options?.sortBy) params.append('sortBy', options.sortBy);
+    if (options?.limit) params.append('limit', options.limit.toString());
+    if (options?.page) params.append('page', options.page.toString());
+
+    const result = await this.makeRequest<PaginatedResponse<Folder | FileItem>>(`/search?${params.toString()}`);
+    console.log('Subfolder Search API response:', result);
+    return result;
+  }
+
+  // Client Search - specific endpoint for searching client subfolders
+  async searchClients(query: string, options?: {
+    limit?: number;
+    page?: number;
+  }): Promise<PaginatedResponse<Folder | FileItem>> {
+    const params = new URLSearchParams({ query });
+    if (options?.limit) params.append('limit', options.limit.toString());
+    if (options?.page) params.append('page', options.page.toString());
+
+    const result = await this.makeRequest<PaginatedResponse<Folder | FileItem>>(`/search-clients?${params.toString()}`);
+    console.log('Client Search API response:', result);
     return result;
   }
 

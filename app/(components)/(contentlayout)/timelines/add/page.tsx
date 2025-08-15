@@ -45,22 +45,7 @@ interface Client {
   updatedAt: string;
 }
 
-interface TeamMember {
-    id: string;
-    name: string;
-    email: string;
-    phone: string;
-    address: string;
-    city: string;
-    state: string;
-    country: string;
-    pinCode: string;
-    branch: Branch;
-    sortOrder: number;
-    skills: Activity[];
-    createdAt: string;
-    updatedAt: string;
-}
+
 
 interface Branch {
     id: string;
@@ -97,7 +82,6 @@ const AddTimelinePage = () => {
   // API data states
   const [activities, setActivities] = useState<Activity[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   
   const [formData, setFormData] = useState({
     activityId: '',
@@ -121,9 +105,7 @@ const AddTimelinePage = () => {
       yearlyDate: 1,
       yearlyTime: ''
     },
-    status: 'pending' as 'pending' | 'completed' | 'ongoing' | 'delayed',
-    teamMemberId: '',
-    teamMemberName: ''
+    status: 'pending' as 'pending' | 'completed' | 'ongoing' | 'delayed'
   });
 
   // State for managing selected clients in modal
@@ -171,26 +153,7 @@ const AddTimelinePage = () => {
     }
   };
 
-  // Fetch team members from API
-  const fetchTeamMembers = async () => {
-    try {
-      const response = await fetch(`${Base_url}team-members?limit=1000`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch team members');
-      }
-
-      const data = await response.json();
-      setTeamMembers(data.results);
-    } catch (error) {
-      console.error('Error fetching team members:', error);
-      toast.error('Failed to fetch team members');
-    }
-  };
 
   // Load all data on component mount
   useEffect(() => {
@@ -198,8 +161,7 @@ const AddTimelinePage = () => {
       try {
         await Promise.all([
           fetchActivities(),
-          fetchGroups(),
-          fetchTeamMembers()
+          fetchGroups()
         ]);
       } catch (error) {
         console.error('Error loading data:', error);
@@ -223,25 +185,6 @@ const AddTimelinePage = () => {
       ...prev,
       [name]: value
     }));
-
-    // Auto-fill team member name when team member is selected
-    if (name === 'teamMemberId') {
-      if (value) {
-        const selectedMember = teamMembers.find(member => member.id === value);
-        if (selectedMember) {
-          setFormData(prev => ({
-            ...prev,
-            teamMemberName: selectedMember.name
-          }));
-        }
-      } else {
-        // Clear team member name when no team member is selected
-        setFormData(prev => ({
-          ...prev,
-          teamMemberName: ''
-        }));
-      }
-    }
   };
 
   const handleGroupChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -512,7 +455,7 @@ const AddTimelinePage = () => {
 
   // Helper function to generate preview text
   const generatePreviewText = () => {
-    if (!formData.activityId || !formData.clientId.length || !formData.frequency || !formData.teamMemberId || !validateFrequencyConfig()) {
+    if (!formData.activityId || !formData.clientId.length || !formData.frequency || !validateFrequencyConfig()) {
       return '';
     }
 
@@ -631,13 +574,24 @@ const AddTimelinePage = () => {
       // Remove empty fields from request body
       const cleanedFormData = removeEmptyFields({
         activity: formData.activityId,
+        client: formData.clientId, // Send array of client IDs - backend will handle creating multiple timelines
+        branch: formData.branch,
+        frequency: formData.frequency,
+        frequencyConfig: formData.frequencyConfig,
+        status: formData.status
+      });
+
+      console.log('Form Data before cleaning:', {
+        activity: formData.activityId,
         client: formData.clientId,
         branch: formData.branch,
         frequency: formData.frequency,
         frequencyConfig: formData.frequencyConfig,
-        status: formData.status,
-        assignedMember: formData.teamMemberId
+        status: formData.status
       });
+
+      console.log('Cleaned Form Data being sent to API:', cleanedFormData);
+      console.log('Request body (stringified):', JSON.stringify(cleanedFormData));
 
       const response = await fetch(`${Base_url}timelines`, {
         method: 'POST',
@@ -648,11 +602,23 @@ const AddTimelinePage = () => {
         body: JSON.stringify(cleanedFormData)
       });
 
+      console.log('API Response status:', response.status);
+      console.log('API Response ok:', response.ok);
+
       if (!response.ok) {
-        throw new Error('Failed to create timeline');
+        const errorData = await response.text();
+        console.log('API Error response:', errorData);
+        try {
+          const errorJson = JSON.parse(errorData);
+          console.log('API Error JSON:', errorJson);
+          throw new Error(errorJson.message || 'Failed to create timeline');
+        } catch (parseError) {
+          console.log('Failed to parse error response as JSON');
+          throw new Error(`Failed to create timeline: ${response.status} - ${errorData}`);
+        }
       }
 
-      toast.success('Timeline created successfully');
+      toast.success(`Timeline(s) created successfully for ${formData.clientId.length} client(s)`);
       router.push('/timelines');
     } catch (err) {
       console.error('Error creating timeline:', err);
@@ -872,26 +838,7 @@ const AddTimelinePage = () => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-                  {/* Third Row: Assigned Member, Branch */}
-                  <div className="form-group">
-                    <label htmlFor="teamMemberId" className="form-label">Assigned Member <span className="text-red-500">*</span></label>
-                    <select
-                      id="teamMemberId"
-                      name="teamMemberId"
-                      className="form-select"
-                      value={formData.teamMemberId}
-                      onChange={handleInputChange}
-                      required
-                    >
-                      <option value="">Select Assigned Member</option>
-                      {teamMembers.map(member => (
-                        <option key={member.id} value={member.id}>
-                          {member.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
+                  {/* Third Row: Branch */}
                   <div className="form-group">
                     <label htmlFor="branch" className="form-label">Branch <span className="text-red-500">*</span></label>
                     <select

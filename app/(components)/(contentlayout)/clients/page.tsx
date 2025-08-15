@@ -84,7 +84,6 @@ interface ExcelRow {
   "Udyam Number"?: string;
   "IEC Code"?: string;
   "Activity Name"?: string;
-  "Team Member Name"?: string;
   "Activity Notes"?: string;
   "Created At"?: string;
 }
@@ -303,7 +302,6 @@ const ClientsPage = () => {
             "Udyam Number": client.udyamNumber,
             "IEC Code": client.iecCode,
             "Activity Name": client.activities && client.activities.length > 0 ? client.activities[0].activity : "",
-            "Team Member Name": client.activities && client.activities.length > 0 ? client.activities[0].assignedTeamMember : "",
             "Activity Notes": client.activities && client.activities.length > 0 ? client.activities[0].notes : "",
           }));
       } else {
@@ -337,7 +335,6 @@ const ClientsPage = () => {
           "Udyam Number": client.udyamNumber,
           "IEC Code": client.iecCode,
           "Activity Name": client.activities && client.activities.length > 0 ? client.activities[0].activity : "",
-          "Team Member Name": client.activities && client.activities.length > 0 ? client.activities[0].assignedTeamMember : "",
           "Activity Notes": client.activities && client.activities.length > 0 ? client.activities[0].notes : "",
         }));
       }
@@ -366,7 +363,6 @@ const ClientsPage = () => {
         { wch: 20 }, // Udyam Number
         { wch: 20 }, // IEC Code
         { wch: 25 }, // Activity Name
-        { wch: 25 }, // Team Member Name
         { wch: 30 }, // Activity Notes
       ];
 
@@ -499,17 +495,14 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
             // Handle activity mapping if provided
             const activityMapping = {
               activity: row["Activity Name"]?.toString().trim() || "",
-              assignedTeamMember: row["Team Member Name"]?.toString().trim() || "",
               notes: row["Activity Notes"]?.toString().trim() || ""
             };
 
-            // Validate MongoDB ObjectId format for activity and team member IDs
+            // Validate MongoDB ObjectId format for activity ID
             const isValidObjectId = (id: string) => /^[0-9a-fA-F]{24}$/.test(id);
             
-            const hasValidActivityIds = activityMapping.activity && 
-                                      activityMapping.assignedTeamMember && 
-                                      isValidObjectId(activityMapping.activity) && 
-                                      isValidObjectId(activityMapping.assignedTeamMember);
+            const hasValidActivityId = activityMapping.activity && 
+                                      isValidObjectId(activityMapping.activity);
 
             let clientId = row["ID"];
             if (!clientId) {
@@ -525,20 +518,17 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
             // Debug logging for activity mapping
             console.log('Row activity data:', {
               activityId: activityMapping.activity,
-              teamMemberId: activityMapping.assignedTeamMember,
               notes: activityMapping.notes,
               hasActivity: !!activityMapping.activity,
-              hasTeamMember: !!activityMapping.assignedTeamMember,
               isValidActivityId: isValidObjectId(activityMapping.activity),
-              isValidTeamMemberId: isValidObjectId(activityMapping.assignedTeamMember),
-              hasValidActivityIds,
-              willIncludeActivities: hasValidActivityIds
+              hasValidActivityId,
+              willIncludeActivities: hasValidActivityId
             });
 
             return {
               ...(clientId && { id: clientId }),
               ...clientData,
-              activities: hasValidActivityIds ? [activityMapping] : []
+              activities: hasValidActivityId ? [activityMapping] : []
             };
           } catch (error) {
             console.error(`Error processing row ${index + 1}:`, error);
@@ -757,18 +747,18 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                       className="form-control py-2 w-full"
                       placeholder="Search by name, email, phone, city, PAN..."
                       value={filters.name}
-                                              onChange={(e) => {
-                          const value = e.target.value;
-                          setFilters(prev => ({
-                            ...prev,
-                            name: value,
-                            email: value,
-                            phone: value,
-                            district: value,
-                            pan: value,
-                          }));
-                          setCurrentPage(1);
-                        }}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setFilters(prev => ({
+                          ...prev,
+                          name: value,
+                          email: value,
+                          phone: value,
+                          district: value,
+                          pan: value,
+                        }));
+                        setCurrentPage(1);
+                      }}
                     />
                   </div>
 
@@ -805,26 +795,26 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                   {/* Reset button */}
                   <button
                     className="ti-btn ti-btn-secondary py-2 w-full sm:w-auto"
-                                          onClick={() => {
-                        setFilters({
-                          name: "",
-                          email: "",
-                          phone: "",
-                          district: "",
-                          state: "",
-                          country: "",
-                          pan: "",
-                          branch: "",
-                          businessType: "",
-                          entityType: "",
-                          gstNumber: "",
-                          tanNumber: "",
-                          cinNumber: "",
-                          udyamNumber: "",
-                          iecCode: ""
-                        });
-                        setSortBy("name:asc");
-                      }}
+                    onClick={() => {
+                      setFilters({
+                        name: "",
+                        email: "",
+                        phone: "",
+                        district: "",
+                        state: "",
+                        country: "",
+                        pan: "",
+                        branch: "",
+                        businessType: "",
+                        entityType: "",
+                        gstNumber: "",
+                        tanNumber: "",
+                        cinNumber: "",
+                        udyamNumber: "",
+                        iecCode: ""
+                      });
+                      setSortBy("name:asc");
+                    }}
                   >
                     <i className="ri-refresh-line me-2"></i>
                     Reset

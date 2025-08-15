@@ -42,39 +42,6 @@ interface Client {
     updatedAt: string;
 }
 
-interface TeamMember {
-    id: string;
-    name: string;
-    email: string;
-    phone: string;
-    address: string;
-    city: string;
-    state: string;
-    country: string;
-    pinCode: string;
-    branch: Branch;
-    sortOrder: number;
-    skills: Activity[];
-    createdAt: string;
-    updatedAt: string;
-}
-
-interface Branch {
-    id: string;
-    name: string;
-    branchHead: string;
-    email: string;
-    phone: string;
-    address: string;
-    city: string;
-    state: string;
-    country: string;
-    pinCode: string;
-    sortOrder: number;
-    createdAt: string;
-    updatedAt: string;
-}
-
 interface Timeline {
   id: string;
   activity: {
@@ -104,10 +71,6 @@ interface Timeline {
     yearlyTime: string;
   };
   turnover?: number;
-  assignedMember: {
-    id: string;
-    name: string;
-  };
   startDate?: string;
   endDate?: string;
   createdAt: string;
@@ -133,7 +96,6 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
   // API data states
   const [activities, setActivities] = useState<Activity[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   
   const [formData, setFormData] = useState({
     activityId: '',
@@ -159,8 +121,6 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
     },
     status: 'pending' as 'pending' | 'completed' | 'ongoing' | 'delayed',
     turnover: '',
-    teamMemberId: '',
-    teamMemberName: '',
     startDate: '',
     endDate: ''
   });
@@ -265,28 +225,9 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
     }
   };
 
-  // Fetch team members from API
-  const fetchTeamMembers = async () => {
-    try {
-      const response = await fetch(`${Base_url}team-members?limit=1000`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch team members');
-      }
 
-      const data = await response.json();
-      setTeamMembers(data.results);
-    } catch (error) {
-      console.error('Error fetching team members:', error);
-      toast.error('Failed to fetch team members');
-    }
-  };
-
-  // Fetch timeline data on component mount
+  // Load all data on component mount
   useEffect(() => {
     const fetchTimelineData = async () => {
       try {
@@ -295,8 +236,7 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
         // Load all required data from APIs
         await Promise.all([
           fetchActivities(),
-          fetchGroups(),
-          fetchTeamMembers()
+          fetchGroups()
         ]);
         
         // Fetch timeline data from API
@@ -326,8 +266,6 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
           frequencyConfig: timelineData.frequencyConfig,
           status: timelineData.status,
           turnover: timelineData.turnover?.toString() || '',
-          teamMemberId: timelineData.assignedMember.id,
-          teamMemberName: timelineData.assignedMember.name,
           startDate: formatDateForInput(timelineData.startDate),
           endDate: formatDateForInput(timelineData.endDate)
         });
@@ -380,25 +318,6 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
           ...prev,
           clientName: '',
           clientEmail: ''
-        }));
-      }
-    }
-
-    // Auto-fill team member name when team member is selected
-    if (name === 'teamMemberId') {
-      if (value) {
-        const selectedMember = teamMembers.find(member => member.id === value);
-        if (selectedMember) {
-          setFormData(prev => ({
-            ...prev,
-            teamMemberName: selectedMember.name
-          }));
-        }
-      } else {
-        // Clear team member name when no team member is selected
-        setFormData(prev => ({
-          ...prev,
-          teamMemberName: ''
         }));
       }
     }
@@ -668,7 +587,6 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
         frequencyConfig: formattedFrequencyConfig,
         status: formData.status,
         turnover: formData.turnover ? parseFloat(formData.turnover) : undefined,
-        assignedMember: formData.teamMemberId,
         startDate: formatDateToISO(formData.startDate),
         endDate: formatDateToISO(formData.endDate)
       });
@@ -913,7 +831,7 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-                  {/* Third Row: Turnover, Assigned Member */}
+                  {/* Third Row: Turnover */}
                   <div className="form-group">
                     <label htmlFor="turnover" className="form-label">Turnover</label>
                     <input
@@ -925,25 +843,6 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
                       value={formData.turnover}
                       onChange={handleInputChange}
                     />
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="teamMemberId" className="form-label">Assigned Member <span className="text-red-500">*</span></label>
-                    <select
-                      id="teamMemberId"
-                      name="teamMemberId"
-                      className="form-select"
-                      value={formData.teamMemberId}
-                      onChange={handleInputChange}
-                      required
-                    >
-                      <option value="">Select Assigned Member</option>
-                      {teamMembers.map(member => (
-                        <option key={member.id} value={member.id}>
-                          {member.name}
-                        </option>
-                      ))}
-                    </select>
                   </div>
                 </div>
 

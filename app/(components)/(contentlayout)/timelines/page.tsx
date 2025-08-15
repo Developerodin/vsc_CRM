@@ -34,10 +34,7 @@ interface Timeline {
     yearlyTime: string;
   };
   turnover?: number;
-  assignedMember: {
-    id: string;
-    name: string;
-  };
+
   startDate?: string;
   endDate?: string;
   createdAt: string;
@@ -61,8 +58,7 @@ interface ExcelRow {
   "Client Email": string;
   "Frequency": string;
   "Turnover"?: string;
-  "Team Member ID"?: string;
-  "Team Member Name": string;
+
   "Start Date"?: string;
   "End Date"?: string;
   "Status": string;
@@ -229,8 +225,7 @@ const TimelinesPage = () => {
             "Client Email": timeline.client?.email || "",
             "Frequency": timeline.frequency,
             "Turnover": timeline.turnover?.toString() || "",
-            "Team Member ID": timeline.assignedMember?.id || "",
-            "Team Member Name": timeline.assignedMember?.name || "",
+
             "Start Date": timeline.startDate || "",
             "End Date": timeline.endDate || "",
             "Status": timeline.status
@@ -257,8 +252,7 @@ const TimelinesPage = () => {
           "Client Email": timeline.client?.email || "",
           "Frequency": timeline.frequency,
           "Turnover": timeline.turnover?.toString() || "",
-          "Team Member ID": timeline.assignedMember?.id || "",
-          "Team Member Name": timeline.assignedMember?.name || "",
+
           "Start Date": timeline.startDate || "",
           "End Date": timeline.endDate || "",
           "Status": timeline.status
@@ -276,8 +270,6 @@ const TimelinesPage = () => {
         { wch: 30 }, // Client Email
         { wch: 20 }, // Frequency
         { wch: 25 }, // Turnover
-        { wch: 25 }, // Team Member ID
-        { wch: 25 }, // Team Member
         { wch: 20 }, // Start Date
         { wch: 20 }, // End Date
         { wch: 20 }, // Status
@@ -320,7 +312,7 @@ const TimelinesPage = () => {
             status: row["Status"] as 'pending' | 'completed' | 'ongoing' | 'delayed',
             frequency: row["Frequency"] as 'Hourly' | 'Daily' | 'Weekly' | 'Monthly' | 'Quarterly' | 'Yearly',
             turnover: row["Turnover"] ? parseFloat(row["Turnover"]) : undefined,
-            assignedMember: row["Team Member ID"],
+
             startDate: row["Start Date"] || undefined,
             endDate: row["End Date"] || undefined,
           }));
@@ -626,7 +618,7 @@ const TimelinesPage = () => {
                       <th className="px-4 py-3">Client Email</th>
                       <th className="px-4 py-3">Frequency</th>
                       <th className="px-4 py-3">Turnover</th>
-                      <th className="px-4 py-3">Assigned Member</th>
+
                       <th className="px-4 py-3">Start Date</th>
                       <th className="px-4 py-3">End Date</th>
                       <th className="px-4 py-3">Status</th>
@@ -636,7 +628,7 @@ const TimelinesPage = () => {
                   <tbody>
                     {isLoading ? (
                       <tr>
-                        <td colSpan={6} className="text-center py-4">
+                        <td colSpan={10} className="text-center py-4">
                           <div className="flex justify-center">
                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                           </div>
@@ -644,13 +636,13 @@ const TimelinesPage = () => {
                       </tr>
                     ) : error ? (
                       <tr>
-                        <td colSpan={6} className="text-center text-red-500 py-4">
+                        <td colSpan={10} className="text-center text-red-500 py-4">
                           {error}
                         </td>
                       </tr>
                     ) : timelines.length === 0 ? (
                       <tr>
-                        <td colSpan={12} className="text-center py-8">
+                                                    <td colSpan={10} className="text-center py-8">
                           <div className="flex flex-col items-center justify-center">
                             <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
                               <i className="ri-time-line text-4xl text-primary"></i>
@@ -686,7 +678,7 @@ const TimelinesPage = () => {
                           <td>{timeline.client?.email || "-"}</td>
                           <td>{timeline.frequency}</td>
                           <td>{timeline.turnover || "-"}</td>
-                          <td>{timeline.assignedMember?.name || "-"}</td>
+
                           <td>{timeline.startDate ? new Date(timeline.startDate).toISOString().split('T')[0] : "-"}</td>
                           <td>{timeline.endDate ? new Date(timeline.endDate).toISOString().split('T')[0] : "-"}</td>
                           <td>
