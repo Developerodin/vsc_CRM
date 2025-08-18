@@ -41,6 +41,43 @@ interface ApiResponse {
   totalResults: number;
 }
 
+interface TaskStatisticsResponse {
+  results: Array<{
+    groupId: string;
+    groupName: string;
+    numberOfClients: number;
+    clients: Array<{
+      clientId: string;
+      clientName: string;
+      clientEmail: string;
+      taskStatistics: {
+        total: number;
+        pending: number;
+        ongoing: number;
+        completed: number;
+        onHold: number;
+        cancelled: number;
+        delayed: number;
+      };
+    }>;
+    taskStatistics: {
+      total: number;
+      pending: number;
+      ongoing: number;
+      completed: number;
+      onHold: number;
+      cancelled: number;
+      delayed: number;
+    };
+  }>;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
 interface ExcelRow {
   "Group Name": string;
   "Sort Order"?: number;
@@ -50,6 +87,8 @@ interface ExcelRow {
   "Completed"?: number;
   "Delayed"?: number;
   "Ongoing"?: number;
+  "On Hold"?: number;
+  "Cancelled"?: number;
 }
 
 const GroupsPage = () => {
@@ -76,6 +115,8 @@ const GroupsPage = () => {
   const [clientCurrentPage, setClientCurrentPage] = useState(1);
   const [clientTotalPages, setClientTotalPages] = useState(1);
   const [clientTotalResults, setClientTotalResults] = useState(0);
+  const [taskStatsMap, setTaskStatsMap] = useState<Map<string, any>>(new Map());
+  const [isLoadingTaskStats, setIsLoadingTaskStats] = useState(false);
 
   // Use the custom hook for filters
   const {
@@ -89,25 +130,44 @@ const GroupsPage = () => {
     updateTaskStatusFilter
   } = useGroupFilters();
 
-  // Mock task stats for groups
-  const generateMockTaskStats = (groupId: string) => {
-    // Generate consistent mock data based on group ID
-    const seed = groupId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const total = 10 + (seed % 20); // 10-29 tasks
-    
-    // Calculate percentages that ensure they don't exceed 100%
-    const pendingPercent = Math.min(0.3, 0.2 + (seed % 3) * 0.05); // Max 30%
-    const completedPercent = Math.min(0.4, 0.3 + (seed % 4) * 0.05); // Max 40%
-    const delayedPercent = Math.min(0.2, 0.1 + (seed % 2) * 0.05); // Max 20%
-    
-    const pending = Math.floor(total * pendingPercent);
-    const completed = Math.floor(total * completedPercent);
-    const delayed = Math.floor(total * delayedPercent);
-    
-    // Ensure ongoing is never negative
-    const ongoing = Math.max(0, total - pending - completed - delayed);
-    
-    return { total, pending, completed, delayed, ongoing };
+  // Function to fetch task statistics for all groups
+  const fetchGroupTaskStats = async (): Promise<Map<string, any>> => {
+    try {
+      setIsLoadingTaskStats(true);
+      const queryParams = new URLSearchParams({
+        page: '1',
+        limit: '1000', // Get all groups' task stats
+        // Pass the same filters as groups
+        ...(filters.name && { name: filters.name }),
+      });
+
+      const response = await fetch(`${Base_url}groups/task-statistics?${queryParams}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch task statistics');
+      }
+
+      const data: TaskStatisticsResponse = await response.json();
+      
+      // Create a map of groupId to taskStatistics
+      const statsMap = new Map<string, any>();
+      data.results.forEach(item => {
+        statsMap.set(item.groupId, item.taskStatistics);
+      });
+
+      return statsMap;
+    } catch (error) {
+      console.error('Error fetching task statistics:', error);
+      toast.error('Failed to fetch task statistics');
+      // Return empty map on error
+      return new Map();
+    } finally {
+      setIsLoadingTaskStats(false);
+    }
   };
 
   const fetchGroups = async (page = 1, limit = itemsPerPage) => {
@@ -132,11 +192,23 @@ const GroupsPage = () => {
 
       const data: ApiResponse = await response.json();
       
-      // Add mock task stats to each group
-      const groupsWithTasks: GroupWithTasks[] = data.results.map(group => ({
-        ...group,
-        taskStats: generateMockTaskStats(group.id)
-      }));
+      // Fetch task statistics for all groups
+      const newTaskStatsMap = await fetchGroupTaskStats();
+      setTaskStatsMap(newTaskStatsMap);
+      
+      // Merge groups with their task statistics
+      const groupsWithTasks: GroupWithTasks[] = data.results.map(group => {
+        const taskStats = newTaskStatsMap.get(group.id) || {
+          pending: 0,
+          ongoing: 0,
+          completed: 0,
+          delayed: 0,
+          onHold: 0,
+          cancelled: 0,
+          total: 0
+        };
+        return { ...group, taskStats };
+      });
       
       // Apply advanced filters if any are active
       const filteredGroups = applyAdvancedFilters(groupsWithTasks);
@@ -154,7 +226,33 @@ const GroupsPage = () => {
 
   useEffect(() => {
     fetchGroups(currentPage, itemsPerPage);
-  }, [currentPage, itemsPerPage, filters, sortBy, advancedFilters]);
+  }, [currentPage, itemsPerPage, sortBy]);
+
+  // Separate useEffect for filters and advanced filters to update task statistics
+  useEffect(() => {
+    const updateTaskStats = async () => {
+      const newTaskStatsMap = await fetchGroupTaskStats();
+      setTaskStatsMap(newTaskStatsMap);
+      
+      // Update existing groups with new task stats
+      setGroups(prevGroups => 
+        prevGroups.map(group => {
+          const taskStats = newTaskStatsMap.get(group.id) || {
+            pending: 0,
+            ongoing: 0,
+            completed: 0,
+            delayed: 0,
+            onHold: 0,
+            cancelled: 0,
+            total: 0
+          };
+          return { ...group, taskStats };
+        })
+      );
+    };
+
+    updateTaskStats();
+  }, [filters, advancedFilters]);
 
   const handleSelectAll = () => {
     if (selectAll) {
@@ -259,19 +357,31 @@ const GroupsPage = () => {
         }
 
         const apiData: ApiResponse = await response.json();
-        exportData = apiData.results.map((group: Group) => ({
-          ID: group.id,
-          "Group Name": group.name,
-          "Number Of Clients": group.numberOfClients,
-          "Created Date": new Date(group.createdAt).toLocaleDateString(),
-          "Sort Order": group.sortOrder,
-          "Client IDs": group.clients?.map(client => client.id).join(',') || '',
-          "Total Tasks": generateMockTaskStats(group.id).total,
-          "Pending": generateMockTaskStats(group.id).pending,
-          "Completed": generateMockTaskStats(group.id).completed,
-          "Delayed": generateMockTaskStats(group.id).delayed,
-          "Ongoing": generateMockTaskStats(group.id).ongoing
-        }));
+                exportData = apiData.results.map((group: Group) => {
+          const taskStats = taskStatsMap.get(group.id) || {
+            total: 0,
+            pending: 0,
+            completed: 0,
+            delayed: 0,
+            ongoing: 0,
+            onHold: 0,
+            cancelled: 0
+          };
+          
+          return {
+            ID: group.id,
+            "Group Name": group.name,
+            "Number Of Clients": group.numberOfClients,
+            "Created Date": new Date(group.createdAt).toLocaleDateString(),
+            "Sort Order": group.sortOrder,
+            "Client IDs": group.clients?.map(client => client.id).join(',') || '',
+            "Total Tasks": taskStats.total,
+            "Pending": taskStats.pending,
+            "Completed": taskStats.completed,
+            "Delayed": taskStats.delayed,
+            "Ongoing": taskStats.ongoing
+          };
+        });
         successMessage = "All groups exported successfully";
       }
 
@@ -349,22 +459,30 @@ const GroupsPage = () => {
             sortOrder: parseInt(row["Sort Order"]?.toString() || "1"),
             numberOfClients: existingGroup?.clients?.length || 0,
             clients: existingGroup?.clients?.map((client: Client) => client.id) || [],
-            // Use imported task stats if available, otherwise generate mock data
+            // Use imported task stats if available, otherwise use default values
             taskStats: (() => {
-              const total = parseInt(row["Total Tasks"]?.toString() || "0") || generateMockTaskStats(row["ID"] || row["Group Name"]).total;
-              const pending = parseInt(row["Pending"]?.toString() || "0") || generateMockTaskStats(row["ID"] || row["Group Name"]).pending;
-              const completed = parseInt(row["Completed"]?.toString() || "0") || generateMockTaskStats(row["ID"] || row["Group Name"]).completed;
-              const delayed = parseInt(row["Delayed"]?.toString() || "0") || generateMockTaskStats(row["ID"] || row["Group Name"]).delayed;
+              const total = parseInt(row["Total Tasks"]?.toString() || "0") || 0;
+              const pending = parseInt(row["Pending"]?.toString() || "0") || 0;
+              const completed = parseInt(row["Completed"]?.toString() || "0") || 0;
+              const delayed = parseInt(row["Delayed"]?.toString() || "0") || 0;
               
               // Ensure ongoing is never negative by adjusting other values if needed
-              let ongoing = parseInt(row["Ongoing"]?.toString() || "0") || generateMockTaskStats(row["ID"] || row["Group Name"]).ongoing;
+              let ongoing = parseInt(row["Ongoing"]?.toString() || "0") || 0;
               
               // If the sum exceeds total, recalculate ongoing to prevent negative values
               if (pending + completed + delayed + ongoing > total) {
                 ongoing = Math.max(0, total - pending - completed - delayed);
               }
               
-              return { total, pending, completed, delayed, ongoing };
+              return { 
+                total, 
+                pending, 
+                completed, 
+                delayed, 
+                ongoing,
+                onHold: 0,
+                cancelled: 0
+              };
             })()
           };
 
@@ -535,8 +653,17 @@ const GroupsPage = () => {
     }
   };
 
-  // Function to render task status badges (exact copy from clients page)
-  const renderTaskStatus = (taskStats: any) => {
+  // Function to render task status badges
+  const renderTaskStatus = (taskStats: any, groupId: string) => {
+    if (isLoadingTaskStats) {
+      return (
+        <div className="text-center text-gray-400 text-xs">
+          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary mx-auto mb-1"></div>
+          Loading...
+        </div>
+      );
+    }
+
     if (taskStats.total === 0) {
       return (
         <div className="text-center text-gray-400 text-xs">
@@ -565,6 +692,16 @@ const GroupsPage = () => {
           {taskStats.completed > 0 && (
             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success text-black">
               {taskStats.completed} Completed
+            </span>
+          )}
+          {taskStats.onHold > 0 && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+              {taskStats.onHold} On Hold
+            </span>
+          )}
+          {taskStats.cancelled > 0 && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+              {taskStats.cancelled} Cancelled
             </span>
           )}
           {taskStats.delayed > 0 && (
@@ -773,7 +910,7 @@ const GroupsPage = () => {
                             <td>{group.numberOfClients}</td>
                             <td>{new Date(group.createdAt).toLocaleDateString()}</td>
                                                <td className="px-4 py-3">
-                              {renderTaskStatus(group.taskStats)}
+                              {renderTaskStatus(group.taskStats, group.id)}
                             </td>
                             <td>
                               <div className="flex space-x-2">

@@ -43,6 +43,8 @@ export interface GroupWithTasks {
     completed: number;
     delayed: number;
     ongoing: number;
+    onHold: number;
+    cancelled: number;
   };
 }
 

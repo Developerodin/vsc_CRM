@@ -46,6 +46,8 @@ interface TaskStats {
   ongoing: number;
   completed: number;
   delayed: number;
+  onHold: number;
+  cancelled: number;
   total: number;
 }
 
@@ -59,6 +61,21 @@ interface ApiResponse {
   limit: number;
   totalPages: number;
   totalResults: number;
+}
+
+interface TaskStatisticsResponse {
+  results: Array<{
+    clientId: string;
+    clientName: string;
+    clientEmail: string;
+    taskStatistics: TaskStats;
+  }>;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
 }
 
 interface ExcelRow {
@@ -122,29 +139,63 @@ const ClientsPage = () => {
   });
 
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [taskStatsMap, setTaskStatsMap] = useState<Map<string, TaskStats>>(new Map());
+  const [isLoadingTaskStats, setIsLoadingTaskStats] = useState(false);
 
 
   console.log(selectedBranchId, "selectedBranchId");
 
-  // Function to fetch task statistics for a client
-  const fetchClientTaskStats = async (clientId: string): Promise<TaskStats> => {
-    // Static mock data for now
-    const mockStats = [
-      { pending: 3, ongoing: 2, completed: 8, delayed: 1, total: 14 },
-      { pending: 1, ongoing: 4, completed: 12, delayed: 0, total: 17 },
-      { pending: 5, ongoing: 1, completed: 6, delayed: 2, total: 14 },
-      { pending: 0, ongoing: 3, completed: 15, delayed: 0, total: 18 },
-      { pending: 2, ongoing: 5, completed: 9, delayed: 1, total: 17 },
-      { pending: 4, ongoing: 2, completed: 7, delayed: 3, total: 16 },
-      { pending: 1, ongoing: 6, completed: 11, delayed: 0, total: 18 },
-      { pending: 3, ongoing: 1, completed: 13, delayed: 2, total: 19 },
-      { pending: 0, ongoing: 4, completed: 10, delayed: 1, total: 15 },
-      { pending: 2, ongoing: 3, completed: 8, delayed: 4, total: 17 }
-    ];
-    
-    // Use client ID to get consistent mock data
-    const index = parseInt(clientId.slice(-1)) || 0;
-    return mockStats[index % mockStats.length];
+  // Function to fetch task statistics for all clients
+  const fetchClientTaskStats = async (): Promise<Map<string, TaskStats>> => {
+    try {
+      setIsLoadingTaskStats(true);
+      const queryParams = new URLSearchParams({
+        page: '1',
+        limit: '1000', // Get all clients' task stats
+        // Pass the same filters as clients
+        ...(searchQuery && { search: searchQuery }),
+        ...(!searchQuery && filters.name && { name: filters.name }),
+        ...(!searchQuery && filters.email && { email: filters.email }),
+        ...(!searchQuery && filters.phone && { phone: filters.phone }),
+        ...(!searchQuery && filters.district && { district: filters.district }),
+        ...(!searchQuery && filters.pan && { pan: filters.pan }),
+        ...(filters.branch && { branch: filters.branch }),
+        ...(filters.businessType && { businessType: filters.businessType }),
+        ...(filters.entityType && { entityType: filters.entityType }),
+        ...(filters.gstNumber && { gstNumber: filters.gstNumber }),
+        ...(filters.tanNumber && { tanNumber: filters.tanNumber }),
+        ...(filters.cinNumber && { cinNumber: filters.cinNumber }),
+        ...(filters.udyamNumber && { udyamNumber: filters.udyamNumber }),
+        ...(filters.iecCode && { iecCode: filters.iecCode }),
+      });
+
+      const response = await fetch(`${Base_url}clients/task-statistics?${queryParams}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch task statistics');
+      }
+
+      const data: TaskStatisticsResponse = await response.json();
+      
+      // Create a map of clientId to taskStatistics
+      const statsMap = new Map<string, TaskStats>();
+      data.results.forEach(item => {
+        statsMap.set(item.clientId, item.taskStatistics);
+      });
+
+      return statsMap;
+    } catch (error) {
+      console.error('Error fetching task statistics:', error);
+      toast.error('Failed to fetch task statistics');
+      // Return empty map on error
+      return new Map();
+    } finally {
+      setIsLoadingTaskStats(false);
+    }
   };
 
   const fetchClients = async (page = 1, limit = itemsPerPage) => {
@@ -189,13 +240,23 @@ const ClientsPage = () => {
 
       const data: ApiResponse = await response.json();
       
-      // Fetch task stats for each client
-      const clientsWithTasks = await Promise.all(
-        data.results.map(async (client: Client) => {
-          const taskStats = await fetchClientTaskStats(client.id);
-          return { ...client, taskStats };
-        })
-      );
+      // Fetch task statistics for all clients
+      const newTaskStatsMap = await fetchClientTaskStats();
+      setTaskStatsMap(newTaskStatsMap);
+      
+      // Merge clients with their task statistics
+      const clientsWithTasks = data.results.map((client: Client) => {
+        const taskStats = newTaskStatsMap.get(client.id) || {
+          pending: 0,
+          ongoing: 0,
+          completed: 0,
+          delayed: 0,
+          onHold: 0,
+          cancelled: 0,
+          total: 0
+        };
+        return { ...client, taskStats };
+      });
 
       setClients(clientsWithTasks);
       setTotalResults(data.totalResults);
@@ -211,7 +272,33 @@ const ClientsPage = () => {
 
   useEffect(() => {
     fetchClients(currentPage, itemsPerPage);
-  }, [currentPage, sortBy, filters, itemsPerPage, searchQuery]);
+  }, [currentPage, sortBy, itemsPerPage]);
+
+  // Separate useEffect for filters and search to update task statistics
+  useEffect(() => {
+    const updateTaskStats = async () => {
+      const newTaskStatsMap = await fetchClientTaskStats();
+      setTaskStatsMap(newTaskStatsMap);
+      
+      // Update existing clients with new task stats
+      setClients(prevClients => 
+        prevClients.map(client => {
+          const taskStats = newTaskStatsMap.get(client.id) || {
+            pending: 0,
+            ongoing: 0,
+            completed: 0,
+            delayed: 0,
+            onHold: 0,
+            cancelled: 0,
+            total: 0
+          };
+          return { ...client, taskStats };
+        })
+      );
+    };
+
+    updateTaskStats();
+  }, [filters, searchQuery]);
 
   const handleSelectAll = () => {
     if (selectAll) {
@@ -613,7 +700,16 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
   }
 
   // Function to render task status badges
-  const renderTaskStatus = (taskStats: TaskStats) => {
+  const renderTaskStatus = (taskStats: TaskStats, clientId: string) => {
+    if (isLoadingTaskStats) {
+      return (
+        <div className="text-center text-gray-400 text-xs">
+          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary mx-auto mb-1"></div>
+          Loading...
+        </div>
+      );
+    }
+
     if (taskStats.total === 0) {
       return (
         <div className="text-center text-gray-400 text-xs">
@@ -642,6 +738,16 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
           {taskStats.completed > 0 && (
             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success text-black">
               {taskStats.completed} Completed
+            </span>
+          )}
+          {taskStats.onHold > 0 && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+              {taskStats.onHold} On Hold
+            </span>
+          )}
+          {taskStats.cancelled > 0 && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+              {taskStats.cancelled} Cancelled
             </span>
           )}
           {taskStats.delayed > 0 && (
@@ -1272,7 +1378,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
 
                             <td>{client.pan}</td>
                             <td className="px-4 py-3">
-                              {renderTaskStatus(client.taskStats)}
+                              {renderTaskStatus(client.taskStats, client.id)}
                             </td>
                             <td>
                               <div className="flex space-x-2">
