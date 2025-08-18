@@ -149,6 +149,12 @@ const TasksPage = () => {
     setShowQuickEditModal(true);
   };
 
+  // Task details modal functions
+  const openTaskDetailsModal = (task: Task) => {
+    setSelectedTask(task);
+    setShowTaskModal(true);
+  };
+
   const closeQuickEditModal = () => {
     setShowQuickEditModal(false);
     setQuickEditTask(null);
@@ -201,14 +207,41 @@ const TasksPage = () => {
     }
   };
 
+  // Helper function to validate date range
+  const validateDateRange = (startDate: string, endDate: string) => {
+    if (!startDate || !endDate) return false;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    return start <= end;
+  };
+
   // Fetch tasks using the new API
   const fetchTasks = async (page = 1, limit = itemsPerPage) => {
     setIsLoading(true);
     setError(null);
     try {
+      // Create a copy of filters for processing
+      let processedFilters: any = { ...filters };
+      
+      // Handle date range filtering - convert to backend-compatible format
+      if (processedFilters.startDate && processedFilters.endDate) {
+        // Validate date range
+        if (!validateDateRange(processedFilters.startDate, processedFilters.endDate)) {
+          toast.error('Start date must be before or equal to end date');
+          setIsLoading(false);
+          return;
+        }
+        
+        // Convert to startDateRange and endDateRange for backend processing
+        processedFilters.startDateRange = processedFilters.startDate;
+        processedFilters.endDateRange = processedFilters.endDate;
+        delete processedFilters.startDate;
+        delete processedFilters.endDate;
+      }
+
       // Filter out empty values
       const cleanFilters = Object.fromEntries(
-        Object.entries(filters).filter(([key, value]) => value !== "" && value !== "false")
+        Object.entries(processedFilters).filter(([key, value]) => value !== "" && value !== "false")
       );
 
       const queryParams = new URLSearchParams({
@@ -219,7 +252,9 @@ const TasksPage = () => {
       });
 
       console.log('Fetching tasks with URL:', `${Base_url}tasks?${queryParams}`);
-      console.log('Filters:', filters);
+      console.log('Original Filters:', filters);
+      console.log('Processed Filters:', processedFilters);
+      console.log('Clean Filters:', cleanFilters);
 
       const response = await axios.get(`${Base_url}tasks?${queryParams}`, {
         headers: {
@@ -528,6 +563,33 @@ const TasksPage = () => {
         </div>
       </div>
 
+      {/* Date Range Summary */}
+      {filters.startDate && filters.endDate && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <span className="text-sm font-medium text-blue-800">Date Range Filter:</span>
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                From: {new Date(filters.startDate).toLocaleDateString()}
+              </span>
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                To: {new Date(filters.endDate).toLocaleDateString()}
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                setFilters(prev => ({ ...prev, startDate: "", endDate: "" }));
+                setCurrentPage(1);
+              }}
+              className="text-blue-600 hover:text-blue-800 text-sm"
+            >
+              <i className="ri-close-line me-1"></i>
+              Clear Date Range
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Simple Filters Row */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
         <div className="flex items-center w-full lg:w-auto">
@@ -594,13 +656,8 @@ const TasksPage = () => {
 
           <div className="relative">
             <input
-              ref={(el) => {
-                if (el) {
-                  el.startDateRef = el;
-                }
-              }}
               type="date"
-              className={`form-control py-2 w-full sm:w-auto ${!filters.startDate ? 'text-transparent' : ''}`}
+              className={`form-control py-2 w-full sm:w-auto ${!filters.startDate ? 'text-transparent' : ''} ${filters.startDate ? 'border-primary' : ''}`}
               value={filters.startDate}
               onChange={(e) => {
                 setFilters(prev => ({ ...prev, startDate: e.target.value }));
@@ -623,17 +680,15 @@ const TasksPage = () => {
                 Start Date
               </div>
             )}
+            {filters.startDate && (
+              <div className="absolute -top-2 -right-2 w-3 h-3 bg-primary rounded-full"></div>
+            )}
           </div>
 
           <div className="relative">
             <input
-              ref={(el) => {
-                if (el) {
-                  el.endDateRef = el;
-                }
-              }}
               type="date"
-              className={`form-control py-2 w-full sm:w-auto ${!filters.endDate ? 'text-transparent' : ''}`}
+              className={`form-control py-2 w-full sm:w-auto ${!filters.endDate ? 'text-transparent' : ''} ${filters.endDate ? 'border-primary' : ''}`}
               value={filters.endDate}
               onChange={(e) => {
                 setFilters(prev => ({ ...prev, endDate: e.target.value }));
@@ -655,6 +710,9 @@ const TasksPage = () => {
               >
                 End Date
               </div>
+            )}
+            {filters.endDate && (
+              <div className="absolute -top-2 -right-2 w-3 h-3 bg-primary rounded-full"></div>
             )}
           </div>
 
@@ -714,12 +772,13 @@ const TasksPage = () => {
               <th className="px-4 py-3">Branch</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Remarks</th>
+              <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={8} className="text-center py-4">
+                <td colSpan={9} className="text-center py-4">
                   <div className="flex justify-center">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                   </div>
@@ -727,13 +786,13 @@ const TasksPage = () => {
               </tr>
             ) : error ? (
               <tr>
-                <td colSpan={8} className="text-center text-red-500 py-4">
+                <td colSpan={9} className="text-center text-red-500 py-4">
                   {error}
                 </td>
               </tr>
             ) : tasks.length === 0 ? (
               <tr>
-                <td colSpan={8} className="text-center py-8">
+                <td colSpan={9} className="text-center py-8">
                   <div className="flex flex-col items-center justify-center">
                     <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
                       <i className="ri-task-line text-4xl text-primary"></i>
@@ -781,17 +840,29 @@ const TasksPage = () => {
                       {task.status.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                     </span>
                   </td>
-                  <td 
-                    className="max-w-xs truncate cursor-pointer hover:bg-gray-50 transition-colors px-2 py-1 rounded" 
-                    title={`${task.remarks || "No remarks"} - Click to edit`}
-                    onClick={() => openQuickEditModal(task)}
-                  >
-                    {task.remarks || "-"}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
+                                     <td 
+                     className="max-w-xs truncate cursor-pointer hover:bg-gray-50 transition-colors px-2 py-1 rounded" 
+                     title={`${task.remarks || "No remarks"} - Click to edit`}
+                     onClick={() => openQuickEditModal(task)}
+                   >
+                     {task.remarks || "-"}
+                   </td>
+                   <td className="px-4 py-3">
+                     <div className="flex items-center space-x-2">
+                       <button
+                         type="button"
+                         className="ti-btn ti-btn-sm ti-btn-primary"
+                         onClick={() => openTaskDetailsModal(task)}
+                         title="View Task Details"
+                       >
+                         <i className="ri-eye-line"></i>
+                       </button>
+                     </div>
+                   </td>
+                 </tr>
+               ))
+             )}
+           </tbody>
         </table>
       </div>
 
@@ -990,6 +1061,53 @@ const TaskDetailsModal = ({
 }) => {
   const [selectedStatus, setSelectedStatus] = useState(task.status);
   const [remarks, setRemarks] = useState(task.remarks || '');
+  const [timelineDetails, setTimelineDetails] = useState<any[]>([]);
+  const [isLoadingTimelines, setIsLoadingTimelines] = useState(false);
+  const [timelineCurrentPage, setTimelineCurrentPage] = useState(1);
+  const [timelinesPerPage] = useState(5);
+
+  // Fetch timeline details when modal opens
+  useEffect(() => {
+    if (task.timeline && task.timeline.length > 0) {
+      fetchTimelineDetails();
+    }
+  }, [task]);
+
+  const fetchTimelineDetails = async () => {
+    if (!task.timeline || task.timeline.length === 0) return;
+    
+    setIsLoadingTimelines(true);
+    try {
+      const timelinePromises = task.timeline.map(async (timelineRef) => {
+        try {
+          const response = await fetch(`${Base_url}timelines/${timelineRef.id}`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+          
+          if (response.ok) {
+            return await response.json();
+          } else {
+            console.error(`Failed to fetch timeline ${timelineRef.id}:`, response.status);
+            return null;
+          }
+        } catch (error) {
+          console.error(`Error fetching timeline ${timelineRef.id}:`, error);
+          return null;
+        }
+      });
+
+             const results = await Promise.all(timelinePromises);
+       const validTimelines = results.filter(timeline => timeline !== null);
+       setTimelineDetails(validTimelines);
+       setTimelineCurrentPage(1); // Reset to first page when new data is loaded
+    } catch (error) {
+      console.error('Error fetching timeline details:', error);
+    } finally {
+      setIsLoadingTimelines(false);
+    }
+  };
 
   const handleStatusUpdate = async () => {
     if (selectedStatus !== task.status || remarks !== (task.remarks || '')) {
@@ -997,183 +1115,299 @@ const TaskDetailsModal = ({
     }
   };
 
+  const handleDownloadAttachment = (attachment: { fileName: string; fileUrl: string }) => {
+    const link = document.createElement('a');
+    link.href = attachment.fileUrl;
+    link.download = attachment.fileName;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Timeline pagination logic
+  const getPaginatedTimelines = () => {
+    const startIndex = (timelineCurrentPage - 1) * timelinesPerPage;
+    const endIndex = startIndex + timelinesPerPage;
+    return timelineDetails.slice(startIndex, endIndex);
+  };
+
+  const totalTimelinePages = Math.ceil(timelineDetails.length / timelinesPerPage);
+
+  const handleTimelinePageChange = (page: number) => {
+    setTimelineCurrentPage(page);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
       <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between p-6 border-b">
-          <div className="flex-1 mr-6">
-            <h2 className="text-xl font-bold text-gray-800">Task Details</h2>
-            <p className="text-sm text-gray-500 mt-1">
-              {task.teamMember.name} • {task.branch.name}
-            </p>
-          </div>
-          <button 
-            className="text-gray-500 hover:text-gray-700 flex-shrink-0 p-1"
-            onClick={onClose}
-          >
-            <i className="ri-close-line text-2xl"></i>
-          </button>
-        </div>
+                 <div className="flex items-center justify-between p-6 border-b">
+           <div className="flex-1 mr-6">
+             <h2 className="text-lg font-semibold text-gray-800">Task Details</h2>
+             <p className="text-sm text-gray-500 mt-1">
+               {task.teamMember.name} • {task.branch.name}
+             </p>
+           </div>
+           <button 
+             className="text-gray-500 hover:text-gray-700 flex-shrink-0 p-1"
+             onClick={onClose}
+           >
+             <i className="ri-close-line text-2xl"></i>
+           </button>
+         </div>
         
         <div className="flex-1 overflow-y-auto p-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Left Column - Task Info */}
-            <div className="space-y-4">
-              <div>
-                <h3 className="font-medium text-gray-700 mb-2">Task Information</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Team Member:</span>
-                    <span className="font-medium">{task.teamMember.name}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Email:</span>
-                    <span className="font-medium">{task.teamMember.email}</span>
-                  </div>
-                  {task.teamMember.phone && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Phone:</span>
-                      <span className="font-medium">{task.teamMember.phone}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Branch:</span>
-                    <span className="font-medium">{task.branch.name}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Location:</span>
-                    <span className="font-medium">{task.branch.location}</span>
-                  </div>
-                </div>
-              </div>
+                         {/* Left Column - Task Info */}
+             <div className="space-y-4">
+               <div>
+                 <h3 className="text-sm font-medium text-gray-700 mb-2">Task Information</h3>
+                 <div className="space-y-2 text-sm">
+                   <div className="flex justify-between">
+                     <span className="text-gray-500">Team Member:</span>
+                     <span className="font-medium">{task.teamMember.name}</span>
+                   </div>
+                   <div className="flex justify-between">
+                     <span className="text-gray-500">Email:</span>
+                     <span className="font-medium">{task.teamMember.email}</span>
+                   </div>
+                   {task.teamMember.phone && (
+                     <div className="flex justify-between">
+                       <span className="text-gray-500">Phone:</span>
+                       <span className="font-medium">{task.teamMember.phone}</span>
+                     </div>
+                   )}
+                   <div className="flex justify-between">
+                     <span className="text-gray-500">Branch:</span>
+                     <span className="font-medium">{task.branch.name}</span>
+                   </div>
+                 </div>
+               </div>
 
-              <div>
-                <h3 className="font-medium text-gray-700 mb-2">Timeline Information</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Start Date:</span>
-                    <span className="font-medium">{new Date(task.startDate).toLocaleDateString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">End Date:</span>
-                    <span className="font-medium">{new Date(task.endDate).toLocaleDateString()}</span>
-                  </div>
-                  {task.assignedBy && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Assigned By:</span>
-                      <span className="font-medium">{task.assignedBy.name}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
+                             <div>
+                 <h3 className="text-sm font-medium text-gray-700 mb-2">Timeline Information</h3>
+                 <div className="space-y-2 text-sm">
+                   <div className="flex justify-between">
+                     <span className="text-gray-500">Start Date:</span>
+                     <span className="font-medium">{new Date(task.startDate).toLocaleDateString()}</span>
+                   </div>
+                   <div className="flex justify-between">
+                     <span className="text-gray-500">End Date:</span>
+                     <span className="font-medium">{new Date(task.endDate).toLocaleDateString()}</span>
+                   </div>
+                   {task.assignedBy && (
+                     <div className="flex justify-between">
+                       <span className="text-gray-500">Assigned By:</span>
+                       <span className="font-medium">{task.assignedBy.name}</span>
+                     </div>
+                   )}
+                 </div>
+               </div>
 
-              {task.timeline && task.timeline.length > 0 && (
-                <div>
-                  <h3 className="font-medium text-gray-700 mb-2">Related Timelines</h3>
-                  <div className="space-y-2">
-                    {task.timeline.map((tl, index) => (
-                      <div key={index} className="bg-gray-50 p-2 rounded text-sm">
-                        <div className="font-medium">{tl.activity}</div>
-                        <div className="text-gray-500">{tl.client}</div>
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusStyling(tl.status)}`}>
-                          {tl.status}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                             <div>
+                 <div className="flex items-center justify-between mb-2">
+                   <h3 className="text-sm font-medium text-gray-700">Related Timelines</h3>
+                   {task.timeline && task.timeline.length > 0 && (
+                     <button
+                       onClick={fetchTimelineDetails}
+                       disabled={isLoadingTimelines}
+                       className="text-xs text-primary hover:text-primary-dark p-1 hover:bg-primary/10 rounded"
+                       title="Refresh timeline details"
+                     >
+                       <i className={`ri-refresh-line ${isLoadingTimelines ? 'animate-spin' : ''}`}></i>
+                     </button>
+                   )}
+                 </div>
+                 {isLoadingTimelines ? (
+                   <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded text-center">
+                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mx-auto mb-2"></div>
+                     Loading timeline details...
+                   </div>
+                 ) : timelineDetails.length > 0 ? (
+                   <>
+                     <div className="space-y-2">
+                       {getPaginatedTimelines().map((timeline, index) => (
+                         <div key={index} className="bg-gray-50 p-2 rounded text-sm">
+                           <div className="font-medium">{timeline.activity?.name || timeline.activity || 'Unknown Activity'}</div>
+                           <div className="text-gray-500">{timeline.client?.name || timeline.client || 'Unknown Client'}</div>
+                           <div className="flex items-center justify-between mt-1">
+                             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusStyling(timeline.status)}`}>
+                               {timeline.status || 'Unknown Status'}
+                             </span>
+                             {timeline.priority && (
+                               <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getPriorityStyling(timeline.priority)}`}>
+                                 {timeline.priority}
+                               </span>
+                             )}
+                           </div>
+                           {timeline.description && (
+                             <div className="text-xs text-gray-600 mt-1">
+                               {timeline.description}
+                             </div>
+                           )}
+                         </div>
+                       ))}
+                     </div>
+                     
+                     {/* Timeline Pagination */}
+                     {totalTimelinePages > 1 && (
+                       <div className="mt-4 flex justify-center">
+                         <nav className="flex items-center space-x-1">
+                           <button
+                             onClick={() => handleTimelinePageChange(timelineCurrentPage - 1)}
+                             disabled={timelineCurrentPage === 1}
+                             className="px-2 py-1 text-xs border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                           >
+                             Previous
+                           </button>
+                           
+                           {Array.from({ length: totalTimelinePages }, (_, i) => i + 1).map((page) => (
+                             <button
+                               key={page}
+                               onClick={() => handleTimelinePageChange(page)}
+                               className={`px-2 py-1 text-xs border rounded ${
+                                 timelineCurrentPage === page
+                                   ? 'bg-primary text-white border-primary'
+                                   : 'border-gray-300 hover:bg-gray-50'
+                               }`}
+                             >
+                               {page}
+                             </button>
+                           ))}
+                           
+                           <button
+                             onClick={() => handleTimelinePageChange(timelineCurrentPage + 1)}
+                             disabled={timelineCurrentPage === totalTimelinePages}
+                             className="px-2 py-1 text-xs border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                           >
+                             Next
+                           </button>
+                         </nav>
+                       </div>
+                     )}
+                     
+                     <div className="text-xs text-gray-500 text-center mt-2">
+                       Showing {((timelineCurrentPage - 1) * timelinesPerPage) + 1} to {Math.min(timelineCurrentPage * timelinesPerPage, timelineDetails.length)} of {timelineDetails.length} timelines
+                     </div>
+                   </>
+                 ) : task.timeline && task.timeline.length > 0 ? (
+                   <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded text-center">
+                     <i className="ri-error-warning-line text-gray-400 me-2"></i>
+                     Failed to load timeline details
+                     <button
+                       onClick={fetchTimelineDetails}
+                       className="block mx-auto mt-2 text-primary hover:text-primary-dark text-xs underline"
+                     >
+                       Try again
+                     </button>
+                   </div>
+                 ) : (
+                   <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded text-center">
+                     <i className="ri-time-line text-gray-400 me-2"></i>
+                     No related timelines available
+                   </div>
+                 )}
+               </div>
             </div>
 
-            {/* Right Column - Status Update */}
-            <div className="space-y-4">
-              <div>
-                <h3 className="font-medium text-gray-700 mb-2">Current Status</h3>
-                <div className="flex items-center gap-2 mb-4">
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusStyling(task.status)}`}>
-                    {task.status.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                  </span>
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getPriorityStyling(task.priority)}`}>
-                    {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-                  </span>
-                </div>
-              </div>
+                         {/* Right Column - Status Update */}
+             <div className="space-y-4">
+               <div>
+                 <h3 className="text-sm font-medium text-gray-700 mb-2">Status</h3>
+                 <div className="flex items-center gap-2 mb-4">
+                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusStyling(task.status)}`}>
+                     {task.status.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                   </span>
+                 </div>
+               </div>
 
-              <div>
-                <h3 className="font-medium text-gray-700 mb-2">Update Status</h3>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      New Status
-                    </label>
-                    <select
-                      className="form-select w-full"
-                      value={selectedStatus}
-                      onChange={(e) => setSelectedStatus(e.target.value as Task['status'])}
-                      disabled={isUpdating}
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="ongoing">Ongoing</option>
-                      <option value="completed">Completed</option>
-                      <option value="on_hold">On Hold</option>
-                      <option value="cancelled">Cancelled</option>
-                      <option value="delayed">Delayed</option>
-                    </select>
-                  </div>
+               <div>
+                 <h3 className="text-sm font-medium text-gray-700 mb-2">Priority</h3>
+                 <div className="flex items-center gap-2 mb-4">
+                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getPriorityStyling(task.priority)}`}>
+                     {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                   </span>
+                 </div>
+               </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Remarks
-                    </label>
-                    <textarea
-                      className="form-control w-full"
-                      rows={3}
-                      placeholder="Add any additional notes or remarks..."
-                      value={remarks}
-                      onChange={(e) => setRemarks(e.target.value)}
-                      disabled={isUpdating}
-                    />
-                  </div>
-                </div>
-              </div>
+                             <div>
+                 <h3 className="text-sm font-medium text-gray-700 mb-2">Update Status</h3>
+                 <div className="space-y-3">
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 mb-1">
+                       New Status
+                     </label>
+                     <select
+                       className="form-select w-full"
+                       value={selectedStatus}
+                       onChange={(e) => setSelectedStatus(e.target.value as Task['status'])}
+                       disabled={isUpdating}
+                     >
+                       <option value="pending">Pending</option>
+                       <option value="ongoing">Ongoing</option>
+                       <option value="completed">Completed</option>
+                       <option value="on_hold">On Hold</option>
+                       <option value="cancelled">Cancelled</option>
+                       <option value="delayed">Delayed</option>
+                     </select>
+                   </div>
 
-              {task.attachments && task.attachments.length > 0 && (
-                <div>
-                  <h3 className="font-medium text-gray-700 mb-2">Attachments</h3>
-                  <div className="space-y-2">
-                    {task.attachments.map((attachment, index) => (
-                      <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                        <div className="flex items-center gap-2">
-                          <i className="ri-file-line text-gray-400"></i>
-                          <span className="text-sm font-medium">{attachment.fileName}</span>
-                        </div>
-                        <a
-                          href={attachment.fileUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary hover:text-primary-dark text-sm"
-                        >
-                          <i className="ri-external-link-line"></i>
-                        </a>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                   <div>
+                     <label className="block text-sm font-medium text-gray-700 mb-1">
+                       Remarks
+                     </label>
+                     <textarea
+                       className="form-control w-full"
+                       rows={3}
+                       placeholder="Add any additional notes or remarks..."
+                       value={remarks}
+                       onChange={(e) => setRemarks(e.target.value)}
+                       disabled={isUpdating}
+                     />
+                   </div>
+                 </div>
+               </div>
 
-              {task.metadata && Object.keys(task.metadata).length > 0 && (
-                <div>
-                  <h3 className="font-medium text-gray-700 mb-2">Additional Information</h3>
-                  <div className="bg-gray-50 p-3 rounded text-sm">
-                    {Object.entries(task.metadata).map(([key, value]) => (
-                      <div key={key} className="flex justify-between mb-1">
-                        <span className="text-gray-500 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
-                        <span className="font-medium">{String(value)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                             <div>
+                 <h3 className="text-sm font-medium text-gray-700 mb-2">Attachments</h3>
+                 {task.attachments && task.attachments.length > 0 ? (
+                   <div className="space-y-2">
+                     {task.attachments.map((attachment, index) => (
+                       <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                         <div className="flex items-center gap-2">
+                           <i className="ri-file-line text-gray-400"></i>
+                           <span className="text-sm font-medium">{attachment.fileName}</span>
+                         </div>
+                         <div className="flex items-center gap-2">
+                           <button
+                             onClick={() => handleDownloadAttachment(attachment)}
+                             className="text-primary hover:text-primary-dark text-sm p-1 hover:bg-primary/10 rounded"
+                             title="Download Attachment"
+                           >
+                             <i className="ri-download-line"></i>
+                           </button>
+                           <a
+                             href={attachment.fileUrl}
+                             target="_blank"
+                             rel="noopener noreferrer"
+                             className="text-primary hover:text-primary-dark text-sm p-1 hover:bg-primary/10 rounded"
+                             title="View Attachment"
+                           >
+                             <i className="ri-external-link-line"></i>
+                           </a>
+                         </div>
+                       </div>
+                     ))}
+                   </div>
+                 ) : (
+                   <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded text-center">
+                     <i className="ri-file-line text-gray-400 me-2"></i>
+                     No attachments available
+                   </div>
+                 )}
+               </div>
+
+              
             </div>
           </div>
         </div>
