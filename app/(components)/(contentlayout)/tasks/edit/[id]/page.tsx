@@ -55,6 +55,47 @@ interface Branch {
   location?: string;
 }
 
+interface Activity {
+  id: string;
+  name: string;
+  sortOrder: number;
+  frequency?: string;
+  frequencyConfig?: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface Client {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  address: string;
+  city: string;
+  state: string;
+  country: string;
+  pinCode: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+  activities?: Array<{
+    _id: string;
+    activity: string;
+    assignedDate: string;
+    notes: string;
+  }>;
+}
+
+interface Group {
+  id: string;
+  name: string;
+  numberOfClients: number;
+  clients: Client[];
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface Timeline {
   id: string;
   title: string;
@@ -101,6 +142,15 @@ const EditTaskPage = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [attachments, setAttachments] = useState<Array<{fileName: string, fileUrl: string}>>([]);
+  
+  // New state for activity and group filters
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [selectedActivity, setSelectedActivity] = useState<string>("");
+  const [selectedGroup, setSelectedGroup] = useState<string>("");
+  const [isLoadingActivities, setIsLoadingActivities] = useState(false);
+  const [isLoadingGroups, setIsLoadingGroups] = useState(false);
+  
   const [formData, setFormData] = useState({
     teamMember: "",
     startDate: "",
@@ -120,8 +170,23 @@ const EditTaskPage = () => {
       fetchTask();
       fetchTeamMembers();
       fetchBranches();
+      fetchActivities();
+      fetchGroups();
     }
   }, [taskId]);
+
+  // Refetch timelines when filters change
+  useEffect(() => {
+    if (showTimelineModal) {
+      if (selectedActivity || selectedGroup) {
+        setTimelineCurrentPage(1);
+        fetchTimelines(1, timelineSearchQuery);
+      } else {
+        // If no filters are selected, fetch all timelines
+        fetchTimelines(1, "", true);
+      }
+    }
+  }, [selectedActivity, selectedGroup, showTimelineModal]);
 
   const fetchTask = async () => {
     try {
@@ -349,12 +414,79 @@ const EditTaskPage = () => {
     }
   };
 
-  const fetchTimelines = async (page: number = 1, searchQueryParam?: string) => {
+  const fetchActivities = async () => {
+    try {
+      setIsLoadingActivities(true);
+      const response = await fetch(`${Base_url}activities`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setActivities(data.results || []);
+      }
+    } catch (error) {
+      console.error('Error fetching activities:', error);
+      toast.error('Failed to fetch activities');
+    } finally {
+      setIsLoadingActivities(false);
+    }
+  };
+
+  const fetchGroups = async () => {
+    try {
+      setIsLoadingGroups(true);
+      const response = await fetch(`${Base_url}groups`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setGroups(data.results || []);
+      }
+    } catch (error) {
+      console.error('Error fetching groups:', error);
+      toast.error('Failed to fetch groups');
+    } finally {
+      setIsLoadingGroups(false);
+    }
+  };
+
+  const fetchTimelines = async (page: number = 1, searchQueryParam?: string, forceClearFilters: boolean = false) => {
     try {
       setIsLoadingTimelines(true);
+      
+      // If no filters are applied or force clear is requested, fetch all timelines with pagination
+      if ((!selectedActivity && !selectedGroup && !searchQueryParam && !timelineSearchQuery) || forceClearFilters) {
+        const queryParams = new URLSearchParams({
+          page: page.toString(),
+          limit: "100", // Fetch more timelines per page
+          sortBy: "title:asc"
+        });
+
+        const response = await fetch(`${Base_url}timelines?${queryParams}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch timelines');
+        }
+
+        const data = await response.json();
+        setTimelines(data.results || []);
+        setTimelineTotalPages(data.totalPages || 1);
+        setTimelineCurrentPage(page);
+        return;
+      }
+
+      // If filters are applied, fetch all timelines first then filter
       const queryParams = new URLSearchParams({
-        page: page.toString(),
-        limit: "10",
+        page: "1",
+        limit: "1000", // Fetch all timelines for filtering
         sortBy: "title:asc",
         ...((searchQueryParam || timelineSearchQuery) && { search: searchQueryParam || timelineSearchQuery })
       });
@@ -369,9 +501,52 @@ const EditTaskPage = () => {
         throw new Error('Failed to fetch timelines');
       }
 
-        const data = await response.json();
-        setTimelines(data.results || []);
-      const totalResults = data.totalResults || data.total || 0;
+      const data = await response.json();
+      let allTimelines = data.results || [];
+      
+      // Apply client-side filtering only if filters are selected
+      let filteredTimelines = allTimelines;
+      
+      if (selectedActivity || selectedGroup) {
+        console.log('Filtering timelines with:', { selectedActivity, selectedGroup });
+        console.log('Available groups:', groups);
+        console.log('All timelines:', allTimelines);
+        
+        filteredTimelines = allTimelines.filter((timeline: Timeline) => {
+          let matchesActivity = true;
+          let matchesGroup = true;
+          
+          // Filter by activity
+          if (selectedActivity) {
+            matchesActivity = timeline.activity?.id === selectedActivity;
+            console.log(`Timeline ${timeline.id} activity match:`, matchesActivity, timeline.activity?.id, selectedActivity);
+          }
+          
+          // Filter by group (check if client belongs to selected group)
+          if (selectedGroup) {
+            const selectedGroupData = groups.find(g => g.id === selectedGroup);
+            console.log('Selected group data:', selectedGroupData);
+            if (selectedGroupData && timeline.client?.id) {
+              // Check if the timeline's client is in the selected group's clients array
+              const clientIds = selectedGroupData.clients.map(client => client.id);
+              console.log('Group client IDs:', clientIds, 'Timeline client ID:', timeline.client.id);
+              matchesGroup = clientIds.includes(timeline.client.id);
+            } else {
+              matchesGroup = false;
+            }
+            console.log(`Timeline ${timeline.id} group match:`, matchesGroup);
+          }
+          
+          const finalMatch = matchesActivity && matchesGroup;
+          console.log(`Timeline ${timeline.id} final match:`, finalMatch);
+          return finalMatch;
+        });
+        
+        console.log('Filtered timelines:', filteredTimelines);
+      }
+      
+      setTimelines(filteredTimelines);
+      const totalResults = filteredTimelines.length;
       const limit = 10;
       setTimelineTotalPages(Math.max(1, Math.ceil(totalResults / limit)));
       setTimelineCurrentPage(page);
@@ -427,7 +602,43 @@ const EditTaskPage = () => {
 
   const handleTimelinePageChange = (newPage: number) => {
     setTimelineCurrentPage(newPage);
-    fetchTimelines(newPage, timelineSearchQuery);
+    // If filters are applied, we need to fetch all data first then paginate client-side
+    if (selectedActivity || selectedGroup) {
+      fetchTimelines(1, timelineSearchQuery); // Fetch all data
+      setTimelineCurrentPage(newPage); // Update page for display
+    } else {
+      fetchTimelines(newPage, timelineSearchQuery);
+    }
+  };
+
+  // Filter change handlers
+  const handleActivityFilterChange = (activityId: string) => {
+    setSelectedActivity(activityId);
+  };
+
+  const handleGroupFilterChange = (groupId: string) => {
+    setSelectedGroup(groupId);
+  };
+
+  const clearFilters = () => {
+    setSelectedActivity("");
+    setSelectedGroup("");
+    setTimelineSearchQuery("");
+    setTimelineCurrentPage(1);
+    // Force fetch all timelines without any filters
+    fetchTimelines(1, "", true);
+  };
+
+  // Get paginated timelines for display
+  const getPaginatedTimelines = () => {
+    if (selectedActivity || selectedGroup) {
+      // Client-side pagination for filtered results
+      const startIndex = (timelineCurrentPage - 1) * 10;
+      const endIndex = startIndex + 10;
+      return timelines.slice(startIndex, endIndex);
+    }
+    // Server-side pagination for unfiltered results
+    return timelines;
   };
 
   // Debounced search function for timelines
@@ -811,7 +1022,10 @@ const EditTaskPage = () => {
                         setShowTimelineModal(true);
                         setTimelineSearchQuery("");
                         setTimelineCurrentPage(1);
-                        fetchTimelines(1);
+                        setSelectedActivity("");
+                        setSelectedGroup("");
+                        // Fetch all timelines without filters initially
+                        fetchTimelines(1, "", true);
                       }}
                     >
                       Select Timelines ({selectedTimelines.length} selected)
@@ -1014,6 +1228,61 @@ const EditTaskPage = () => {
             </div>
 
             <div className="p-4 border-b bg-gray-50">
+              {/* Activity and Group Filters */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                {/* Activity Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Filter by Activity
+                  </label>
+                  <select
+                    className="form-select w-full"
+                    value={selectedActivity}
+                    onChange={(e) => handleActivityFilterChange(e.target.value)}
+                  >
+                    <option value="">All Activities</option>
+                    {activities.map((activity) => (
+                      <option key={activity.id} value={activity.id}>
+                        {activity.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Group Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Filter by Group
+                  </label>
+                  <select
+                    className="form-select w-full"
+                    value={selectedGroup}
+                    onChange={(e) => handleGroupFilterChange(e.target.value)}
+                  >
+                    <option value="">All Groups</option>
+                    {groups.map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.name} ({group.numberOfClients} clients)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Clear Filters Button */}
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="ti-btn ti-btn-secondary w-full"
+                    disabled={!selectedActivity && !selectedGroup && !timelineSearchQuery}
+                  >
+                    <i className="ri-refresh-line me-2"></i>
+                    Clear Filters
+                  </button>
+                </div>
+              </div>
+
+              {/* Search Bar */}
               <div className="flex items-center space-x-4">
                 <div className="relative flex-1">
                   <div className="flex items-center">
@@ -1042,6 +1311,34 @@ const EditTaskPage = () => {
             </div>
 
             <div className="flex-1 overflow-auto p-4">
+              {/* Active Filters Summary */}
+              {(selectedActivity || selectedGroup) && (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <span className="text-sm font-medium text-blue-800">Active Filters:</span>
+                      {selectedActivity && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                          Activity: {activities.find(a => a.id === selectedActivity)?.name}
+                        </span>
+                      )}
+                      {selectedGroup && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                          Group: {groups.find(g => g.id === selectedGroup)?.name}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={clearFilters}
+                      className="text-blue-600 hover:text-blue-800 text-sm"
+                    >
+                      <i className="ri-close-line me-1"></i>
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {isLoadingTimelines ? (
                 <div className="flex items-center justify-center h-32">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -1070,44 +1367,73 @@ const EditTaskPage = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {timelines.map((timeline) => (
-                        <tr key={timeline.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <input
-                              type="checkbox"
-                              className="form-checkbox h-5 w-5 text-primary"
-                              checked={selectedTimelines.some(t => t.id === timeline.id)}
-                              onChange={() => handleTimelineSelect(timeline)}
-                            />
-                          </td>
-
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">{timeline.activity?.name || 'Unknown Activity'}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">{timeline.client?.name || 'Unknown Client'}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              timeline.status === 'completed' ? 'bg-green-100 text-green-800' :
-                              timeline.status === 'ongoing' ? 'bg-blue-100 text-blue-800' :
-                              timeline.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {timeline.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              timeline.priority === 'high' ? 'bg-red-100 text-red-800' :
-                              timeline.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-green-100 text-green-800'
-                            }`}>
-                              {timeline.priority}
-                            </span>
+                      {timelines.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-8 text-center">
+                            <div className="flex flex-col items-center justify-center">
+                              <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                                <i className="ri-search-line text-2xl text-gray-400"></i>
+                              </div>
+                              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                No timelines found
+                              </h3>
+                              <p className="text-gray-500 text-center mb-4">
+                                {selectedActivity || selectedGroup 
+                                  ? "Try adjusting your filters or search criteria."
+                                  : "No timelines available at the moment."
+                                }
+                              </p>
+                              {(selectedActivity || selectedGroup) && (
+                                <button
+                                  onClick={clearFilters}
+                                  className="ti-btn ti-btn-primary"
+                                >
+                                  <i className="ri-refresh-line me-2"></i>
+                                  Clear Filters
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        getPaginatedTimelines().map((timeline) => (
+                          <tr key={timeline.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <input
+                                type="checkbox"
+                                className="form-checkbox h-5 w-5 text-primary"
+                                checked={selectedTimelines.some(t => t.id === timeline.id)}
+                                onChange={() => handleTimelineSelect(timeline)}
+                              />
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">{timeline.activity?.name || 'Unknown Activity'}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">{timeline.client?.name || 'Unknown Client'}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                timeline.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                timeline.status === 'ongoing' ? 'bg-blue-100 text-blue-800' :
+                                timeline.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {timeline.status}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                timeline.priority === 'high' ? 'bg-red-100 text-red-800' :
+                                timeline.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-green-100 text-green-800'
+                              }`}>
+                                {timeline.priority}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -1118,21 +1444,25 @@ const EditTaskPage = () => {
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => handleTimelinePageChange(Math.max(timelineCurrentPage - 1, 1))}
-                  disabled={timelineCurrentPage === 1}
+                  disabled={timelineCurrentPage === 1 || timelines.length === 0}
                   className="ti-btn ti-btn-secondary"
                 >
                   Previous
                 </button>
                 <span className="text-sm text-gray-500">
-                  {timelineTotalPages > 0 ? (
-                    `Page ${timelineCurrentPage} of ${timelineTotalPages}`
+                  {timelines.length > 0 ? (
+                    timelineTotalPages > 0 ? (
+                      `Page ${timelineCurrentPage} of ${timelineTotalPages} (${timelines.length} total)`
+                    ) : (
+                      "No pages"
+                    )
                   ) : (
-                    "No pages"
+                    "No results"
                   )}
                 </span>
                 <button
                   onClick={() => handleTimelinePageChange(Math.min(timelineCurrentPage + 1, timelineTotalPages))}
-                  disabled={timelineCurrentPage === timelineTotalPages || timelineTotalPages === 0}
+                  disabled={timelineCurrentPage === timelineTotalPages || timelineTotalPages === 0 || timelines.length === 0}
                   className="ti-btn ti-btn-secondary"
                 >
                   Next
