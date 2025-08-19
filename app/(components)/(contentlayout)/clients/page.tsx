@@ -120,6 +120,7 @@ const ClientsPage = () => {
   const [sortBy, setSortBy] = useState<string>("name:asc");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [filters, setFilters] = useState({
     name: "",
     email: "",
@@ -141,6 +142,7 @@ const ClientsPage = () => {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [taskStatsMap, setTaskStatsMap] = useState<Map<string, TaskStats>>(new Map());
   const [isLoadingTaskStats, setIsLoadingTaskStats] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
 
   console.log(selectedBranchId, "selectedBranchId");
@@ -153,12 +155,12 @@ const ClientsPage = () => {
         page: '1',
         limit: '1000', // Get all clients' task stats
         // Pass the same filters as clients
-        ...(searchQuery && { search: searchQuery }),
-        ...(!searchQuery && filters.name && { name: filters.name }),
-        ...(!searchQuery && filters.email && { email: filters.email }),
-        ...(!searchQuery && filters.phone && { phone: filters.phone }),
-        ...(!searchQuery && filters.district && { district: filters.district }),
-        ...(!searchQuery && filters.pan && { pan: filters.pan }),
+        ...(debouncedSearchQuery && { search: debouncedSearchQuery }),
+        ...(!debouncedSearchQuery && filters.name && { name: filters.name }),
+        ...(!debouncedSearchQuery && filters.email && { email: filters.email }),
+        ...(!debouncedSearchQuery && filters.phone && { phone: filters.phone }),
+        ...(filters.district && { district: filters.district }),
+        ...(filters.pan && { pan: filters.pan }),
         ...(filters.branch && { branch: filters.branch }),
         ...(filters.businessType && { businessType: filters.businessType }),
         ...(filters.entityType && { entityType: filters.entityType }),
@@ -203,20 +205,18 @@ const ClientsPage = () => {
       setIsLoading(true);
       setError(null);
 
-     
-      
       const queryParams = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),
         sortBy,
-        // Global search parameter
-        ...(searchQuery && { search: searchQuery }),
+        // Global search parameter - search across multiple fields
+        ...(debouncedSearchQuery && { search: debouncedSearchQuery }),
         // Individual field filters (only if not using global search)
-        ...(!searchQuery && filters.name && { name: filters.name }),
-        ...(!searchQuery && filters.email && { email: filters.email }),
-        ...(!searchQuery && filters.phone && { phone: filters.phone }),
-        ...(!searchQuery && filters.district && { district: filters.district }),
-        ...(!searchQuery && filters.pan && { pan: filters.pan }),
+        ...(!debouncedSearchQuery && filters.name && { name: filters.name }),
+        ...(!debouncedSearchQuery && filters.email && { email: filters.email }),
+        ...(!debouncedSearchQuery && filters.phone && { phone: filters.phone }),
+        ...(!debouncedSearchQuery && filters.district && { district: filters.district }),
+        ...(!debouncedSearchQuery && filters.pan && { pan: filters.pan }),
 
         ...(filters.branch && { branch: filters.branch }),
         ...(filters.businessType && { businessType: filters.businessType }),
@@ -240,7 +240,7 @@ const ClientsPage = () => {
 
       const data: ApiResponse = await response.json();
       
-      // Fetch task statistics for all clients
+      // Fetch task statistics only for the found clients
       const newTaskStatsMap = await fetchClientTaskStats();
       setTaskStatsMap(newTaskStatsMap);
       
@@ -274,6 +274,28 @@ const ClientsPage = () => {
     fetchClients(currentPage, itemsPerPage);
   }, [currentPage, sortBy, itemsPerPage]);
 
+  // Refetch clients when search query changes
+  useEffect(() => {
+    if (debouncedSearchQuery !== undefined) {
+      setCurrentPage(1); // Reset to first page when searching
+      fetchClients(1, itemsPerPage);
+    }
+  }, [debouncedSearchQuery]);
+
+  // Debounce search query
+  useEffect(() => {
+    if (searchQuery) {
+      setIsSearching(true);
+    }
+    
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      setIsSearching(false);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   // Separate useEffect for filters and search to update task statistics
   useEffect(() => {
     const updateTaskStats = async () => {
@@ -298,7 +320,7 @@ const ClientsPage = () => {
     };
 
     updateTaskStats();
-  }, [filters, searchQuery]);
+  }, [filters]);
 
   const handleSelectAll = () => {
     if (selectAll) {
@@ -854,17 +876,30 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                   <div className="relative flex-grow sm:max-w-xs">
                     <input
                       type="text"
-                      className="form-control py-2 w-full"
-                      placeholder="Search by name, email, phone, city, PAN..."
+                      className="form-control py-2 w-full pl-10 pr-4"
+                      placeholder="Search by name, email, phone, city, business type, PAN..."
                       value={searchQuery}
                       onChange={(e) => {
                         setSearchQuery(e.target.value);
-                        setCurrentPage(1);
                       }}
                     />
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <i className="ri-search-line text-gray-400"></i>
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                      {isSearching ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                      ) : (
+                        <i className="ri-search-line text-gray-400"></i>
+                      )}
                     </div>
+                    {searchQuery && (
+                      <button
+                        className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                        onClick={() => {
+                          setSearchQuery("");
+                        }}
+                      >
+                        <i className="ri-close-line"></i>
+                      </button>
+                    )}
                   </div>
 
                   {/* Filter button */}
@@ -1184,9 +1219,9 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-2 mt-2">
-                    {searchQuery && (
+                    {debouncedSearchQuery && (
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        Search: "{searchQuery}"
+                        Search: "{debouncedSearchQuery}"
                         <button
                           className="ml-1 text-green-600 hover:text-green-800"
                           onClick={() => setSearchQuery("")}

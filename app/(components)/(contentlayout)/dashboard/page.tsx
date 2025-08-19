@@ -14,13 +14,17 @@ import DashboardService, {
   FrequencyAnalyticsData, 
   StatusTrendsData, 
   CompletionRatesData,
-  FrequencyStatusStats
+  FrequencyStatusStats,
+  TaskTrendsResponse,
+  TaskAnalyticsResponse
 } from './services/DashboardService';
 import {
   FrequencyAnalyticsChart,
   StatusTrendsChart,
   CompletionRatesCard,
-  TimelinePeriodTable
+  TimelinePeriodTable,
+  TaskTrendsChart,
+  TaskAnalyticsCard
 } from './components';
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
@@ -180,6 +184,9 @@ const Dashboard = () => {
   const [statusTrendsData, setStatusTrendsData] = useState<StatusTrendsData[]>([]);
   const [completionRatesData, setCompletionRatesData] = useState<CompletionRatesData | null>(null);
   const [frequencyStatusStats, setFrequencyStatusStats] = useState<FrequencyStatusStats | null>(null);
+  const [taskTrendsData, setTaskTrendsData] = useState<TaskTrendsResponse | null>(null);
+  const [taskStatusAnalytics, setTaskStatusAnalytics] = useState<TaskAnalyticsResponse | null>(null);
+  const [taskPriorityAnalytics, setTaskPriorityAnalytics] = useState<TaskAnalyticsResponse | null>(null);
   
   // Frequency selection state
   const [selectedFrequency, setSelectedFrequency] = useState<string>('Daily');
@@ -196,6 +203,9 @@ const Dashboard = () => {
   const [isLoadingCompletionRates, setIsLoadingCompletionRates] = useState(false);
   const [isLoadingPeriods, setIsLoadingPeriods] = useState(false);
   const [isLoadingFrequencyStats, setIsLoadingFrequencyStats] = useState(false);
+  const [isLoadingTaskTrends, setIsLoadingTaskTrends] = useState(false);
+  const [isLoadingTaskStatusAnalytics, setIsLoadingTaskStatusAnalytics] = useState(false);
+  const [isLoadingTaskPriorityAnalytics, setIsLoadingTaskPriorityAnalytics] = useState(false);
   
   const [error, setError] = useState<string | null>(null);
 
@@ -377,14 +387,91 @@ const Dashboard = () => {
     }
   };
 
+  // Fetch task trends data
+  const fetchTaskTrends = async () => {
+    setIsLoadingTaskTrends(true);
+    try {
+      const filters = {
+        branchId: selectedBranch?.id || '',
+        interval: 'month' // Default to monthly
+      };
+      const data = await DashboardService.getTaskTrends(filters);
+      setTaskTrendsData(data);
+    } catch (err) {
+      console.error('Error fetching task trends:', err);
+      toast.error('Failed to load task trends');
+      setTaskTrendsData(null);
+    } finally {
+      setIsLoadingTaskTrends(false);
+    }
+  };
+
+  // Fetch task status analytics
+  const fetchTaskStatusAnalytics = async () => {
+    setIsLoadingTaskStatusAnalytics(true);
+    try {
+      const filters = {
+        branchId: selectedBranch?.id || '',
+        groupBy: 'status'
+      };
+      const data = await DashboardService.getTaskAnalytics(filters);
+      setTaskStatusAnalytics(data);
+    } catch (err) {
+      console.error('Error fetching task status analytics:', err);
+      toast.error('Failed to load task status analytics');
+      setTaskStatusAnalytics(null);
+    } finally {
+      setIsLoadingTaskStatusAnalytics(false);
+    }
+  };
+
+  // Fetch task priority analytics
+  const fetchTaskPriorityAnalytics = async () => {
+    setIsLoadingTaskPriorityAnalytics(true);
+    try {
+      const filters = {
+        branchId: selectedBranch?.id || '',
+        groupBy: 'priority'
+      };
+      const data = await DashboardService.getTaskAnalytics(filters);
+      setTaskPriorityAnalytics(data);
+    } catch (err) {
+      console.error('Error fetching task priority analytics:', err);
+      toast.error('Failed to load task priority analytics');
+      setTaskPriorityAnalytics(null);
+    } finally {
+      setIsLoadingTaskPriorityAnalytics(false);
+    }
+  };
+
   // Global function to refresh frequency status stats (can be called from other components)
   const refreshFrequencyStatusStats = async () => {
     await fetchFrequencyStatusStats();
   };
 
-  // Expose the refresh function globally
+  // Global function to refresh task trends (can be called from other components)
+  const refreshTaskTrends = async (interval?: string) => {
+    const filters = {
+      branchId: selectedBranch?.id || '',
+      interval: interval || 'month'
+    };
+    
+    setIsLoadingTaskTrends(true);
+    try {
+      const data = await DashboardService.getTaskTrends(filters);
+      setTaskTrendsData(data);
+    } catch (err) {
+      console.error('Error refreshing task trends:', err);
+      toast.error('Failed to refresh task trends');
+    } finally {
+      setIsLoadingTaskTrends(false);
+    }
+  };
+
+  // Expose the refresh functions globally
   if (typeof window !== 'undefined') {
     (window as any).refreshFrequencyStatusStats = refreshFrequencyStatusStats;
+    (window as any).refreshTaskTrends = refreshTaskTrends;
   }
 
   // Fetch period data (without filters)
@@ -433,6 +520,9 @@ const Dashboard = () => {
       fetchCompletionRates();
       fetchFrequencyStatusStats();
       fetchPeriodData();
+      fetchTaskTrends();
+      fetchTaskStatusAnalytics();
+      fetchTaskPriorityAnalytics();
     }
   }, [selectedBranch]);
 
@@ -440,6 +530,20 @@ const Dashboard = () => {
   useEffect(() => {
     if (selectedBranch?.id) {
       fetchPeriodData();
+    }
+  }, [selectedFrequency]);
+
+  // Refetch task trends when frequency changes
+  useEffect(() => {
+    if (selectedBranch?.id) {
+      // Map frequency to API interval format
+      const frequencyToInterval: { [key: string]: string } = {
+        'Daily': 'day',
+        'Weekly': 'week',
+        'Monthly': 'month'
+      };
+      const interval = frequencyToInterval[selectedFrequency] || 'month';
+      refreshTaskTrends(interval);
     }
   }, [selectedFrequency]);
 
@@ -837,6 +941,26 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* Task Analytics - Tasks By Status and Tasks By Priority */}
+      <div className="grid grid-cols-12 gap-x-6 mb-6">
+        <div className="lg:col-span-6 col-span-12">
+          <TaskAnalyticsCard
+            data={taskStatusAnalytics}
+            isLoading={isLoadingTaskStatusAnalytics}
+            groupBy="status"
+            title="Tasks By Status"
+          />
+        </div>
+        <div className="lg:col-span-6 col-span-12">
+          <TaskAnalyticsCard
+            data={taskPriorityAnalytics}
+            isLoading={isLoadingTaskPriorityAnalytics}
+            groupBy="priority"
+            title="Tasks By Priority"
+          />
+        </div>
+      </div>
+
 
 
       {/* Frequency Analytics and Status Trends */}
@@ -964,7 +1088,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Timeline Periods Table and Monthly Tasks Chart */}
+      {/* Timeline Periods Table and Task Trends Chart */}
       <div className="grid grid-cols-12 gap-x-6 mb-6">
         <div className="lg:col-span-12 col-span-12">
           <TimelinePeriodTable
@@ -974,6 +1098,18 @@ const Dashboard = () => {
             onFrequencyChange={handleFrequencyChange}
           />
         </div>
+        <div className="lg:col-span-12 col-span-12">
+          <TaskTrendsChart
+            data={taskTrendsData}
+            isLoading={isLoadingTaskTrends}
+            branchId={selectedBranch?.id}
+            selectedFrequency={selectedFrequency}
+          />
+        </div>
+      </div>
+
+      {/* Monthly Tasks Chart */}
+      <div className="grid grid-cols-12 gap-x-6 mb-6">
         <div className="lg:col-span-12 col-span-12">
           {isLoadingMonthly ? (
             <LineChartSkeleton />

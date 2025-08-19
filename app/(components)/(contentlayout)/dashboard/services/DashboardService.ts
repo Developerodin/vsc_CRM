@@ -63,6 +63,85 @@ export interface FrequencyStatusStats {
   total: number;
 }
 
+export interface TaskTrendsData {
+  interval: string;
+  totalTasks: number;
+  statusBreakdown: {
+    pending: number;
+    ongoing: number;
+    completed: number;
+    on_hold: number;
+    cancelled: number;
+    delayed: number;
+  };
+  priorityBreakdown: {
+    low: number;
+    medium: number;
+    high: number;
+    urgent: number;
+    critical: number;
+  };
+}
+
+export interface TaskTrendsResponse {
+  interval: string;
+  dateRange: {
+    startDate: string;
+    endDate: string;
+  };
+  totalTasks: number;
+  trends: TaskTrendsData[];
+}
+
+// Task Analytics Interfaces
+export interface TaskAnalyticsResponse {
+  groupBy: string;
+  dateRange: {
+    startDate: string;
+    endDate: string;
+  };
+  totalTasks: number;
+  totalGroups: number;
+  analytics: TaskAnalyticsData[];
+}
+
+export interface TaskAnalyticsData {
+  status?: string;
+  priority?: string;
+  branch?: string;
+  teamMember?: string;
+  month?: string;
+  week?: string;
+  count: number;
+  tasks: TaskDetail[];
+  statusBreakdown: {
+    pending: number;
+    ongoing: number;
+    completed: number;
+    on_hold: number;
+    cancelled: number;
+    delayed: number;
+  };
+  priorityBreakdown: {
+    low: number;
+    medium: number;
+    high: number;
+    urgent: number;
+    critical: number;
+  };
+}
+
+export interface TaskDetail {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  startDate: string;
+  endDate: string;
+  teamMember: string;
+  assignedBy: string;
+}
+
 export interface DashboardFilters {
   startDate?: string;
   endDate?: string;
@@ -259,6 +338,34 @@ class DashboardService {
       return response.data || [];
     } catch (error) {
       console.error('Error fetching top activities:', error);
+      throw error;
+    }
+  }
+
+  // Get task trends
+  async getTaskTrends(filters: DashboardFilters): Promise<TaskTrendsResponse> {
+    try {
+      const response = await axios.get(`${Base_url}dashboard/task-trends`, {
+        headers: this.getHeaders(),
+        params: filters
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching task trends:', error);
+      throw error;
+    }
+  }
+
+  // Get task analytics
+  async getTaskAnalytics(filters: DashboardFilters & { groupBy: string }): Promise<TaskAnalyticsResponse> {
+    try {
+      const response = await axios.get(`${Base_url}dashboard/task-analytics`, {
+        headers: this.getHeaders(),
+        params: filters
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching task analytics:', error);
       throw error;
     }
   }
