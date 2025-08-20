@@ -156,6 +156,7 @@ const AnalyticsPage = () => {
   const [globalTeamLoading, setGlobalTeamLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedMonths, setSelectedMonths] = useState(6);
+  const [chartType, setChartType] = useState<'combined' | 'separate'>('combined');
   const [selectedBranch, setSelectedBranch] = useState("all");
   const [dateRange, setDateRange] = useState({
     startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
@@ -308,6 +309,22 @@ const AnalyticsPage = () => {
     return 'bg-red-100 text-red-800 border-red-200';
   };
 
+  // Helper function to normalize task data for better chart display
+  const normalizeTaskData = (data: number[]) => {
+    if (!data || data.length === 0) return data;
+    
+    const maxValue = Math.max(...data);
+    const minValue = Math.min(...data);
+    
+    // If all values are very small (less than 1), scale them up for better visibility
+    if (maxValue < 1 && maxValue > 0) {
+      return data.map(value => Math.round(value * 100) / 100);
+    }
+    
+    // If values are already reasonable, just round them
+    return data.map(value => Math.round(value * 100) / 100);
+  };
+
   // Chart options for completion trends
   const getChartOptions = () => ({
     chart: {
@@ -316,7 +333,7 @@ const AnalyticsPage = () => {
       toolbar: { show: false },
       zoom: { enabled: false }
     },
-    colors: ['#3B82F6', '#10B981'],
+    colors: ['#3B82F6', '#10B981', '#F59E0B'],
     dataLabels: { enabled: false },
     grid: { 
       borderColor: '#E5E7EB',
@@ -336,7 +353,15 @@ const AnalyticsPage = () => {
           text: 'Number of Tasks',
           style: { color: '#6B7280' }
         },
-        labels: { style: { colors: '#6B7280' } }
+        labels: { 
+          style: { colors: '#6B7280' },
+          formatter: function(value: any) {
+            return String(Math.round(Number(value) * 100) / 100);
+          }
+        },
+        min: 0,
+        forceNiceScale: true,
+        tickAmount: 5
       },
       {
         opposite: true,
@@ -344,7 +369,13 @@ const AnalyticsPage = () => {
           text: 'Completion Rate (%)',
           style: { color: '#6B7280' }
         },
-        labels: { style: { colors: '#6B7280' } },
+        labels: { 
+          style: { colors: '#6B7280' },
+          formatter: function(value: any) {
+            return String(Math.round(Number(value) * 100) / 100) + '%';
+          }
+        },
+        min: 0,
         max: 100
       }
     ],
@@ -362,15 +393,22 @@ const AnalyticsPage = () => {
     },
     tooltip: {
       theme: 'light' as const,
+      shared: true,
+      intersect: false,
       y: [
         {
           formatter: function(value: any) {
-            return value + ' tasks';
+            return String(Math.round(Number(value) || 0)) + ' tasks';
           }
         },
         {
           formatter: function(value: any) {
-            return value + '%';
+            return String(Math.round(Number(value) || 0)) + ' tasks';
+          }
+        },
+        {
+          formatter: function(value: any) {
+            return String(Math.round(Number(value) || 0)) + '%';
           }
         }
       ]
@@ -381,17 +419,156 @@ const AnalyticsPage = () => {
     {
       name: 'Completed Tasks',
       type: 'column',
-      data: completionTrends?.trends.map(t => t.completed) || []
+      data: normalizeTaskData(completionTrends?.trends.map(t => Number(t.completed)) || [])
     },
     {
       name: 'Total Tasks',
       type: 'column',
-      data: completionTrends?.trends.map(t => t.total) || []
+      data: normalizeTaskData(completionTrends?.trends.map(t => Number(t.total)) || [])
     },
     {
       name: 'Completion Rate',
       type: 'line',
-      data: completionTrends?.trends.map(t => t.completionRate) || []
+      data: completionTrends?.trends.map(t => Math.round(Number(t.completionRate) * 100) / 100) || []
+    }
+  ];
+
+  // Separate chart options for tasks only
+  const getTasksChartOptions = () => ({
+    chart: {
+      type: 'bar' as const,
+      height: 300,
+      toolbar: { show: false },
+      zoom: { enabled: false }
+    },
+    colors: ['#3B82F6', '#10B981'],
+    dataLabels: { enabled: false },
+    grid: { 
+      borderColor: '#E5E7EB',
+      strokeDashArray: 4
+    },
+    xaxis: {
+      categories: completionTrends?.trends.map(t => t.month) || [],
+      labels: { 
+        style: { colors: '#6B7280' },
+        rotate: -45,
+        rotateAlways: false
+      }
+    },
+    yaxis: {
+      title: {
+        text: 'Number of Tasks',
+        style: { color: '#6B7280' }
+      },
+      labels: { 
+        style: { colors: '#6B7280' },
+        formatter: function(value: any) {
+          return String(Math.round(Number(value) * 100) / 100);
+        }
+      },
+      min: 0,
+      forceNiceScale: true,
+      tickAmount: 5
+    },
+    plotOptions: {
+      bar: {
+        horizontal: false,
+        columnWidth: '60%',
+        borderRadius: 6,
+        endingShape: 'rounded' as const
+      }
+    },
+    legend: {
+      position: 'top' as const,
+      labels: { colors: '#374151' }
+    },
+    tooltip: {
+      theme: 'light' as const,
+      y: {
+        formatter: function(value: any) {
+          return String(Math.round(Number(value) || 0)) + ' tasks';
+        }
+      }
+    }
+  });
+
+  // Separate chart options for completion rate only
+  const getCompletionRateChartOptions = () => ({
+    chart: {
+      type: 'line' as const,
+      height: 300,
+      toolbar: { show: false },
+      zoom: { enabled: false }
+    },
+    colors: ['#F59E0B'],
+    dataLabels: { enabled: false },
+    grid: { 
+      borderColor: '#E5E7EB',
+      strokeDashArray: 4
+    },
+    xaxis: {
+      categories: completionTrends?.trends.map(t => t.month) || [],
+      labels: { 
+        style: { colors: '#6B7280' },
+        rotate: -45,
+        rotateAlways: false
+      }
+    },
+    yaxis: {
+      title: {
+        text: 'Completion Rate (%)',
+        style: { color: '#6B7280' }
+      },
+      labels: { 
+        style: { colors: '#6B7280' },
+        formatter: function(value: any) {
+          return String(Math.round(Number(value) || 0)) + '%';
+        }
+      },
+      min: 0,
+      max: 100
+    },
+    stroke: {
+      curve: 'smooth' as const,
+      width: 3
+    },
+    markers: {
+      size: 6,
+      hover: {
+        size: 8
+      }
+    },
+    legend: {
+      position: 'top' as const,
+      labels: { colors: '#374151' }
+    },
+    tooltip: {
+      theme: 'light' as const,
+      y: {
+        formatter: function(value: any) {
+          return String(Math.round(Number(value) || 0)) + '%';
+        }
+      }
+    }
+  });
+
+  // Separate chart series for tasks only
+  const getTasksChartSeries = () => [
+    {
+      name: 'Completed Tasks',
+      data: normalizeTaskData(completionTrends?.trends.map(t => Number(t.completed)) || [])
+    },
+    {
+      name: 'Total Tasks',
+      data: normalizeTaskData(completionTrends?.trends.map(t => Number(t.total)) || [])
+    }
+  ];
+
+  // Separate chart series for completion rate only
+  const getCompletionRateChartSeries = () => [
+    {
+      name: 'Completion Rate',
+      data: completionTrends?.trends.map(t => Math.round(Number(t.completionRate) * 100) / 100) || []
     }
   ];
 
@@ -534,28 +711,82 @@ const AnalyticsPage = () => {
           </div>
         ) : completionTrends && ReactApexChart ? (
           <div>
-            <ReactApexChart
-              options={getChartOptions()}
-              series={getChartSeries()}
-              type="bar"
-              height={400}
-            />
-            
-            {/* Summary Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 pt-6 border-t border-gray-200">
-              <div className="text-center">
-                <p className="text-sm font-medium text-gray-600">Total Completed</p>
-                <p className="text-2xl font-bold text-blue-600">{completionTrends.summary.totalCompleted}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-sm font-medium text-gray-600">Total Tasks</p>
-                <p className="text-2xl font-bold text-purple-600">{completionTrends.summary.totalTasks}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-sm font-medium text-gray-600">Average Completion Rate</p>
-                <p className="text-2xl font-bold text-green-600">{completionTrends.summary.averageCompletionRate}%</p>
+            {/* Chart Type Toggle */}
+            <div className="flex justify-end mb-4">
+              <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => setChartType('combined')}
+                  className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                    chartType === 'combined' 
+                      ? 'bg-white text-gray-900 shadow-sm' 
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Combined View
+                </button>
+                <button
+                  onClick={() => setChartType('separate')}
+                  className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                    chartType === 'separate' 
+                      ? 'bg-white text-gray-900 shadow-sm' 
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Separate Charts
+                </button>
               </div>
             </div>
+
+            {chartType === 'combined' ? (
+              <ReactApexChart
+                options={getChartOptions()}
+                series={getChartSeries()}
+                type="bar"
+                height={400}
+              />
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Tasks Chart */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">Task Counts</h3>
+                  <ReactApexChart
+                    options={getTasksChartOptions()}
+                    series={getTasksChartSeries()}
+                    type="bar"
+                    height={300}
+                  />
+                </div>
+                
+                {/* Completion Rate Chart */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">Completion Rate</h3>
+                  <ReactApexChart
+                    options={getCompletionRateChartOptions()}
+                    series={getCompletionRateChartSeries()}
+                    type="line"
+                    height={300}
+                  />
+                </div>
+              </div>
+            )}
+            
+                         {/* Summary Stats */}
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 pt-6 border-t border-gray-200">
+               <div className="text-center">
+                 <p className="text-sm font-medium text-gray-600">Total Completed</p>
+                 <p className="text-2xl font-bold text-blue-600">{completionTrends.summary.totalCompleted}</p>
+               </div>
+               <div className="text-center">
+                 <p className="text-sm font-medium text-gray-600">Total Tasks</p>
+                 <p className="text-2xl font-bold text-purple-600">{completionTrends.summary.totalTasks}</p>
+               </div>
+               <div className="text-center">
+                 <p className="text-sm font-medium text-gray-600">Average Completion Rate</p>
+                 <p className="text-2xl font-bold text-green-600">{completionTrends.summary.averageCompletionRate}%</p>
+               </div>
+             </div>
+
+             
           </div>
         ) : (
           <div className="h-[400px] flex items-center justify-center bg-gray-50 rounded-lg">
@@ -888,7 +1119,7 @@ const AnalyticsPage = () => {
                     Branch
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Skills
+                    Activities
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
