@@ -149,11 +149,13 @@ const AnalyticsPage = () => {
   const [topByCompletion, setTopByCompletion] = useState<TopByCompletionResponse['data'] | null>(null);
   const [topByBranch, setTopByBranch] = useState<TopByBranchResponse['data'] | null>(null);
   const [globalTeamMembers, setGlobalTeamMembers] = useState<GlobalTeamMembersResponse['data'] | null>(null);
+  const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [trendsLoading, setTrendsLoading] = useState(true);
   const [topCompletionLoading, setTopCompletionLoading] = useState(true);
   const [topBranchLoading, setTopBranchLoading] = useState(true);
   const [globalTeamLoading, setGlobalTeamLoading] = useState(true);
+  const [clientsLoading, setClientsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedMonths, setSelectedMonths] = useState(6);
   const [chartType, setChartType] = useState<'combined' | 'separate'>('combined');
@@ -169,6 +171,7 @@ const AnalyticsPage = () => {
     fetchTopByCompletion();
     fetchTopByBranch();
     fetchGlobalTeamMembers();
+    fetchClients();
   }, []);
 
   useEffect(() => {
@@ -290,6 +293,24 @@ const AnalyticsPage = () => {
       console.error('Error fetching global team members:', err);
     } finally {
       setGlobalTeamLoading(false);
+    }
+  };
+
+  const fetchClients = async () => {
+    try {
+      setClientsLoading(true);
+      const response = await axios.get(`${Base_url}clients?page=1&limit=10`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      console.log('Clients API response:', response.data);
+      setClients(response.data.results || []);
+    } catch (err) {
+      console.error('Error fetching clients:', err);
+    } finally {
+      setClientsLoading(false);
     }
   };
 
@@ -1199,10 +1220,115 @@ const AnalyticsPage = () => {
               <p className="text-gray-500">No team members data available</p>
             </div>
           </div>
-        )}
-      </div>
-    </div>
-  );
-};
+                 )}
+       </div>
+
+       {/* Clients Table */}
+       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
+         <div className="flex items-center justify-between mb-6">
+           <h2 className="text-xl font-semibold text-gray-900">Clients Overview</h2>
+           <div className="text-right">
+             <p className="text-sm text-gray-600">Total Clients: <span className="font-semibold text-blue-600">{clients.length}</span></p>
+             <p className="text-sm text-gray-600">Showing: <span className="font-semibold text-green-600">{clients.length}</span> of {clients.length}</p>
+           </div>
+         </div>
+
+         {clientsLoading ? (
+           <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
+             <div className="text-center">
+               <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                 <i className="ri-loader-4-line text-xl text-gray-400 animate-spin"></i>
+               </div>
+               <p className="text-gray-500">Loading clients...</p>
+             </div>
+           </div>
+         ) : clients.length > 0 ? (
+           <div className="overflow-x-auto">
+             <table className="w-full">
+               <thead className="bg-gray-50">
+                 <tr>
+                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                     Client
+                   </th>
+                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                     Contact
+                   </th>
+                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                     Business Type
+                   </th>
+                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                     Entity Type
+                   </th>
+                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                     Branch
+                   </th>
+                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                     Status
+                   </th>
+                 </tr>
+               </thead>
+               <tbody className="bg-white divide-y divide-gray-200">
+                 {clients.map((client) => (
+                   <tr key={client.id} className="hover:bg-gray-50">
+                     <td className="px-6 py-4 whitespace-nowrap">
+                       <div className="flex items-center">
+                         <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
+                           {client.name.charAt(0).toUpperCase()}
+                         </div>
+                         <div className="ml-4">
+                           <button
+                             onClick={() => router.push(`/analytics/clients/${client.id}/overview`)}
+                             className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                           >
+                             {client.name}
+                           </button>
+                         </div>
+                       </div>
+                     </td>
+                     <td className="px-6 py-4 whitespace-nowrap">
+                       <div className="text-sm text-gray-900">{client.email}</div>
+                       <div className="text-sm text-gray-500">{client.phone}</div>
+                     </td>
+                     <td className="px-6 py-4 whitespace-nowrap">
+                       <span className={`px-2 py-1 text-xs rounded-full ${
+                         client.businessType ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
+                       }`}>
+                         {client.businessType || 'N/A'}
+                       </span>
+                     </td>
+                     <td className="px-6 py-4 whitespace-nowrap">
+                       <span className={`px-2 py-1 text-xs rounded-full ${
+                         client.entityType ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                       }`}>
+                         {client.entityType || 'N/A'}
+                       </span>
+                     </td>
+                     <td className="px-6 py-4 whitespace-nowrap">
+                       <span className="text-sm text-gray-900">{client.branch || 'N/A'}</span>
+                     </td>
+                     <td className="px-6 py-4 whitespace-nowrap">
+                       <span className="px-2 py-1 text-xs rounded-full border bg-green-100 text-green-800 border-green-200">
+                         Active
+                       </span>
+                     </td>
+                   </tr>
+                 ))}
+               </tbody>
+             </table>
+           </div>
+         ) : (
+           <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
+             <div className="text-center">
+               <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                 <i className="ri-folder-line text-xl text-gray-400"></i>
+               </div>
+               <p className="text-gray-500">No clients data available</p>
+             </div>
+           </div>
+         )}
+       </div>
+     </div>
+   );
+ };
 
 export default AnalyticsPage;

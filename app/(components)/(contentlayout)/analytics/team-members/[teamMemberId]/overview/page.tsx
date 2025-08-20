@@ -386,7 +386,7 @@ const TeamMemberOverviewPage = () => {
       <Seo title={`${teamMember.name} - Team Member Overview`} />
 
       {/* Back to Analytics */}
-      <div className="mb-6">
+      <div className="mb-2 mt-2">
         <Link 
           href="/analytics"
           className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 transition-colors duration-200"
@@ -735,12 +735,12 @@ const TeamMemberOverviewPage = () => {
 
           {/* Client Summary Table */}
                       {/* Client Summary Table from Tasks Data */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Client Summary from Tasks</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client Name</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Tasks</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completed Tasks</th>
@@ -851,40 +851,40 @@ const TeamMemberOverviewPage = () => {
                           if (task.timeline && Array.isArray(task.timeline)) {
                             return task.timeline.map((timelineItem, index) => (
                               <tr key={`${task.id}-${index}`} className="hover:bg-gray-50">
-                                <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-4 whitespace-nowrap">
                                   <div className="text-sm font-medium text-gray-900">
                                     {timelineItem.client?.name || 'Unknown Client'}
                                   </div>
                                   <div className="text-xs text-gray-500">
                                     {timelineItem.client?.email || 'No email'}
                                   </div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
                                   <div className="text-sm font-medium text-gray-900">
                                     {timelineItem.activity?.name || 'Unknown Activity'}
                                   </div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
                                   <span className={`px-2 py-1 text-xs rounded-full border ${getStatusColor(String(timelineItem.status || 'unknown'))}`}>
                                     {String(timelineItem.status || 'unknown')}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
                                   <span className="text-sm text-gray-900">
                                     {timelineItem.frequency || 'N/A'}
                                   </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
                                   <span className="text-sm text-gray-900">
                                     {formatDate(String(timelineItem.startDate || new Date().toISOString()))}
                                   </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
                                   <span className="text-sm text-gray-900">
                                     {formatDate(String(timelineItem.endDate || new Date().toISOString()))}
                                   </span>
-                                </td>
-                              </tr>
+                        </td>
+                      </tr>
                             ));
                           }
                           return [];
@@ -977,40 +977,40 @@ const TeamMemberOverviewPage = () => {
               }
 
               return ReactApexChart ? (
-                <ReactApexChart
-                  options={{
-                    chart: {
-                      type: 'bar' as const,
-                      height: 300,
+              <ReactApexChart
+                options={{
+                  chart: {
+                    type: 'bar' as const,
+                    height: 300,
                       toolbar: { show: false },
                       animations: {
                         enabled: false // Disable animations to prevent errors
                       }
-                    },
-                    colors: ['#3B82F6', '#10B981'],
-                    dataLabels: { enabled: false },
-                    xaxis: {
+                  },
+                  colors: ['#3B82F6', '#10B981'],
+                  dataLabels: { enabled: false },
+                  xaxis: {
                       categories: categories,
                       labels: { 
                         style: { colors: '#6B7280' },
                         trim: true,
                         maxHeight: 60
                       }
-                    },
-                    yaxis: {
-                      title: { text: 'Number of Tasks', style: { color: '#6B7280' } },
+                  },
+                  yaxis: {
+                    title: { text: 'Number of Tasks', style: { color: '#6B7280' } },
                       labels: { 
                         style: { colors: '#6B7280' },
                         formatter: function(val) {
                           return String(Math.round(Number(val) || 0));
                         }
                       }
-                    },
-                    legend: {
-                      position: 'top' as const,
-                      labels: { colors: '#374151' }
-                    },
-                    tooltip: {
+                  },
+                  legend: {
+                    position: 'top' as const,
+                    labels: { colors: '#374151' }
+                  },
+                  tooltip: {
                       theme: 'light' as const,
                       y: {
                         formatter: function(val) {
@@ -1037,28 +1037,28 @@ const TeamMemberOverviewPage = () => {
                         }
                       }
                     }]
-                  }}
-                  series={[
-                    {
-                      name: 'Completed Tasks',
+                }}
+                series={[
+                  {
+                    name: 'Completed Tasks',
                       data: completedData
-                    },
-                    {
-                      name: 'Total Tasks',
+                  },
+                  {
+                    name: 'Total Tasks',
                       data: totalData
-                    }
-                  ]}
-                  type="bar"
-                  height={300}
-                />
-              ) : (
-                <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-                  <div className="text-center">
-                    <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                  }
+                ]}
+                type="bar"
+                height={300}
+              />
+            ) : (
+              <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
+                <div className="text-center">
+                  <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
                       <i className="ri-loader-4-line text-xl text-gray-400 animate-spin"></i>
-                    </div>
-                    <p className="text-gray-500">Loading chart...</p>
                   </div>
+                    <p className="text-gray-500">Loading chart...</p>
+                </div>
                 </div>
               );
             })()}
