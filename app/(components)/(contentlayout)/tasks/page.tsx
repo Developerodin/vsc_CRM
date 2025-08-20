@@ -79,6 +79,7 @@ const TasksPage = () => {
   const searchParams = useSearchParams();
   const router = useRouter();
   const status = searchParams.get('status');
+  const priority = searchParams.get('priority');
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -91,7 +92,7 @@ const TasksPage = () => {
   const [searchInputValue, setSearchInputValue] = useState("");
   const [filters, setFilters] = useState({
     status: status || "",
-    priority: "",
+    priority: priority || "",
     branch: "",
     teamMember: "",
     startDate: "",
@@ -446,6 +447,21 @@ const TasksPage = () => {
     fetchTaskStats();
   }, []);
 
+  // Update filters when URL parameters change
+  useEffect(() => {
+    const newStatus = searchParams.get('status') || "";
+    const newPriority = searchParams.get('priority') || "";
+    
+    if (newStatus !== filters.status || newPriority !== filters.priority) {
+      setFilters(prev => ({
+        ...prev,
+        status: newStatus,
+        priority: newPriority
+      }));
+      setCurrentPage(1); // Reset to first page when filters change
+    }
+  }, [searchParams, filters.status, filters.priority]);
+
   return (
     <div className="main-content">
       <Toaster position="top-right" />
@@ -563,28 +579,53 @@ const TasksPage = () => {
         </div>
       </div>
 
-      {/* Date Range Summary */}
-      {filters.startDate && filters.endDate && (
+      {/* Active Filters Summary */}
+      {(filters.status || filters.priority || (filters.startDate && filters.endDate)) && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <span className="text-sm font-medium text-blue-800">Date Range Filter:</span>
-              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                From: {new Date(filters.startDate).toLocaleDateString()}
-              </span>
-              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                To: {new Date(filters.endDate).toLocaleDateString()}
-              </span>
+              <span className="text-sm font-medium text-blue-800">Active Filters:</span>
+              
+              {filters.status && (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                  Status: {filters.status.charAt(0).toUpperCase() + filters.status.slice(1)}
+                </span>
+              )}
+              
+              {filters.priority && (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                  Priority: {filters.priority.charAt(0).toUpperCase() + filters.priority.slice(1)}
+                </span>
+              )}
+              
+              {filters.startDate && filters.endDate && (
+                <>
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                    From: {new Date(filters.startDate).toLocaleDateString()}
+                  </span>
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                    To: {new Date(filters.endDate).toLocaleDateString()}
+                  </span>
+                </>
+              )}
             </div>
             <button
               onClick={() => {
-                setFilters(prev => ({ ...prev, startDate: "", endDate: "" }));
+                setFilters(prev => ({ 
+                  ...prev, 
+                  status: "", 
+                  priority: "",
+                  startDate: "", 
+                  endDate: "" 
+                }));
                 setCurrentPage(1);
+                // Clear URL parameters
+                router.push('/tasks');
               }}
               className="text-blue-600 hover:text-blue-800 text-sm"
             >
               <i className="ri-close-line me-1"></i>
-              Clear Date Range
+              Clear All Filters
             </button>
           </div>
         </div>
@@ -840,13 +881,13 @@ const TasksPage = () => {
                       {task.status.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                     </span>
                   </td>
-                                     <td 
-                     className="max-w-xs truncate cursor-pointer hover:bg-gray-50 transition-colors px-2 py-1 rounded" 
-                     title={`${task.remarks || "No remarks"} - Click to edit`}
-                     onClick={() => openQuickEditModal(task)}
-                   >
-                     {task.remarks || "-"}
-                   </td>
+                  <td 
+                    className="max-w-xs truncate cursor-pointer hover:bg-gray-50 transition-colors px-2 py-1 rounded" 
+                    title={`${task.remarks || "No remarks"} - Click to edit`}
+                    onClick={() => openQuickEditModal(task)}
+                  >
+                    {task.remarks || "-"}
+                  </td>
                    <td className="px-4 py-3">
                      <div className="flex items-center space-x-2">
                        <button
@@ -858,11 +899,11 @@ const TasksPage = () => {
                          <i className="ri-eye-line"></i>
                        </button>
                      </div>
-                   </td>
-                 </tr>
-               ))
-             )}
-           </tbody>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
         </table>
       </div>
 
@@ -1141,70 +1182,70 @@ const TaskDetailsModal = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
       <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] flex flex-col">
-                 <div className="flex items-center justify-between p-6 border-b">
-           <div className="flex-1 mr-6">
+        <div className="flex items-center justify-between p-6 border-b">
+          <div className="flex-1 mr-6">
              <h2 className="text-lg font-semibold text-gray-800">Task Details</h2>
-             <p className="text-sm text-gray-500 mt-1">
-               {task.teamMember.name} • {task.branch.name}
-             </p>
-           </div>
-           <button 
-             className="text-gray-500 hover:text-gray-700 flex-shrink-0 p-1"
-             onClick={onClose}
-           >
-             <i className="ri-close-line text-2xl"></i>
-           </button>
-         </div>
+            <p className="text-sm text-gray-500 mt-1">
+              {task.teamMember.name} • {task.branch.name}
+            </p>
+          </div>
+          <button 
+            className="text-gray-500 hover:text-gray-700 flex-shrink-0 p-1"
+            onClick={onClose}
+          >
+            <i className="ri-close-line text-2xl"></i>
+          </button>
+        </div>
         
         <div className="flex-1 overflow-y-auto p-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                         {/* Left Column - Task Info */}
-             <div className="space-y-4">
-               <div>
+            {/* Left Column - Task Info */}
+            <div className="space-y-4">
+              <div>
                  <h3 className="text-sm font-medium text-gray-700 mb-2">Task Information</h3>
-                 <div className="space-y-2 text-sm">
-                   <div className="flex justify-between">
-                     <span className="text-gray-500">Team Member:</span>
-                     <span className="font-medium">{task.teamMember.name}</span>
-                   </div>
-                   <div className="flex justify-between">
-                     <span className="text-gray-500">Email:</span>
-                     <span className="font-medium">{task.teamMember.email}</span>
-                   </div>
-                   {task.teamMember.phone && (
-                     <div className="flex justify-between">
-                       <span className="text-gray-500">Phone:</span>
-                       <span className="font-medium">{task.teamMember.phone}</span>
-                     </div>
-                   )}
-                   <div className="flex justify-between">
-                     <span className="text-gray-500">Branch:</span>
-                     <span className="font-medium">{task.branch.name}</span>
-                   </div>
-                 </div>
-               </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Team Member:</span>
+                    <span className="font-medium">{task.teamMember.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Email:</span>
+                    <span className="font-medium">{task.teamMember.email}</span>
+                  </div>
+                  {task.teamMember.phone && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Phone:</span>
+                      <span className="font-medium">{task.teamMember.phone}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Branch:</span>
+                    <span className="font-medium">{task.branch.name}</span>
+                  </div>
+                </div>
+              </div>
 
-                             <div>
+              <div>
                  <h3 className="text-sm font-medium text-gray-700 mb-2">Timeline Information</h3>
-                 <div className="space-y-2 text-sm">
-                   <div className="flex justify-between">
-                     <span className="text-gray-500">Start Date:</span>
-                     <span className="font-medium">{new Date(task.startDate).toLocaleDateString()}</span>
-                   </div>
-                   <div className="flex justify-between">
-                     <span className="text-gray-500">End Date:</span>
-                     <span className="font-medium">{new Date(task.endDate).toLocaleDateString()}</span>
-                   </div>
-                   {task.assignedBy && (
-                     <div className="flex justify-between">
-                       <span className="text-gray-500">Assigned By:</span>
-                       <span className="font-medium">{task.assignedBy.name}</span>
-                     </div>
-                   )}
-                 </div>
-               </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Start Date:</span>
+                    <span className="font-medium">{new Date(task.startDate).toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">End Date:</span>
+                    <span className="font-medium">{new Date(task.endDate).toLocaleDateString()}</span>
+                  </div>
+                  {task.assignedBy && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Assigned By:</span>
+                      <span className="font-medium">{task.assignedBy.name}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
 
-                             <div>
+                <div>
                  <div className="flex items-center justify-between mb-2">
                    <h3 className="text-sm font-medium text-gray-700">Related Timelines</h3>
                    {task.timeline && task.timeline.length > 0 && (
@@ -1225,15 +1266,15 @@ const TaskDetailsModal = ({
                    </div>
                  ) : timelineDetails.length > 0 ? (
                    <>
-                     <div className="space-y-2">
+                  <div className="space-y-2">
                        {getPaginatedTimelines().map((timeline, index) => (
-                         <div key={index} className="bg-gray-50 p-2 rounded text-sm">
+                      <div key={index} className="bg-gray-50 p-2 rounded text-sm">
                            <div className="font-medium">{timeline.activity?.name || timeline.activity || 'Unknown Activity'}</div>
                            <div className="text-gray-500">{timeline.client?.name || timeline.client || 'Unknown Client'}</div>
                            <div className="flex items-center justify-between mt-1">
                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusStyling(timeline.status)}`}>
                                {timeline.status || 'Unknown Status'}
-                             </span>
+                        </span>
                              {timeline.priority && (
                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getPriorityStyling(timeline.priority)}`}>
                                  {timeline.priority}
@@ -1245,9 +1286,9 @@ const TaskDetailsModal = ({
                                {timeline.description}
                              </div>
                            )}
-                         </div>
-                       ))}
-                     </div>
+                      </div>
+                    ))}
+                  </div>
                      
                      {/* Timeline Pagination */}
                      {totalTimelinePages > 1 && (
@@ -1283,8 +1324,8 @@ const TaskDetailsModal = ({
                              Next
                            </button>
                          </nav>
-                       </div>
-                     )}
+                </div>
+              )}
                      
                      <div className="text-xs text-gray-500 text-center mt-2">
                        Showing {((timelineCurrentPage - 1) * timelinesPerPage) + 1} to {Math.min(timelineCurrentPage * timelinesPerPage, timelineDetails.length)} of {timelineDetails.length} timelines
@@ -1310,14 +1351,14 @@ const TaskDetailsModal = ({
                </div>
             </div>
 
-                         {/* Right Column - Status Update */}
-             <div className="space-y-4">
-               <div>
+            {/* Right Column - Status Update */}
+            <div className="space-y-4">
+              <div>
                  <h3 className="text-sm font-medium text-gray-700 mb-2">Status</h3>
-                 <div className="flex items-center gap-2 mb-4">
-                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusStyling(task.status)}`}>
-                     {task.status.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                   </span>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusStyling(task.status)}`}>
+                    {task.status.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                  </span>
                  </div>
                </div>
 
@@ -1325,59 +1366,59 @@ const TaskDetailsModal = ({
                  <h3 className="text-sm font-medium text-gray-700 mb-2">Priority</h3>
                  <div className="flex items-center gap-2 mb-4">
                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getPriorityStyling(task.priority)}`}>
-                     {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-                   </span>
-                 </div>
-               </div>
+                    {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                  </span>
+                </div>
+              </div>
 
-                             <div>
+              <div>
                  <h3 className="text-sm font-medium text-gray-700 mb-2">Update Status</h3>
-                 <div className="space-y-3">
-                   <div>
-                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                       New Status
-                     </label>
-                     <select
-                       className="form-select w-full"
-                       value={selectedStatus}
-                       onChange={(e) => setSelectedStatus(e.target.value as Task['status'])}
-                       disabled={isUpdating}
-                     >
-                       <option value="pending">Pending</option>
-                       <option value="ongoing">Ongoing</option>
-                       <option value="completed">Completed</option>
-                       <option value="on_hold">On Hold</option>
-                       <option value="cancelled">Cancelled</option>
-                       <option value="delayed">Delayed</option>
-                     </select>
-                   </div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      New Status
+                    </label>
+                    <select
+                      className="form-select w-full"
+                      value={selectedStatus}
+                      onChange={(e) => setSelectedStatus(e.target.value as Task['status'])}
+                      disabled={isUpdating}
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="ongoing">Ongoing</option>
+                      <option value="completed">Completed</option>
+                      <option value="on_hold">On Hold</option>
+                      <option value="cancelled">Cancelled</option>
+                      <option value="delayed">Delayed</option>
+                    </select>
+                  </div>
 
-                   <div>
-                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                       Remarks
-                     </label>
-                     <textarea
-                       className="form-control w-full"
-                       rows={3}
-                       placeholder="Add any additional notes or remarks..."
-                       value={remarks}
-                       onChange={(e) => setRemarks(e.target.value)}
-                       disabled={isUpdating}
-                     />
-                   </div>
-                 </div>
-               </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Remarks
+                    </label>
+                    <textarea
+                      className="form-control w-full"
+                      rows={3}
+                      placeholder="Add any additional notes or remarks..."
+                      value={remarks}
+                      onChange={(e) => setRemarks(e.target.value)}
+                      disabled={isUpdating}
+                    />
+                  </div>
+                </div>
+              </div>
 
-                             <div>
+                <div>
                  <h3 className="text-sm font-medium text-gray-700 mb-2">Attachments</h3>
                  {task.attachments && task.attachments.length > 0 ? (
-                   <div className="space-y-2">
-                     {task.attachments.map((attachment, index) => (
-                       <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                         <div className="flex items-center gap-2">
-                           <i className="ri-file-line text-gray-400"></i>
-                           <span className="text-sm font-medium">{attachment.fileName}</span>
-                         </div>
+                  <div className="space-y-2">
+                    {task.attachments.map((attachment, index) => (
+                      <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                        <div className="flex items-center gap-2">
+                          <i className="ri-file-line text-gray-400"></i>
+                          <span className="text-sm font-medium">{attachment.fileName}</span>
+                        </div>
                          <div className="flex items-center gap-2">
                            <button
                              onClick={() => handleDownloadAttachment(attachment)}
@@ -1386,25 +1427,25 @@ const TaskDetailsModal = ({
                            >
                              <i className="ri-download-line"></i>
                            </button>
-                           <a
-                             href={attachment.fileUrl}
-                             target="_blank"
-                             rel="noopener noreferrer"
+                        <a
+                          href={attachment.fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
                              className="text-primary hover:text-primary-dark text-sm p-1 hover:bg-primary/10 rounded"
                              title="View Attachment"
-                           >
-                             <i className="ri-external-link-line"></i>
-                           </a>
-                         </div>
-                       </div>
-                     ))}
-                   </div>
+                        >
+                          <i className="ri-external-link-line"></i>
+                        </a>
+                      </div>
+                      </div>
+                    ))}
+                  </div>
                  ) : (
                    <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded text-center">
                      <i className="ri-file-line text-gray-400 me-2"></i>
                      No attachments available
-                   </div>
-                 )}
+                </div>
+              )}
                </div>
 
               

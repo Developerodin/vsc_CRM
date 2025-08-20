@@ -369,12 +369,12 @@ const GroupsPage = () => {
           };
           
           return {
-            ID: group.id,
-            "Group Name": group.name,
-            "Number Of Clients": group.numberOfClients,
-            "Created Date": new Date(group.createdAt).toLocaleDateString(),
-            "Sort Order": group.sortOrder,
-            "Client IDs": group.clients?.map(client => client.id).join(',') || '',
+          ID: group.id,
+          "Group Name": group.name,
+          "Number Of Clients": group.numberOfClients,
+          "Created Date": new Date(group.createdAt).toLocaleDateString(),
+          "Sort Order": group.sortOrder,
+          "Client IDs": group.clients?.map(client => client.id).join(',') || '',
             "Total Tasks": taskStats.total,
             "Pending": taskStats.pending,
             "Completed": taskStats.completed,

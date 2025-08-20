@@ -65,10 +65,17 @@ interface ApiResponse {
 
 interface TaskStatisticsResponse {
   results: Array<{
-    clientId: string;
-    clientName: string;
-    clientEmail: string;
-    taskStatistics: TaskStats;
+    _id: string;
+    name: string;
+    email: string;
+    branch: string;
+    totalTasks: number;
+    pendingTasks: number;
+    ongoingTasks: number;
+    completedTasks: number;
+    on_holdTasks: number;
+    cancelledTasks: number;
+    delayedTasks: number;
   }>;
   pagination: {
     page: number;
@@ -183,12 +190,26 @@ const ClientsPage = () => {
 
       const data: TaskStatisticsResponse = await response.json();
       
+      console.log('Task Statistics API Response:', data);
+      
       // Create a map of clientId to taskStatistics
       const statsMap = new Map<string, TaskStats>();
       data.results.forEach(item => {
-        statsMap.set(item.clientId, item.taskStatistics);
+        const taskStats: TaskStats = {
+          pending: item.pendingTasks,
+          ongoing: item.ongoingTasks,
+          completed: item.completedTasks,
+          delayed: item.delayedTasks,
+          onHold: item.on_holdTasks,
+          cancelled: item.cancelledTasks,
+          total: item.totalTasks
+        };
+        
+        console.log(`Mapping client ${item._id} (${item.name}) to task stats:`, taskStats);
+        statsMap.set(item._id, taskStats);
       });
 
+      console.log('Final stats map:', statsMap);
       return statsMap;
     } catch (error) {
       console.error('Error fetching task statistics:', error);
@@ -204,7 +225,7 @@ const ClientsPage = () => {
     try {
       setIsLoading(true);
       setError(null);
-
+      
       const queryParams = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),
@@ -244,6 +265,9 @@ const ClientsPage = () => {
       const newTaskStatsMap = await fetchClientTaskStats();
       setTaskStatsMap(newTaskStatsMap);
       
+      console.log('Clients found:', data.results.length);
+      console.log('Task stats map keys:', Array.from(newTaskStatsMap.keys()));
+      
       // Merge clients with their task statistics
       const clientsWithTasks = data.results.map((client: Client) => {
         const taskStats = newTaskStatsMap.get(client.id) || {
@@ -255,7 +279,9 @@ const ClientsPage = () => {
           cancelled: 0,
           total: 0
         };
-        return { ...client, taskStats };
+        
+        console.log(`Client ${client.id} (${client.name}) - Task stats:`, taskStats);
+          return { ...client, taskStats };
       });
 
       setClients(clientsWithTasks);
@@ -887,7 +913,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                       {isSearching ? (
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
                       ) : (
-                        <i className="ri-search-line text-gray-400"></i>
+                      <i className="ri-search-line text-gray-400"></i>
                       )}
                     </div>
                     {searchQuery && (
