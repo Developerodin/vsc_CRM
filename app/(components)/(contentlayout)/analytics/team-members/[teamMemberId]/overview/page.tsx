@@ -366,6 +366,21 @@ const TeamMemberOverviewPage = () => {
     );
   }
 
+  // Ensure tasks has required properties
+  const safeTasks = {
+    byStatus: tasks.byStatus || {},
+    byPriority: tasks.byPriority || {},
+    recent: Array.isArray(tasks.recent) ? tasks.recent : [],
+    monthlyDistribution: Array.isArray(tasks.monthlyDistribution) ? tasks.monthlyDistribution : []
+  };
+
+  // Ensure clients has required properties
+  const safeClients = {
+    summary: Array.isArray(clients.summary) ? clients.summary : [],
+    timelines: Array.isArray(clients.timelines) ? clients.timelines : [],
+    timelineDetails: Array.isArray(clients.timelineDetails) ? clients.timelineDetails : []
+  };
+
   return (
     <div className="main-content">
       <Seo title={`${teamMember.name} - Team Member Overview`} />
@@ -583,8 +598,8 @@ const TeamMemberOverviewPage = () => {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Task Status Breakdown</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {tasks.byStatus && typeof tasks.byStatus === 'object' ? (
-                Object.entries(tasks.byStatus).map(([status, tasksArray]) => (
+              {safeTasks.byStatus && typeof safeTasks.byStatus === 'object' ? (
+                Object.entries(safeTasks.byStatus).map(([status, tasksArray]) => (
                   <div key={status} className="text-center p-4 bg-gray-50 rounded-lg">
                     <p className="text-sm font-medium text-gray-600 capitalize">{String(status)}</p>
                     <p className="text-2xl font-bold text-gray-900">{Array.isArray(tasksArray) ? tasksArray.length : 0}</p>
@@ -598,66 +613,6 @@ const TeamMemberOverviewPage = () => {
             </div>
           </div>
 
-          {/* Ongoing Tasks with Frequency Details */}
-          {tasks.byStatus?.ongoing && Array.isArray(tasks.byStatus.ongoing) && tasks.byStatus.ongoing.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Ongoing Tasks - Frequency Details</h3>
-              <div className="space-y-4">
-                {tasks.byStatus.ongoing.map((task) => (
-                  <div key={task.id} className="border border-gray-200 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <h4 className="font-medium text-gray-900">
-                          {task.timeline && task.timeline.length > 0 
-                            ? `${task.timeline[0].activity?.name || 'Unknown Activity'}`
-                            : 'Unknown Activity'
-                          }
-                        </h4>
-                        <p className="text-sm text-gray-600">
-                          {task.timeline && task.timeline.length > 0 
-                            ? `${task.timeline[0].client?.name || 'Unknown Client'}`
-                            : 'Unknown Client'
-                          }
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <span className={`px-2 py-1 text-xs rounded-full border ${getPriorityColor(String(task.priority || 'medium'))}`}>
-                          {String(task.priority || 'medium')}
-                        </span>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {task.timeline && task.timeline.length > 0 
-                            ? task.timeline[0].frequency || 'No frequency'
-                            : 'No frequency'
-                          }
-                        </p>
-                      </div>
-                    </div>
-                    {task.timeline && task.timeline.length > 0 && task.timeline[0].frequencyStatus && (
-                      <div>
-                        <p className="text-sm font-medium text-gray-700 mb-2">Frequency Status:</p>
-                        <div className="grid grid-cols-6 gap-2">
-                          {task.timeline[0].frequencyStatus.map((freqStatus, index) => (
-                            <div key={index} className="text-center">
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium ${
-                                freqStatus.status === 'completed' 
-                                  ? 'bg-green-100 text-green-800' 
-                                  : freqStatus.status === 'pending' 
-                                    ? 'bg-yellow-100 text-yellow-800'
-                                    : 'bg-gray-100 text-gray-800'
-                              }`}>
-                                {freqStatus.period.split('-')[1]}
-                              </div>
-                              <p className="text-xs text-gray-500 mt-1">{freqStatus.status}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Recent Tasks */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -666,59 +621,42 @@ const TeamMemberOverviewPage = () => {
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activity</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frequency</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Start Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {Array.isArray(tasks.recent) && tasks.recent.length > 0 ? (
-                    tasks.recent.flatMap((task) => {
-                      if (task.timeline && Array.isArray(task.timeline)) {
-                        return task.timeline.map((timelineItem, index) => (
-                          <tr key={`${task.id}-${index}`} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-gray-900">
-                                {timelineItem.client?.name || 'Unknown Client'}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {timelineItem.client?.email || 'No email'}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-gray-900">
-                                {timelineItem.activity?.name || 'Unknown Activity'}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`px-2 py-1 text-xs rounded-full border ${getStatusColor(String(timelineItem.status || 'unknown'))}`}>
-                                {String(timelineItem.status || 'unknown')}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`px-2 py-1 text-xs rounded-full border ${getPriorityColor(String(task.priority || 'medium'))}`}>
-                                {String(task.priority || 'medium')}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className="text-sm text-gray-900">
-                                {timelineItem.frequency || 'N/A'}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className="text-sm text-gray-900">{formatDate(String(timelineItem.startDate || new Date().toISOString()))}</span>
-                            </td>
-                          </tr>
-                        ));
-                      }
-                      return [];
-                    })
+                  {Array.isArray(safeTasks.recent) && safeTasks.recent.length > 0 ? (
+                    safeTasks.recent.map((task) => (
+                      <tr key={task.id || Math.random()} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">
+                            {task.timeline && task.timeline.length > 0 
+                              ? `${task.timeline[0].activity?.name || 'Unknown Activity'} - ${task.timeline[0].client?.name || 'Unknown Client'}`
+                              : 'No timeline info'
+                            }
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 text-xs rounded-full border ${getStatusColor(String(task.status || 'unknown'))}`}>
+                            {String(task.status || 'unknown')}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 text-xs rounded-full border ${getPriorityColor(String(task.priority || 'medium'))}`}>
+                            {String(task.priority || 'medium')}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="text-sm text-gray-900">{formatDate(String(task.startDate || new Date().toISOString()))}</span>
+                        </td>
+                      </tr>
+                    ))
                   ) : (
                     <tr>
-                      <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                      <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
                         No recent tasks available
                       </td>
                     </tr>
@@ -738,71 +676,159 @@ const TeamMemberOverviewPage = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="text-center">
                 <p className="text-sm font-medium text-gray-600">Total Clients</p>
-                <p className="text-3xl font-bold text-blue-600">{clients.summary?.length || 0}</p>
+                <p className="text-3xl font-bold text-blue-600">
+                  {(() => {
+                    const uniqueClients = new Set();
+                    if (safeTasks.byStatus && typeof safeTasks.byStatus === 'object') {
+                      Object.values(safeTasks.byStatus).forEach(tasksArray => {
+                        if (Array.isArray(tasksArray)) {
+                          tasksArray.forEach(task => {
+                            if (task.timeline && Array.isArray(task.timeline)) {
+                              task.timeline.forEach(timelineItem => {
+                                if (timelineItem.client?.id) {
+                                  uniqueClients.add(timelineItem.client.id);
+                                }
+                              });
+                            }
+                          });
+                        }
+                      });
+                    }
+                    return uniqueClients.size;
+                  })()}
+                </p>
               </div>
               <div className="text-center">
                 <p className="text-sm font-medium text-gray-600">Total Tasks</p>
                 <p className="text-3xl font-bold text-green-600">
-                  {clients.summary?.reduce((sum, client) => sum + client.totalTasks, 0) || 0}
+                  {(() => {
+                    let totalTasks = 0;
+                    if (safeTasks.byStatus && typeof safeTasks.byStatus === 'object') {
+                      Object.values(safeTasks.byStatus).forEach(tasksArray => {
+                        if (Array.isArray(tasksArray)) {
+                          totalTasks += tasksArray.length;
+                        }
+                      });
+                    }
+                    return totalTasks;
+                  })()}
                 </p>
               </div>
               <div className="text-center">
                 <p className="text-sm font-medium text-gray-600">Completed Tasks</p>
                 <p className="text-3xl font-bold text-purple-600">
-                  {clients.summary?.reduce((sum, client) => sum + client.tasksCompleted, 0) || 0}
+                  {(() => {
+                    let completedTasks = 0;
+                    if (safeTasks.byStatus && typeof safeTasks.byStatus === 'object') {
+                      Object.entries(safeTasks.byStatus).forEach(([status, tasksArray]) => {
+                        if (Array.isArray(tasksArray) && status.toLowerCase() === 'completed') {
+                          completedTasks += tasksArray.length;
+                        }
+                      });
+                    }
+                    return completedTasks;
+                  })()}
                 </p>
               </div>
             </div>
           </div>
 
           {/* Client Summary Table */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Client Summary</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client Name</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Tasks</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completed Tasks</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completion Rate</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {clients.summary && clients.summary.length > 0 ? (
-                    clients.summary.map((client) => (
-                      <tr key={client.clientId} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{client.clientName}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm text-gray-900">{client.totalTasks}</span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm text-gray-900">{client.tasksCompleted}</span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm text-gray-900">
-                            {client.totalTasks > 0 
-                              ? Math.round((client.tasksCompleted / client.totalTasks) * 100)
-                              : 0}%
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
+                      {/* Client Summary Table from Tasks Data */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Client Summary from Tasks</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
                     <tr>
-                      <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
-                        No client summary available
-                      </td>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Tasks</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completed Tasks</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ongoing Tasks</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pending Tasks</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {(() => {
+                      const clientSummary = new Map();
+                      
+                      if (safeTasks.byStatus && typeof safeTasks.byStatus === 'object') {
+                        Object.entries(safeTasks.byStatus).forEach(([status, tasksArray]) => {
+                          if (Array.isArray(tasksArray)) {
+                            tasksArray.forEach(task => {
+                              if (task.timeline && Array.isArray(task.timeline)) {
+                                task.timeline.forEach(timelineItem => {
+                                  if (timelineItem.client?.id && timelineItem.client?.name) {
+                                    const clientId = timelineItem.client.id;
+                                    if (!clientSummary.has(clientId)) {
+                                      clientSummary.set(clientId, {
+                                        id: clientId,
+                                        name: timelineItem.client.name,
+                                        email: timelineItem.client.email || 'No email',
+                                        totalTasks: 0,
+                                        completedTasks: 0,
+                                        ongoingTasks: 0,
+                                        pendingTasks: 0
+                                      });
+                                    }
+                                    
+                                    const client = clientSummary.get(clientId);
+                                    client.totalTasks++;
+                                    
+                                    if (status.toLowerCase() === 'completed') {
+                                      client.completedTasks++;
+                                    } else if (status.toLowerCase() === 'ongoing') {
+                                      client.ongoingTasks++;
+                                    } else if (status.toLowerCase() === 'pending') {
+                                      client.pendingTasks++;
+                                    }
+                                  }
+                                });
+                              }
+                            });
+                          }
+                        });
+                      }
+                      
+                      const clients = Array.from(clientSummary.values());
+                      
+                      if (clients.length > 0) {
+                        return clients.map((client) => (
+                          <tr key={client.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">{client.name}</div>
+                              <div className="text-xs text-gray-500">{client.email}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="text-sm text-gray-900">{client.totalTasks}</span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="text-sm text-gray-900">{client.completedTasks}</span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="text-sm text-gray-900">{client.ongoingTasks}</span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="text-sm text-gray-900">{client.pendingTasks}</span>
+                            </td>
+                          </tr>
+                        ));
+                      } else {
+                        return (
+                          <tr>
+                            <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                              No client data available from tasks
+                            </td>
+                          </tr>
+                        );
+                      }
+                    })()}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
 
-          {/* Client Task Details */}
+            {/* Client Task Details */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Client Task Details</h3>
             <div className="overflow-x-auto">
@@ -818,8 +844,8 @@ const TeamMemberOverviewPage = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {tasks.byStatus && typeof tasks.byStatus === 'object' ? (
-                    Object.entries(tasks.byStatus).flatMap(([status, tasksArray]) => {
+                  {safeTasks.byStatus && typeof safeTasks.byStatus === 'object' ? (
+                    Object.entries(safeTasks.byStatus).flatMap(([status, tasksArray]) => {
                       if (Array.isArray(tasksArray)) {
                         return tasksArray.flatMap((task) => {
                           if (task.timeline && Array.isArray(task.timeline)) {
@@ -885,53 +911,193 @@ const TeamMemberOverviewPage = () => {
           {/* Monthly Distribution Chart */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Monthly Task Distribution</h3>
-            {tasks.monthlyDistribution.length > 0 && ReactApexChart ? (
-              <ReactApexChart
-                options={{
-                  chart: {
-                    type: 'bar' as const,
-                    height: 300,
-                    toolbar: { show: false }
-                  },
-                  colors: ['#3B82F6', '#10B981'],
-                  dataLabels: { enabled: false },
-                  xaxis: {
-                    categories: tasks.monthlyDistribution.map(item => item.month),
-                    labels: { style: { colors: '#6B7280' } }
-                  },
-                  yaxis: {
-                    title: { text: 'Number of Tasks', style: { color: '#6B7280' } },
-                    labels: { style: { colors: '#6B7280' } }
-                  },
-                  legend: {
-                    position: 'top' as const,
-                    labels: { colors: '#374151' }
-                  },
-                  tooltip: {
-                    theme: 'light' as const
-                  }
-                }}
-                series={[
-                  {
-                    name: 'Completed Tasks',
-                    data: tasks.monthlyDistribution.map(item => item.completed)
-                  },
-                  {
-                    name: 'Total Tasks',
-                    data: tasks.monthlyDistribution.map(item => item.total)
-                  }
-                ]}
-                type="bar"
-                height={300}
-              />
-            ) : (
-              <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-                <div className="text-center">
-                  <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <i className="ri-bar-chart-line text-xl text-gray-400"></i>
+            {(() => {
+              // Comprehensive data validation and sanitization
+              if (!safeTasks.monthlyDistribution || !Array.isArray(safeTasks.monthlyDistribution) || safeTasks.monthlyDistribution.length === 0) {
+                return (
+                  <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
+                    <div className="text-center">
+                      <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i className="ri-bar-chart-line text-xl text-gray-400"></i>
+                      </div>
+                      <p className="text-gray-500">No performance data available</p>
+                    </div>
                   </div>
-                  <p className="text-gray-500">No performance data available</p>
+                );
+              }
+
+              // Sanitize and validate data
+              const sanitizedData = safeTasks.monthlyDistribution
+                .filter(item => 
+                  item && 
+                  typeof item === 'object' && 
+                  item.month && 
+                  typeof item.month === 'string' &&
+                  item.month.trim() !== '' &&
+                  (typeof item.completed === 'number' || typeof item.completed === 'string') &&
+                  (typeof item.total === 'number' || typeof item.total === 'string')
+                )
+                .map(item => ({
+                  month: String(item.month).trim(),
+                  completed: Math.max(0, Number(item.completed) || 0),
+                  total: Math.max(0, Number(item.total) || 0)
+                }))
+                .filter(item => item.month && item.completed >= 0 && item.total >= 0);
+
+              if (sanitizedData.length === 0) {
+                return (
+                  <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
+                    <div className="text-center">
+                      <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i className="ri-error-warning-line text-xl text-gray-400"></i>
+                      </div>
+                      <p className="text-gray-500">Invalid chart data format</p>
+                    </div>
+                  </div>
+                );
+              }
+
+              // Ensure we have valid chart data
+              const categories = sanitizedData.map(item => item.month);
+              const completedData = sanitizedData.map(item => item.completed);
+              const totalData = sanitizedData.map(item => item.total);
+
+              // Additional validation for chart data
+              if (categories.length === 0 || completedData.some(val => val === undefined || val === null) || totalData.some(val => val === undefined || val === null)) {
+                return (
+                  <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
+                    <div className="text-center">
+                      <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i className="ri-error-warning-line text-xl text-gray-400"></i>
+                      </div>
+                      <p className="text-gray-500">Chart data validation failed</p>
+                    </div>
+                  </div>
+                );
+              }
+
+              return ReactApexChart ? (
+                <ReactApexChart
+                  options={{
+                    chart: {
+                      type: 'bar' as const,
+                      height: 300,
+                      toolbar: { show: false },
+                      animations: {
+                        enabled: false // Disable animations to prevent errors
+                      }
+                    },
+                    colors: ['#3B82F6', '#10B981'],
+                    dataLabels: { enabled: false },
+                    xaxis: {
+                      categories: categories,
+                      labels: { 
+                        style: { colors: '#6B7280' },
+                        trim: true,
+                        maxHeight: 60
+                      }
+                    },
+                    yaxis: {
+                      title: { text: 'Number of Tasks', style: { color: '#6B7280' } },
+                      labels: { 
+                        style: { colors: '#6B7280' },
+                        formatter: function(val) {
+                          return String(Math.round(Number(val) || 0));
+                        }
+                      }
+                    },
+                    legend: {
+                      position: 'top' as const,
+                      labels: { colors: '#374151' }
+                    },
+                    tooltip: {
+                      theme: 'light' as const,
+                      y: {
+                        formatter: function(val) {
+                          return String(Math.round(Number(val) || 0));
+                        }
+                      }
+                    },
+                    plotOptions: {
+                      bar: {
+                        borderRadius: 4,
+                        dataLabels: {
+                          position: 'top'
+                        }
+                      }
+                    },
+                    responsive: [{
+                      breakpoint: 480,
+                      options: {
+                        chart: {
+                          height: 200
+                        },
+                        legend: {
+                          position: 'bottom'
+                        }
+                      }
+                    }]
+                  }}
+                  series={[
+                    {
+                      name: 'Completed Tasks',
+                      data: completedData
+                    },
+                    {
+                      name: 'Total Tasks',
+                      data: totalData
+                    }
+                  ]}
+                  type="bar"
+                  height={300}
+                />
+              ) : (
+                <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
+                  <div className="text-center">
+                    <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <i className="ri-loader-4-line text-xl text-gray-400 animate-spin"></i>
+                    </div>
+                    <p className="text-gray-500">Loading chart...</p>
+                  </div>
                 </div>
+              );
+            })()}
+          </div>
+
+          {/* Task Priority Distribution */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Task Priority Distribution</h3>
+            {safeTasks.byPriority && typeof safeTasks.byPriority === 'object' && Object.keys(safeTasks.byPriority).length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {Object.entries(safeTasks.byPriority).map(([priority, count]) => (
+                  <div key={priority} className="text-center p-4 bg-gray-50 rounded-lg">
+                    <p className="text-sm font-medium text-gray-600 capitalize">{priority}</p>
+                    <p className="text-2xl font-bold text-gray-900">{count}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-500">No priority distribution data available</p>
+              </div>
+            )}
+          </div>
+
+          {/* Task Status Summary */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Task Status Summary</h3>
+            {safeTasks.byStatus && typeof safeTasks.byStatus === 'object' && Object.keys(safeTasks.byStatus).length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {Object.entries(safeTasks.byStatus).map(([status, tasksArray]) => (
+                  <div key={status} className="text-center p-4 bg-gray-50 rounded-lg">
+                    <p className="text-sm font-medium text-gray-600 capitalize">{status}</p>
+                    <p className="text-2xl font-bold text-gray-900">{Array.isArray(tasksArray) ? tasksArray.length : 0}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-500">No status distribution data available</p>
               </div>
             )}
           </div>
