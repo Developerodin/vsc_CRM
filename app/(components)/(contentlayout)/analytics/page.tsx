@@ -440,7 +440,7 @@ const AnalyticsPage = () => {
       {/* Page Header */}
       <div className="box !bg-transparent border-0 shadow-none mb-6">
         <div className="box-header">
-          <h1 className="box-title text-3xl font-bold text-gray-900">Team Analytics Dashboard</h1>
+          <h1 className="box-title text-3xl font-bold text-gray-900">Analytics Dashboard</h1>
           <p className="text-gray-600 mt-1">Key performance metrics and team insights</p>
         </div>
       </div>
@@ -619,7 +619,7 @@ const AnalyticsPage = () => {
       </div> */}
 
       {/* Top Team Members by Completion */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
+      {/* <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold text-gray-900">Top Team Members by Branch</h2>
           {topByCompletion?.summary && (
@@ -628,9 +628,9 @@ const AnalyticsPage = () => {
               <p className="text-sm text-gray-600">Average: <span className="font-semibold text-green-600">{topByCompletion.summary.averageCompletion}%</span></p>
             </div>
           )}
-        </div>
+        </div> */}
 
-        {topCompletionLoading ? (
+        {/* {topCompletionLoading ? (
           <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
             <div className="text-center">
               <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -704,7 +704,7 @@ const AnalyticsPage = () => {
             </div>
           </div>
         )}
-      </div>
+      </div> */}
 
       {/* Top Team Members by Branch */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
