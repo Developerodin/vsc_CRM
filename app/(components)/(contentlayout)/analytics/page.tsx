@@ -140,6 +140,91 @@ interface GlobalTeamMembersResponse {
   };
 }
 
+interface Client {
+  _id: string;
+  name: string;
+  email: string;
+  email2?: string;
+  phone: string;
+  address: string;
+  district: string;
+  state: string;
+  country: string;
+  pan: string;
+  dob: string | null;
+  businessType: string;
+  gstNumber: string;
+  tanNumber: string;
+  cinNumber: string;
+  udyamNumber: string;
+  iecCode: string;
+  entityType: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+  branch: {
+    _id: string;
+    name: string;
+    address: string;
+    city: string;
+    state: string;
+    country: string;
+    pinCode: string;
+  };
+  activities: {
+    assigned: Array<{
+      _id: string;
+      activity: {
+        _id: string;
+        name: string;
+      };
+      assignedDate: string;
+      notes: string;
+    }>;
+    total: number;
+    summary: Array<{
+      id: string;
+      name: string;
+    }>;
+  };
+  teamMembers: {
+    total: number;
+    members: Array<{
+      _id: string;
+      name: string;
+      email: string;
+      phone: string;
+    }>;
+  };
+  tasks: {
+    total: number;
+    byStatus: {
+      completed: number;
+      pending: number;
+      ongoing: number;
+      on_hold: number;
+      delayed: number;
+      cancelled: number;
+    };
+    status: {
+      pending: number;
+      ongoing: number;
+      completed: number;
+      on_hold: number;
+      delayed: number;
+      cancelled: number;
+    };
+  };
+  timelines: {
+    total: number;
+    summary: Array<{
+      id: string;
+      client: string;
+    }>;
+    hasTimelines: boolean;
+  };
+}
+
 
 
 const AnalyticsPage = () => {
@@ -149,7 +234,7 @@ const AnalyticsPage = () => {
   const [topByCompletion, setTopByCompletion] = useState<TopByCompletionResponse['data'] | null>(null);
   const [topByBranch, setTopByBranch] = useState<TopByBranchResponse['data'] | null>(null);
   const [globalTeamMembers, setGlobalTeamMembers] = useState<GlobalTeamMembersResponse['data'] | null>(null);
-  const [clients, setClients] = useState<any[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [trendsLoading, setTrendsLoading] = useState(true);
   const [topCompletionLoading, setTopCompletionLoading] = useState(true);
@@ -299,14 +384,14 @@ const AnalyticsPage = () => {
   const fetchClients = async () => {
     try {
       setClientsLoading(true);
-      const response = await axios.get(`${Base_url}clients?page=1&limit=10`, {
+      const response = await axios.get(`${Base_url}analytics/clients/table?page=1&limit=5`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
       
       console.log('Clients API response:', response.data);
-      setClients(response.data.results || []);
+      setClients(response.data.data?.results || []);
     } catch (err) {
       console.error('Error fetching clients:', err);
     } finally {
@@ -1108,12 +1193,12 @@ const AnalyticsPage = () => {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold text-gray-900">Team Members Overview</h2>
-          {globalTeamMembers && (
-            <div className="text-right">
-              <p className="text-sm text-gray-600">Total Members: <span className="font-semibold text-blue-600">{globalTeamMembers.total}</span></p>
-              <p className="text-sm text-gray-600">Showing: <span className="font-semibold text-green-600">{globalTeamMembers.teamMembers.length}</span> of {globalTeamMembers.total}</p>
-            </div>
-          )}
+          <button
+            onClick={() => router.push('/users')}
+            className="ti-btn ti-btn-primary"
+          >
+            Explore All Members
+          </button>
         </div>
 
         {globalTeamLoading ? (
@@ -1227,10 +1312,12 @@ const AnalyticsPage = () => {
        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
          <div className="flex items-center justify-between mb-6">
            <h2 className="text-xl font-semibold text-gray-900">Clients Overview</h2>
-           <div className="text-right">
-             <p className="text-sm text-gray-600">Total Clients: <span className="font-semibold text-blue-600">{clients.length}</span></p>
-             <p className="text-sm text-gray-600">Showing: <span className="font-semibold text-green-600">{clients.length}</span> of {clients.length}</p>
-           </div>
+           <button
+             onClick={() => router.push('/analytics/clients')}
+             className="ti-btn ti-btn-primary"
+           >
+             Explore All Clients
+           </button>
          </div>
 
          {clientsLoading ? (
@@ -1242,74 +1329,85 @@ const AnalyticsPage = () => {
                <p className="text-gray-500">Loading clients...</p>
              </div>
            </div>
-         ) : clients.length > 0 ? (
+         ) : clients && clients.length > 0 ? (
            <div className="overflow-x-auto">
              <table className="w-full">
                <thead className="bg-gray-50">
                  <tr>
                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                     Client
+                     Personal Details
                    </th>
                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                     Contact
+                     Activity
                    </th>
                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                     Business Type
+                     Team Member
                    </th>
                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                     Entity Type
-                   </th>
-                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                     Branch
-                   </th>
-                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                     Status
+                     Task Status
                    </th>
                  </tr>
                </thead>
                <tbody className="bg-white divide-y divide-gray-200">
                  {clients.map((client) => (
-                   <tr key={client.id} className="hover:bg-gray-50">
+                   <tr key={client._id} className="hover:bg-gray-50">
                      <td className="px-6 py-4 whitespace-nowrap">
                        <div className="flex items-center">
                          <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
-                           {client.name.charAt(0).toUpperCase()}
+                           {client.name?.charAt(0)?.toUpperCase() || 'C'}
                          </div>
                          <div className="ml-4">
-                           <button
-                             onClick={() => router.push(`/analytics/clients/${client.id}/overview`)}
-                             className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
-                           >
-                             {client.name}
-                           </button>
+                           <div className="text-sm font-medium text-gray-900">{client.name || 'N/A'}</div>
+                           <div className="text-sm text-gray-500">{client.email || 'N/A'}</div>
                          </div>
                        </div>
                      </td>
                      <td className="px-6 py-4 whitespace-nowrap">
-                       <div className="text-sm text-gray-900">{client.email}</div>
-                       <div className="text-sm text-gray-500">{client.phone}</div>
+                       <div className="text-sm text-gray-900">
+                         {client.activities?.summary?.map((activity: any) => activity.name).join(', ') || 'No activities'}
+                       </div>
                      </td>
                      <td className="px-6 py-4 whitespace-nowrap">
-                       <span className={`px-2 py-1 text-xs rounded-full ${
-                         client.businessType ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
-                       }`}>
-                         {client.businessType || 'N/A'}
-                       </span>
+                       <div className="text-sm text-gray-900">
+                         {client.teamMembers?.members?.map((member: any) => member.name).join(', ') || 'No team members'}
+                       </div>
                      </td>
                      <td className="px-6 py-4 whitespace-nowrap">
-                       <span className={`px-2 py-1 text-xs rounded-full ${
-                         client.entityType ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
-                       }`}>
-                         {client.entityType || 'N/A'}
-                       </span>
-                     </td>
-                     <td className="px-6 py-4 whitespace-nowrap">
-                       <span className="text-sm text-gray-900">{client.branch || 'N/A'}</span>
-                     </td>
-                     <td className="px-6 py-4 whitespace-nowrap">
-                       <span className="px-2 py-1 text-xs rounded-full border bg-green-100 text-green-800 border-green-200">
-                         Active
-                       </span>
+                       <div className="text-sm text-gray-900">
+                         {client.tasks?.status?.pending > 0 && (
+                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-warning text-black mr-1">
+                             {client.tasks.status.pending} Pending
+                           </span>
+                         )}
+                         {client.tasks?.status?.ongoing > 0 && (
+                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary text-black mr-1">
+                             {client.tasks.status.ongoing} Ongoing
+                           </span>
+                         )}
+                         {client.tasks?.status?.completed > 0 && (
+                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success text-black mr-1">
+                             {client.tasks.status.completed} Completed
+                           </span>
+                         )}
+                         {client.tasks?.status?.on_hold > 0 && (
+                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 mr-1">
+                             {client.tasks.status.on_hold} On Hold
+                           </span>
+                         )}
+                         {client.tasks?.status?.delayed > 0 && (
+                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-danger text-black mr-1">
+                             {client.tasks.status.delayed} Delayed
+                           </span>
+                         )}
+                         {client.tasks?.status?.cancelled > 0 && (
+                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 mr-1">
+                             {client.tasks.status.cancelled} Cancelled
+                           </span>
+                         )}
+                         {(!client.tasks || client.tasks.total === 0) && (
+                           <span className="text-gray-400 text-xs">No tasks</span>
+                         )}
+                       </div>
                      </td>
                    </tr>
                  ))}
@@ -1322,7 +1420,9 @@ const AnalyticsPage = () => {
                <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
                  <i className="ri-folder-line text-xl text-gray-400"></i>
                </div>
-               <p className="text-gray-500">No clients data available</p>
+               <p className="text-gray-500">
+                 {clientsLoading ? 'Loading clients...' : 'No clients data available'}
+               </p>
              </div>
            </div>
          )}
