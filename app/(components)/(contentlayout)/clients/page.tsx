@@ -6,6 +6,7 @@ import { toast, Toaster } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { Base_url } from "@/app/api/config/BaseUrl";
 import { useSelectedBranchId } from "@/shared/contextapi";
+import { useRouter } from "next/navigation";
 
 interface Client {
   id: string;
@@ -113,6 +114,7 @@ interface ExcelRow {
 }
 
 const ClientsPage = () => {
+  const router = useRouter();
   const selectedBranchId = useSelectedBranchId();
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
@@ -1410,7 +1412,12 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                             </td>
                             <td>
                               <div className="flex flex-col">
-                                <div className="font-medium text-gray-900">{client.name}</div>
+                                <button
+                                  onClick={() => router.push(`/analytics/clients/${client.id}/overview`)}
+                                  className="font-medium text-gray-900 hover:text-blue-600 hover:underline cursor-pointer text-left"
+                                >
+                                  {client.name}
+                                </button>
                                 <div className="text-sm text-gray-500 flex items-center">
                                   <i className="ri-mail-line mr-1 text-gray-400"></i>
                                   {client.email}

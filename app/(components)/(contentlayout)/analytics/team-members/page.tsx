@@ -445,9 +445,6 @@ const AnalyticsTeamMembersPage = () => {
                           >
                             <td>
                               <div className="flex items-center">
-                                <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
-                                  {member.name?.charAt(0)?.toUpperCase() || 'T'}
-                                </div>
                                 <div className="ml-4">
                                   <button
                                     onClick={() => router.push(`/analytics/team-members/${member._id}/overview`)}

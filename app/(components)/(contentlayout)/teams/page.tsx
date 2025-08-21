@@ -6,6 +6,7 @@ import { toast, Toaster } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import axios from "axios";
 import { Base_url } from "@/app/api/config/BaseUrl";
+import { useRouter } from "next/navigation";
 
 interface Branch {
   id: string;
@@ -67,6 +68,7 @@ const formatDate = (dateString: string) => {
 };
 
 const TeamsPage = () => {
+  const router = useRouter();
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
   // const [searchQuery, setSearchQuery] = useState("");
@@ -732,7 +734,12 @@ const TeamsPage = () => {
                             </td>
                             <td>
                               <div className="flex flex-col">
-                                <div className="font-medium text-gray-900">{teamMember.name}</div>
+                                <button
+                                  onClick={() => router.push(`/analytics/team-members/${teamMember.id}/overview`)}
+                                  className="font-medium text-gray-900 hover:text-blue-600 hover:underline cursor-pointer text-left"
+                                >
+                                  {teamMember.name}
+                                </button>
                                 <div className="text-sm text-gray-500">{teamMember.email}</div>
                                 <div className="text-sm text-gray-500">{teamMember.phone}</div>
                               </div>
