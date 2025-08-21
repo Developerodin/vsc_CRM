@@ -111,15 +111,82 @@ interface TopByCompletionResponse {
 }
 
 interface GlobalTeamMember {
-  id: string;
+  _id: string;
   name: string;
   email: string;
   phone: string;
+  address: string;
+  city: string;
+  state: string;
+  country: string;
+  pinCode: string;
   branch: {
-    id: string;
+    _id: string;
     name: string;
+    address: string;
+    city: string;
+    state: string;
+    country: string;
+    pinCode: string;
   };
-  skills: Activity[];
+  skills: {
+    total: number;
+    list: Activity[];
+  };
+  tasks: {
+    total: number;
+    byStatus: {
+      completed: number;
+      pending: number;
+      ongoing: number;
+      on_hold: number;
+      delayed: number;
+      cancelled: number;
+    };
+    status: {
+      pending: number;
+      ongoing: number;
+      completed: number;
+      on_hold: number;
+      delayed: number;
+      cancelled: number;
+    };
+    completionRate: number;
+  };
+  timelines: {
+    total: number;
+    summary: Array<{
+      _id: string;
+      status: string;
+      startDate: string;
+      endDate: string;
+      frequency: string;
+      client: {
+        _id: string;
+        name: string;
+        email: string;
+        phone: string;
+      };
+      activity: {
+        _id: string;
+        name: string;
+      };
+    }>;
+  };
+  clients: {
+    total: number;
+    list: Array<{
+      _id: string;
+      name: string;
+      email: string;
+      phone: string;
+      address: string;
+      state: string;
+      country: string;
+      businessType: string;
+      entityType: string;
+    }>;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -249,6 +316,8 @@ const AnalyticsPage = () => {
     startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0]
   });
+  const [selectedMemberForClients, setSelectedMemberForClients] = useState<any>(null);
+  const [showClientsModal, setShowClientsModal] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
@@ -355,7 +424,7 @@ const AnalyticsPage = () => {
   const fetchGlobalTeamMembers = async () => {
     try {
       setGlobalTeamLoading(true);
-      const response = await axios.get(`${Base_url}team-members?page=1&limit=5`, {
+      const response = await axios.get(`${Base_url}analytics/team-members/table?page=1&limit=5`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -366,10 +435,10 @@ const AnalyticsPage = () => {
       // The API returns data in response.data.results, not response.data.data
       const apiData = response.data;
       const transformedData = {
-        teamMembers: apiData.results || [],
-        total: apiData.totalResults || 0,
-        page: apiData.page || 1,
-        limit: apiData.limit || 5
+        teamMembers: apiData.data?.results || [],
+        total: apiData.data?.totalResults || 0,
+        page: apiData.data?.page || 1,
+        limit: apiData.data?.limit || 5
       };
       
       console.log('Transformed data:', transformedData);
@@ -1194,7 +1263,7 @@ const AnalyticsPage = () => {
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold text-gray-900">Team Members Overview</h2>
           <button
-            onClick={() => router.push('/users')}
+            onClick={() => router.push('/analytics/team-members')}
             className="ti-btn ti-btn-primary"
           >
             Explore All Members
@@ -1219,34 +1288,34 @@ const AnalyticsPage = () => {
                     Team Member
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Contact
+                    Personal Details
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Branch
+                    Task Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Activities
+                    Skills
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
+                    Activity
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Joined
+                    Clients
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {globalTeamMembers.teamMembers.map((member) => (
-                  <tr key={member.id} className="hover:bg-gray-50">
+                  <tr key={member._id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
-                          {member.name.charAt(0).toUpperCase()}
+                          {member.name?.charAt(0)?.toUpperCase() || 'T'}
                         </div>
                         <div className="ml-4">
                           <button
-                            onClick={() => router.push(`/analytics/team-members/${member.id}/overview`)}
-                            className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                            onClick={() => router.push(`/analytics/team-members/${member._id}/overview`)}
+                            className="text-sm font-medium text-gray-900 hover:text-blue-600 hover:underline cursor-pointer"
                           >
                             {member.name}
                           </button>
@@ -1256,40 +1325,67 @@ const AnalyticsPage = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">{member.email}</div>
                       <div className="text-sm text-gray-500">{member.phone}</div>
+                      <div className="text-sm text-gray-500">{member.city}, {member.state}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900">{member.branch.name}</span>
+                      <div className="text-sm text-gray-900">
+                        {member.tasks?.status?.pending > 0 && (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-warning text-black mr-1">
+                            {member.tasks.status.pending} Pending
+                          </span>
+                        )}
+                        {member.tasks?.status?.ongoing > 0 && (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary text-black mr-1">
+                            {member.tasks.status.ongoing} Ongoing
+                          </span>
+                        )}
+                        {member.tasks?.status?.completed > 0 && (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success text-black mr-1">
+                            {member.tasks.status.completed} Completed
+                          </span>
+                        )}
+                        {member.tasks?.status?.on_hold > 0 && (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 mr-1">
+                            {member.tasks.status.on_hold} On Hold
+                          </span>
+                        )}
+                        {(!member.tasks || member.tasks.total === 0) && (
+                          <span className="text-gray-400 text-xs">No tasks</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-wrap gap-1">
-                        {member.skills.slice(0, 3).map((skill, index) => (
+                        {member.skills?.list?.slice(0, 3).map((skill: any) => (
                           <span
-                            key={skill.id}
+                            key={skill._id}
                             className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full"
                           >
                             {skill.name}
                           </span>
                         ))}
-                        {member.skills.length > 3 && (
+                        {member.skills?.list && member.skills.list.length > 3 && (
                           <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
-                            +{member.skills.length - 3}
+                            +{member.skills.list.length - 3}
                           </span>
                         )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-1 text-xs rounded-full border bg-green-100 text-green-800 border-green-200">
-                        Active
-                      </span>
+                      <div className="text-sm text-gray-900">
+                        {member.timelines?.total || 0} Timelines
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {member.timelines?.summary?.slice(0, 2).map((timeline: any) => timeline.activity?.name).join(', ') || 'No activities'}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900">
-                        {new Date(member.createdAt).toLocaleDateString('en-US', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric'
-                        })}
-                      </span>
+                      <button
+                        onClick={() => setSelectedMemberForClients(member)}
+                        className="text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                      >
+                        {member.clients?.total || 0} Clients
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -1353,11 +1449,16 @@ const AnalyticsPage = () => {
                    <tr key={client._id} className="hover:bg-gray-50">
                      <td className="px-6 py-4 whitespace-nowrap">
                        <div className="flex items-center">
-                         <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
+                         {/* <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
                            {client.name?.charAt(0)?.toUpperCase() || 'C'}
-                         </div>
+                         </div> */}
                          <div className="ml-4">
-                           <div className="text-sm font-medium text-gray-900">{client.name || 'N/A'}</div>
+                           <button
+                             onClick={() => router.push(`/analytics/clients/${client._id}/overview`)}
+                             className="text-sm font-medium text-gray-900 hover:text-blue-600 hover:underline cursor-pointer"
+                           >
+                             {client.name || 'N/A'}
+                           </button>
                            <div className="text-sm text-gray-500">{client.email || 'N/A'}</div>
                          </div>
                        </div>
@@ -1427,6 +1528,72 @@ const AnalyticsPage = () => {
            </div>
          )}
        </div>
+
+       {/* Clients Modal */}
+       {showClientsModal && selectedMemberForClients && (
+         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+           <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+             <div className="mt-3">
+               <div className="flex items-center justify-between mb-4">
+                 <h3 className="text-lg font-medium text-gray-900">
+                   Clients for {selectedMemberForClients.name}
+                 </h3>
+                 <button
+                   onClick={() => {
+                     setShowClientsModal(false);
+                     setSelectedMemberForClients(null);
+                   }}
+                   className="text-gray-400 hover:text-gray-600"
+                 >
+                   <i className="ri-close-line text-xl"></i>
+                 </button>
+               </div>
+               
+               <div className="max-h-96 overflow-y-auto">
+                 {selectedMemberForClients.clients?.list && selectedMemberForClients.clients.list.length > 0 ? (
+                   <div className="space-y-3">
+                     {selectedMemberForClients.clients.list.map((client: any) => (
+                       <div key={client._id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+                         <div className="flex items-center justify-between">
+                           <div>
+                             <h4 className="font-medium text-gray-900">{client.name}</h4>
+                             <p className="text-sm text-gray-500">{client.email}</p>
+                             <p className="text-sm text-gray-500">{client.phone}</p>
+                           </div>
+                           <div className="text-right">
+                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                               {client.businessType || 'N/A'}
+                             </span>
+                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 ml-2">
+                               {client.entityType || 'N/A'}
+                             </span>
+                           </div>
+                         </div>
+                       </div>
+                     ))}
+                   </div>
+                 ) : (
+                   <div className="text-center py-8">
+                     <p className="text-gray-500">No clients found for this team member.</p>
+                   </div>
+                 )}
+               </div>
+               
+               <div className="mt-4 flex justify-end">
+                 <button
+                   onClick={() => {
+                     setShowClientsModal(false);
+                     setSelectedMemberForClients(null);
+                   }}
+                   className="ti-btn ti-btn-secondary"
+                 >
+                   Close
+                 </button>
+               </div>
+             </div>
+           </div>
+         </div>
+       )}
      </div>
    );
  };

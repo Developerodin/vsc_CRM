@@ -836,7 +836,12 @@ const AnalyticsClientsPage = () => {
                           >
                             <td>
                               <div className="flex flex-col">
-                                <div className="font-medium text-gray-900">{client.name}</div>
+                                <button
+                                  onClick={() => router.push(`/analytics/clients/${client._id}/overview`)}
+                                  className="font-medium text-gray-900 hover:text-blue-600 hover:underline cursor-pointer text-left"
+                                >
+                                  {client.name}
+                                </button>
                                 <div className="text-sm text-gray-500 flex items-center">
                                   <i className="ri-mail-line mr-1 text-gray-400"></i>
                                   {client.email}
