@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import Seo from "@/shared/layout-components/seo/seo";
 import Link from "next/link";
 import { toast, Toaster } from "react-hot-toast";
+import * as XLSX from "xlsx";
 import { Base_url } from "@/app/api/config/BaseUrl";
 import { useRouter } from "next/navigation";
 
@@ -270,6 +271,92 @@ const AnalyticsClientsPage = () => {
     );
   };
 
+  // Export function
+  const handleExport = async () => {
+    try {
+      // Export all clients from the current filtered results
+      const exportData = clients.map((client: Client) => ({
+        ID: client._id,
+        "Client Name": client.name,
+        "Client Phone": client.phone,
+        "Client Email": client.email,
+        "Client Email 2": client.email2,
+        "Client Address": client.address,
+        "Client District": client.district,
+        "Client State": client.state,
+        "Client Country": client.country,
+        "Branch": client.branch?.name || "",
+        "PAN": client.pan,
+        "Date of Birth": client.dob,
+        "Sort Order": client.sortOrder,
+        "Business Type": client.businessType,
+        "Entity Type": client.entityType,
+        "GST Number": client.gstNumber,
+        "TAN Number": client.tanNumber,
+        "CIN Number": client.cinNumber,
+        "Udyam Number": client.udyamNumber,
+        "IEC Code": client.iecCode,
+        "Activities": client.activities?.summary?.map((activity: any) => activity.name).join(', ') || "",
+        "Team Members": client.teamMembers?.members?.map((member: any) => member.name).join(', ') || "",
+        "Total Tasks": client.tasks?.total || 0,
+        "Pending Tasks": client.tasks?.status?.pending || 0,
+        "Ongoing Tasks": client.tasks?.status?.ongoing || 0,
+        "Completed Tasks": client.tasks?.status?.completed || 0,
+        "On Hold Tasks": client.tasks?.status?.on_hold || 0,
+        "Delayed Tasks": client.tasks?.status?.delayed || 0,
+        "Cancelled Tasks": client.tasks?.status?.cancelled || 0,
+        "Created At": client.createdAt,
+        "Updated At": client.updatedAt
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      
+      // Set column widths
+      ws["!cols"] = [
+        { wch: 20 }, // ID
+        { wch: 30 }, // Name
+        { wch: 20 }, // Phone
+        { wch: 30 }, // Email
+        { wch: 30 }, // Email 2
+        { wch: 40 }, // Address
+        { wch: 20 }, // District
+        { wch: 20 }, // State
+        { wch: 20 }, // Country
+        { wch: 20 }, // Branch
+        { wch: 15 }, // PAN
+        { wch: 15 }, // Date of Birth
+        { wch: 10 }, // Sort Order
+        { wch: 25 }, // Business Type
+        { wch: 20 }, // Entity Type
+        { wch: 20 }, // GST Number
+        { wch: 20 }, // TAN Number
+        { wch: 20 }, // CIN Number
+        { wch: 20 }, // Udyam Number
+        { wch: 20 }, // IEC Code
+        { wch: 40 }, // Activities
+        { wch: 40 }, // Team Members
+        { wch: 15 }, // Total Tasks
+        { wch: 15 }, // Pending Tasks
+        { wch: 15 }, // Ongoing Tasks
+        { wch: 15 }, // Completed Tasks
+        { wch: 15 }, // On Hold Tasks
+        { wch: 15 }, // Delayed Tasks
+        { wch: 15 }, // Cancelled Tasks
+        { wch: 20 }, // Created At
+        { wch: 20 }  // Updated At
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Analytics Clients");
+      const fileName = `analytics_clients_${new Date().toISOString().split("T")[0]}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      toast.success("Analytics clients data exported successfully");
+    } catch (error) {
+      console.error("Error exporting analytics clients:", error);
+      toast.error("Failed to export analytics clients");
+    }
+  };
+
   // Condensed pagination helper
   function getPagination(currentPage: number, totalPages: number) {
     const pages = [];
@@ -310,9 +397,12 @@ const AnalyticsClientsPage = () => {
                   <i className="ri-arrow-left-line me-2"></i>
                   Back to Analytics
                 </Link>
-                <Link href="/clients/add" className="ti-btn ti-btn-primary">
-                  <i className="ri-add-line me-2"></i> Add New Client
-                </Link>
+                <button
+                  onClick={handleExport}
+                  className="ti-btn ti-btn-primary"
+                >
+                  <i className="ri-upload-2-line me-2"></i> Export
+                </button>
               </div>
             </div>
           </div>
@@ -916,13 +1006,12 @@ const AnalyticsClientsPage = () => {
                               <p className="text-gray-500 text-center mb-6">
                                 Start by adding your first client.
                               </p>
-                              <Link
-                                href="/clients/add"
+                              <button
+                                onClick={handleExport}
                                 className="ti-btn ti-btn-primary"
                               >
-                                <i className="ri-add-line mr-2"></i> Add First
-                                Client
-                              </Link>
+                                <i className="ri-upload-2-line mr-2"></i> Export Data
+                              </button>
                             </div>
                           </td>
                         </tr>

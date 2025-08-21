@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import Seo from "@/shared/layout-components/seo/seo";
 import Link from "next/link";
 import { toast, Toaster } from "react-hot-toast";
+import * as XLSX from "xlsx";
 import { Base_url } from "@/app/api/config/BaseUrl";
 import { useRouter } from "next/navigation";
 
@@ -104,6 +105,98 @@ const AnalyticsTeamMembersPage = () => {
     fetchTeamMembers(1, itemsPerPage);
   }, [filters]);
 
+  // Export function
+  const handleExport = async () => {
+    try {
+      // Export all team members from the current filtered results
+      const exportData = teamMembers.map((member: any) => ({
+        ID: member._id,
+        "Team Member Name": member.name,
+        "Email": member.email,
+        "Phone": member.phone,
+        "Address": member.address || "",
+        "City": member.city || "",
+        "State": member.state || "",
+        "Country": member.country || "",
+        "Pin Code": member.pinCode || "",
+        "Branch": member.branch?.name || "",
+        "Branch Address": member.branch?.address || "",
+        "Branch City": member.branch?.city || "",
+        "Branch State": member.branch?.state || "",
+        "Branch Country": member.branch?.country || "",
+        "Branch Pin Code": member.branch?.pinCode || "",
+        "Skills Total": member.skills?.total || 0,
+        "Skills": member.skills?.list?.map((skill: any) => skill.name).join(', ') || "",
+        "Total Tasks": member.tasks?.total || 0,
+        "Pending Tasks": member.tasks?.status?.pending || 0,
+        "Ongoing Tasks": member.tasks?.status?.ongoing || 0,
+        "Completed Tasks": member.tasks?.status?.completed || 0,
+        "On Hold Tasks": member.tasks?.status?.on_hold || 0,
+        "Delayed Tasks": member.tasks?.status?.delayed || 0,
+        "Cancelled Tasks": member.tasks?.status?.cancelled || 0,
+        "Task Completion Rate": member.tasks?.completionRate || 0,
+        "Overdue Tasks": member.tasks?.overdue || 0,
+        "Current Month Tasks": member.tasks?.currentMonth?.total || 0,
+        "Current Month Completed": member.tasks?.currentMonth?.completed || 0,
+        "Total Timelines": member.timelines?.total || 0,
+        "Timeline Activities": member.timelines?.summary?.map((timeline: any) => timeline.activity?.name).join(', ') || "",
+        "Total Clients": member.clients?.total || 0,
+        "Client Names": member.clients?.list?.map((client: any) => client.name).join(', ') || "",
+        "Created At": member.createdAt,
+        "Updated At": member.updatedAt
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      
+      // Set column widths
+      ws["!cols"] = [
+        { wch: 20 }, // ID
+        { wch: 25 }, // Name
+        { wch: 30 }, // Email
+        { wch: 20 }, // Phone
+        { wch: 40 }, // Address
+        { wch: 20 }, // City
+        { wch: 20 }, // State
+        { wch: 20 }, // Country
+        { wch: 15 }, // Pin Code
+        { wch: 25 }, // Branch
+        { wch: 40 }, // Branch Address
+        { wch: 20 }, // Branch City
+        { wch: 20 }, // Branch State
+        { wch: 20 }, // Branch Country
+        { wch: 15 }, // Branch Pin Code
+        { wch: 15 }, // Skills Total
+        { wch: 40 }, // Skills
+        { wch: 15 }, // Total Tasks
+        { wch: 15 }, // Pending Tasks
+        { wch: 15 }, // Ongoing Tasks
+        { wch: 15 }, // Completed Tasks
+        { wch: 15 }, // On Hold Tasks
+        { wch: 15 }, // Delayed Tasks
+        { wch: 15 }, // Cancelled Tasks
+        { wch: 20 }, // Task Completion Rate
+        { wch: 15 }, // Overdue Tasks
+        { wch: 20 }, // Current Month Tasks
+        { wch: 25 }, // Current Month Completed
+        { wch: 20 }, // Total Timelines
+        { wch: 40 }, // Timeline Activities
+        { wch: 15 }, // Total Clients
+        { wch: 40 }, // Client Names
+        { wch: 20 }, // Created At
+        { wch: 20 }  // Updated At
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Analytics Team Members");
+      const fileName = `analytics_team_members_${new Date().toISOString().split("T")[0]}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      toast.success("Analytics team members data exported successfully");
+    } catch (error) {
+      console.error("Error exporting analytics team members:", error);
+      toast.error("Failed to export analytics team members");
+    }
+  };
+
   function getPagination(currentPage: number, totalPages: number) {
     const pages = [];
     if (totalPages <= 7) {
@@ -143,9 +236,12 @@ const AnalyticsTeamMembersPage = () => {
                   <i className="ri-arrow-left-line me-2"></i>
                   Back to Analytics
                 </Link>
-                <Link href="/users/add" className="ti-btn ti-btn-primary">
-                  <i className="ri-add-line me-2"></i> Add New Member
-                </Link>
+                <button
+                  onClick={handleExport}
+                  className="ti-btn ti-btn-primary"
+                >
+                  <i className="ri-upload-2-line me-2"></i> Export
+                </button>
               </div>
             </div>
           </div>
@@ -445,6 +541,9 @@ const AnalyticsTeamMembersPage = () => {
                           >
                             <td>
                               <div className="flex items-center">
+                                <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
+                                  {member.name?.charAt(0)?.toUpperCase() || 'T'}
+                                </div>
                                 <div className="ml-4">
                                   <button
                                     onClick={() => router.push(`/analytics/team-members/${member._id}/overview`)}
@@ -540,13 +639,12 @@ const AnalyticsTeamMembersPage = () => {
                               <p className="text-gray-500 text-center mb-6">
                                 Start by adding your first team member.
                               </p>
-                              <Link
-                                href="/users/add"
+                              <button
+                                onClick={handleExport}
                                 className="ti-btn ti-btn-primary"
                               >
-                                <i className="ri-add-line mr-2"></i> Add First
-                                Team Member
-                              </Link>
+                                <i className="ri-upload-2-line mr-2"></i> Export Data
+                              </button>
                             </div>
                           </td>
                         </tr>
