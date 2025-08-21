@@ -660,7 +660,7 @@ const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
 						<img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/logo/vsc-logo1.png`} alt="VSC Logo" className="main-logo desktop-logo" />
 						<img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/logo/vsc-logo1.png`} alt="VSC Logo" className="main-logo toggle-logo" />
 						<img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/logo/vsc-logo1.png`} alt="VSC Logo" className="main-logo desktop-dark" />
-						<img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/logo/vsc-logo1.png`} alt="VSC Logo" className="main-logo toggle-logo" />
+						{/* <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/logo/vsc-logo1.png`} alt="VSC Logo" className="main-logo toggle-logo" /> */}
 						<img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/logo/vsc-logo1.png`} alt="VSC Logo" className="main-logo desktop-white" />
 						<img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/logo/vsc-logo1.png`} alt="VSC Logo" className="main-logo toggle-white" />
 
