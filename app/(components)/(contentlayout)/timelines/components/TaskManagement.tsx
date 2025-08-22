@@ -78,10 +78,14 @@ const TaskManagement = () => {
   const [filters, setFilters] = useState({
     status: "",
     priority: "",
-    branch: ""
+    branch: "",
+    teamMember: "",
+    startDate: "",
+    endDate: "",
+    today: "false",
   });
 
-  // Debounced search function
+  // Debounced search function for the main search input
   const debouncedSearch = useCallback(
     (() => {
       let timeoutId: NodeJS.Timeout;
@@ -90,7 +94,7 @@ const TaskManagement = () => {
         timeoutId = setTimeout(() => {
           setFilters(prev => ({
             ...prev,
-            status: searchValue
+            teamMember: searchValue
           }));
           setCurrentPage(1);
         }, 500);
@@ -105,16 +109,54 @@ const TaskManagement = () => {
     debouncedSearch(value);
   };
 
+  // Helper function to validate date range
+  const validateDateRange = (startDate: string, endDate: string) => {
+    if (!startDate || !endDate) return false;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    return start <= end;
+  };
+
+  // Fetch tasks using the new API
   const fetchTasks = async (page = 1, limit = itemsPerPage) => {
     setIsLoading(true);
     setError(null);
     try {
+      // Create a copy of filters for processing
+      let processedFilters: any = { ...filters };
+      
+      // Handle date range filtering - convert to backend-compatible format
+      if (processedFilters.startDate && processedFilters.endDate) {
+        // Validate date range
+        if (!validateDateRange(processedFilters.startDate, processedFilters.endDate)) {
+          toast.error('Start date must be before or equal to end date');
+          setIsLoading(false);
+          return;
+        }
+        
+        // Convert to startDateRange and endDateRange for backend processing
+        processedFilters.startDateRange = processedFilters.startDate;
+        processedFilters.endDateRange = processedFilters.endDate;
+        delete processedFilters.startDate;
+        delete processedFilters.endDate;
+      }
+
+      // Filter out empty values
+      const cleanFilters = Object.fromEntries(
+        Object.entries(processedFilters).filter(([key, value]) => value !== "" && value !== "false")
+      );
+
       const queryParams = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),
-        ...filters,
+        ...cleanFilters,
         ...(sortBy && { sortBy })
       });
+
+      console.log('Fetching tasks with URL:', `${Base_url}tasks?${queryParams}`);
+      console.log('Original Filters:', filters);
+      console.log('Processed Filters:', processedFilters);
+      console.log('Clean Filters:', cleanFilters);
 
       const response = await fetch(`${Base_url}tasks?${queryParams}`, {
         headers: {
@@ -432,7 +474,10 @@ const TaskManagement = () => {
         {/* Pending Card */}
         <div 
           className="bg-warning/10 border border-warning/20 rounded-lg p-4 cursor-pointer hover:bg-warning/20 transition-colors"
-          onClick={() => setFilters({ ...filters, status: 'pending' })}
+          onClick={() => {
+            setFilters(prev => ({ ...prev, status: 'pending' }));
+            setCurrentPage(1);
+          }}
         >
           <div className="flex items-center justify-between">
             <div>
@@ -450,7 +495,10 @@ const TaskManagement = () => {
         {/* Ongoing Card */}
         <div 
           className="bg-primary/10 border border-primary/20 rounded-lg p-4 cursor-pointer hover:bg-primary/20 transition-colors"
-          onClick={() => setFilters({ ...filters, status: 'ongoing' })}
+          onClick={() => {
+            setFilters(prev => ({ ...prev, status: 'ongoing' }));
+            setCurrentPage(1);
+          }}
         >
           <div className="flex items-center justify-between">
             <div>
@@ -468,7 +516,10 @@ const TaskManagement = () => {
         {/* Completed Card */}
         <div 
           className="bg-success/10 border border-success/20 rounded-lg p-4 cursor-pointer hover:bg-success/20 transition-colors"
-          onClick={() => setFilters({ ...filters, status: 'completed' })}
+          onClick={() => {
+            setFilters(prev => ({ ...prev, status: 'completed' }));
+            setCurrentPage(1);
+          }}
         >
           <div className="flex items-center justify-between">
             <div>
@@ -486,7 +537,10 @@ const TaskManagement = () => {
         {/* On Hold Card */}
         <div 
           className="bg-warning/10 border border-warning/20 rounded-lg p-4 cursor-pointer hover:bg-warning/20 transition-colors"
-          onClick={() => setFilters({ ...filters, status: 'on_hold' })}
+          onClick={() => {
+            setFilters(prev => ({ ...prev, status: 'on_hold' }));
+            setCurrentPage(1);
+          }}
         >
           <div className="flex items-center justify-between">
             <div>
@@ -504,7 +558,10 @@ const TaskManagement = () => {
         {/* Delayed Card */}
         <div 
           className="bg-danger/10 border border-danger/20 rounded-lg p-4 cursor-pointer hover:bg-danger/20 transition-colors"
-          onClick={() => setFilters({ ...filters, status: 'delayed' })}
+          onClick={() => {
+            setFilters(prev => ({ ...prev, status: 'delayed' }));
+            setCurrentPage(1);
+          }}
         >
           <div className="flex items-center justify-between">
             <div>
@@ -545,7 +602,7 @@ const TaskManagement = () => {
             <input
               type="text"
               className="form-control py-2 w-full"
-              placeholder="Search by status..."
+              placeholder="Search tasks..."
               value={searchInputValue}
               onChange={handleSearchChange}
             />
@@ -553,6 +610,101 @@ const TaskManagement = () => {
 
           <select
             className="form-select py-2 w-full sm:w-auto"
+            value={filters.status}
+            onChange={(e) => {
+              setFilters(prev => ({ ...prev, status: e.target.value }));
+              setCurrentPage(1);
+            }}
+          >
+            <option value="">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="ongoing">Ongoing</option>
+            <option value="completed">Completed</option>
+            <option value="on_hold">On Hold</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="delayed">Delayed</option>
+          </select>
+
+          <select
+            className="form-select py-2 w-full sm:w-auto"
+            value={filters.priority}
+            onChange={(e) => {
+              setFilters(prev => ({ ...prev, priority: e.target.value }));
+              setCurrentPage(1);
+            }}
+          >
+            <option value="">All Priority</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+            <option value="urgent">Urgent</option>
+            <option value="critical">Critical</option>
+          </select>
+
+          <div className="relative">
+            <input
+              type="date"
+              className={`form-control py-2 w-full sm:w-auto ${!filters.startDate ? 'text-transparent' : ''} ${filters.startDate ? 'border-primary' : ''}`}
+              value={filters.startDate}
+              onChange={(e) => {
+                setFilters(prev => ({ ...prev, startDate: e.target.value }));
+                setCurrentPage(1);
+              }}
+              title="Start Date From"
+              style={!filters.startDate ? { color: 'transparent' } : {}}
+            />
+            {!filters.startDate && (
+              <div 
+                className="absolute inset-0 flex items-center px-3 text-gray-500 bg-white cursor-pointer"
+                onClick={(e) => {
+                  const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                  if (input) {
+                    input.focus();
+                    input.showPicker();
+                  }
+                }}
+              >
+                Start Date
+              </div>
+            )}
+            {filters.startDate && (
+              <div className="absolute -top-2 -right-2 w-3 h-3 bg-primary rounded-full"></div>
+            )}
+          </div>
+
+          <div className="relative">
+            <input
+              type="date"
+              className={`form-control py-2 w-full sm:w-auto ${!filters.endDate ? 'text-transparent' : ''} ${filters.endDate ? 'border-primary' : ''}`}
+              value={filters.endDate}
+              onChange={(e) => {
+                setFilters(prev => ({ ...prev, endDate: e.target.value }));
+                setCurrentPage(1);
+              }}
+              title="End Date Until"
+              style={!filters.endDate ? { color: 'transparent' } : {}}
+            />
+            {!filters.endDate && (
+              <div 
+                className="absolute inset-0 flex items-center px-3 text-gray-500 bg-white cursor-pointer"
+                onClick={(e) => {
+                  const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                  if (input) {
+                    input.focus();
+                    input.showPicker();
+                  }
+                }}
+              >
+                End Date
+              </div>
+            )}
+            {filters.endDate && (
+              <div className="absolute -top-2 -right-2 w-3 h-3 bg-primary rounded-full"></div>
+            )}
+          </div>
+
+          <select
+            className="form-select py-2 w-full sm:w-32"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
           >
@@ -571,9 +723,14 @@ const TaskManagement = () => {
               setFilters({
                 status: "",
                 priority: "",
-                branch: ""
+                branch: "",
+                teamMember: "",
+                startDate: "",
+                endDate: "",
+                today: "false",
               });
               setSortBy("createdAt:desc");
+              setCurrentPage(1);
             }}
           >
             <i className="ri-refresh-line me-2"></i>
@@ -581,6 +738,90 @@ const TaskManagement = () => {
           </button>
         </div>
       </div>
+
+      {/* Search Results Indicator */}
+      {filters.teamMember && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <i className="ri-search-line text-green-600 mr-2"></i>
+              <span className="text-sm font-medium text-green-800">
+                Search Results for "{filters.teamMember}": {tasks.length} tasks found
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                setFilters(prev => ({ ...prev, teamMember: "" }));
+                setSearchInputValue("");
+                setCurrentPage(1);
+              }}
+              className="text-green-600 hover:text-green-800 text-sm"
+            >
+              <i className="ri-close-line mr-1"></i>
+              Clear Search
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Active Filters Summary */}
+      {(filters.status || filters.priority || (filters.startDate && filters.endDate) || filters.teamMember) && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <span className="text-sm font-medium text-blue-800">Active Filters:</span>
+              
+              {filters.status && (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                  Status: {filters.status.charAt(0).toUpperCase() + filters.status.slice(1)}
+                </span>
+              )}
+              
+              {filters.priority && (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                  Priority: {filters.priority.charAt(0).toUpperCase() + filters.priority.slice(1)}
+                </span>
+              )}
+              
+              {filters.teamMember && (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                  <i className="ri-search-line mr-1"></i>
+                  Search: {filters.teamMember}
+                </span>
+              )}
+              
+              {filters.startDate && filters.endDate && (
+                <>
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                    From: {new Date(filters.startDate).toLocaleDateString()}
+                  </span>
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                    To: {new Date(filters.endDate).toLocaleDateString()}
+                  </span>
+                </>
+              )}
+            </div>
+            <button
+              onClick={() => {
+                setFilters(prev => ({ 
+                  ...prev, 
+                  status: "", 
+                  priority: "",
+                  teamMember: "",
+                  startDate: "", 
+                  endDate: "" 
+                }));
+                setSearchInputValue("");
+                setCurrentPage(1);
+              }}
+              className="text-blue-600 hover:text-blue-800 text-sm"
+            >
+              <i className="ri-close-line me-1"></i>
+              Clear All Filters
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Tasks Table */}
       <div className="table-responsive">

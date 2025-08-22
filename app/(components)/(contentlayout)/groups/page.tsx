@@ -141,6 +141,8 @@ const GroupsPage = () => {
         ...(filters.name && { name: filters.name }),
       });
 
+      console.log('Fetching task statistics with query params:', queryParams.toString());
+
       const response = await fetch(`${Base_url}groups/task-statistics?${queryParams}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -152,6 +154,7 @@ const GroupsPage = () => {
       }
 
       const data: TaskStatisticsResponse = await response.json();
+      console.log('Task statistics API response:', data);
       
       // Create a map of groupId to taskStatistics
       const statsMap = new Map<string, any>();
@@ -159,6 +162,7 @@ const GroupsPage = () => {
         statsMap.set(item.groupId, item.taskStatistics);
       });
 
+      console.log('Task statistics map created:', statsMap);
       return statsMap;
     } catch (error) {
       console.error('Error fetching task statistics:', error);
@@ -192,7 +196,7 @@ const GroupsPage = () => {
 
       const data: ApiResponse = await response.json();
       
-      // Fetch task statistics for all groups
+      // Fetch task statistics for all groups with the same search filter
       const newTaskStatsMap = await fetchGroupTaskStats();
       setTaskStatsMap(newTaskStatsMap);
       
@@ -226,9 +230,9 @@ const GroupsPage = () => {
 
   useEffect(() => {
     fetchGroups(currentPage, itemsPerPage);
-  }, [currentPage, itemsPerPage, sortBy]);
+  }, [currentPage, itemsPerPage, sortBy, filters.name]);
 
-  // Separate useEffect for filters and advanced filters to update task statistics
+  // Separate useEffect for advanced filters to update task statistics
   useEffect(() => {
     const updateTaskStats = async () => {
       const newTaskStatsMap = await fetchGroupTaskStats();
@@ -252,7 +256,7 @@ const GroupsPage = () => {
     };
 
     updateTaskStats();
-  }, [filters, advancedFilters]);
+  }, [advancedFilters]);
 
   const handleSelectAll = () => {
     if (selectAll) {
@@ -833,6 +837,22 @@ const GroupsPage = () => {
                 onReset={handleReset}
               />
 
+              {/* Clear Search Button */}
+              {filters.name && (
+                <div className="mb-4 flex justify-end">
+                  <button
+                    onClick={() => {
+                      setFilters(prev => ({ ...prev, name: "" }));
+                      setCurrentPage(1);
+                    }}
+                    className="ti-btn ti-btn-secondary"
+                  >
+                    <i className="ri-close-line me-2"></i>
+                    Clear Search
+                  </button>
+                </div>
+              )}
+
               {/* Advanced Filters Panel */}
               <AdvancedFiltersPanel
                 showAdvancedFilters={showAdvancedFilters}
@@ -859,6 +879,30 @@ const GroupsPage = () => {
                   setCurrentPage(1);
                 }}
               />
+
+              {/* Search Results Indicator */}
+              {filters.name && (
+                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <i className="ri-search-line text-green-600 mr-2"></i>
+                      <span className="text-sm font-medium text-green-800">
+                        Search Results for "{filters.name}": {groups.length} groups found
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setFilters(prev => ({ ...prev, name: "" }));
+                        setCurrentPage(1);
+                      }}
+                      className="text-green-600 hover:text-green-800 text-sm"
+                    >
+                      <i className="ri-close-line mr-1"></i>
+                      Clear Search
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {isLoading ? (
                 <div className="flex items-center justify-center py-8">
@@ -944,18 +988,34 @@ const GroupsPage = () => {
                                 <i className="ri-folder-line text-4xl text-primary"></i>
                               </div>
                               <h3 className="text-xl font-medium mb-2">
-                                No Groups Found
+                                {filters.name ? 'No Search Results Found' : 'No Groups Found'}
                               </h3>
                               <p className="text-gray-500 text-center mb-6">
-                                Start by adding your first group.
+                                {filters.name 
+                                  ? `No groups found matching "${filters.name}". Try adjusting your search terms.`
+                                  : 'Start by adding your first group.'
+                                }
                               </p>
-                              <Link
-                                href="/groups/add"
-                                className="ti-btn ti-btn-primary"
-                              >
-                                <i className="ri-add-line me-2"></i> Add First
-                                Group
-                              </Link>
+                              {filters.name ? (
+                                <button
+                                  onClick={() => {
+                                    setFilters(prev => ({ ...prev, name: "" }));
+                                    setCurrentPage(1);
+                                  }}
+                                  className="ti-btn ti-btn-primary"
+                                >
+                                  <i className="ri-refresh-line me-2"></i>
+                                  Clear Search
+                                </button>
+                              ) : (
+                                <Link
+                                  href="/groups/add"
+                                  className="ti-btn ti-btn-primary"
+                                >
+                                  <i className="ri-add-line me-2"></i> Add First
+                                  Group
+                                </Link>
+                              )}
                             </div>
                           </td>
                         </tr>
