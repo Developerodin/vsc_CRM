@@ -168,6 +168,8 @@ const AddTaskPage = () => {
         ...((searchQueryParam || teamMemberSearchQuery) && { search: searchQueryParam || teamMemberSearchQuery })
       });
 
+      console.log('Fetching team members with query params:', queryParams.toString());
+
       const response = await fetch(`${Base_url}team-members?${queryParams}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -179,8 +181,10 @@ const AddTaskPage = () => {
       }
 
       const data = await response.json();
+      console.log('Team members API response:', data);
+      
       setAllTeamMembers(data.results || []);
-      const totalResults = data.totalResults || data.total || 0;
+      const totalResults = data.totalResults || 0;
       const limit = 10;
       setTeamMemberTotalPages(Math.max(1, Math.ceil(totalResults / limit)));
       setTeamMemberCurrentPage(page);
@@ -474,6 +478,7 @@ const AddTaskPage = () => {
 
   const handleTeamMemberSearchClick = () => {
     if (showTeamMemberModal) {
+      console.log('Team member search clicked:', teamMemberSearchQuery);
       setTeamMemberCurrentPage(1);
       fetchTeamMembersModal(1, teamMemberSearchQuery);
     }
@@ -491,6 +496,7 @@ const AddTaskPage = () => {
       return (searchQuery: string) => {
         clearTimeout(timeoutId);
         timeoutId = setTimeout(() => {
+          console.log('Debounced team member search triggered:', searchQuery);
           setTeamMemberCurrentPage(1);
           fetchTeamMembersModal(1, searchQuery);
         }, 500);
@@ -1300,10 +1306,47 @@ const AddTaskPage = () => {
                     <i className="ri-search-line text-xl"></i>
                   </button>
                 </div>
+                {teamMemberSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTeamMemberSearchQuery("");
+                      fetchTeamMembersModal(1, "");
+                    }}
+                    className="ti-btn ti-btn-secondary"
+                  >
+                    <i className="ri-close-line me-2"></i>
+                    Clear
+                  </button>
+                )}
               </div>
             </div>
 
             <div className="flex-1 overflow-auto p-4">
+              {/* Search Results Indicator */}
+              {teamMemberSearchQuery && (
+                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <i className="ri-search-line text-green-600 mr-2"></i>
+                      <span className="text-sm font-medium text-green-800">
+                        Search Results for "{teamMemberSearchQuery}": {allTeamMembers.length} team members found
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setTeamMemberSearchQuery("");
+                        fetchTeamMembersModal(1, "");
+                      }}
+                      className="text-green-600 hover:text-green-800 text-sm"
+                    >
+                      <i className="ri-close-line mr-1"></i>
+                      Clear Search
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {isLoadingTeamMembers ? (
                 <div className="flex items-center justify-center h-32">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -1325,25 +1368,58 @@ const AddTaskPage = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {allTeamMembers.map((teamMember) => (
-                        <tr key={teamMember.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <input
-                              type="radio"
-                              name="teamMemberSelection"
-                              className="form-radio h-5 w-5 text-primary"
-                              checked={selectedTeamMember?.id === teamMember.id}
-                              onChange={() => handleTeamMemberSelect(teamMember)}
-                            />
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">{teamMember.name}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">{teamMember.email}</div>
+                      {allTeamMembers.length === 0 ? (
+                        <tr>
+                          <td colSpan={3} className="px-6 py-8 text-center">
+                            <div className="flex flex-col items-center justify-center">
+                              <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                                <i className="ri-search-line text-2xl text-gray-400"></i>
+                              </div>
+                              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                {teamMemberSearchQuery ? 'No Team Members Found' : 'No Team Members Available'}
+                              </h3>
+                              <p className="text-gray-500 text-center mb-4">
+                                {teamMemberSearchQuery 
+                                  ? `No team members found matching "${teamMemberSearchQuery}". Try adjusting your search terms.`
+                                  : 'No team members available at the moment.'
+                                }
+                              </p>
+                              {teamMemberSearchQuery && (
+                                <button
+                                  onClick={() => {
+                                    setTeamMemberSearchQuery("");
+                                    fetchTeamMembersModal(1, "");
+                                  }}
+                                  className="ti-btn ti-btn-primary"
+                                >
+                                  <i className="ri-refresh-line me-2"></i>
+                                  Clear Search
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        allTeamMembers.map((teamMember) => (
+                          <tr key={teamMember.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <input
+                                type="radio"
+                                name="teamMemberSelection"
+                                className="form-radio h-5 w-5 text-primary"
+                                checked={selectedTeamMember?.id === teamMember.id}
+                                onChange={() => handleTeamMemberSelect(teamMember)}
+                              />
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">{teamMember.name}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">{teamMember.email}</div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>

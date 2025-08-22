@@ -78,12 +78,10 @@ interface TaskStatisticsResponse {
     cancelledTasks: number;
     delayedTasks: number;
   }>;
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  };
+  page: number;
+  limit: number;
+  totalPages: number;
+  totalResults: number;
 }
 
 interface ExcelRow {
@@ -158,16 +156,21 @@ const ClientsPage = () => {
 
   // Function to fetch task statistics for all clients
   const fetchClientTaskStats = async (): Promise<Map<string, TaskStats>> => {
+    // If we're using search, we don't need to fetch task stats separately
+    if (debouncedSearchQuery) {
+      console.log('Skipping task stats fetch for search query');
+      return new Map();
+    }
+
     try {
       setIsLoadingTaskStats(true);
       const queryParams = new URLSearchParams({
         page: '1',
         limit: '1000', // Get all clients' task stats
         // Pass the same filters as clients
-        ...(debouncedSearchQuery && { search: debouncedSearchQuery }),
-        ...(!debouncedSearchQuery && filters.name && { name: filters.name }),
-        ...(!debouncedSearchQuery && filters.email && { email: filters.email }),
-        ...(!debouncedSearchQuery && filters.phone && { phone: filters.phone }),
+        ...(filters.name && { name: filters.name }),
+        ...(filters.email && { email: filters.email }),
+        ...(filters.phone && { phone: filters.phone }),
         ...(filters.district && { district: filters.district }),
         ...(filters.pan && { pan: filters.pan }),
         ...(filters.branch && { branch: filters.branch }),
@@ -179,6 +182,8 @@ const ClientsPage = () => {
         ...(filters.udyamNumber && { udyamNumber: filters.udyamNumber }),
         ...(filters.iecCode && { iecCode: filters.iecCode }),
       });
+
+      console.log('Fetching task statistics with query params:', queryParams.toString());
 
       const response = await fetch(`${Base_url}clients/task-statistics?${queryParams}`, {
         headers: {
@@ -228,67 +233,149 @@ const ClientsPage = () => {
       setIsLoading(true);
       setError(null);
       
-      const queryParams = new URLSearchParams({
-        page: page.toString(),
-        limit: limit.toString(),
-        sortBy,
-        // Global search parameter - search across multiple fields
-        ...(debouncedSearchQuery && { search: debouncedSearchQuery }),
-        // Individual field filters (only if not using global search)
-        ...(!debouncedSearchQuery && filters.name && { name: filters.name }),
-        ...(!debouncedSearchQuery && filters.email && { email: filters.email }),
-        ...(!debouncedSearchQuery && filters.phone && { phone: filters.phone }),
-        ...(!debouncedSearchQuery && filters.district && { district: filters.district }),
-        ...(!debouncedSearchQuery && filters.pan && { pan: filters.pan }),
-
-        ...(filters.branch && { branch: filters.branch }),
-        ...(filters.businessType && { businessType: filters.businessType }),
-        ...(filters.entityType && { entityType: filters.entityType }),
-        ...(filters.gstNumber && { gstNumber: filters.gstNumber }),
-        ...(filters.tanNumber && { tanNumber: filters.tanNumber }),
-        ...(filters.cinNumber && { cinNumber: filters.cinNumber }),
-        ...(filters.udyamNumber && { udyamNumber: filters.udyamNumber }),
-        ...(filters.iecCode && { iecCode: filters.iecCode }),
-      });
-
-      const response = await fetch(`${Base_url}clients?${queryParams}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch clients');
-      }
-
-      const data: ApiResponse = await response.json();
-      
-      // Fetch task statistics only for the found clients
-      const newTaskStatsMap = await fetchClientTaskStats();
-      setTaskStatsMap(newTaskStatsMap);
-      
-      console.log('Clients found:', data.results.length);
-      console.log('Task stats map keys:', Array.from(newTaskStatsMap.keys()));
-      
-      // Merge clients with their task statistics
-      const clientsWithTasks = data.results.map((client: Client) => {
-        const taskStats = newTaskStatsMap.get(client.id) || {
-          pending: 0,
-          ongoing: 0,
-          completed: 0,
-          delayed: 0,
-          onHold: 0,
-          cancelled: 0,
-          total: 0
-        };
+      // If there's a search query, use the task statistics API which works better for search
+      if (debouncedSearchQuery) {
+        console.log('Using task statistics API for search:', debouncedSearchQuery);
         
-        console.log(`Client ${client.id} (${client.name}) - Task stats:`, taskStats);
-          return { ...client, taskStats };
-      });
+        const queryParams = new URLSearchParams({
+          page: '1',
+          limit: '1000', // Get all results for search
+          search: debouncedSearchQuery
+        });
 
-      setClients(clientsWithTasks);
-      setTotalResults(data.totalResults);
-      setTotalPages(data.totalPages);
+        console.log('Fetching clients via task statistics API with query params:', queryParams.toString());
+
+        const response = await fetch(`${Base_url}clients/task-statistics?${queryParams}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch clients via task statistics');
+        }
+
+        const data: TaskStatisticsResponse = await response.json();
+        
+        console.log('Task Statistics API response for search:', data);
+        
+        // Convert task statistics response to client format
+        const clientsWithTasks = data.results.map((item) => {
+          const taskStats: TaskStats = {
+            pending: item.pendingTasks,
+            ongoing: item.ongoingTasks,
+            completed: item.completedTasks,
+            delayed: item.delayedTasks,
+            onHold: item.on_holdTasks,
+            cancelled: item.cancelledTasks,
+            total: item.totalTasks
+          };
+
+          // Create a minimal client object from the task statistics response
+          const client: ClientWithTasks = {
+            id: item._id,
+            name: item.name,
+            email: item.email,
+            email2: "",
+            address: "",
+            district: "",
+            state: "",
+            country: "",
+            pan: "",
+            dob: "",
+            phone: "", // Add missing phone property
+            branch: item.branch,
+            sortOrder: 1,
+            businessType: "",
+            gstNumber: "",
+            tanNumber: "",
+            cinNumber: "",
+            udyamNumber: "",
+            iecCode: "",
+            entityType: "",
+            activities: [],
+            createdAt: "",
+            updatedAt: "",
+            taskStats
+          };
+
+          return client;
+        });
+
+        setClients(clientsWithTasks);
+        setTotalResults((data as any).totalResults); // Use type assertion to access totalResults
+        setTotalPages(Math.ceil((data as any).totalResults / itemsPerPage)); // Use type assertion
+        
+        // No need to fetch task stats separately since we already have them
+        setTaskStatsMap(new Map());
+        
+      } else {
+        // Use the regular clients API for non-search requests
+        console.log('Using regular clients API for non-search request');
+        
+        const queryParams = new URLSearchParams({
+          page: page.toString(),
+          limit: limit.toString(),
+          sortBy,
+          // Individual field filters
+          ...(filters.name && { name: filters.name }),
+          ...(filters.email && { email: filters.email }),
+          ...(filters.phone && { phone: filters.phone }),
+          ...(filters.district && { district: filters.district }),
+          ...(filters.pan && { pan: filters.pan }),
+          ...(filters.branch && { branch: filters.branch }),
+          ...(filters.businessType && { businessType: filters.businessType }),
+          ...(filters.entityType && { entityType: filters.entityType }),
+          ...(filters.gstNumber && { gstNumber: filters.gstNumber }),
+          ...(filters.tanNumber && { tanNumber: filters.tanNumber }),
+          ...(filters.cinNumber && { cinNumber: filters.cinNumber }),
+          ...(filters.udyamNumber && { udyamNumber: filters.udyamNumber }),
+          ...(filters.iecCode && { iecCode: filters.iecCode }),
+        });
+
+        console.log('Fetching clients with query params:', queryParams.toString());
+
+        const response = await fetch(`${Base_url}clients?${queryParams}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch clients');
+        }
+
+        const data: ApiResponse = await response.json();
+        
+        console.log('Clients API response:', data);
+        
+        // Fetch task statistics only for the found clients
+        const newTaskStatsMap = await fetchClientTaskStats();
+        setTaskStatsMap(newTaskStatsMap);
+        
+        console.log('Clients found:', data.results.length);
+        console.log('Task stats map keys:', Array.from(newTaskStatsMap.keys()));
+        
+        // Merge clients with their task statistics
+        const clientsWithTasks = data.results.map((client: Client) => {
+          const taskStats = newTaskStatsMap.get(client.id) || {
+            pending: 0,
+            ongoing: 0,
+            completed: 0,
+            delayed: 0,
+            onHold: 0,
+            cancelled: 0,
+            total: 0
+          };
+          
+          console.log(`Client ${client.id} (${client.name}) - Task stats:`, taskStats);
+          return { ...client, taskStats };
+        });
+
+        setClients(clientsWithTasks);
+        setTotalResults(data.totalResults);
+        setTotalPages(data.totalPages);
+      }
     } catch (err) {
       console.error('Error fetching clients:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch clients');
@@ -305,6 +392,8 @@ const ClientsPage = () => {
   // Refetch clients when search query changes
   useEffect(() => {
     if (debouncedSearchQuery !== undefined) {
+      console.log('Search query changed, refetching clients:', debouncedSearchQuery);
+      console.log('Will use task statistics API for search');
       setCurrentPage(1); // Reset to first page when searching
       fetchClients(1, itemsPerPage);
     }
@@ -317,6 +406,7 @@ const ClientsPage = () => {
     }
     
     const timer = setTimeout(() => {
+      console.log('Setting debounced search query:', searchQuery);
       setDebouncedSearchQuery(searchQuery);
       setIsSearching(false);
     }, 500);
@@ -326,6 +416,12 @@ const ClientsPage = () => {
 
   // Separate useEffect for filters and search to update task statistics
   useEffect(() => {
+    // Don't update task stats if we're using search (we already have them)
+    if (debouncedSearchQuery) {
+      console.log('Skipping task stats update for search query');
+      return;
+    }
+
     const updateTaskStats = async () => {
       const newTaskStatsMap = await fetchClientTaskStats();
       setTaskStatsMap(newTaskStatsMap);
@@ -348,7 +444,7 @@ const ClientsPage = () => {
     };
 
     updateTaskStats();
-  }, [filters]);
+  }, [filters, debouncedSearchQuery]);
 
   const handleSelectAll = () => {
     if (selectAll) {
@@ -908,6 +1004,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                       placeholder="Search by name, email, phone, city, business type, PAN..."
                       value={searchQuery}
                       onChange={(e) => {
+                        console.log('Search input changed:', e.target.value);
                         setSearchQuery(e.target.value);
                       }}
                     />
@@ -922,6 +1019,8 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                       <button
                         className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
                         onClick={() => {
+                          console.log('Clearing search query');
+                          console.log('Will switch back to regular clients API');
                           setSearchQuery("");
                         }}
                       >
@@ -1226,6 +1325,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                     <button
                       className="text-blue-600 hover:text-blue-800 text-sm"
                       onClick={() => {
+                        console.log('Clearing all filters and search');
                         setSearchQuery("");
                         setFilters(prev => ({
                           ...prev,
@@ -1249,10 +1349,14 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                   <div className="flex flex-wrap gap-2 mt-2">
                     {debouncedSearchQuery && (
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <i className="ri-search-line mr-1"></i>
                         Search: "{debouncedSearchQuery}"
                         <button
                           className="ml-1 text-green-600 hover:text-green-800"
-                          onClick={() => setSearchQuery("")}
+                          onClick={() => {
+                            console.log('Clearing search query from filter summary');
+                            setSearchQuery("");
+                          }}
                         >
                           <i className="ri-close-line"></i>
                         </button>
@@ -1371,134 +1475,157 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                   <p>{error}</p>
                 </div>
               ) : (
-                <div className="table-responsive">
-                  <table className="table whitespace-nowrap table-bordered min-w-full">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            className="form-checkbox"
-                            checked={selectedClients.length === clients.length}
-                            onChange={handleSelectAll}
-                          />
-                        </th>
-                        <th className="px-4 py-3">Client</th>
-                        <th className="px-4 py-3">City</th>
-                        <th className="px-4 py-3">Business Type</th>
-                        <th className="px-4 py-3">Entity Type</th>
+                <>
+                  {/* Search Results Indicator */}
+                  {debouncedSearchQuery && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                      <div className="flex items-center">
+                        <i className="ri-search-line text-green-600 mr-2"></i>
+                        <span className="text-sm font-medium text-green-800">
+                          Search Results for "{debouncedSearchQuery}": {totalResults} clients found
+                        </span>
+                      </div>
+                      <div className="text-xs text-green-600 mt-1">
+                        <i className="ri-information-line mr-1"></i>
+                        Note: Search results show basic client info and task statistics. Use filters for detailed information.
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="table-responsive">
+                    <table className="table whitespace-nowrap table-bordered min-w-full">
+                      <thead>
+                        <tr className="border-b border-gray-200">
+                          <th className="px-4 py-3">
+                            <input
+                              type="checkbox"
+                              className="form-checkbox"
+                              checked={selectedClients.length === clients.length}
+                              onChange={handleSelectAll}
+                            />
+                          </th>
+                          <th className="px-4 py-3">Client</th>
+                          <th className="px-4 py-3">City</th>
+                          <th className="px-4 py-3">Business Type</th>
+                          <th className="px-4 py-3">Entity Type</th>
 
-                        <th className="px-4 py-3">PAN</th>
-                        <th className="px-4 py-3">Task Status</th>
-                        <th className="px-4 py-3">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {clients.length > 0 ? (
-                        clients.map((client: ClientWithTasks, index: number) => (
-                          <tr
-                            key={client.id}
-                            className={`border-b border-gray-200 ${
-                              index % 2 === 0 ? "bg-gray-50" : ""
-                            }`}
-                          >
-                            <td>
-                              <input
-                                type="checkbox"
-                                className="form-check-input"
-                                checked={selectedClients.includes(client.id)}
-                                onChange={() => handleClientSelect(client.id)}
-                              />
-                            </td>
-                            <td>
-                              <div className="flex flex-col">
-                                <button
-                                  onClick={() => router.push(`/analytics/clients/${client.id}/overview`)}
-                                  className="font-medium text-gray-900 hover:text-blue-600 hover:underline cursor-pointer text-left"
-                                >
-                                  {client.name}
-                                </button>
-                                <div className="text-sm text-gray-500 flex items-center">
-                                  <i className="ri-mail-line mr-1 text-gray-400"></i>
-                                  {client.email}
+                          <th className="px-4 py-3">PAN</th>
+                          <th className="px-4 py-3">Task Status</th>
+                          <th className="px-4 py-3">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {clients.length > 0 ? (
+                          clients.map((client: ClientWithTasks, index: number) => (
+                            <tr
+                              key={client.id}
+                              className={`border-b border-gray-200 ${
+                                index % 2 === 0 ? "bg-gray-50" : ""
+                              }`}
+                            >
+                              <td>
+                                <input
+                                  type="checkbox"
+                                  className="form-check-input"
+                                  checked={selectedClients.includes(client.id)}
+                                  onChange={() => handleClientSelect(client.id)}
+                                />
+                              </td>
+                              <td>
+                                <div className="flex flex-col">
+                                  <button
+                                    onClick={() => router.push(`/analytics/clients/${client.id}/overview`)}
+                                    className="font-medium text-gray-900 hover:text-blue-600 hover:underline cursor-pointer text-left"
+                                  >
+                                    {client.name}
+                                  </button>
+                                  <div className="text-sm text-gray-500 flex items-center">
+                                    <i className="ri-mail-line mr-1 text-gray-400"></i>
+                                    {client.email}
+                                  </div>
+                                  <div className="text-sm text-gray-500 flex items-center">
+                                    <i className="ri-phone-line mr-1 text-gray-400"></i>
+                                    {client.phone}
+                                  </div>
                                 </div>
-                                <div className="text-sm text-gray-500 flex items-center">
-                                  <i className="ri-phone-line mr-1 text-gray-400"></i>
-                                  {client.phone}
-                                </div>
-                              </div>
-                            </td>
-                            <td>{client.district}</td>
-                            <td>
-                              <span className={`px-2 py-1 text-xs rounded-full ${
-                                client.businessType ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
-                              }`}>
-                                {client.businessType || 'N/A'}
-                              </span>
-                            </td>
-                            <td>
-                              <span className={`px-2 py-1 text-xs rounded-full ${
-                                client.entityType ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
-                              }`}>
-                                {client.entityType || 'N/A'}
-                              </span>
-                            </td>
+                              </td>
+                              <td>{client.district || 'N/A'}</td>
+                              <td>
+                                <span className={`px-2 py-1 text-xs rounded-full ${
+                                  client.businessType ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {client.businessType || 'N/A'}
+                                </span>
+                              </td>
+                              <td>
+                                <span className={`px-2 py-1 text-xs rounded-full ${
+                                  client.entityType ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {client.entityType || 'N/A'}
+                                </span>
+                              </td>
 
-                            <td>{client.pan}</td>
-                            <td className="px-4 py-3">
-                              {renderTaskStatus(client.taskStats, client.id)}
-                            </td>
-                            <td>
-                              <div className="flex space-x-2">
-                                <Link
-                                  href={`/clients/edit/${client.id}`}
-                                  className="ti-btn ti-btn-primary ti-btn-sm"
-                                >
-                                  <i className="ri-edit-line"></i>
-                                </Link>
-                                {/* <button
-                                  className="ti-btn ti-btn-success ti-btn-sm"
-                                  title="View Files"
-                                >
-                                  <i className="ri-folder-line"></i>
-                                </button> */}
-                                <button
-                                  className="ti-btn ti-btn-danger ti-btn-sm"
-                                  onClick={() => handleDelete(client.id)}
-                                >
-                                  <i className="ri-delete-bin-line"></i>
-                                </button>
+                              <td>{client.pan || 'N/A'}</td>
+                              <td className="px-4 py-3">
+                                {renderTaskStatus(client.taskStats, client.id)}
+                              </td>
+                              <td>
+                                <div className="flex space-x-2">
+                                  <Link
+                                    href={`/clients/edit/${client.id}`}
+                                    className="ti-btn ti-btn-primary ti-btn-sm"
+                                  >
+                                    <i className="ri-edit-line"></i>
+                                  </Link>
+                                  {/* <button
+                                    className="ti-btn ti-btn-success ti-btn-sm"
+                                    title="View Files"
+                                  >
+                                    <i className="ri-folder-line"></i>
+                                  </button> */}
+                                  <button
+                                    className="ti-btn ti-btn-danger ti-btn-sm"
+                                    onClick={() => handleDelete(client.id)}
+                                  >
+                                    <i className="ri-delete-bin-line"></i>
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={8} className="text-center py-8">
+                              <div className="flex flex-col items-center justify-center">
+                                <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
+                                  <i className="ri-folder-line text-4xl text-primary"></i>
+                                </div>
+                                <h3 className="text-xl font-medium mb-2">
+                                  {debouncedSearchQuery ? 'No Search Results Found' : 'No Clients Found'}
+                                </h3>
+                                <p className="text-gray-500 text-center mb-6">
+                                  {debouncedSearchQuery 
+                                    ? `No clients found matching "${debouncedSearchQuery}". Try adjusting your search terms.`
+                                    : 'Start by adding your first client.'
+                                  }
+                                </p>
+                                {!debouncedSearchQuery && (
+                                  <Link
+                                    href="/clients/add"
+                                    className="ti-btn ti-btn-primary"
+                                  >
+                                    <i className="ri-add-line mr-2"></i> Add First
+                                    Client
+                                  </Link>
+                                )}
                               </div>
                             </td>
                           </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={8} className="text-center py-8">
-                            <div className="flex flex-col items-center justify-center">
-                              <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
-                                <i className="ri-folder-line text-4xl text-primary"></i>
-                              </div>
-                              <h3 className="text-xl font-medium mb-2">
-                                No Clients Found
-                              </h3>
-                              <p className="text-gray-500 text-center mb-6">
-                                Start by adding your first client.
-                              </p>
-                              <Link
-                                href="/clients/add"
-                                className="ti-btn ti-btn-primary"
-                              >
-                                <i className="ri-add-line mr-2"></i> Add First
-                                Client
-                              </Link>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
 
               {/* Pagination */}
