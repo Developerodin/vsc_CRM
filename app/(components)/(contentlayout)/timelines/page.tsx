@@ -81,12 +81,14 @@ const TimelinesPage = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [searchInputValue, setSearchInputValue] = useState("");
+  const [clientSearchInputValue, setClientSearchInputValue] = useState("");
   const [filters, setFilters] = useState({
     activityName: "",
+    clientName: "",
     status: ""
   });
 
-  // Debounced search function
+  // Debounced search function for activity name
   const debouncedSearch = useCallback(
     (() => {
       let timeoutId: NodeJS.Timeout;
@@ -104,11 +106,36 @@ const TimelinesPage = () => {
     []
   );
 
-  // Handle search input change
+  // Debounced search function for client name
+  const debouncedClientSearch = useCallback(
+    (() => {
+      let timeoutId: NodeJS.Timeout;
+      return (searchValue: string) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          setFilters(prev => ({
+            ...prev,
+            clientName: searchValue
+          }));
+          setCurrentPage(1);
+        }, 500);
+      };
+    })(),
+    []
+  );
+
+  // Handle search input change for activity name
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchInputValue(value); // Update input immediately
     debouncedSearch(value); // Debounce the API call
+  };
+
+  // Handle client search input change
+  const handleClientSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setClientSearchInputValue(value); // Update input immediately
+    debouncedClientSearch(value); // Debounce the API call
   };
 
   const fetchTimelines = async (page = 1, limit = itemsPerPage) => {
@@ -118,9 +145,13 @@ const TimelinesPage = () => {
       const queryParams = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),
-        ...filters,
+        ...(filters.activityName && { activityName: filters.activityName }),
+        ...(filters.clientName && { client: filters.clientName }),
+        ...(filters.status && { status: filters.status }),
         ...(sortBy && { sortBy })
       });
+
+      console.log('Fetching timelines with query params:', queryParams.toString());
 
       const response = await fetch(`${Base_url}timelines?${queryParams}`, {
         headers: {
@@ -133,7 +164,7 @@ const TimelinesPage = () => {
       }
 
       const data: ApiResponse = await response.json();
-      console.log(data.results);
+      console.log('Timelines API response:', data);
       setTimelines(data.results);
       setTotalPages(data.totalPages);
       setTotalResults(data.totalResults);
@@ -578,7 +609,7 @@ const TimelinesPage = () => {
 
                 {/* Search and filters */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
-                  {/* Search bar */}
+                  {/* Search bar for activity name */}
                   <div className="relative flex-grow sm:max-w-xs">
                     <input
                       type="text"
@@ -586,6 +617,17 @@ const TimelinesPage = () => {
                       placeholder="Search by activity name..."
                       value={searchInputValue}
                       onChange={handleSearchChange}
+                    />
+                  </div>
+
+                  {/* Search bar for client name */}
+                  <div className="relative flex-grow sm:max-w-xs">
+                    <input
+                      type="text"
+                      className="form-control py-2 w-full"
+                      placeholder="Search by client name..."
+                      value={clientSearchInputValue}
+                      onChange={handleClientSearchChange}
                     />
                   </div>
 
@@ -608,8 +650,10 @@ const TimelinesPage = () => {
                     className="ti-btn ti-btn-secondary py-2 w-full sm:w-auto"
                     onClick={() => {
                       setSearchInputValue("");
+                      setClientSearchInputValue("");
                       setFilters({
                         activityName: "",
+                        clientName: "",
                         status: ""
                       });
                       setSortBy("activityName:asc");
@@ -620,6 +664,51 @@ const TimelinesPage = () => {
                   </button>
                 </div>
               </div>
+
+              {/* Search Results Indicator */}
+              {(filters.activityName || filters.clientName || filters.status) && (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <span className="text-sm font-medium text-blue-800">Active Filters:</span>
+                      
+                      {filters.activityName && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                          Activity: {filters.activityName}
+                        </span>
+                      )}
+                      
+                      {filters.clientName && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                          Client: {filters.clientName}
+                        </span>
+                      )}
+                      
+                      {filters.status && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                          Status: {filters.status.charAt(0).toUpperCase() + filters.status.slice(1)}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSearchInputValue("");
+                        setClientSearchInputValue("");
+                        setFilters({
+                          activityName: "",
+                          clientName: "",
+                          status: ""
+                        });
+                        setCurrentPage(1);
+                      }}
+                      className="text-blue-600 hover:text-blue-800 text-sm"
+                    >
+                      <i className="ri-close-line me-1"></i>
+                      Clear All Filters
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Timelines Table */}
               <div className="table-responsive">
@@ -665,17 +754,39 @@ const TimelinesPage = () => {
                               <i className="ri-time-line text-4xl text-primary"></i>
                             </div>
                             <h3 className="text-xl font-medium mb-2">
-                              No Timelines Found
+                              {(filters.activityName || filters.clientName || filters.status) ? 'No Search Results Found' : 'No Timelines Found'}
                             </h3>
                             <p className="text-gray-500 text-center mb-6">
-                              Start by adding your first timeline.
+                              {(filters.activityName || filters.clientName || filters.status) 
+                                ? `No timelines found matching your search criteria. Try adjusting your filters.`
+                                : 'Start by adding your first timeline.'
+                              }
                             </p>
-                            <Link
-                              href="/timelines/add"
-                              className="ti-btn ti-btn-primary"
-                            >
-                              <i className="ri-add-line me-2"></i> Add First Timeline
-                            </Link>
+                            {(filters.activityName || filters.clientName || filters.status) ? (
+                              <button
+                                onClick={() => {
+                                  setSearchInputValue("");
+                                  setClientSearchInputValue("");
+                                  setFilters({
+                                    activityName: "",
+                                    clientName: "",
+                                    status: ""
+                                  });
+                                  setCurrentPage(1);
+                                }}
+                                className="ti-btn ti-btn-primary"
+                              >
+                                <i className="ri-refresh-line me-2"></i>
+                                Clear All Filters
+                              </button>
+                            ) : (
+                              <Link
+                                href="/timelines/add"
+                                className="ti-btn ti-btn-primary"
+                              >
+                                <i className="ri-add-line me-2"></i> Add First Timeline
+                              </Link>
+                            )}
                           </div>
                         </td>
                       </tr>
