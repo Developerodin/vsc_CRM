@@ -104,6 +104,20 @@ const AddClientPage = () => {
     }
   ]);
 
+  // Add these state variables after the existing useState declarations
+  const [showBusinessTypeModal, setShowBusinessTypeModal] = useState(false);
+  const [showEntityTypeModal, setShowEntityTypeModal] = useState(false);
+  const [businessTypes, setBusinessTypes] = useState<Array<{id: string, name: string}>>([]);
+  const [entityTypes, setEntityTypes] = useState<Array<{id: string, name: string}>>([]);
+  const [businessTypeSearch, setBusinessTypeSearch] = useState("");
+  const [entityTypeSearch, setEntityTypeSearch] = useState("");
+  const [businessTypePage, setBusinessTypePage] = useState(1);
+  const [entityTypePage, setEntityTypePage] = useState(1);
+  const [businessTypeTotalPages, setBusinessTypeTotalPages] = useState(1);
+  const [entityTypeTotalPages, setEntityTypeTotalPages] = useState(1);
+  const [businessTypeLoading, setBusinessTypeLoading] = useState(false);
+  const [entityTypeLoading, setEntityTypeLoading] = useState(false);
+
   // Fetch activities
   useEffect(() => {
     const fetchActivities = async () => {
@@ -690,6 +704,156 @@ const AddClientPage = () => {
     }
   };
 
+  const fetchBusinessTypes = async (page = 1, search = "") => {
+    setBusinessTypeLoading(true);
+    try {
+      console.log('Fetching business types...', { page, search });
+      
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: '10',
+        name: search,
+        sortBy: 'name:asc'
+      });
+
+      const url = `${Base_url}business-master?${queryParams}`;
+      console.log('API URL:', url);
+
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error Response:', errorText);
+        throw new Error(`Failed to fetch business types: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('API Response Data:', data);
+      
+      if (data && data.results && Array.isArray(data.results)) {
+        setBusinessTypes(data.results);
+        setBusinessTypeTotalPages(data.totalPages || 1);
+        console.log('Business types set:', data.results);
+      } else {
+        console.error('Invalid data structure:', data);
+        // Fallback to some default business types if API fails
+        setBusinessTypes([
+          { id: '1', name: 'Information Technology' },
+          { id: '2', name: 'Manufacturing' },
+          { id: '3', name: 'Banking' },
+          { id: '4', name: 'Insurance' },
+          { id: '5', name: 'Construction' }
+        ]);
+        setBusinessTypeTotalPages(1);
+      }
+    } catch (err) {
+      console.error('Error fetching business types:', err);
+      toast.error(`Failed to fetch business types: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      
+      // Fallback to default business types on error
+      setBusinessTypes([
+        { id: '1', name: 'Information Technology' },
+        { id: '2', name: 'Manufacturing' },
+        { id: '3', name: 'Banking' },
+        { id: '4', name: 'Insurance' },
+        { id: '5', name: 'Construction' }
+      ]);
+      setBusinessTypeTotalPages(1);
+    } finally {
+      setBusinessTypeLoading(false);
+    }
+  };
+
+  const fetchEntityTypes = async (page = 1, search = "") => {
+    setEntityTypeLoading(true);
+    try {
+      console.log('Fetching entity types...', { page, search });
+      
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: '10',
+        name: search,
+        sortBy: 'name:asc'
+      });
+
+      const url = `${Base_url}entity-master?${queryParams}`;
+      console.log('API URL:', url);
+
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error Response:', errorText);
+        throw new Error(`Failed to fetch entity types: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('API Response Data:', data);
+      
+      if (data && data.results && Array.isArray(data.results)) {
+        setEntityTypes(data.results);
+        setEntityTypeTotalPages(data.totalPages || 1);
+        console.log('Entity types set:', data.results);
+      } else {
+        console.error('Invalid data structure:', data);
+        // Fallback to some default entity types if API fails
+        setEntityTypes([
+          { id: '1', name: 'Private Limited' },
+          { id: '2', name: 'Public Limited' },
+          { id: '3', name: 'Partnership' },
+          { id: '4', name: 'Proprietorship' },
+          { id: '5', name: 'LLP' }
+        ]);
+        setEntityTypeTotalPages(1);
+      }
+    } catch (err) {
+      console.error('Error fetching entity types:', err);
+      toast.error(`Failed to fetch entity types: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      
+      // Fallback to default entity types on error
+      setEntityTypes([
+        { id: '1', name: 'Private Limited' },
+        { id: '2', name: 'Public Limited' },
+        { id: '3', name: 'Partnership' },
+        { id: '4', name: 'Proprietorship' },
+        { id: '5', name: 'LLP' }
+      ]);
+      setEntityTypeTotalPages(1);
+    } finally {
+      setEntityTypeLoading(false);
+    }
+  };
+
+  const handleBusinessTypeSelect = (businessType: {id: string, name: string}) => {
+    setFormData(prev => ({
+      ...prev,
+      businessType: businessType.name
+    }));
+    setShowBusinessTypeModal(false);
+  };
+
+  const handleEntityTypeSelect = (entityType: {id: string, name: string}) => {
+    setFormData(prev => ({
+      ...prev,
+      entityType: entityType.name
+    }));
+    setShowEntityTypeModal(false);
+  };
+
   return (
     <div className="main-content">
       <Toaster position="top-right" />
@@ -929,61 +1093,67 @@ const AddClientPage = () => {
                     {/* Business Type */}
                     <div className="form-group">
                       <label htmlFor="businessType" className="form-label">Business Type</label>
-                      <select
-                        id="businessType"
-                        name="businessType"
-                        className="form-control"
-                        value={formData.businessType}
-                        onChange={handleInputChange}
-                      >
-                        <option value="">Select Business Type</option>
-                        <option value="Aviation">Aviation</option>
-                        <option value="Banking">Banking</option>
-                        <option value="Chemicals, Petrochemicals">Chemicals, Petrochemicals</option>
-                        <option value="Coal">Coal</option>
-                        <option value="Construction">Construction</option>
-                        <option value="Consultancy Services">Consultancy Services</option>
-                        <option value="Co-operatives">Co-operatives</option>
-                        <option value="Education">Education</option>
-                        <option value="Information Technology">Information Technology</option>
-                        <option value="Insurance">Insurance</option>
-                        <option value="Manufacturing">Manufacturing</option>
-                        <option value="Mining">Mining</option>
-                        <option value="Non Banking Financial Companies">Non Banking Financial Companies</option>
-                        <option value="Non Government Organisation">Non Government Organisation</option>
-                        <option value="Oil & Gas">Oil & Gas</option>
-                        <option value="Power">Power</option>
-                        <option value="Shipping">Shipping</option>
-                        <option value="Steel">Steel</option>
-                        <option value="Tele-Communication">Tele-Communication</option>
-                        <option value="Tourism">Tourism</option>
-                        <option value="Trading">Trading</option>
-                        <option value="Transport other than Shipping & Aviation">Transport other than Shipping & Aviation</option>
-                      </select>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          id="businessType"
+                          name="businessType"
+                          className="form-control"
+                          value={formData.businessType}
+                          placeholder="Select Business Type"
+                          readOnly
+                          onClick={() => {
+                            console.log('Opening business type modal...');
+                            setShowBusinessTypeModal(true);
+                            console.log('Modal state set to true');
+                            fetchBusinessTypes(1, "");
+                            console.log('Fetch business types called');
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="absolute right-0 top-0 h-full px-3 text-gray-400 hover:text-gray-600"
+                          onClick={() => {
+                            setShowBusinessTypeModal(true);
+                            fetchBusinessTypes(1, "");
+                          }}
+                        >
+                          <i className="ri-arrow-down-s-line"></i>
+                        </button>
+                      </div>
                     </div>
 
                     {/* Entity Type */}
                     <div className="form-group">
                       <label htmlFor="entityType" className="form-label">Entity Type</label>
-                      <select
-                        id="entityType"
-                        name="entityType"
-                        className="form-control"
-                        value={formData.entityType}
-                        onChange={handleInputChange}
-                      >
-                        <option value="">Select entity type</option>
-                        <option value="Proprietorship">Proprietorship</option>
-                        <option value="Partnership">Partnership</option>
-                        <option value="Private Limited">Private Limited</option>
-                        <option value="Public Limited">Public Limited</option>
-                        <option value="LLP">LLP</option>
-                        <option value="Sole Proprietorship">Sole Proprietorship</option>
-                        <option value="HUF">HUF</option>
-                        <option value="Trust">Trust</option>
-                        <option value="Society">Society</option>
-                        <option value="Other">Other</option>
-                      </select>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          id="entityType"
+                          name="entityType"
+                          className="form-control"
+                          value={formData.entityType}
+                          placeholder="Select Entity Type"
+                          readOnly
+                          onClick={() => {
+                            console.log('Opening entity type modal...');
+                            setShowEntityTypeModal(true);
+                            console.log('Modal state set to true');
+                            fetchEntityTypes(1, "");
+                            console.log('Fetch entity types called');
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="absolute right-0 top-0 h-full px-3 text-gray-400 hover:text-gray-600"
+                          onClick={() => {
+                            setShowEntityTypeModal(true);
+                            fetchEntityTypes(1, "");
+                          }}
+                        >
+                          <i className="ri-arrow-down-s-line"></i>
+                        </button>
+                      </div>
                     </div>
 
 
@@ -1536,6 +1706,181 @@ const AddClientPage = () => {
             <i className="ri-delete-bin-line"></i>
             Delete File
           </button>
+        </div>
+      )}
+
+      {/* Business Type Selection Modal */}
+      {showBusinessTypeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-hidden">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Select Business Type</h3>
+              <button
+                onClick={() => setShowBusinessTypeModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <i className="ri-close-line text-xl"></i>
+              </button>
+            </div>
+            
+            {/* Debug info */}
+            <div className="mb-2 text-xs text-gray-500">
+              Debug: Loading: {businessTypeLoading.toString()}, Count: {businessTypes.length}, Search: "{businessTypeSearch}"
+            </div>
+            
+            <div className="mb-4">
+              <input
+                type="text"
+                placeholder="Search business types..."
+                className="form-control w-full"
+                value={businessTypeSearch}
+                onChange={(e) => {
+                  setBusinessTypeSearch(e.target.value);
+                  setBusinessTypePage(1);
+                  fetchBusinessTypes(1, e.target.value);
+                }}
+              />
+            </div>
+
+            <div className="max-h-96 overflow-y-auto">
+              {businessTypeLoading ? (
+                <div className="text-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
+                </div>
+              ) : businessTypes.length === 0 ? (
+                <div className="text-center py-4 text-gray-500">
+                  No business types found
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {businessTypes.map((businessType) => (
+                    <button
+                      key={businessType.id}
+                      onClick={() => handleBusinessTypeSelect(businessType)}
+                      className="w-full text-left p-3 hover:bg-gray-100 rounded border border-gray-200 hover:border-primary transition-colors"
+                    >
+                      {businessType.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {businessTypeTotalPages > 1 && (
+              <div className="flex justify-center items-center space-x-2 mt-4">
+                <button
+                  onClick={() => {
+                    const newPage = businessTypePage - 1;
+                    setBusinessTypePage(newPage);
+                    fetchBusinessTypes(newPage, businessTypeSearch);
+                  }}
+                  disabled={businessTypePage === 1}
+                  className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <span className="px-3 py-1">
+                  Page {businessTypePage} of {businessTypeTotalPages}
+                </span>
+                <button
+                  onClick={() => {
+                    const newPage = businessTypePage + 1;
+                    setBusinessTypePage(newPage);
+                    fetchBusinessTypes(newPage, businessTypeSearch);
+                  }}
+                  disabled={businessTypePage === businessTypeTotalPages}
+                  className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Entity Type Selection Modal */}
+      {showEntityTypeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-hidden">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Select Entity Type</h3>
+              <button
+                onClick={() => setShowEntityTypeModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <i className="ri-close-line text-xl"></i>
+              </button>
+            </div>
+            
+            <div className="mb-4">
+              <input
+                type="text"
+                placeholder="Search entity types..."
+                className="form-control w-full"
+                value={entityTypeSearch}
+                onChange={(e) => {
+                  setEntityTypeSearch(e.target.value);
+                  setEntityTypePage(1);
+                  fetchEntityTypes(1, e.target.value);
+                }}
+              />
+            </div>
+
+            <div className="max-h-96 overflow-y-auto">
+              {entityTypeLoading ? (
+                <div className="text-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
+                </div>
+              ) : entityTypes.length === 0 ? (
+                <div className="text-center py-4 text-gray-500">
+                  No entity types found
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {entityTypes.map((entityType) => (
+                    <button
+                      key={entityType.id}
+                      onClick={() => handleEntityTypeSelect(entityType)}
+                      className="w-full text-left p-3 hover:bg-gray-100 rounded border border-gray-200 hover:border-primary transition-colors"
+                    >
+                      {entityType.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {entityTypeTotalPages > 1 && (
+              <div className="flex justify-center items-center space-x-2 mt-4">
+                <button
+                  onClick={() => {
+                    const newPage = entityTypePage - 1;
+                    setEntityTypePage(newPage);
+                    fetchEntityTypes(newPage, entityTypeSearch);
+                  }}
+                  disabled={entityTypePage === 1}
+                  className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <span className="px-3 py-1">
+                  Page {entityTypePage} of {entityTypeTotalPages}
+                </span>
+                <button
+                  onClick={() => {
+                    const newPage = entityTypePage + 1;
+                    setEntityTypePage(newPage);
+                    fetchEntityTypes(newPage, entityTypeSearch);
+                  }}
+                  disabled={entityTypePage === entityTypeTotalPages}
+                  className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
