@@ -5,7 +5,7 @@ import Link from "next/link";
 import { toast, Toaster } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { Base_url } from "@/app/api/config/BaseUrl";
-import { useGroupFilters, GroupWithTasks } from "./hooks/useGroupFilters";
+import { useGroupFilters, GroupWithTasks, AdvancedFilters, TaskStatus } from "./hooks/useGroupFilters";
 import { AdvancedFiltersPanel, ActiveFiltersSummary, SearchAndFilterControls } from "./components";
 
 interface Client {
@@ -220,7 +220,7 @@ const GroupsPage = () => {
         return { ...group, taskStats };
       });
       
-      // Apply advanced filters if any are active
+      // Apply advanced filters (Task Count, Client Count, Task Status)
       const filteredGroups = applyAdvancedFilters(groupsWithTasks);
       
       setGroups(filteredGroups);
@@ -238,15 +238,15 @@ const GroupsPage = () => {
     fetchGroups(currentPage, itemsPerPage);
   }, [currentPage, itemsPerPage, sortBy, filters.name, advancedFilters.clientName]);
 
-  // Separate useEffect for advanced filters to update task statistics
+  // Separate useEffect for advanced filters to update task statistics and reapply filters
   useEffect(() => {
     const updateTaskStats = async () => {
       const newTaskStatsMap = await fetchGroupTaskStats();
       setTaskStatsMap(newTaskStatsMap);
       
-      // Update existing groups with new task stats
-      setGroups(prevGroups => 
-        prevGroups.map(group => {
+      // Update existing groups with new task stats and reapply advanced filters
+      setGroups(prevGroups => {
+        const updatedGroups = prevGroups.map(group => {
           const taskStats = newTaskStatsMap.get(group.id) || {
             pending: 0,
             ongoing: 0,
@@ -257,12 +257,15 @@ const GroupsPage = () => {
             total: 0
           };
           return { ...group, taskStats };
-        })
-      );
+        });
+        
+        // Reapply advanced filters after updating task stats
+        return applyAdvancedFilters(updatedGroups);
+      });
     };
 
     updateTaskStats();
-  }, [advancedFilters]);
+  }, [advancedFilters, applyAdvancedFilters]);
 
   const handleSelectAll = () => {
     if (selectAll) {
@@ -762,6 +765,38 @@ const GroupsPage = () => {
     setSortBy("name:asc");
     clearAdvancedFilters();
     setCurrentPage(1);
+    
+    // Refresh the groups data to show all groups without any filters
+    fetchGroups(1, itemsPerPage);
+  };
+
+  // Handle advanced filter changes
+  const handleAdvancedFilterChange = (key: keyof AdvancedFilters, value: string | TaskStatus) => {
+    console.log(`Advanced filter changed: ${key} = ${value}`);
+    updateFilter(key, value);
+    setCurrentPage(1); // Reset to first page when filters change
+    
+    // Refresh the groups data to apply the new filters
+    fetchGroups(1, itemsPerPage);
+  };
+
+  // Handle task status filter changes
+  const handleTaskStatusFilterChange = (status: keyof TaskStatus, value: boolean) => {
+    console.log(`Task status filter changed: ${status} = ${value}`);
+    updateTaskStatusFilter(status, value);
+    setCurrentPage(1); // Reset to first page when filters change
+    
+    // Refresh the groups data to apply the new filters
+    fetchGroups(1, itemsPerPage);
+  };
+
+  // Handle clear all filters
+  const handleClearAllFilters = () => {
+    clearAdvancedFilters();
+    setCurrentPage(1);
+    
+    // Refresh the groups data to show all groups without filters
+    fetchGroups(currentPage, itemsPerPage);
   };
 
   return (
@@ -874,28 +909,61 @@ const GroupsPage = () => {
               <AdvancedFiltersPanel
                 showAdvancedFilters={showAdvancedFilters}
                 advancedFilters={advancedFilters}
-                onUpdateFilter={(key, value) => {
-                  updateFilter(key, value);
-                  setCurrentPage(1);
-                }}
-                onUpdateTaskStatusFilter={(status, value) => {
-                  updateTaskStatusFilter(status, value);
-                  setCurrentPage(1);
-                }}
-                onClearFilters={() => {
-                  clearAdvancedFilters();
-                  setCurrentPage(1);
-                }}
+                onUpdateFilter={handleAdvancedFilterChange}
+                onUpdateTaskStatusFilter={handleTaskStatusFilterChange}
+                onClearFilters={handleClearAllFilters}
               />
 
               {/* Active Filters Summary */}
               <ActiveFiltersSummary
                 advancedFilters={advancedFilters}
-                onClearAll={() => {
-                  clearAdvancedFilters();
-                  setCurrentPage(1);
-                }}
+                onClearAll={handleClearAllFilters}
               />
+
+              {/* Advanced Filters Summary */}
+              {hasActiveAdvancedFilters() && (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <span className="text-sm font-medium text-blue-800">Active Advanced Filters:</span>
+                      
+                      {advancedFilters.clientName && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                          Client: {advancedFilters.clientName}
+                        </span>
+                      )}
+                      
+                      {(advancedFilters.minTasks || advancedFilters.maxTasks) && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                          Tasks: {advancedFilters.minTasks || '0'} - {advancedFilters.maxTasks || '∞'}
+                        </span>
+                      )}
+                      
+                      {(advancedFilters.minClients || advancedFilters.maxClients) && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                          Clients: {advancedFilters.minClients || '0'} - {advancedFilters.maxClients || '∞'}
+                        </span>
+                      )}
+                      
+                      {Object.entries(advancedFilters.taskStatus).some(([status, isActive]) => isActive) && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                          Status: {Object.entries(advancedFilters.taskStatus)
+                            .filter(([status, isActive]) => isActive)
+                            .map(([status]) => status.charAt(0).toUpperCase() + status.slice(1))
+                            .join(', ')}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={handleClearAllFilters}
+                      className="text-blue-600 hover:text-blue-800 text-sm"
+                    >
+                      <i className="ri-close-line me-1"></i>
+                      Clear All Advanced Filters
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Search Results Indicator */}
               {filters.name && (
