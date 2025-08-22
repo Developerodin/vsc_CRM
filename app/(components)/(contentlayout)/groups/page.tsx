@@ -139,6 +139,8 @@ const GroupsPage = () => {
         limit: '1000', // Get all groups' task stats
         // Pass the same filters as groups
         ...(filters.name && { name: filters.name }),
+        // Also pass client search filter if available
+        ...(advancedFilters.clientName && { client: advancedFilters.clientName }),
       });
 
       console.log('Fetching task statistics with query params:', queryParams.toString());
@@ -182,7 +184,11 @@ const GroupsPage = () => {
         limit: itemsPerPage.toString(),
         sortBy,
         ...(filters.name && { name: filters.name }),
+        // Also pass client search filter if available
+        ...(advancedFilters.clientName && { client: advancedFilters.clientName }),
       });
+
+      console.log('Fetching groups with query params:', queryParams.toString());
 
       const response = await fetch(`${Base_url}groups?${queryParams}`, {
         headers: {
@@ -230,7 +236,7 @@ const GroupsPage = () => {
 
   useEffect(() => {
     fetchGroups(currentPage, itemsPerPage);
-  }, [currentPage, itemsPerPage, sortBy, filters.name]);
+  }, [currentPage, itemsPerPage, sortBy, filters.name, advancedFilters.clientName]);
 
   // Separate useEffect for advanced filters to update task statistics
   useEffect(() => {
@@ -542,8 +548,10 @@ const GroupsPage = () => {
       const queryParams = new URLSearchParams({
         page: clientCurrentPage.toString(),
         limit: "10",
-        ...(clientSearchQuery && { name: clientSearchQuery })
+        ...(clientSearchQuery && { search: clientSearchQuery })
       });
+
+      console.log('Fetching clients with query params:', queryParams.toString());
 
       // First get the group details to get the clients
       const groupResponse = await fetch(`${Base_url}groups/${groupId}`, {
@@ -560,12 +568,21 @@ const GroupsPage = () => {
       
       // If the group has clients array, use it directly
       if (Array.isArray(groupData.clients)) {
-        const searchedClients = groupData.clients.filter((client: Client) => client.name.toLowerCase().includes(clientSearchQuery.toLowerCase()));
+        let searchedClients = groupData.clients;
+        
+        // Apply search filter if search query exists
+        if (clientSearchQuery) {
+          searchedClients = groupData.clients.filter((client: Client) => 
+            client.name.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+            client.email.toLowerCase().includes(clientSearchQuery.toLowerCase())
+          );
+        }
+        
         setAvailableClients(searchedClients);
         setClientTotalResults(searchedClients.length);
         setClientTotalPages(Math.ceil(searchedClients.length / 10));
       } else {
-        // If no clients array, fetch clients for the group
+        // If no clients array, fetch clients for the group with search
         const clientsResponse = await fetch(`${Base_url}groups/${groupId}/clients?${queryParams}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -1141,6 +1158,30 @@ const GroupsPage = () => {
                   </div>
                 </div>
 
+                {/* Client Search Results Indicator */}
+                {clientSearchQuery && (
+                  <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <i className="ri-search-line text-green-600 mr-2"></i>
+                        <span className="text-sm font-medium text-green-800">
+                          Search Results for "{clientSearchQuery}": {availableClients.length} clients found
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setClientSearchQuery("");
+                          setClientCurrentPage(1);
+                        }}
+                        className="text-green-600 hover:text-green-800 text-sm"
+                      >
+                        <i className="ri-close-line mr-1"></i>
+                        Clear Search
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {isLoadingClients ? (
                   <div className="flex items-center justify-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -1178,7 +1219,32 @@ const GroupsPage = () => {
                         ) : (
                           <tr>
                             <td colSpan={5} className="text-center py-8">
-                              No clients found
+                              <div className="flex flex-col items-center justify-center">
+                                <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                                  <i className="ri-search-line text-2xl text-gray-400"></i>
+                                </div>
+                                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                  {clientSearchQuery ? 'No Clients Found' : 'No Clients Available'}
+                                </h3>
+                                <p className="text-gray-500 text-center mb-4">
+                                  {clientSearchQuery 
+                                    ? `No clients found matching "${clientSearchQuery}". Try adjusting your search terms.`
+                                    : 'This group has no clients assigned yet.'
+                                  }
+                                </p>
+                                {clientSearchQuery && (
+                                  <button
+                                    onClick={() => {
+                                      setClientSearchQuery("");
+                                      setClientCurrentPage(1);
+                                    }}
+                                    className="ti-btn ti-btn-primary"
+                                  >
+                                    <i className="ri-refresh-line me-2"></i>
+                                    Clear Search
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         )}
