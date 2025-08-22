@@ -402,13 +402,13 @@ const TaskManagement = () => {
               accept=".xlsx,.xls"
               className="hidden"
             />
-            <button
+            {/* <button
               onClick={() => fileInputRef.current?.click()}
               className="ti-btn ti-btn-success"
             >
               <i className="ri-download-2-line me-2"></i>
               Import
-            </button>
+            </button> */}
             <button
               type="button"
               className="ti-btn ti-btn-primary"

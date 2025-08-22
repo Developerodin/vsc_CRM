@@ -68,7 +68,7 @@ interface ExcelRow {
 }
 
 const TimelinesPage = () => {
-  const [activeTab, setActiveTab] = useState<'timelines' | 'tasks'>('timelines');
+  const [activeTab, setActiveTab] = useState<'timelines' | 'tasks'>('tasks');
   const [selectedTimelines, setSelectedTimelines] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [timelines, setTimelines] = useState<Timeline[]>([]);
@@ -450,17 +450,6 @@ const TimelinesPage = () => {
           <div className="box !bg-transparent border-0 shadow-none mb-6">
             <div className="flex border-b border-gray-200">
               <button
-                onClick={() => setActiveTab('timelines')}
-                className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'timelines'
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <i className="ri-time-line me-2"></i>
-                Timelines
-              </button>
-              <button
                 onClick={() => setActiveTab('tasks')}
                 className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === 'tasks'
@@ -471,11 +460,24 @@ const TimelinesPage = () => {
                 <i className="ri-task-line me-2"></i>
                 Task Management
               </button>
+              <button
+                onClick={() => setActiveTab('timelines')}
+                className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'timelines'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <i className="ri-time-line me-2"></i>
+                Timelines
+              </button>
             </div>
           </div>
 
           {/* Content Box */}
-          {activeTab === 'timelines' ? (
+          {activeTab === 'tasks' ? (
+            <TaskManagement />
+          ) : (
             <div className="box">
               <div className="box-body">
                 {/* Status Summary Cards */}
@@ -619,22 +621,6 @@ const TimelinesPage = () => {
                 </div>
               </div>
 
-              {/* Import Progress */}
-              {/* {importProgress > 0 && importProgress < 100 && (
-                <div className="mb-4">
-                  <div className="flex justify-between mb-1">
-                    <span>Importing...</span>
-                    <span>{Math.round(importProgress)}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-primary h-2 rounded-full"
-                      style={{ width: `${importProgress}%` }}
-                    ></div>
-                  </div>
-                </div>
-              )} */}
-
               {/* Timelines Table */}
               <div className="table-responsive">
                 <table className="table whitespace-nowrap table-bordered">
@@ -677,7 +663,7 @@ const TimelinesPage = () => {
                       </tr>
                     ) : timelines.length === 0 ? (
                       <tr>
-                                                    <td colSpan={10} className="text-center py-8">
+                        <td colSpan={10} className="text-center py-8">
                           <div className="flex flex-col items-center justify-center">
                             <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
                               <i className="ri-time-line text-4xl text-primary"></i>
@@ -825,8 +811,6 @@ const TimelinesPage = () => {
               )}
             </div>
           </div>
-        ) : (
-          <TaskManagement />
         )}
         </div>
       </div>
