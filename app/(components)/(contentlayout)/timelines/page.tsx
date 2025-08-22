@@ -638,10 +638,6 @@ const TimelinesPage = () => {
                       <th className="px-4 py-3">Client Name</th>
                       <th className="px-4 py-3">Client Email</th>
                       <th className="px-4 py-3">Frequency</th>
-                      <th className="px-4 py-3">Turnover</th>
-
-                      <th className="px-4 py-3">Start Date</th>
-                      <th className="px-4 py-3">End Date</th>
                       <th className="px-4 py-3">Status</th>
                       <th className="px-4 py-3">Actions</th>
                     </tr>
@@ -649,7 +645,7 @@ const TimelinesPage = () => {
                   <tbody>
                     {isLoading ? (
                       <tr>
-                        <td colSpan={10} className="text-center py-4">
+                        <td colSpan={7} className="text-center py-4">
                           <div className="flex justify-center">
                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                           </div>
@@ -657,13 +653,13 @@ const TimelinesPage = () => {
                       </tr>
                     ) : error ? (
                       <tr>
-                        <td colSpan={10} className="text-center text-red-500 py-4">
+                        <td colSpan={7} className="text-center text-red-500 py-4">
                           {error}
                         </td>
                       </tr>
                     ) : timelines.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="text-center py-8">
+                        <td colSpan={7} className="text-center py-8">
                           <div className="flex flex-col items-center justify-center">
                             <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
                               <i className="ri-time-line text-4xl text-primary"></i>
@@ -698,10 +694,6 @@ const TimelinesPage = () => {
                           <td>{timeline.client?.name || "-"}</td>
                           <td>{timeline.client?.email || "-"}</td>
                           <td>{timeline.frequency}</td>
-                          <td>{timeline.turnover || "-"}</td>
-
-                          <td>{timeline.startDate ? new Date(timeline.startDate).toISOString().split('T')[0] : "-"}</td>
-                          <td>{timeline.endDate ? new Date(timeline.endDate).toISOString().split('T')[0] : "-"}</td>
                           <td>
                             <span className={`badge ${
                               timeline.status === 'completed' ? 'bg-success' :

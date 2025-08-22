@@ -192,6 +192,22 @@ export const MenuItems: any = [
         path: "/activities",
       },
       {
+        title: "Business Master",
+        type: "link",
+        active: false,
+        selected: false,
+        dirchange: false,
+        path: "/settings/business-master",
+      },
+      {
+        title: "Entity Master",
+        type: "link",
+        active: false,
+        selected: false,
+        dirchange: false,
+        path: "/settings/entity-master",
+      },
+      {
         title: "Branches",
         type: "link",
         active: false,
