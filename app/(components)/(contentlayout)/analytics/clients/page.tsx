@@ -438,7 +438,7 @@ const AnalyticsClientsPage = () => {
                     <input
                       type="text"
                       className="form-control py-2 w-full pl-10 pr-4"
-                      placeholder="Search by name, email, phone, city, business type, PAN..."
+                      placeholder="Search clients, activities, business details..."
                       value={searchQuery}
                       onChange={(e) => {
                         setSearchQuery(e.target.value);
@@ -462,6 +462,12 @@ const AnalyticsClientsPage = () => {
                       </button>
                     )}
                   </div>
+                  
+                  {/* Search Help Text */}
+                  {/* <div className="text-xs text-gray-500 mt-1 lg:mt-0 lg:ml-3">
+                    <i className="ri-information-line mr-1"></i>
+                    Search across: Client name, email, phone, activities, business details, PAN, GST, etc.
+                  </div> */}
 
                   {/* Filter button */}
                   <button
@@ -747,6 +753,27 @@ const AnalyticsClientsPage = () => {
                 </div>
               )}
 
+              {/* Search Results Summary */}
+              {debouncedSearchQuery && !isLoading && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <i className="ri-search-eye-line text-green-600 mr-2"></i>
+                      <span className="text-sm font-medium text-green-800">
+                        Search Results for "{debouncedSearchQuery}"
+                      </span>
+                    </div>
+                    <span className="text-sm text-green-600">
+                      Found {totalResults} result{totalResults !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <div className="text-xs text-green-600 mt-1">
+                    <i className="ri-information-line mr-1"></i>
+                    Search includes: Client names, emails, phones, activities, business types, PAN, GST, TAN, CIN, Udyam, IEC codes, and more
+                  </div>
+                </div>
+              )}
+
               {/* Active Filters Summary */}
               {(searchQuery || Object.values(filters).some(f => f !== "")) && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
@@ -781,7 +808,11 @@ const AnalyticsClientsPage = () => {
                   <div className="flex flex-wrap gap-2 mt-2">
                     {debouncedSearchQuery && (
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        Search: "{debouncedSearchQuery}"
+                        <i className="ri-search-line mr-1"></i>
+                        Global Search: "{debouncedSearchQuery}"
+                        <span className="ml-2 text-xs text-green-600">
+                          (clients, activities, business details)
+                        </span>
                         <button
                           className="ml-1 text-green-600 hover:text-green-800"
                           onClick={() => setSearchQuery("")}
@@ -928,25 +959,79 @@ const AnalyticsClientsPage = () => {
                               <div className="flex flex-col">
                                 <button
                                   onClick={() => router.push(`/analytics/clients/${client._id}/overview`)}
-                                  className="font-medium text-gray-900 hover:text-blue-600 hover:underline cursor-pointer text-left"
+                                  className={`font-medium text-gray-900 hover:text-blue-600 hover:underline cursor-pointer text-left ${
+                                    debouncedSearchQuery && client.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) 
+                                      ? 'bg-yellow-100 text-yellow-800 px-1 rounded' 
+                                      : ''
+                                  }`}
                                 >
                                   {client.name}
+                                  {debouncedSearchQuery && client.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) && (
+                                    <i className="ri-search-line ml-1 text-xs"></i>
+                                  )}
                                 </button>
-                                <div className="text-sm text-gray-500 flex items-center">
+                                <div className={`text-sm text-gray-500 flex items-center ${
+                                  debouncedSearchQuery && client.email.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) 
+                                    ? 'bg-yellow-100 text-yellow-800 px-1 rounded' 
+                                    : ''
+                                }`}>
                                   <i className="ri-mail-line mr-1 text-gray-400"></i>
                                   {client.email}
+                                  {debouncedSearchQuery && client.email.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) && (
+                                    <i className="ri-search-line ml-1 text-xs"></i>
+                                  )}
                                 </div>
-                                <div className="text-sm text-gray-500 flex items-center">
+                                <div className={`text-sm text-gray-500 flex items-center ${
+                                  debouncedSearchQuery && client.phone.includes(debouncedSearchQuery) 
+                                    ? 'bg-yellow-100 text-yellow-800 px-1 rounded' 
+                                    : ''
+                                }`}>
                                   <i className="ri-phone-line mr-1 text-gray-400"></i>
                                   {client.phone}
+                                  {debouncedSearchQuery && client.phone.includes(debouncedSearchQuery) && (
+                                    <i className="ri-search-line ml-1 text-xs"></i>
+                                  )}
                                 </div>
                               </div>
                             </td>
-                                                         <td>{client.district}</td>
-                             <td>{client.pan}</td>
+                            <td className={`${
+                              debouncedSearchQuery && client.district?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) 
+                                ? 'bg-yellow-100 text-yellow-800 px-1 rounded' 
+                                : ''
+                            }`}>
+                              {client.district}
+                              {debouncedSearchQuery && client.district?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) && (
+                                <i className="ri-search-line ml-1 text-xs"></i>
+                              )}
+                            </td>
+                            <td className={`${
+                              debouncedSearchQuery && client.pan?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) 
+                                ? 'bg-yellow-100 text-yellow-800 px-1 rounded' 
+                                : ''
+                            }`}>
+                              {client.pan}
+                              {debouncedSearchQuery && client.pan?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) && (
+                                <i className="ri-search-line ml-1 text-xs"></i>
+                              )}
+                            </td>
                             <td>
                               <div className="text-sm text-gray-900">
-                                {client.activities?.summary?.map((activity: any) => activity.name).join(', ') || 'No activities'}
+                                {client.activities?.summary?.map((activity: any, index: number) => {
+                                  const isActivityMatch = debouncedSearchQuery && 
+                                    activity.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
+                                  
+                                  return (
+                                    <span key={activity.id || index}>
+                                      <span className={`${isActivityMatch ? 'bg-yellow-100 text-yellow-800 px-1 rounded' : ''}`}>
+                                        {activity.name}
+                                        {isActivityMatch && (
+                                          <i className="ri-search-line ml-1 text-xs"></i>
+                                        )}
+                                      </span>
+                                      {index < client.activities.summary.length - 1 ? ', ' : ''}
+                                    </span>
+                                  );
+                                }) || 'No activities'}
                               </div>
                             </td>
                             <td>

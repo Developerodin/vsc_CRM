@@ -21,7 +21,7 @@ const ClientOverviewPage = () => {
   const [clientData, setClientData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'personal' | 'activity' | 'task' | 'team'>('personal');
+  const [activeTab, setActiveTab] = useState<'personal' | 'activity' | 'task'>('personal');
 
   useEffect(() => {
     if (clientId) {
@@ -323,16 +323,6 @@ const ClientOverviewPage = () => {
             >
               Task
             </button>
-            <button
-              onClick={() => setActiveTab('team')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'team'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Team Member
-            </button>
           </nav>
         </div>
 
@@ -389,21 +379,6 @@ const ClientOverviewPage = () => {
             <div className="space-y-6">
               <h3 className="text-lg font-semibold text-gray-900">Activities Overview</h3>
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <div className="text-center">
-                  <p className="text-sm font-medium text-gray-600">Total Activities</p>
-                  <p className="text-3xl font-bold text-blue-600">{activities.summary.length}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-medium text-gray-600">Total Timelines</p>
-                  <p className="text-3xl font-bold text-green-600">{timelines.total}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-medium text-gray-600">Categories</p>
-                  <p className="text-3xl font-bold text-purple-600">{Object.keys(activities.byCategory).length}</p>
-                </div>
-              </div>
-
               {activities.summary && activities.summary.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full">
@@ -413,13 +388,7 @@ const ClientOverviewPage = () => {
                           Activity
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Category
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Frequency
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Frequency Config
+                          Due Date
                         </th>
                       </tr>
                     </thead>
@@ -430,27 +399,22 @@ const ClientOverviewPage = () => {
                             <div className="text-sm font-medium text-gray-900">{activity.name}</div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
-                              {activity.category || 'Uncategorized'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
-                              {activity.frequency}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
                               {activity.frequency === 'Monthly' && activity.frequencyConfig?.monthlyDay && activity.frequencyConfig?.monthlyTime ? (
-                                `Day ${activity.frequencyConfig.monthlyDay} at ${activity.frequencyConfig.monthlyTime}`
+                                `Monthly on day ${activity.frequencyConfig.monthlyDay} at ${activity.frequencyConfig.monthlyTime}`
                               ) : activity.frequency === 'Weekly' && activity.frequencyConfig?.weeklyDays ? (
-                                `Days: ${activity.frequencyConfig.weeklyDays.join(', ')}`
+                                `Weekly on ${activity.frequencyConfig.weeklyDays.join(', ')} at ${activity.frequencyConfig.weeklyTime || 'Default time'}`
                               ) : activity.frequency === 'Quarterly' && activity.frequencyConfig?.quarterlyMonths ? (
-                                `Months: ${activity.frequencyConfig.quarterlyMonths.join(', ')}`
+                                `Quarterly in ${activity.frequencyConfig.quarterlyMonths.join(', ')} on day ${activity.frequencyConfig.quarterlyDay || 'Default'} at ${activity.frequencyConfig.quarterlyTime || 'Default time'}`
                               ) : activity.frequency === 'Yearly' && activity.frequencyConfig?.yearlyMonth ? (
-                                `Month: ${activity.frequencyConfig.yearlyMonth.join(', ')}`
-                              ) : 'Default'
-                              }
+                                `Yearly in ${activity.frequencyConfig.yearlyMonth.join(', ')} on day ${activity.frequencyConfig.yearlyDate || 'Default'} at ${activity.frequencyConfig.yearlyTime || 'Default time'}`
+                              ) : activity.frequency === 'Daily' && activity.frequencyConfig?.dailyTime ? (
+                                `Daily at ${activity.frequencyConfig.dailyTime}`
+                              ) : activity.frequency === 'Hourly' && activity.frequencyConfig?.hourlyInterval ? (
+                                `Every ${activity.frequencyConfig.hourlyInterval} hour(s)`
+                              ) : (
+                                activity.frequency
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -461,77 +425,6 @@ const ClientOverviewPage = () => {
               ) : (
                 <div className="text-center py-8">
                   <p className="text-gray-500">No activities found for this client.</p>
-                </div>
-              )}
-
-              {/* Timeline Details */}
-              {timelines.summary && timelines.summary.length > 0 && (
-                <div className="mt-8">
-                  <h4 className="text-lg font-semibold text-gray-900 mb-4">Timeline Details</h4>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Activity
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Status
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Frequency
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Progress
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Next Due
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {timelines.summary.map((timeline: any) => (
-                          <tr key={timeline.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-gray-900">{timeline.activity?.name}</div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`px-2 py-1 text-xs rounded-full border ${
-                                timeline.status === 'completed' ? 'bg-green-100 text-green-800 border-green-200' :
-                                timeline.status === 'pending' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
-                                'bg-blue-100 text-blue-800 border-blue-200'
-                              }`}>
-                                {timeline.status}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-800">
-                                {timeline.frequency}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="flex items-center">
-                                <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
-                                  <div 
-                                    className="bg-blue-600 h-2 rounded-full" 
-                                    style={{ width: `${(timeline.completedPeriods / timeline.totalPeriods) * 100}%` }}
-                                  ></div>
-                                </div>
-                                <span className="text-sm text-gray-600">
-                                  {timeline.completedPeriods}/{timeline.totalPeriods}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">
-                                {new Date(timeline.startDate).toLocaleDateString()}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
                 </div>
               )}
             </div>
@@ -634,94 +527,6 @@ const ClientOverviewPage = () => {
               ) : (
                 <div className="text-center py-8">
                   <p className="text-gray-500">No tasks found for this client.</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Team Member Tab */}
-          {activeTab === 'team' && (
-            <div className="space-y-6">
-              <h3 className="text-lg font-semibold text-gray-900">Team Members Overview</h3>
-              
-              <div className="text-center mb-6">
-                <p className="text-sm font-medium text-gray-600">Total Team Members</p>
-                <p className="text-3xl font-bold text-blue-600">{teamMembers.total}</p>
-              </div>
-
-              {teamMembers.summary && teamMembers.summary.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Team Member
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Contact
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Skills
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Task Stats
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Completion Rate
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {teamMembers.summary.map((member: any) => (
-                        <tr key={member.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
-                                {member.name.charAt(0).toUpperCase()}
-                              </div>
-                              <div className="ml-4">
-                                <div className="text-sm font-medium text-gray-900">{member.name}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">{member.email}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex flex-wrap gap-1">
-                              {member.skills.slice(0, 3).map((skill: any) => (
-                                <span
-                                  key={skill.id}
-                                  className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full"
-                                >
-                                  {skill.name}
-                                </span>
-                              ))}
-                              {member.skills.length > 3 && (
-                                <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
-                                  +{member.skills.length - 3}
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              {member.taskStats.completedTasks} / {member.taskStats.totalTasks}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="px-2 py-1 text-xs rounded-full border bg-green-100 text-green-800 border-green-200">
-                              {member.taskStats.completionRate}%
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-gray-500">No team members found for this client.</p>
                 </div>
               )}
             </div>
