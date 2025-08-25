@@ -22,6 +22,23 @@ const ClientOverviewPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'personal' | 'activity' | 'task'>('personal');
+  
+  // Task tab filters and pagination state
+  const [taskFilters, setTaskFilters] = useState({
+    activitySearch: '',
+    startDate: '',
+    endDate: '',
+    priority: '',
+    status: '',
+    teamMemberId: ''
+  });
+  const [taskPagination, setTaskPagination] = useState({
+    page: 1,
+    limit: 10,
+    totalPages: 1,
+    totalTasks: 0
+  });
+  const [filteredTasks, setFilteredTasks] = useState<any[]>([]);
 
   useEffect(() => {
     if (clientId) {
@@ -29,12 +46,50 @@ const ClientOverviewPage = () => {
     }
   }, [clientId]);
 
-  const fetchClientOverview = async () => {
+  // Apply filters when they change
+  useEffect(() => {
+    if (clientData?.tasks?.recent) {
+      // Call API with current filters and pagination
+      fetchClientOverview(taskFilters, taskPagination);
+    }
+  }, [taskFilters, taskPagination.page]);
+
+  const fetchClientOverview = async (filters: any = {}, pagination: any = { page: 1, limit: 10 }) => {
     try {
       setLoading(true);
       setError(null);
       
-      const response = await axios.get(`${Base_url}analytics/clients/${clientId}/overview`, {
+      // Build query parameters
+      const queryParams = new URLSearchParams();
+      
+      // Add filters
+      if (filters.activitySearch) {
+        queryParams.append('activitySearch', filters.activitySearch);
+      }
+      if (filters.startDate) {
+        queryParams.append('startDate', filters.startDate);
+      }
+      if (filters.endDate) {
+        queryParams.append('endDate', filters.endDate);
+      }
+      if (filters.priority) {
+        queryParams.append('priority', filters.priority);
+      }
+      if (filters.status) {
+        queryParams.append('status', filters.status);
+      }
+      if (filters.teamMemberId) {
+        queryParams.append('teamMemberId', filters.teamMemberId);
+      }
+      
+      // Add pagination
+      queryParams.append('page', pagination.page.toString());
+      queryParams.append('limit', pagination.limit.toString());
+      
+      const url = `${Base_url}analytics/clients/${clientId}/overview?${queryParams.toString()}`;
+      console.log('API URL:', url);
+      
+      const response = await axios.get(url, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -42,12 +97,66 @@ const ClientOverviewPage = () => {
       
       console.log('Client overview API response:', response.data);
       setClientData(response.data.data);
+      
+      // Update filtered tasks and pagination from API response
+      if (response.data.data?.tasks?.recent) {
+        setFilteredTasks(response.data.data.tasks.recent);
+        setTaskPagination({
+          page: response.data.data.tasks.pagination?.page || 1,
+          limit: response.data.data.tasks.pagination?.limit || 10,
+          totalPages: response.data.data.tasks.pagination?.totalPages || 1,
+          totalTasks: response.data.data.tasks.pagination?.totalTasks || 0
+        });
+      }
     } catch (err) {
       console.error('Error fetching client overview:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch client overview');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Handle filter changes
+  const handleFilterChange = (filterName: string, value: string) => {
+    setTaskFilters(prev => ({
+      ...prev,
+      [filterName]: value
+    }));
+    
+    // Reset to first page when filters change
+    setTaskPagination(prev => ({
+      ...prev,
+      page: 1
+    }));
+  };
+
+  // Handle pagination
+  const handlePageChange = (newPage: number) => {
+    setTaskPagination(prev => ({
+      ...prev,
+      page: newPage
+    }));
+    
+    // API call will be triggered by useEffect
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setTaskFilters({
+      activitySearch: '',
+      startDate: '',
+      endDate: '',
+      priority: '',
+      status: '',
+      teamMemberId: ''
+    });
+    
+    setTaskPagination(prev => ({
+      ...prev,
+      page: 1
+    }));
+    
+    // API call will be triggered by useEffect
   };
 
   if (loading) {
@@ -454,7 +563,107 @@ const ClientOverviewPage = () => {
                 </div>
               </div>
 
-              {tasks.recent && tasks.recent.length > 0 ? (
+              {/* Filters */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+                  {/* Activity Search */}
+                  <div className="lg:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Search Activity</label>
+                    <input
+                      type="text"
+                      placeholder="Search by activity name..."
+                      value={taskFilters.activitySearch}
+                      onChange={(e) => handleFilterChange('activitySearch', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  {/* Start Date */}
+                  <div className="lg:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                    <input
+                      type="date"
+                      value={taskFilters.startDate}
+                      onChange={(e) => handleFilterChange('startDate', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  {/* End Date */}
+                  <div className="lg:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                    <input
+                      type="date"
+                      value={taskFilters.endDate}
+                      onChange={(e) => handleFilterChange('endDate', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  {/* Priority Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                    <select
+                      value={taskFilters.priority}
+                      onChange={(e) => handleFilterChange('priority', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">All Priority</option>
+                      <option value="high">High</option>
+                      <option value="medium">Medium</option>
+                      <option value="low">Low</option>
+                    </select>
+                  </div>
+
+                  {/* Status Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select
+                      value={taskFilters.status}
+                      onChange={(e) => handleFilterChange('status', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">All Status</option>
+                      <option value="pending">Pending</option>
+                      <option value="ongoing">Ongoing</option>
+                      <option value="completed">Completed</option>
+                      <option value="on_hold">On Hold</option>
+                      <option value="delayed">Delayed</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  </div>
+
+                  {/* Team Member Filter */}
+                  {/* <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Team Member</label>
+                    <select
+                      value={taskFilters.teamMemberId}
+                      onChange={(e) => handleFilterChange('teamMemberId', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">All Team Members</option>
+                      {clientData?.teamMembers?.summary?.map((member: any) => (
+                        <option key={member.id} value={member.id}>{member.name}</option>
+                      ))}
+                    </select>
+                  </div> */}
+                </div>
+
+                {/* Filter Actions */}
+                <div className="flex justify-between items-center mt-4">
+                  <div className="text-sm text-gray-600">
+                    Showing {filteredTasks.length} of {taskPagination.totalTasks} tasks
+                  </div>
+                  <button
+                    onClick={clearFilters}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    Clear Filters
+                  </button>
+                </div>
+              </div>
+
+              {filteredTasks && filteredTasks.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gray-50">
@@ -480,11 +689,11 @@ const ClientOverviewPage = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {tasks.recent.map((task: any) => (
+                      {filteredTasks.map((task: any) => (
                         <tr key={task.id} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">
-                              Professional Tax Payment
+                              {task.activity?.name || 'Professional Tax Payment'}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -527,6 +736,31 @@ const ClientOverviewPage = () => {
               ) : (
                 <div className="text-center py-8">
                   <p className="text-gray-500">No tasks found for this client.</p>
+                </div>
+              )}
+
+              {/* Pagination */}
+              {taskPagination.totalPages > 1 && (
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-700">
+                    Page {taskPagination.page} of {taskPagination.totalPages}
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => handlePageChange(taskPagination.page - 1)}
+                      disabled={taskPagination.page <= 1}
+                      className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={() => handlePageChange(taskPagination.page + 1)}
+                      disabled={taskPagination.page >= taskPagination.totalPages}
+                      className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
