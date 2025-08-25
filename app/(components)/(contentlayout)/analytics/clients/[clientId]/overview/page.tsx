@@ -487,7 +487,7 @@ const ClientOverviewPage = () => {
           {activeTab === 'activity' && (
             <div className="space-y-6">
               <h3 className="text-lg font-semibold text-gray-900">Activities Overview</h3>
-              
+
               {activities.summary && activities.summary.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full">
@@ -736,15 +736,15 @@ const ClientOverviewPage = () => {
               ) : (
                 <div className="text-center py-8">
                   <p className="text-gray-500">No tasks found for this client.</p>
-                </div>
-              )}
+            </div>
+          )}
 
               {/* Pagination */}
               {taskPagination.totalPages > 1 && (
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-gray-700">
                     Page {taskPagination.page} of {taskPagination.totalPages}
-                  </div>
+              </div>
                   <div className="flex space-x-2">
                     <button
                       onClick={() => handlePageChange(taskPagination.page - 1)}
@@ -760,7 +760,7 @@ const ClientOverviewPage = () => {
                     >
                       Next
                     </button>
-                  </div>
+                              </div>
                 </div>
               )}
             </div>

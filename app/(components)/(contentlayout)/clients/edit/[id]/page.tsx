@@ -1268,10 +1268,10 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                       <div className="relative">
                         <input
                           type="text"
-                          id="businessType"
-                          name="businessType"
-                          className="form-control"
-                          value={formData.businessType}
+                        id="businessType"
+                        name="businessType"
+                        className="form-control"
+                        value={formData.businessType}
                           placeholder="Select Business Type"
                           readOnly
                           onClick={() => {
@@ -1301,10 +1301,10 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                       <div className="relative">
                         <input
                           type="text"
-                          id="entityType"
-                          name="entityType"
-                          className="form-control"
-                          value={formData.entityType}
+                        id="entityType"
+                        name="entityType"
+                        className="form-control"
+                        value={formData.entityType}
                           placeholder="Select Entity Type"
                           readOnly
                           onClick={() => {

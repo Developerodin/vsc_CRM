@@ -1475,12 +1475,12 @@ const AnalyticsPage = () => {
                          {client.tasks?.status?.pending > 0 && (
                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-warning text-black mr-1">
                              {client.tasks.status.pending} Pending
-                           </span>
+                       </span>
                          )}
                          {client.tasks?.status?.ongoing > 0 && (
                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary text-black mr-1">
                              {client.tasks.status.ongoing} Ongoing
-                           </span>
+                       </span>
                          )}
                          {client.tasks?.status?.completed > 0 && (
                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success text-black mr-1">

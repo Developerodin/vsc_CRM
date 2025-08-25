@@ -978,8 +978,8 @@ const GroupsPage = () => {
                     <button
                       onClick={() => {
                         setFilters(prev => ({ ...prev, name: "" }));
-                        setCurrentPage(1);
-                      }}
+                  setCurrentPage(1);
+                }}
                       className="text-green-600 hover:text-green-800 text-sm"
                     >
                       <i className="ri-close-line mr-1"></i>
@@ -1093,13 +1093,13 @@ const GroupsPage = () => {
                                   Clear Search
                                 </button>
                               ) : (
-                                <Link
-                                  href="/groups/add"
-                                  className="ti-btn ti-btn-primary"
-                                >
-                                  <i className="ri-add-line me-2"></i> Add First
-                                  Group
-                                </Link>
+                              <Link
+                                href="/groups/add"
+                                className="ti-btn ti-btn-primary"
+                              >
+                                <i className="ri-add-line me-2"></i> Add First
+                                Group
+                              </Link>
                               )}
                             </div>
                           </td>
