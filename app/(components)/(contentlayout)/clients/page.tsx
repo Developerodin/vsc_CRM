@@ -211,9 +211,21 @@ const ClientsPage = () => {
         limit: limit.toString(),
         ...(sortBy && { sortBy }),
         ...(debouncedSearchQuery && { search: debouncedSearchQuery }),
+        ...(filters.name && { name: filters.name }),
+        ...(filters.email && { email: filters.email }),
+        ...(filters.phone && { phone: filters.phone }),
+        ...(filters.district && { district: filters.district }),
+        ...(filters.state && { state: filters.state }),
+        ...(filters.country && { country: filters.country }),
+        ...(filters.pan && { pan: filters.pan }),
+        ...(filters.branch && { branch: filters.branch }),
         ...(filters.businessType && { businessType: filters.businessType }),
         ...(filters.entityType && { entityType: filters.entityType }),
-        ...(filters.branch && { branch: filters.branch })
+        ...(filters.gstNumber && { gstNumber: filters.gstNumber }),
+        ...(filters.tanNumber && { tanNumber: filters.tanNumber }),
+        ...(filters.cinNumber && { cinNumber: filters.cinNumber }),
+        ...(filters.udyamNumber && { udyamNumber: filters.udyamNumber }),
+        ...(filters.iecCode && { iecCode: filters.iecCode })
       });
 
       console.log('Fetching clients with query params:', queryParams.toString());
@@ -275,6 +287,15 @@ const ClientsPage = () => {
   useEffect(() => {
     fetchClients(currentPage, itemsPerPage);
   }, [currentPage, sortBy, itemsPerPage]);
+
+  // Refetch clients when filters change
+  useEffect(() => {
+    if (Object.values(filters).some(f => f !== "")) {
+      console.log('Filters changed, refetching clients');
+      setCurrentPage(1); // Reset to first page when filters change
+      fetchClients(1, itemsPerPage);
+    }
+  }, [filters]);
 
   // Refetch clients when search query changes
   useEffect(() => {
