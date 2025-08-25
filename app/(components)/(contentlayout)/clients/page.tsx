@@ -137,10 +137,14 @@ const ClientsPage = () => {
   const fetchClientTaskStats = async (): Promise<Map<string, TaskStats>> => {
     try {
       setIsLoadingTaskStats(true);
+      
+      // Check if any filters are active
+      const hasActiveFilters = Object.values(filters).some(f => f !== "");
+      
       const queryParams = new URLSearchParams({
         page: '1',
         limit: '1000', // Get all clients' task stats
-        // Pass the same filters as clients
+        // Only pass filters if they have values
         ...(filters.name && { name: filters.name }),
         ...(filters.email && { email: filters.email }),
         ...(filters.phone && { phone: filters.phone }),
@@ -206,6 +210,7 @@ const ClientsPage = () => {
       setIsLoading(true);
       setError(null);
 
+      // Build query parameters, only including non-empty values
       const queryParams = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),
@@ -245,7 +250,6 @@ const ClientsPage = () => {
 
       // Handle the actual API response structure
       if (data.results) {
-        setClients(data.results || []);
         setTotalResults(data.totalResults || 0);
         setTotalPages(data.totalPages || 1);
         
@@ -283,6 +287,16 @@ const ClientsPage = () => {
       setIsLoading(false);
     }
   };
+
+  // Function to load initial data without any filters
+  const loadInitialData = async () => {
+    console.log('Loading initial data without filters');
+    await fetchClients(1, itemsPerPage);
+  };
+
+  useEffect(() => {
+    loadInitialData();
+  }, []); // Only run once on component mount
 
   useEffect(() => {
     fetchClients(currentPage, itemsPerPage);
@@ -966,7 +980,9 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                   <button
                     className="ti-btn ti-btn-secondary py-2 w-full sm:w-auto"
                     onClick={() => {
+                      console.log('Resetting all filters and search');
                       setSearchQuery("");
+                      setDebouncedSearchQuery("");
                       setFilters({
                         name: "",
                         email: "",
@@ -985,6 +1001,9 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         iecCode: ""
                       });
                       setSortBy("name:asc");
+                      setCurrentPage(1);
+                      // Load initial data without any filters
+                      loadInitialData();
                     }}
                   >
                     <i className="ri-refresh-line me-2"></i>
@@ -1188,6 +1207,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                     <button
                       className="ti-btn ti-btn-secondary me-2"
                       onClick={() => {
+                        console.log('Clearing advanced filters');
                         setFilters(prev => ({
                           ...prev,
                           businessType: "",
@@ -1201,6 +1221,8 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                           country: ""
                         }));
                         setCurrentPage(1);
+                        // Load initial data without these filters
+                        loadInitialData();
                       }}
                     >
                       <i className="ri-filter-off-line me-2"></i>
@@ -1230,6 +1252,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                       onClick={() => {
                         console.log('Clearing all filters and search');
                         setSearchQuery("");
+                        setDebouncedSearchQuery("");
                         setFilters(prev => ({
                           ...prev,
                           businessType: "",
@@ -1243,6 +1266,8 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                           country: ""
                         }));
                         setCurrentPage(1);
+                        // Load initial data without any filters
+                        loadInitialData();
                       }}
                     >
                       <i className="ri-close-line mr-1"></i>
