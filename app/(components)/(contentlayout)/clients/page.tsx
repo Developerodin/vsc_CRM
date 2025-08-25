@@ -64,26 +64,6 @@ interface ApiResponse {
   totalResults: number;
 }
 
-interface TaskStatisticsResponse {
-  results: Array<{
-    _id: string;
-    name: string;
-    email: string;
-    branch: string;
-    totalTasks: number;
-    pendingTasks: number;
-    ongoingTasks: number;
-    completedTasks: number;
-    on_holdTasks: number;
-    cancelledTasks: number;
-    delayedTasks: number;
-  }>;
-  page: number;
-  limit: number;
-  totalPages: number;
-  totalResults: number;
-}
-
 interface ExcelRow {
   ID?: string;
   "Client Name"?: string;
@@ -151,17 +131,10 @@ const ClientsPage = () => {
   const [isLoadingTaskStats, setIsLoadingTaskStats] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
 
-
   console.log(selectedBranchId, "selectedBranchId");
 
   // Function to fetch task statistics for all clients
   const fetchClientTaskStats = async (): Promise<Map<string, TaskStats>> => {
-    // If we're using search, we don't need to fetch task stats separately
-    if (debouncedSearchQuery) {
-      console.log('Skipping task stats fetch for search query');
-      return new Map();
-    }
-
     try {
       setIsLoadingTaskStats(true);
       const queryParams = new URLSearchParams({
@@ -195,13 +168,13 @@ const ClientsPage = () => {
         throw new Error('Failed to fetch task statistics');
       }
 
-      const data: TaskStatisticsResponse = await response.json();
+      const data = await response.json();
       
       console.log('Task Statistics API Response:', data);
       
       // Create a map of clientId to taskStatistics
       const statsMap = new Map<string, TaskStats>();
-      data.results.forEach(item => {
+      data.results.forEach((item: any) => {
         const taskStats: TaskStats = {
           pending: item.pendingTasks,
           ongoing: item.ongoingTasks,
@@ -228,136 +201,51 @@ const ClientsPage = () => {
     }
   };
 
-  const fetchClients = async (page = 1, limit = itemsPerPage) => {
+  const fetchClients = async (page: number = 1, limit: number = itemsPerPage) => {
     try {
       setIsLoading(true);
       setError(null);
-      
-      // If there's a search query, use the task statistics API which works better for search
-      if (debouncedSearchQuery) {
-        console.log('Using task statistics API for search:', debouncedSearchQuery);
-        
-        const queryParams = new URLSearchParams({
-          page: '1',
-          limit: '1000', // Get all results for search
-          search: debouncedSearchQuery
-        });
 
-        console.log('Fetching clients via task statistics API with query params:', queryParams.toString());
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        ...(sortBy && { sortBy }),
+        ...(debouncedSearchQuery && { search: debouncedSearchQuery }),
+        ...(filters.businessType && { businessType: filters.businessType }),
+        ...(filters.entityType && { entityType: filters.entityType }),
+        ...(filters.branch && { branch: filters.branch })
+      });
 
-        const response = await fetch(`${Base_url}clients/task-statistics?${queryParams}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
+      console.log('Fetching clients with query params:', queryParams.toString());
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch clients via task statistics');
+      const response = await fetch(`${Base_url}clients?${queryParams}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
+      });
 
-        const data: TaskStatisticsResponse = await response.json();
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Clients API response:', data);
+
+      // Handle the actual API response structure
+      if (data.results) {
+        setClients(data.results || []);
+        setTotalResults(data.totalResults || 0);
+        setTotalPages(data.totalPages || 1);
         
-        console.log('Task Statistics API response for search:', data);
-        
-        // Convert task statistics response to client format
-        const clientsWithTasks = data.results.map((item) => {
-          const taskStats: TaskStats = {
-            pending: item.pendingTasks,
-            ongoing: item.ongoingTasks,
-            completed: item.completedTasks,
-            delayed: item.delayedTasks,
-            onHold: item.on_holdTasks,
-            cancelled: item.cancelledTasks,
-            total: item.totalTasks
-          };
-
-          // Create a minimal client object from the task statistics response
-          const client: ClientWithTasks = {
-            id: item._id,
-            name: item.name,
-            email: item.email,
-            email2: "",
-            address: "",
-            district: "",
-            state: "",
-            country: "",
-            pan: "",
-            dob: "",
-            phone: "", // Add missing phone property
-            branch: item.branch,
-            sortOrder: 1,
-            businessType: "",
-            gstNumber: "",
-            tanNumber: "",
-            cinNumber: "",
-            udyamNumber: "",
-            iecCode: "",
-            entityType: "",
-            activities: [],
-            createdAt: "",
-            updatedAt: "",
-            taskStats
-          };
-
-          return client;
-        });
-
-        setClients(clientsWithTasks);
-        setTotalResults((data as any).totalResults); // Use type assertion to access totalResults
-        setTotalPages(Math.ceil((data as any).totalResults / itemsPerPage)); // Use type assertion
-        
-        // No need to fetch task stats separately since we already have them
-        setTaskStatsMap(new Map());
-        
-      } else {
-        // Use the regular clients API for non-search requests
-        console.log('Using regular clients API for non-search request');
-        
-        const queryParams = new URLSearchParams({
-          page: page.toString(),
-          limit: limit.toString(),
-          sortBy,
-          // Individual field filters
-          ...(filters.name && { name: filters.name }),
-          ...(filters.email && { email: filters.email }),
-          ...(filters.phone && { phone: filters.phone }),
-          ...(filters.district && { district: filters.district }),
-          ...(filters.pan && { pan: filters.pan }),
-          ...(filters.branch && { branch: filters.branch }),
-          ...(filters.businessType && { businessType: filters.businessType }),
-          ...(filters.entityType && { entityType: filters.entityType }),
-          ...(filters.gstNumber && { gstNumber: filters.gstNumber }),
-          ...(filters.tanNumber && { tanNumber: filters.tanNumber }),
-          ...(filters.cinNumber && { cinNumber: filters.cinNumber }),
-          ...(filters.udyamNumber && { udyamNumber: filters.udyamNumber }),
-          ...(filters.iecCode && { iecCode: filters.iecCode }),
-        });
-
-        console.log('Fetching clients with query params:', queryParams.toString());
-
-        const response = await fetch(`${Base_url}clients?${queryParams}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch clients');
-        }
-
-        const data: ApiResponse = await response.json();
-        
-        console.log('Clients API response:', data);
-        
-        // Fetch task statistics only for the found clients
+        // Fetch task statistics for the found clients
         const newTaskStatsMap = await fetchClientTaskStats();
         setTaskStatsMap(newTaskStatsMap);
         
-        console.log('Clients found:', data.results.length);
+        console.log('Clients found:', data.results?.length);
         console.log('Task stats map keys:', Array.from(newTaskStatsMap.keys()));
         
         // Merge clients with their task statistics
-        const clientsWithTasks = data.results.map((client: Client) => {
+        const clientsWithTasks = (data.results || []).map((client: Client) => {
           const taskStats = newTaskStatsMap.get(client.id) || {
             pending: 0,
             ongoing: 0,
@@ -371,15 +259,14 @@ const ClientsPage = () => {
           console.log(`Client ${client.id} (${client.name}) - Task stats:`, taskStats);
           return { ...client, taskStats };
         });
-
+        
         setClients(clientsWithTasks);
-        setTotalResults(data.totalResults);
-        setTotalPages(data.totalPages);
+      } else {
+        setError('Invalid response format from API');
       }
     } catch (err) {
-      console.error('Error fetching clients:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch clients');
-      toast.error('Failed to fetch clients');
+      console.error('Error fetching clients:', err);
     } finally {
       setIsLoading(false);
     }
@@ -393,7 +280,7 @@ const ClientsPage = () => {
   useEffect(() => {
     if (debouncedSearchQuery !== undefined) {
       console.log('Search query changed, refetching clients:', debouncedSearchQuery);
-      console.log('Will use task statistics API for search');
+      console.log('Will use regular clients API for search');
       setCurrentPage(1); // Reset to first page when searching
       fetchClients(1, itemsPerPage);
     }
@@ -416,12 +303,7 @@ const ClientsPage = () => {
 
   // Separate useEffect for filters and search to update task statistics
   useEffect(() => {
-    // Don't update task stats if we're using search (we already have them)
-    if (debouncedSearchQuery) {
-      console.log('Skipping task stats update for search query');
-      return;
-    }
-
+    // Update task stats when filters change
     const updateTaskStats = async () => {
       const newTaskStatsMap = await fetchClientTaskStats();
       setTaskStatsMap(newTaskStatsMap);
@@ -1566,7 +1448,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                               </td>
 
                               <td>{client.pan || 'N/A'}</td>
-                              <td className="px-4 py-3">
+                              <td>
                                 {renderTaskStatus(client.taskStats, client.id)}
                               </td>
                               <td>
@@ -1595,7 +1477,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                           ))
                         ) : (
                           <tr>
-                            <td colSpan={8} className="text-center py-8">
+                            <td colSpan={9} className="text-center py-8">
                               <div className="flex flex-col items-center justify-center">
                                 <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
                                   <i className="ri-folder-line text-4xl text-primary"></i>
