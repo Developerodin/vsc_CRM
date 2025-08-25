@@ -168,6 +168,15 @@ interface TaskBreakdown {
     completed: number;
     completionRate: string | number;
   }>;
+  pagination: {
+    page: number;
+    limit: number;
+    totalTasks: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  };
+  byClientActivity: Array<any>;
 }
 
 interface ClientSummary {
@@ -220,6 +229,21 @@ const TeamMemberOverviewPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [overviewData, setOverviewData] = useState<TeamMemberOverviewResponse['data'] | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
+  const [selectedClientForTasks, setSelectedClientForTasks] = useState<{
+    clientId: string;
+    clientName: string;
+    tasks: Array<{
+      id: string;
+      status: string;
+      priority: string;
+      remarks: string;
+      startDate: string;
+      endDate: string;
+      activity: string;
+      timelineId: string;
+    }>;
+  } | null>(null);
+  const [showClientTasksModal, setShowClientTasksModal] = useState(false);
 
   useEffect(() => {
     if (teamMemberId) {
@@ -371,7 +395,9 @@ const TeamMemberOverviewPage = () => {
     byStatus: tasks.byStatus || {},
     byPriority: tasks.byPriority || {},
     recent: Array.isArray(tasks.recent) ? tasks.recent : [],
-    monthlyDistribution: Array.isArray(tasks.monthlyDistribution) ? tasks.monthlyDistribution : []
+    monthlyDistribution: Array.isArray(tasks.monthlyDistribution) ? tasks.monthlyDistribution : [],
+    pagination: tasks.pagination || { page: 1, limit: 10, totalTasks: 0, totalPages: 0, hasNextPage: false, hasPrevPage: false },
+    byClientActivity: tasks.byClientActivity || []
   };
 
   // Ensure clients has required properties
@@ -597,18 +623,32 @@ const TeamMemberOverviewPage = () => {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Task Status Breakdown</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {safeTasks.byStatus && typeof safeTasks.byStatus === 'object' ? (
-                Object.entries(safeTasks.byStatus).map(([status, tasksArray]) => (
-                  <div key={status} className="text-center p-4 bg-gray-50 rounded-lg">
-                    <p className="text-sm font-medium text-gray-600 capitalize">{String(status)}</p>
-                    <p className="text-2xl font-bold text-gray-900">{Array.isArray(tasksArray) ? tasksArray.length : 0}</p>
-                  </div>
-                ))
-              ) : (
-                <div className="col-span-4 text-center py-8">
-                  <p className="text-gray-500">No task status data available</p>
-                </div>
-              )}
+              {(() => {
+                // Count tasks by status from the new API structure
+                const statusCounts: Record<string, number> = {};
+                
+                if (safeTasks.recent && Array.isArray(safeTasks.recent)) {
+                  safeTasks.recent.forEach(task => {
+                    const status = task.status || 'unknown';
+                    statusCounts[status] = (statusCounts[status] || 0) + 1;
+                  });
+                }
+                
+                if (Object.keys(statusCounts).length > 0) {
+                  return Object.entries(statusCounts).map(([status, count]) => (
+                    <div key={status} className="text-center p-4 bg-gray-50 rounded-lg">
+                      <p className="text-sm font-medium text-gray-600 capitalize">{status}</p>
+                      <p className="text-2xl font-bold text-gray-900">{count}</p>
+                    </div>
+                  ));
+                } else {
+                  return (
+                    <div className="col-span-4 text-center py-8">
+                      <p className="text-gray-500">No task status data available</p>
+                    </div>
+                  );
+                }
+              })()}
             </div>
           </div>
 
@@ -621,16 +661,12 @@ const TeamMemberOverviewPage = () => {
                 <p className="text-3xl font-bold text-blue-600">
                   {(() => {
                     const uniqueClients = new Set();
-                    if (safeTasks.byStatus && typeof safeTasks.byStatus === 'object') {
-                      Object.values(safeTasks.byStatus).forEach(tasksArray => {
-                        if (Array.isArray(tasksArray)) {
-                          tasksArray.forEach(task => {
-                            if (task.timeline && Array.isArray(task.timeline)) {
-                              task.timeline.forEach(timelineItem => {
-                                if (timelineItem.client?.id) {
-                                  uniqueClients.add(timelineItem.client.id);
-                                }
-                              });
+                    if (safeTasks.recent && Array.isArray(safeTasks.recent)) {
+                      safeTasks.recent.forEach(task => {
+                        if (task.timeline && Array.isArray(task.timeline)) {
+                          task.timeline.forEach(timelineItem => {
+                            if (timelineItem.client?.id) {
+                              uniqueClients.add(timelineItem.client.id);
                             }
                           });
                         }
@@ -645,12 +681,8 @@ const TeamMemberOverviewPage = () => {
                 <p className="text-3xl font-bold text-green-600">
                   {(() => {
                     let totalTasks = 0;
-                    if (safeTasks.byStatus && typeof safeTasks.byStatus === 'object') {
-                      Object.values(safeTasks.byStatus).forEach(tasksArray => {
-                        if (Array.isArray(tasksArray)) {
-                          totalTasks += tasksArray.length;
-                        }
-                      });
+                    if (safeTasks.recent && Array.isArray(safeTasks.recent)) {
+                      totalTasks = safeTasks.recent.length;
                     }
                     return totalTasks;
                   })()}
@@ -661,12 +693,8 @@ const TeamMemberOverviewPage = () => {
                 <p className="text-3xl font-bold text-purple-600">
                   {(() => {
                     let completedTasks = 0;
-                    if (safeTasks.byStatus && typeof safeTasks.byStatus === 'object') {
-                      Object.entries(safeTasks.byStatus).forEach(([status, tasksArray]) => {
-                        if (Array.isArray(tasksArray) && status.toLowerCase() === 'completed') {
-                          completedTasks += tasksArray.length;
-                        }
-                      });
+                    if (safeTasks.recent && Array.isArray(safeTasks.recent)) {
+                      completedTasks = safeTasks.recent.filter(task => task.status === 'completed').length;
                     }
                     return completedTasks;
                   })()}
@@ -735,172 +763,108 @@ const TeamMemberOverviewPage = () => {
 
       {activeTab === 'clients' && (
         <div className="space-y-6">
-          {/* Client Summary Table */}
-          {/* Client Summary Table from Tasks Data */}
+          {/* Client Summary for Tasks */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Client Summary from Tasks</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Client Summary for Tasks</h3>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client Name</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Tasks</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completed Tasks</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ongoing Tasks</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pending Tasks</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {(() => {
-                      const clientSummary = new Map();
-                      
-                      if (safeTasks.byStatus && typeof safeTasks.byStatus === 'object') {
-                        Object.entries(safeTasks.byStatus).forEach(([status, tasksArray]) => {
-                          if (Array.isArray(tasksArray)) {
-                            tasksArray.forEach(task => {
-                              if (task.timeline && Array.isArray(task.timeline)) {
-                                task.timeline.forEach(timelineItem => {
-                                  if (timelineItem.client?.id && timelineItem.client?.name) {
-                                    const clientId = timelineItem.client.id;
-                                    if (!clientSummary.has(clientId)) {
-                                      clientSummary.set(clientId, {
-                                        id: clientId,
-                                        name: timelineItem.client.name,
-                                        email: timelineItem.client.email || 'No email',
-                                        totalTasks: 0,
-                                        completedTasks: 0,
-                                        ongoingTasks: 0,
-                                        pendingTasks: 0
-                                      });
-                                    }
-                                    
-                                    const client = clientSummary.get(clientId);
-                                    client.totalTasks++;
-                                    
-                                    if (status.toLowerCase() === 'completed') {
-                                      client.completedTasks++;
-                                    } else if (status.toLowerCase() === 'ongoing') {
-                                      client.ongoingTasks++;
-                                    } else if (status.toLowerCase() === 'pending') {
-                                      client.pendingTasks++;
-                                    }
-                                  }
-                                });
-                              }
-                            });
-                          }
-                        });
-                      }
-                      
-                      const clients = Array.from(clientSummary.values());
-                      
-                      if (clients.length > 0) {
-                        return clients.map((client) => (
-                          <tr key={client.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-gray-900">{client.name}</div>
-                              <div className="text-xs text-gray-500">{client.email}</div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className="text-sm text-gray-900">{client.totalTasks}</span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className="text-sm text-gray-900">{client.completedTasks}</span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className="text-sm text-gray-900">{client.ongoingTasks}</span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className="text-sm text-gray-900">{client.pendingTasks}</span>
-                            </td>
-                          </tr>
-                        ));
-                      } else {
-                        return (
-                          <tr>
-                            <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
-                              No client data available from tasks
-                            </td>
-                          </tr>
-                        );
-                      }
-                    })()}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Client Task Details */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Client Task Details</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client Name</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activity</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frequency</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Start Date</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">End Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Tasks</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {safeTasks.byStatus && typeof safeTasks.byStatus === 'object' ? (
-                    Object.entries(safeTasks.byStatus).flatMap(([status, tasksArray]) => {
-                      if (Array.isArray(tasksArray)) {
-                        return tasksArray.flatMap((task) => {
-                          if (task.timeline && Array.isArray(task.timeline)) {
-                            return task.timeline.map((timelineItem, index) => (
-                              <tr key={`${task.id}-${index}`} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                                  <div className="text-sm font-medium text-gray-900">
-                                    {timelineItem.client?.name || 'Unknown Client'}
-                                  </div>
-                                  <div className="text-xs text-gray-500">
-                                    {timelineItem.client?.email || 'No email'}
-                                  </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                                  <div className="text-sm font-medium text-gray-900">
-                                    {timelineItem.activity?.name || 'Unknown Activity'}
-                                  </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                                  <span className={`px-2 py-1 text-xs rounded-full border ${getStatusColor(String(timelineItem.status || 'unknown'))}`}>
-                                    {String(timelineItem.status || 'unknown')}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                                  <span className="text-sm text-gray-900">
-                                    {timelineItem.frequency || 'N/A'}
-                                  </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                                  <span className="text-sm text-gray-900">
-                                    {formatDate(String(timelineItem.startDate || new Date().toISOString()))}
-                                  </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                                  <span className="text-sm text-gray-900">
-                                    {formatDate(String(timelineItem.endDate || new Date().toISOString()))}
-                                  </span>
-                        </td>
-                      </tr>
-                            ));
-                          }
-                          return [];
-                        });
-                      }
-                      return [];
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
-                        No client task details available
-                      </td>
-                    </tr>
-                  )}
+                  {(() => {
+                    const clientSummary = new Map();
+                    
+                    // Process tasks from the new API structure
+                    if (safeTasks.recent && Array.isArray(safeTasks.recent)) {
+                      safeTasks.recent.forEach(task => {
+                        if (task.timeline && Array.isArray(task.timeline)) {
+                          task.timeline.forEach(timelineItem => {
+                            if (timelineItem.client?.id && timelineItem.client?.name) {
+                              const clientId = timelineItem.client.id;
+                              const activityName = timelineItem.activity?.name || 'Unknown Activity';
+                              
+                              if (!clientSummary.has(clientId)) {
+                                clientSummary.set(clientId, {
+                                  id: clientId,
+                                  name: timelineItem.client.name,
+                                  activities: new Map(),
+                                  totalTasks: 0
+                                });
+                              }
+                              
+                              const client = clientSummary.get(clientId);
+                              if (!client.activities.has(activityName)) {
+                                client.activities.set(activityName, {
+                                  name: activityName,
+                                  tasks: []
+                                });
+                              }
+                              
+                              const activity = client.activities.get(activityName);
+                              activity.tasks.push({
+                                id: task.id || Math.random().toString(),
+                                status: task.status || 'unknown',
+                                priority: task.priority || 'medium',
+                                remarks: task.remarks || '',
+                                startDate: task.startDate || '',
+                                endDate: task.endDate || '',
+                                activity: activityName,
+                                timelineId: timelineItem.id || ''
+                              });
+                              
+                              client.totalTasks++;
+                            }
+                          });
+                        }
+                      });
+                    }
+                    
+                    const clients = Array.from(clientSummary.values());
+                    
+                    if (clients.length > 0) {
+                      return clients.map((client) => (
+                        <tr key={client.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">{client.name}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {Array.from(client.activities.values()).map((activity: any) => activity.name).join(', ')}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <button
+                              onClick={() => {
+                                const allTasks = Array.from(client.activities.values()).flatMap((activity: any) => activity.tasks);
+                                setSelectedClientForTasks({
+                                  clientId: client.id,
+                                  clientName: client.name,
+                                  tasks: allTasks
+                                });
+                                setShowClientTasksModal(true);
+                              }}
+                              className="text-sm font-medium text-blue-600 hover:text-blue-800 cursor-pointer underline"
+                            >
+                              {client.totalTasks} Tasks
+                            </button>
+                          </td>
+                        </tr>
+                      ));
+                    } else {
+                      return (
+                        <tr>
+                          <td colSpan={3} className="px-6 py-8 text-center text-gray-500">
+                            No client data available from tasks
+                          </td>
+                        </tr>
+                      );
+                    }
+                  })()}
                 </tbody>
               </table>
             </div>
@@ -1088,20 +1052,119 @@ const TeamMemberOverviewPage = () => {
           {/* Task Status Summary */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Task Status Summary</h3>
-            {safeTasks.byStatus && typeof safeTasks.byStatus === 'object' && Object.keys(safeTasks.byStatus).length > 0 ? (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {Object.entries(safeTasks.byStatus).map(([status, tasksArray]) => (
-                  <div key={status} className="text-center p-4 bg-gray-50 rounded-lg">
-                    <p className="text-sm font-medium text-gray-600 capitalize">{status}</p>
-                    <p className="text-2xl font-bold text-gray-900">{Array.isArray(tasksArray) ? tasksArray.length : 0}</p>
+            {(() => {
+              // Count tasks by status from the new API structure
+              const statusCounts: Record<string, number> = {};
+              
+              if (safeTasks.recent && Array.isArray(safeTasks.recent)) {
+                safeTasks.recent.forEach(task => {
+                  const status = task.status || 'unknown';
+                  statusCounts[status] = (statusCounts[status] || 0) + 1;
+                });
+              }
+              
+              if (Object.keys(statusCounts).length > 0) {
+                return (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {Object.entries(statusCounts).map(([status, count]) => (
+                      <div key={status} className="text-center p-4 bg-gray-50 rounded-lg">
+                        <p className="text-sm font-medium text-gray-600 capitalize">{status}</p>
+                        <p className="text-2xl font-bold text-gray-900">{count}</p>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                );
+              } else {
+                return (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">No status distribution data available</p>
+                  </div>
+                );
+              }
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* Client Tasks Modal */}
+      {showClientTasksModal && selectedClientForTasks && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Task Details for {selectedClientForTasks.clientName}
+              </h3>
+              <button
+                onClick={() => setShowClientTasksModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <i className="ri-close-line text-2xl"></i>
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task ID</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activity</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Start Date</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">End Date</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remarks</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {selectedClientForTasks.tasks.map((task) => (
+                      <tr key={task.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="text-sm font-mono text-gray-900">{task.id.substring(0, 8)}...</span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="text-sm text-gray-900">{task.activity}</span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className={`px-2 py-1 text-xs rounded-full border ${getStatusColor(task.status)}`}>
+                            {task.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className={`px-2 py-1 text-xs rounded-full border ${getPriorityColor(task.priority)}`}>
+                            {task.priority}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="text-sm text-gray-900">{formatDate(task.startDate)}</span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="text-sm text-gray-900">{formatDate(task.endDate)}</span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="text-sm text-gray-900">{task.remarks || '-'}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-gray-500">No status distribution data available</p>
-              </div>
-            )}
+              
+              {selectedClientForTasks.tasks.length === 0 && (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No tasks found for this client</p>
+                </div>
+              )}
+            </div>
+            
+            <div className="flex justify-end p-6 border-t border-gray-200">
+              <button
+                onClick={() => setShowClientTasksModal(false)}
+                className="ti-btn ti-btn-secondary"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
