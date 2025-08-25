@@ -336,6 +336,25 @@ const AnalyticsPage = () => {
     fetchTopByCompletion();
   }, [selectedBranch, dateRange]);
 
+  // Handle escape key to close modal
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && showClientsModal) {
+        console.log('Closing modal with escape key');
+        setShowClientsModal(false);
+        setSelectedMemberForClients(null);
+      }
+    };
+
+    if (showClientsModal) {
+      document.addEventListener('keydown', handleEscape);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [showClientsModal]);
+
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
@@ -788,6 +807,8 @@ const AnalyticsPage = () => {
   return (
     <div className="main-content">
       <Seo title="Analytics" />
+
+     
 
       {/* Page Header */}
       <div className="box !bg-transparent border-0 shadow-none mb-6">
@@ -1376,11 +1397,18 @@ const AnalyticsPage = () => {
                         {member.timelines?.summary?.slice(0, 2).map((timeline: any) => timeline.activity?.name).join(', ') || 'No activities'}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <button
-                        onClick={() => setSelectedMemberForClients(member)}
-                        className="text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                        onClick={() => {
+                          console.log('Opening clients modal for member:', member.name);
+                          console.log('Member clients data:', member.clients);
+                          setSelectedMemberForClients(member);
+                          setShowClientsModal(true);
+                        }}
+                        className="text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded-lg transition-colors duration-200"
+                        title={`Click to view ${member.clients?.total || 0} clients for ${member.name}`}
                       >
+                        <i className="ri-eye-line mr-1"></i>
                         {member.clients?.total || 0} Clients
                       </button>
                     </td>
@@ -1528,8 +1556,18 @@ const AnalyticsPage = () => {
 
        {/* Clients Modal */}
        {showClientsModal && selectedMemberForClients && (
-         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-           <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+         <div 
+           className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-[9999]"
+           onClick={() => {
+             console.log('Closing modal by clicking outside');
+             setShowClientsModal(false);
+             setSelectedMemberForClients(null);
+           }}
+         >
+           <div 
+             className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white"
+             onClick={(e) => e.stopPropagation()}
+           >
              <div className="mt-3">
                <div className="flex items-center justify-between mb-4">
                  <h3 className="text-lg font-medium text-gray-900">
@@ -1537,6 +1575,7 @@ const AnalyticsPage = () => {
                  </h3>
                  <button
                    onClick={() => {
+                     console.log('Closing clients modal from close button');
                      setShowClientsModal(false);
                      setSelectedMemberForClients(null);
                    }}
@@ -1553,7 +1592,7 @@ const AnalyticsPage = () => {
                        <div key={client._id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
                          <div className="flex items-center justify-between">
                            <div>
-                             <h4 className="font-medium text-gray-900">{client.name}</h4>
+                             <p className="font-medium text-gray-900">{client.name}</p>
                              <p className="text-sm text-gray-500">{client.email}</p>
                              <p className="text-sm text-gray-500">{client.phone}</p>
                            </div>
@@ -1569,9 +1608,14 @@ const AnalyticsPage = () => {
                        </div>
                      ))}
                    </div>
-                 ) : (
+                 ) : selectedMemberForClients.clients?.list ? (
                    <div className="text-center py-8">
                      <p className="text-gray-500">No clients found for this team member.</p>
+                   </div>
+                 ) : (
+                   <div className="text-center py-8">
+                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                     <p className="text-gray-500">Loading clients...</p>
                    </div>
                  )}
                </div>
@@ -1579,6 +1623,7 @@ const AnalyticsPage = () => {
                <div className="mt-4 flex justify-end">
                  <button
                    onClick={() => {
+                     console.log('Closing clients modal from close button');
                      setShowClientsModal(false);
                      setSelectedMemberForClients(null);
                    }}
