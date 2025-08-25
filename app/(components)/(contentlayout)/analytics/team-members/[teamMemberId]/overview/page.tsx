@@ -244,12 +244,22 @@ const TeamMemberOverviewPage = () => {
     }>;
   } | null>(null);
   const [showClientTasksModal, setShowClientTasksModal] = useState(false);
+  const [clientsPage, setClientsPage] = useState(1);
+  const [clientsPerPage] = useState(10);
 
   useEffect(() => {
     if (teamMemberId) {
       fetchTeamMemberOverview();
     }
   }, [teamMemberId]);
+
+  const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId);
+    // Reset pagination when switching to clients tab
+    if (tabId === 'clients') {
+      setClientsPage(1);
+    }
+  };
 
   const fetchTeamMemberOverview = async () => {
     try {
@@ -491,13 +501,12 @@ const TeamMemberOverviewPage = () => {
           <nav className="-mb-px flex space-x-8">
             {[
               { id: 'overview', label: 'Overview', icon: 'ri-dashboard-line' },
-              { id: 'tasks', label: 'Tasks', icon: 'ri-task-line' },
               { id: 'clients', label: 'Clients', icon: 'ri-user-line' },
               { id: 'performance', label: 'Performance', icon: 'ri-line-chart-line' }
             ].map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabChange(tab.id)}
                 className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
                   activeTab === tab.id
                     ? 'border-blue-500 text-blue-600'
@@ -705,62 +714,6 @@ const TeamMemberOverviewPage = () => {
         </div>
       )}
 
-      {activeTab === 'tasks' && (
-        <div className="space-y-6">
-          {/* Recent Tasks */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Tasks</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {Array.isArray(safeTasks.recent) && safeTasks.recent.length > 0 ? (
-                    safeTasks.recent.map((task) => (
-                      <tr key={task.id || Math.random()} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {task.timeline && task.timeline.length > 0 
-                              ? `${task.timeline[0].activity?.name || 'Unknown Activity'} - ${task.timeline[0].client?.name || 'Unknown Client'}`
-                              : 'No timeline info'
-                            }
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 text-xs rounded-full border ${getStatusColor(String(task.status || 'unknown'))}`}>
-                            {String(task.status || 'unknown')}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 text-xs rounded-full border ${getPriorityColor(String(task.priority || 'medium'))}`}>
-                            {String(task.priority || 'medium')}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm text-gray-900">{formatDate(String(task.startDate || new Date().toISOString()))}</span>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
-                        No recent tasks available
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
       {activeTab === 'clients' && (
         <div className="space-y-6">
           {/* Client Summary for Tasks */}
@@ -824,10 +777,15 @@ const TeamMemberOverviewPage = () => {
                       });
                     }
                     
-                    const clients = Array.from(clientSummary.values());
+                    const allClients = Array.from(clientSummary.values());
+                    const totalClients = allClients.length;
+                    const startIndex = (clientsPage - 1) * clientsPerPage;
+                    const endIndex = startIndex + clientsPerPage;
+                    const paginatedClients = allClients.slice(startIndex, endIndex);
+                    const totalPages = Math.ceil(totalClients / clientsPerPage);
                     
-                    if (clients.length > 0) {
-                      return clients.map((client) => (
+                    if (paginatedClients.length > 0) {
+                      return paginatedClients.map((client) => (
                         <tr key={client.id} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">{client.name}</div>
@@ -868,6 +826,87 @@ const TeamMemberOverviewPage = () => {
                 </tbody>
               </table>
             </div>
+            
+            {/* Pagination */}
+            {(() => {
+              const clientSummary = new Map();
+              
+              // Process tasks from the new API structure
+              if (safeTasks.recent && Array.isArray(safeTasks.recent)) {
+                safeTasks.recent.forEach(task => {
+                  if (task.timeline && Array.isArray(task.timeline)) {
+                    task.timeline.forEach(timelineItem => {
+                      if (timelineItem.client?.id && timelineItem.client?.name) {
+                        const clientId = timelineItem.client.id;
+                        if (!clientSummary.has(clientId)) {
+                          clientSummary.set(clientId, {
+                            id: clientId,
+                            name: timelineItem.client.name,
+                            activities: new Map(),
+                            totalTasks: 0
+                          });
+                        }
+                        const client = clientSummary.get(clientId);
+                        client.totalTasks++;
+                      }
+                    });
+                  }
+                });
+              }
+              
+              const totalClients = clientSummary.size;
+              const totalPages = Math.ceil(totalClients / clientsPerPage);
+              
+              if (totalPages > 1) {
+                return (
+                  <div className="flex items-center justify-between mt-6">
+                    <div className="text-sm text-gray-700">
+                      Showing {((clientsPage - 1) * clientsPerPage) + 1} to {Math.min(clientsPage * clientsPerPage, totalClients)} of {totalClients} clients
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => setClientsPage(Math.max(1, clientsPage - 1))}
+                        disabled={clientsPage === 1}
+                        className={`px-3 py-2 text-sm font-medium rounded-md ${
+                          clientsPage === 1
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        Previous
+                      </button>
+                      
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                        <button
+                          key={page}
+                          onClick={() => setClientsPage(page)}
+                          className={`px-3 py-2 text-sm font-medium rounded-md ${
+                            page === clientsPage
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                      
+                      <button
+                        onClick={() => setClientsPage(Math.min(totalPages, clientsPage + 1))}
+                        disabled={clientsPage === totalPages}
+                        className={`px-3 py-2 text-sm font-medium rounded-md ${
+                          clientsPage === totalPages
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </div>
         </div>
       )}
@@ -1107,7 +1146,6 @@ const TeamMemberOverviewPage = () => {
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task ID</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activity</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
@@ -1119,9 +1157,6 @@ const TeamMemberOverviewPage = () => {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {selectedClientForTasks.tasks.map((task) => (
                       <tr key={task.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="text-sm font-mono text-gray-900">{task.id.substring(0, 8)}...</span>
-                        </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <span className="text-sm text-gray-900">{task.activity}</span>
                         </td>
