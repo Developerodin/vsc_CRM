@@ -37,7 +37,7 @@ interface Task {
   attachments: Array<{
     fileName: string;
     fileUrl: string;
-    uploadedAt: string;
+    uploadedAt?: string; // Made optional since we don't send this in updates
   }>;
   createdAt: string;
   updatedAt: string;
@@ -96,6 +96,12 @@ interface Group {
   updatedAt: string;
 }
 
+// Interface for clean attachments (without _id and other problematic fields)
+interface CleanAttachment {
+  fileName: string;
+  fileUrl: string;
+}
+
 interface Timeline {
   id: string;
   title: string;
@@ -141,7 +147,7 @@ const EditTaskPage = () => {
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
-  const [attachments, setAttachments] = useState<Array<{fileName: string, fileUrl: string}>>([]);
+  const [attachments, setAttachments] = useState<CleanAttachment[]>([]);
   
   // New state for activity and group filters
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -162,7 +168,7 @@ const EditTaskPage = () => {
     remarks: "",
     status: "pending",
     metadata: {},
-    attachments: [] as Array<{fileName: string, fileUrl: string}>
+    attachments: [] as CleanAttachment[]
   });
 
   useEffect(() => {
@@ -322,9 +328,14 @@ const EditTaskPage = () => {
         setSelectedTeamMember(taskData.teamMember);
       }
 
-      // Set existing attachments
+      // Set existing attachments - clean them to remove _id fields
       if (taskData.attachments) {
-        setAttachments(taskData.attachments);
+        const cleanAttachments = taskData.attachments.map(attachment => ({
+          fileName: attachment.fileName,
+          fileUrl: attachment.fileUrl
+          // Remove _id, uploadedAt, and other fields that might cause issues
+        }));
+        setAttachments(cleanAttachments);
       }
       
       setFormData({
@@ -338,7 +349,10 @@ const EditTaskPage = () => {
         remarks: taskData.remarks || "",
         status: taskData.status,
         metadata: taskData.metadata || {},
-        attachments: taskData.attachments || []
+        attachments: taskData.attachments ? taskData.attachments.map(attachment => ({
+          fileName: attachment.fileName,
+          fileUrl: attachment.fileUrl
+        })) : []
       });
     } catch (error) {
       toast.error('Failed to fetch task');
@@ -762,6 +776,7 @@ const EditTaskPage = () => {
           const attachmentData = {
             fileName: fileData.originalName || file.name,
             fileUrl: fileData.url
+            // Only include fileName and fileUrl, no _id or other fields
           };
 
           // Update progress to 100%
@@ -781,11 +796,18 @@ const EditTaskPage = () => {
       // Add to attachments
       setAttachments(prev => [...prev, ...successfulUploads]);
       
-      // Update form data
-      setFormData(prev => ({
-        ...prev,
-        attachments: [...prev.attachments, ...successfulUploads]
-      }));
+      // Update form data - ensure all attachments are clean
+      setFormData(prev => {
+        const allAttachments = [...prev.attachments, ...successfulUploads];
+        const cleanAttachments = allAttachments.map(attachment => ({
+          fileName: attachment.fileName,
+          fileUrl: attachment.fileUrl
+        }));
+        return {
+          ...prev,
+          attachments: cleanAttachments
+        };
+      });
 
       // Clear uploaded files
       setUploadFiles([]);
@@ -802,9 +824,14 @@ const EditTaskPage = () => {
   const removeAttachment = (index: number) => {
     setAttachments(prev => {
       const newAttachments = prev.filter((_, i) => i !== index);
+      // Ensure attachments are clean (no _id fields) when updating form data
+      const cleanAttachments = newAttachments.map(attachment => ({
+        fileName: attachment.fileName,
+        fileUrl: attachment.fileUrl
+      }));
       setFormData(prevFormData => ({
         ...prevFormData,
-        attachments: newAttachments
+        attachments: cleanAttachments
       }));
       return newAttachments;
     });
@@ -825,13 +852,31 @@ const EditTaskPage = () => {
 
     setIsSaving(true);
     try {
+      // Clean attachments data by removing _id fields
+      const cleanAttachments = formData.attachments.map(attachment => ({
+        fileName: attachment.fileName,
+        fileUrl: attachment.fileUrl
+        // Remove _id, uploadedAt, and any other fields that might cause API errors
+      }));
+
+      // Create clean form data without problematic fields
+      const cleanFormData = {
+        ...formData,
+        attachments: cleanAttachments
+      };
+
+      // Debug log to verify clean data
+      console.log('Original formData attachments:', formData.attachments);
+      console.log('Clean attachments:', cleanAttachments);
+      console.log('Clean form data being sent:', cleanFormData);
+
       const response = await fetch(`${Base_url}tasks/${taskId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(cleanFormData)
       });
 
       if (!response.ok) {
