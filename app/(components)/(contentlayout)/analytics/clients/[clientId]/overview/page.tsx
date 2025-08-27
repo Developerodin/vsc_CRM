@@ -40,6 +40,14 @@ const ClientOverviewPage = () => {
   });
   const [filteredTasks, setFilteredTasks] = useState<any[]>([]);
 
+  // State for search input value
+  const [searchInputValue, setSearchInputValue] = useState('');
+  // Ref for debouncing search
+  const searchTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  
+  // State to track when filters are being applied
+  const [isApplyingFilters, setIsApplyingFilters] = useState(false);
+
   useEffect(() => {
     if (clientId) {
       fetchClientOverview();
@@ -49,8 +57,8 @@ const ClientOverviewPage = () => {
   // Apply filters when they change
   useEffect(() => {
     if (clientData?.tasks?.recent) {
-      // Call API with current filters and pagination
-      fetchClientOverview(taskFilters, taskPagination);
+      // Use a more efficient approach - don't trigger the main loading state
+      applyFiltersWithoutRefresh(taskFilters, taskPagination);
     }
   }, [taskFilters, taskPagination.page]);
 
@@ -116,6 +124,65 @@ const ClientOverviewPage = () => {
     }
   };
 
+  // Function to apply filters without triggering page refresh
+  const applyFiltersWithoutRefresh = async (filters: any, pagination: any) => {
+    try {
+      setIsApplyingFilters(true);
+      
+      // Build query parameters
+      const queryParams = new URLSearchParams();
+      
+      // Add filters
+      if (filters.activitySearch) {
+        queryParams.append('activitySearch', filters.activitySearch);
+      }
+      if (filters.startDate) {
+        queryParams.append('startDate', filters.startDate);
+      }
+      if (filters.endDate) {
+        queryParams.append('endDate', filters.endDate);
+      }
+      if (filters.priority) {
+        queryParams.append('priority', filters.priority);
+      }
+      if (filters.status) {
+        queryParams.append('status', filters.status);
+      }
+      if (filters.teamMemberId) {
+        queryParams.append('teamMemberId', filters.teamMemberId);
+      }
+      
+      // Add pagination
+      queryParams.append('page', pagination.page.toString());
+      queryParams.append('limit', pagination.limit.toString());
+      
+      const url = `${Base_url}analytics/clients/${clientId}/overview?${queryParams.toString()}`;
+      console.log('Applying filters:', url);
+      
+      const response = await axios.get(url, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      // Only update the tasks data, not the entire client data
+      if (response.data.data?.tasks?.recent) {
+        setFilteredTasks(response.data.data.tasks.recent);
+        setTaskPagination({
+          page: response.data.data.tasks.pagination?.page || 1,
+          limit: response.data.data.tasks.pagination?.limit || 10,
+          totalPages: response.data.data.tasks.pagination?.totalPages || 1,
+          totalTasks: response.data.data.tasks.pagination?.totalTasks || 0
+        });
+      }
+    } catch (err) {
+      console.error('Error applying filters:', err);
+      // Don't show error for filter updates to prevent page refresh
+    } finally {
+      setIsApplyingFilters(false);
+    }
+  };
+
   // Handle filter changes
   const handleFilterChange = (filterName: string, value: string) => {
     setTaskFilters(prev => ({
@@ -130,6 +197,29 @@ const ClientOverviewPage = () => {
     }));
   };
 
+  // Handle search input changes with debouncing
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchInputValue(value); // Update input immediately
+    
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // Debounce the search
+    searchTimeoutRef.current = setTimeout(() => {
+      setTaskFilters(prev => ({
+        ...prev,
+        activitySearch: value
+      }));
+      setTaskPagination(prev => ({
+        ...prev,
+        page: 1
+      }));
+    }, 500);
+  };
+
   // Handle pagination
   const handlePageChange = (newPage: number) => {
     setTaskPagination(prev => ({
@@ -142,6 +232,11 @@ const ClientOverviewPage = () => {
 
   // Clear all filters
   const clearFilters = () => {
+    // Clear search timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
     setTaskFilters({
       activitySearch: '',
       startDate: '',
@@ -151,6 +246,8 @@ const ClientOverviewPage = () => {
       teamMemberId: ''
     });
     
+    setSearchInputValue(''); // Reset search input
+    
     setTaskPagination(prev => ({
       ...prev,
       page: 1
@@ -158,6 +255,20 @@ const ClientOverviewPage = () => {
     
     // API call will be triggered by useEffect
   };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Sync search input value with filters when they change externally
+  useEffect(() => {
+    setSearchInputValue(taskFilters.activitySearch);
+  }, [taskFilters.activitySearch]);
 
   if (loading) {
     return (
@@ -572,8 +683,8 @@ const ClientOverviewPage = () => {
                     <input
                       type="text"
                       placeholder="Search by activity name..."
-                      value={taskFilters.activitySearch}
-                      onChange={(e) => handleFilterChange('activitySearch', e.target.value)}
+                      value={searchInputValue}
+                      onChange={handleSearchChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
@@ -652,11 +763,19 @@ const ClientOverviewPage = () => {
                 {/* Filter Actions */}
                 <div className="flex justify-between items-center mt-4">
                   <div className="text-sm text-gray-600">
-                    Showing {filteredTasks.length} of {taskPagination.totalTasks} tasks
+                    {isApplyingFilters ? (
+                      <span className="flex items-center text-blue-600">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
+                        Updating results...
+                      </span>
+                    ) : (
+                      `Showing ${filteredTasks.length} of ${taskPagination.totalTasks} tasks`
+                    )}
                   </div>
                   <button
                     onClick={clearFilters}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={isApplyingFilters}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Clear Filters
                   </button>
