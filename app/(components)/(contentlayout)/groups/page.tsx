@@ -780,15 +780,15 @@ const GroupsPage = () => {
     fetchGroups(1, itemsPerPage);
   };
 
-  // Handle task status filter changes
-  const handleTaskStatusFilterChange = (status: keyof TaskStatus, value: boolean) => {
-    console.log(`Task status filter changed: ${status} = ${value}`);
-    updateTaskStatusFilter(status, value);
-    setCurrentPage(1); // Reset to first page when filters change
-    
-    // Refresh the groups data to apply the new filters
-    fetchGroups(1, itemsPerPage);
-  };
+  // Handle task status filter changes - Commented out
+  // const handleTaskStatusFilterChange = (status: keyof TaskStatus, value: boolean) => {
+  //   console.log(`Task status filter changed: ${status} = ${value}`);
+  //   updateTaskStatusFilter(status, value);
+  //   setCurrentPage(1); // Reset to first page when filters change
+  //   
+  //   // Refresh the groups data to apply the new filters
+  //   fetchGroups(1, itemsPerPage);
+  // };
 
   // Handle clear all filters
   const handleClearAllFilters = () => {
@@ -910,7 +910,6 @@ const GroupsPage = () => {
                 showAdvancedFilters={showAdvancedFilters}
                 advancedFilters={advancedFilters}
                 onUpdateFilter={handleAdvancedFilterChange}
-                onUpdateTaskStatusFilter={handleTaskStatusFilterChange}
                 onClearFilters={handleClearAllFilters}
               />
 
@@ -933,26 +932,29 @@ const GroupsPage = () => {
                         </span>
                       )}
                       
-                      {(advancedFilters.minTasks || advancedFilters.maxTasks) && (
+                      {/* Task Count Range Filter Summary - Commented out */}
+                      {/* {(advancedFilters.minTasks || advancedFilters.maxTasks) && (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
                           Tasks: {advancedFilters.minTasks || '0'} - {advancedFilters.maxTasks || '∞'}
                         </span>
-                      )}
+                      )} */}
                       
-                      {(advancedFilters.minClients || advancedFilters.maxClients) && (
+                      {/* Client Count Range Filter Summary - Commented out */}
+                      {/* {(advancedFilters.minClients || advancedFilters.maxClients) && (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
                           Clients: {advancedFilters.minClients || '0'} - {advancedFilters.maxClients || '∞'}
                         </span>
-                      )}
+                      )} */}
                       
-                      {Object.entries(advancedFilters.taskStatus).some(([status, isActive]) => isActive) && (
+                      {/* Task Status Filter Summary - Commented out */}
+                      {/* {Object.entries(advancedFilters.taskStatus).some(([status, isActive]) => isActive) && (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
                           Status: {Object.entries(advancedFilters.taskStatus)
                             .filter(([status, isActive]) => isActive)
                             .map(([status]) => status.charAt(0).toUpperCase() + status.slice(1))
                             .join(', ')}
                         </span>
-                      )}
+                      )} */}
                     </div>
                     <button
                       onClick={handleClearAllFilters}

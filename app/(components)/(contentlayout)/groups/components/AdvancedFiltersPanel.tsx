@@ -5,7 +5,7 @@ interface AdvancedFiltersPanelProps {
   showAdvancedFilters: boolean;
   advancedFilters: AdvancedFilters;
   onUpdateFilter: (key: keyof AdvancedFilters, value: string | TaskStatus) => void;
-  onUpdateTaskStatusFilter: (status: keyof TaskStatus, value: boolean) => void;
+  onUpdateTaskStatusFilter?: (status: keyof TaskStatus, value: boolean) => void; // Made optional
   onClearFilters: () => void;
 }
 
@@ -35,8 +35,8 @@ const AdvancedFiltersPanel: React.FC<AdvancedFiltersPanelProps> = ({
           />
         </div>
 
-        {/* Task Count Range */}
-        <div>
+        {/* Task Count Range - Commented out */}
+        {/* <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Task Count Range
           </label>
@@ -56,10 +56,10 @@ const AdvancedFiltersPanel: React.FC<AdvancedFiltersPanelProps> = ({
               onChange={(e) => onUpdateFilter('maxTasks', e.target.value)}
             />
           </div>
-        </div>
+        </div> */}
 
-        {/* Client Count Range */}
-        <div>
+        {/* Client Count Range - Commented out */}
+        {/* <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Client Count Range
           </label>
@@ -79,10 +79,10 @@ const AdvancedFiltersPanel: React.FC<AdvancedFiltersPanelProps> = ({
               onChange={(e) => onUpdateFilter('maxClients', e.target.value)}
             />
           </div>
-        </div>
+        </div> */}
 
-        {/* Task Status Filters */}
-        <div className="md:col-span-2 lg:col-span-3">
+        {/* Task Status Filters - Commented out */}
+        {/* <div className="md:col-span-2 lg:col-span-3">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Task Status
           </label>
@@ -99,7 +99,7 @@ const AdvancedFiltersPanel: React.FC<AdvancedFiltersPanelProps> = ({
               </label>
             ))}
           </div>
-        </div>
+        </div> */}
       </div>
 
       {/* Filter Actions */}

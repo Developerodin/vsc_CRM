@@ -67,12 +67,12 @@ export const useGroupFilters = () => {
   // Check if any advanced filters are active
   const hasActiveAdvancedFilters = useCallback(() => {
     return (
-      advancedFilters.clientName ||
-      advancedFilters.minTasks ||
-      advancedFilters.maxTasks ||
-      advancedFilters.minClients ||
-      advancedFilters.maxClients ||
-      Object.values(advancedFilters.taskStatus).some(Boolean)
+      advancedFilters.clientName
+      // || advancedFilters.minTasks
+      // || advancedFilters.maxTasks
+      // || advancedFilters.minClients
+      // || advancedFilters.maxClients
+      // || Object.values(advancedFilters.taskStatus).some(Boolean)
     );
   }, [advancedFilters]);
 
@@ -89,30 +89,30 @@ export const useGroupFilters = () => {
         if (!hasMatchingClient) return false;
       }
 
-      // Filter by task count range
-      if (advancedFilters.minTasks && group.taskStats.total < parseInt(advancedFilters.minTasks)) {
-        return false;
-      }
-      if (advancedFilters.maxTasks && group.taskStats.total > parseInt(advancedFilters.maxTasks)) {
-        return false;
-      }
+      // Filter by task count range - Commented out
+      // if (advancedFilters.minTasks && group.taskStats.total < parseInt(advancedFilters.minTasks)) {
+      //   return false;
+      // }
+      // if (advancedFilters.maxTasks && group.taskStats.total > parseInt(advancedFilters.maxTasks)) {
+      //   return false;
+      // }
 
-      // Filter by client count range
-      if (advancedFilters.minClients && group.numberOfClients < parseInt(advancedFilters.minClients)) {
-        return false;
-      }
-      if (advancedFilters.maxClients && group.numberOfClients > parseInt(advancedFilters.maxClients)) {
-        return false;
-      }
+      // Filter by client count range - Commented out
+      // if (advancedFilters.minClients && group.numberOfClients < parseInt(advancedFilters.minClients)) {
+      //   return false;
+      // }
+      // if (advancedFilters.maxClients && group.numberOfClients > parseInt(advancedFilters.maxClients)) {
+      //   return false;
+      // }
 
-      // Filter by task status
-      if (Object.values(advancedFilters.taskStatus).some(Boolean)) {
-        const hasMatchingStatus = Object.entries(advancedFilters.taskStatus).some(([status, isActive]) => {
-          if (!isActive) return false;
-          return group.taskStats[status as keyof typeof group.taskStats] > 0;
-        });
-        if (!hasMatchingStatus) return false;
-      }
+      // Filter by task status - Commented out
+      // if (Object.values(advancedFilters.taskStatus).some(Boolean)) {
+      //   const hasMatchingStatus = Object.entries(advancedFilters.taskStatus).some(([status, isActive]) => {
+      //     if (!isActive) return false;
+      //     return group.taskStats[status as keyof typeof group.taskStats] > 0;
+      //   });
+      //   if (!hasMatchingStatus) return false;
+      // }
 
       return true;
     });

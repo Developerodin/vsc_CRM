@@ -865,15 +865,19 @@ const Dashboard = () => {
         )}
       </div>
 
-      {/* Completion Rates Card */}
-      <div className="grid grid-cols-12 gap-x-6 mb-6">
+      {/* Completion Rates Card - Commented out */}
+      {/* <div className="grid grid-cols-12 gap-x-6 mb-6">
         <div className="lg:col-span-6 col-span-12">
           <CompletionRatesCard
             data={completionRatesData}
             isLoading={isLoadingCompletionRates}
           />
         </div>
-        <div className="lg:col-span-6 col-span-12">
+        <div className="lg:col-span-6 col-span-12"> */}
+      
+      {/* Timeline by branches - Full width */}
+      <div className="grid grid-cols-12 gap-x-6 mb-6">
+        <div className="lg:col-span-12 col-span-12">
           {isLoadingTimeline ? (
             <ChartSkeleton />
           ) : (
