@@ -189,7 +189,7 @@ const Dashboard = () => {
   const [taskPriorityAnalytics, setTaskPriorityAnalytics] = useState<TaskAnalyticsResponse | null>(null);
   
   // Frequency selection state
-  const [selectedFrequency, setSelectedFrequency] = useState<string>('Daily');
+  const [selectedFrequency, setSelectedFrequency] = useState<string>('Monthly');
   
   // Loading states
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(true);
@@ -975,13 +975,14 @@ const Dashboard = () => {
             isLoading={isLoadingAnalytics}
           />
         </div>
-        <div className="lg:col-span-12 col-span-12">
+        {/* Status Trends Chart - Commented out */}
+        {/* <div className="lg:col-span-12 col-span-12">
           <StatusTrendsChart
             data={statusTrendsData}
             isLoading={isLoadingTrends}
             interval="day"
           />
-        </div>
+        </div> */}
       </div>
 
       {/* Top Clients and Top Activities */}
