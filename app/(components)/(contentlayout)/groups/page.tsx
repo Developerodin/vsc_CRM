@@ -178,8 +178,8 @@ const GroupsPage = () => {
     try {
       setIsLoading(true);
       const queryParams = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: itemsPerPage.toString(),
+        page: page.toString(),
+        limit: limit.toString(),
         sortBy,
         ...(filters.name && { name: filters.name }),
       });
@@ -231,7 +231,7 @@ const GroupsPage = () => {
       
       setGroups(filteredGroups);
       setTotalResults(filteredGroups.length);
-      setTotalPages(Math.ceil(filteredGroups.length / itemsPerPage));
+      setTotalPages(Math.ceil(filteredGroups.length / limit));
     } catch (err) {
       console.error('Error fetching groups:', err);
       setError('Failed to fetch groups');
@@ -242,7 +242,7 @@ const GroupsPage = () => {
 
   useEffect(() => {
     fetchGroups(currentPage, itemsPerPage);
-  }, [currentPage, itemsPerPage, sortBy, filters.name]);
+  }, [currentPage, itemsPerPage, sortBy, filters.name, advancedFilters.clientName]);
 
   // Separate useEffect for advanced filters to update task statistics and reapply filters
   useEffect(() => {
@@ -778,35 +778,30 @@ const GroupsPage = () => {
 
   // Reset all filters and sorting
   const handleReset = () => {
-    setFilters({ name: "" });
-    setSortBy("name:asc");
-    clearAdvancedFilters();
-    setCurrentPage(1);
-    
     // Clear existing groups to show loading state
     setGroups([]);
     setTotalResults(0);
     setTotalPages(1);
     
-    // Refresh the groups data to show all groups without any filters
-    fetchGroups(1, itemsPerPage);
+    // Reset all filters and sorting
+    setFilters({ name: "" });
+    setSortBy("name:asc");
+    clearAdvancedFilters();
+    setCurrentPage(1);
   };
 
   // Handle advanced filter changes
   const handleAdvancedFilterChange = (key: keyof AdvancedFilters, value: string | TaskStatus) => {
     console.log(`Advanced filter changed: ${key} = ${value}`);
+    
+    // Update the filter
     updateFilter(key, value);
     setCurrentPage(1); // Reset to first page when filters change
     
-    // For client name filter, we need to refetch all groups to apply the filter
-    if (key === 'clientName') {
-      // Clear any existing groups first to show loading state
-      setGroups([]);
-      setTotalResults(0);
-      setTotalPages(1);
-      // Then fetch groups with the new filter
-      fetchGroups(1, itemsPerPage);
-    }
+    // Clear existing groups to show loading state for immediate feedback
+    setGroups([]);
+    setTotalResults(0);
+    setTotalPages(1);
   };
 
   // Handle task status filter changes - Commented out
@@ -821,16 +816,13 @@ const GroupsPage = () => {
 
   // Handle clear all filters
   const handleClearAllFilters = () => {
-    clearAdvancedFilters();
-    setCurrentPage(1);
-    
     // Clear existing groups to show loading state
     setGroups([]);
     setTotalResults(0);
     setTotalPages(1);
     
-    // Refresh the groups data to show all groups without filters
-    fetchGroups(1, itemsPerPage);
+    clearAdvancedFilters();
+    setCurrentPage(1);
   };
 
   return (
@@ -930,7 +922,6 @@ const GroupsPage = () => {
                     onClick={() => {
                       setFilters(prev => ({ ...prev, name: "" }));
                       setCurrentPage(1);
-                      fetchGroups(1, itemsPerPage);
                     }}
                     className="ti-btn ti-btn-secondary"
                   >
@@ -955,7 +946,7 @@ const GroupsPage = () => {
               />
 
               {/* Advanced Filters Summary */}
-              {hasActiveAdvancedFilters() && (
+              {/* {hasActiveAdvancedFilters() && (
                 <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
@@ -967,29 +958,7 @@ const GroupsPage = () => {
                         </span>
                       )}
                       
-                      {/* Task Count Range Filter Summary - Commented out */}
-                      {/* {(advancedFilters.minTasks || advancedFilters.maxTasks) && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                          Tasks: {advancedFilters.minTasks || '0'} - {advancedFilters.maxTasks || '∞'}
-                        </span>
-                      )} */}
-                      
-                      {/* Client Count Range Filter Summary - Commented out */}
-                      {/* {(advancedFilters.minClients || advancedFilters.maxClients) && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                          Clients: {advancedFilters.minClients || '0'} - {advancedFilters.maxClients || '∞'}
-                        </span>
-                      )} */}
-                      
-                      {/* Task Status Filter Summary - Commented out */}
-                      {/* {Object.entries(advancedFilters.taskStatus).some(([status, isActive]) => isActive) && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                          Status: {Object.entries(advancedFilters.taskStatus)
-                            .filter(([status, isActive]) => isActive)
-                            .map(([status]) => status.charAt(0).toUpperCase() + status.slice(1))
-                            .join(', ')}
-                        </span>
-                      )} */}
+                     
                     </div>
                     <button
                       onClick={handleClearAllFilters}
@@ -1000,7 +969,7 @@ const GroupsPage = () => {
                     </button>
                   </div>
                 </div>
-              )}
+              )} */}
 
               {/* Search Results Indicator */}
               {filters.name && (
@@ -1016,7 +985,6 @@ const GroupsPage = () => {
                       onClick={() => {
                         setFilters(prev => ({ ...prev, name: "" }));
                         setCurrentPage(1);
-                        fetchGroups(1, itemsPerPage);
                       }}
                       className="text-green-600 hover:text-green-800 text-sm"
                     >
@@ -1124,7 +1092,6 @@ const GroupsPage = () => {
                                   onClick={() => {
                                     setFilters(prev => ({ ...prev, name: "" }));
                                     setCurrentPage(1);
-                                    fetchGroups(1, itemsPerPage);
                                   }}
                                   className="ti-btn ti-btn-primary"
                                 >
