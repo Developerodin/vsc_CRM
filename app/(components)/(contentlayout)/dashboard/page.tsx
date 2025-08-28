@@ -875,8 +875,8 @@ const Dashboard = () => {
         </div>
         <div className="lg:col-span-6 col-span-12"> */}
       
-      {/* Timeline by branches - Full width */}
-      <div className="grid grid-cols-12 gap-x-6 mb-6">
+      {/* Timeline by branches - Full width - Commented out */}
+      {/* <div className="grid grid-cols-12 gap-x-6 mb-6">
         <div className="lg:col-span-12 col-span-12">
           {isLoadingTimeline ? (
             <ChartSkeleton />
@@ -943,7 +943,7 @@ const Dashboard = () => {
             </div>
           )}
         </div>
-      </div>
+      </div> */}
 
       {/* Task Analytics - Tasks By Status and Tasks By Priority */}
       <div className="grid grid-cols-12 gap-x-6 mb-6">

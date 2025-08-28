@@ -779,9 +779,8 @@ const GroupsPage = () => {
   // Reset all filters and sorting
   const handleReset = () => {
     // Clear existing groups to show loading state
-    setGroups([]);
-    setTotalResults(0);
-    setTotalPages(1);
+    
+    
     
     // Reset all filters and sorting
     setFilters({ name: "" });
