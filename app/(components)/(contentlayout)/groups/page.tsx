@@ -139,8 +139,6 @@ const GroupsPage = () => {
         limit: '1000', // Get all groups' task stats
         // Pass the same filters as groups
         ...(filters.name && { name: filters.name }),
-        // Also pass client search filter if available
-        ...(advancedFilters.clientName && { client: advancedFilters.clientName }),
       });
 
       console.log('Fetching task statistics with query params:', queryParams.toString());
@@ -184,8 +182,6 @@ const GroupsPage = () => {
         limit: itemsPerPage.toString(),
         sortBy,
         ...(filters.name && { name: filters.name }),
-        // Also pass client search filter if available
-        ...(advancedFilters.clientName && { client: advancedFilters.clientName }),
       });
 
       console.log('Fetching groups with query params:', queryParams.toString());
@@ -202,12 +198,12 @@ const GroupsPage = () => {
 
       const data: ApiResponse = await response.json();
       
-      // Fetch task statistics for all groups with the same search filter
+      // Fetch task statistics for all groups
       const newTaskStatsMap = await fetchGroupTaskStats();
       setTaskStatsMap(newTaskStatsMap);
       
       // Merge groups with their task statistics
-      const groupsWithTasks: GroupWithTasks[] = data.results.map(group => {
+      let groupsWithTasks: GroupWithTasks[] = data.results.map(group => {
         const taskStats = newTaskStatsMap.get(group.id) || {
           pending: 0,
           ongoing: 0,
@@ -220,7 +216,17 @@ const GroupsPage = () => {
         return { ...group, taskStats };
       });
       
-      // Apply advanced filters (Task Count, Client Count, Task Status)
+      // Apply client name filter after fetching groups
+      if (advancedFilters.clientName) {
+        groupsWithTasks = groupsWithTasks.filter(group => 
+          group.clients && group.clients.some(client => 
+            client.name.toLowerCase().includes(advancedFilters.clientName.toLowerCase()) ||
+            client.email.toLowerCase().includes(advancedFilters.clientName.toLowerCase())
+          )
+        );
+      }
+      
+      // Apply other advanced filters (Task Count, Client Count, Task Status)
       const filteredGroups = applyAdvancedFilters(groupsWithTasks);
       
       setGroups(filteredGroups);
@@ -236,7 +242,7 @@ const GroupsPage = () => {
 
   useEffect(() => {
     fetchGroups(currentPage, itemsPerPage);
-  }, [currentPage, itemsPerPage, sortBy, filters.name, advancedFilters.clientName]);
+  }, [currentPage, itemsPerPage, sortBy, filters.name]);
 
   // Separate useEffect for advanced filters to update task statistics and reapply filters
   useEffect(() => {
@@ -259,8 +265,19 @@ const GroupsPage = () => {
           return { ...group, taskStats };
         });
         
-        // Reapply advanced filters after updating task stats
-        return applyAdvancedFilters(updatedGroups);
+        // Apply client name filter first
+        let filteredGroups = updatedGroups;
+        if (advancedFilters.clientName) {
+          filteredGroups = updatedGroups.filter(group => 
+            group.clients && group.clients.some(client => 
+              client.name.toLowerCase().includes(advancedFilters.clientName.toLowerCase()) ||
+              client.email.toLowerCase().includes(advancedFilters.clientName.toLowerCase())
+            )
+          );
+        }
+        
+        // Then apply other advanced filters
+        return applyAdvancedFilters(filteredGroups);
       });
     };
 
@@ -346,7 +363,7 @@ const GroupsPage = () => {
           .map((group: GroupWithTasks) => ({
             ID: group.id,
             "Group Name": group.name,
-            "Number Of Clients": group.numberOfClients,
+            "Number Of Clients": group.clients ? group.clients.length : 0,
             "Created Date": new Date(group.createdAt).toLocaleDateString(),
             "Sort Order": group.sortOrder,
             "Client IDs": group.clients?.map(client => client.id).join(',') || '',
@@ -384,7 +401,7 @@ const GroupsPage = () => {
           return {
           ID: group.id,
           "Group Name": group.name,
-          "Number Of Clients": group.numberOfClients,
+          "Number Of Clients": group.clients ? group.clients.length : 0,
           "Created Date": new Date(group.createdAt).toLocaleDateString(),
           "Sort Order": group.sortOrder,
           "Client IDs": group.clients?.map(client => client.id).join(',') || '',
@@ -766,6 +783,11 @@ const GroupsPage = () => {
     clearAdvancedFilters();
     setCurrentPage(1);
     
+    // Clear existing groups to show loading state
+    setGroups([]);
+    setTotalResults(0);
+    setTotalPages(1);
+    
     // Refresh the groups data to show all groups without any filters
     fetchGroups(1, itemsPerPage);
   };
@@ -776,8 +798,15 @@ const GroupsPage = () => {
     updateFilter(key, value);
     setCurrentPage(1); // Reset to first page when filters change
     
-    // Refresh the groups data to apply the new filters
-    fetchGroups(1, itemsPerPage);
+    // For client name filter, we need to refetch all groups to apply the filter
+    if (key === 'clientName') {
+      // Clear any existing groups first to show loading state
+      setGroups([]);
+      setTotalResults(0);
+      setTotalPages(1);
+      // Then fetch groups with the new filter
+      fetchGroups(1, itemsPerPage);
+    }
   };
 
   // Handle task status filter changes - Commented out
@@ -795,8 +824,13 @@ const GroupsPage = () => {
     clearAdvancedFilters();
     setCurrentPage(1);
     
+    // Clear existing groups to show loading state
+    setGroups([]);
+    setTotalResults(0);
+    setTotalPages(1);
+    
     // Refresh the groups data to show all groups without filters
-    fetchGroups(currentPage, itemsPerPage);
+    fetchGroups(1, itemsPerPage);
   };
 
   return (
@@ -896,6 +930,7 @@ const GroupsPage = () => {
                     onClick={() => {
                       setFilters(prev => ({ ...prev, name: "" }));
                       setCurrentPage(1);
+                      fetchGroups(1, itemsPerPage);
                     }}
                     className="ti-btn ti-btn-secondary"
                   >
@@ -980,8 +1015,9 @@ const GroupsPage = () => {
                     <button
                       onClick={() => {
                         setFilters(prev => ({ ...prev, name: "" }));
-                  setCurrentPage(1);
-                }}
+                        setCurrentPage(1);
+                        fetchGroups(1, itemsPerPage);
+                      }}
                       className="text-green-600 hover:text-green-800 text-sm"
                     >
                       <i className="ri-close-line mr-1"></i>
@@ -1038,7 +1074,7 @@ const GroupsPage = () => {
                               />
                             </td>
                             <td>{group.name}</td>
-                            <td>{group.numberOfClients}</td>
+                            <td>{group.clients ? group.clients.length : 0}</td>
                             <td>{new Date(group.createdAt).toLocaleDateString()}</td>
                                                <td className="px-4 py-3">
                               {renderTaskStatus(group.taskStats, group.id)}
@@ -1088,6 +1124,7 @@ const GroupsPage = () => {
                                   onClick={() => {
                                     setFilters(prev => ({ ...prev, name: "" }));
                                     setCurrentPage(1);
+                                    fetchGroups(1, itemsPerPage);
                                   }}
                                   className="ti-btn ti-btn-primary"
                                 >
