@@ -62,6 +62,8 @@ interface Group {
 interface ActivityMapping {
   activity: string;
   notes: string;
+  status: string;
+  assignedDate?: string;
 }
 
 const EditClientPage = ({ params }: { params: { id: string } }) => {
@@ -81,7 +83,9 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
   const [activityMappings, setActivityMappings] = useState<ActivityMapping[]>([
     {
       activity: '',
-      notes: ''
+      notes: '',
+      status: 'active',
+      assignedDate: new Date().toISOString()
     }
   ]);
 
@@ -982,7 +986,9 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
       ...activityMappings,
       {
         activity: '',
-        notes: ''
+        notes: '',
+        status: 'active',
+        assignedDate: new Date().toISOString()
       }
     ]);
   };
@@ -1120,6 +1126,10 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
       const mapping = activityMappings[i];
       if (!mapping.activity) {
         toast.error(`Please select an activity for mapping ${i + 1}`);
+        return false;
+      }
+      if (!mapping.status) {
+        toast.error(`Please select a status for mapping ${i + 1}`);
         return false;
       }
     }
@@ -1641,7 +1651,7 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
 
                     {activityMappings.map((mapping, index) => (
                       <div key={index} className="border border-gray-200 rounded-lg p-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           {/* Activity */}
                           <div className="form-group">
                           <label className="form-label">Activity <span className="text-red-500">*</span></label>
@@ -1657,6 +1667,21 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                                 <i className="ri-arrow-down-s-line text-gray-400"></i>
                               </button>
                             </div>
+                          </div>
+
+                          {/* Status */}
+                          <div className="form-group">
+                            <label className="form-label">Status <span className="text-red-500">*</span></label>
+                            <select
+                              className="form-control"
+                              value={mapping.status}
+                              onChange={(e) => handleActivityMappingChange(index, 'status', e.target.value)}
+                              required
+                            >
+                              <option value="">Select Status</option>
+                              <option value="active">Active</option>
+                              <option value="inactive">Inactive</option>
+                            </select>
                           </div>
 
                           {/* Notes */}

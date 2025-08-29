@@ -12,6 +12,7 @@ interface Activity {
   sortOrder: number;
   frequency?: string;
   frequencyConfig?: any;
+  subactivities?: Array<{ name: string }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -29,6 +30,7 @@ interface ExcelRow {
   "Activity Name": string;
   "Sort Order": number;
   "Frequency": string;
+  "Sub-Activities"?: string;
 }
 
 const ActivitiesPage = () => {
@@ -157,7 +159,8 @@ const ActivitiesPage = () => {
             ID: activity.id,
             "Activity Name": activity.name,
             "Sort Order": activity.sortOrder,
-            "Frequency": activity.frequency || 'No frequency set'
+            "Frequency": activity.frequency || 'No frequency set',
+            "Sub-Activities": activity.subactivities && activity.subactivities.length > 0 ? activity.subactivities.map(sub => sub.name).join(', ') : 'None'
           }));
         successMessage = "Selected activities exported successfully";
       } else {
@@ -176,7 +179,8 @@ const ActivitiesPage = () => {
           ID: activity.id,
           "Activity Name": activity.name,
           "Sort Order": activity.sortOrder,
-          "Frequency": activity.frequency || 'No frequency set'
+          "Frequency": activity.frequency || 'No frequency set',
+          "Sub-Activities": activity.subactivities && activity.subactivities.length > 0 ? activity.subactivities.map(sub => sub.name).join(', ') : 'None'
         }));
         successMessage = "All activities exported successfully";
       }
@@ -187,6 +191,7 @@ const ActivitiesPage = () => {
         { wch: 30 }, // Activity Name
         { wch: 15 }, // Sort Order
         { wch: 20 }, // Frequency
+        { wch: 40 }, // Sub-Activities
       ];
 
       const wb = XLSX.utils.book_new();
@@ -219,10 +224,13 @@ const ActivitiesPage = () => {
         }
 
         // Transform data for bulk import
-        const activities = jsonData.map(row => ({
+        const activities = jsonData.map((row: ExcelRow) => ({
           id: row["ID"] || undefined, // Only include if exists
           name: row["Activity Name"],
-          sortOrder: row["Sort Order"] || 1
+          sortOrder: row["Sort Order"] || 1,
+          subactivities: row["Sub-Activities"] ? 
+            row["Sub-Activities"].split(',').map((name: string) => ({ name: name.trim() })).filter((item: { name: string }) => item.name !== 'None' && item.name !== '') : 
+            []
         }));
 
         // Single API call instead of multiple requests
@@ -499,6 +507,7 @@ const ActivitiesPage = () => {
                         />
                       </th>
                       <th className="px-4 py-3">Name</th>
+                      <th className="px-4 py-3">Sub-Activities</th>
                       <th className="px-4 py-3">Due Date</th>
                       <th className="px-4 py-3">Actions</th>
                     </tr>
@@ -506,7 +515,7 @@ const ActivitiesPage = () => {
                   <tbody>
                     {isLoading ? (
                       <tr>
-                        <td colSpan={4} className="text-center py-4">
+                        <td colSpan={5} className="text-center py-4">
                           <div className="flex justify-center">
                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                           </div>
@@ -514,13 +523,13 @@ const ActivitiesPage = () => {
                       </tr>
                     ) : error ? (
                       <tr>
-                        <td colSpan={4} className="text-center text-red-500 py-4">
+                        <td colSpan={5} className="text-center text-red-500 py-4">
                           {error}
                         </td>
                       </tr>
                     ) : activities.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="text-center py-4">
+                        <td colSpan={5} className="text-center py-4">
                           No activities found
                         </td>
                       </tr>
@@ -535,36 +544,49 @@ const ActivitiesPage = () => {
                               className="form-checkbox"
                             />
                           </td>
-                                                     <td>{activity.name}</td>
-                           <td>
-                             <div className="text-sm">
-                               <span className={`px-2 py-1 rounded-full text-xs ${
-                                 activity.frequency 
-                                   ? 'bg-blue-100 text-blue-800' 
-                                   : 'bg-gray-100 text-gray-600'
-                               }`}>
-                                 {formatFrequencyDisplay(activity)}
-                               </span>
-                             </div>
-                           </td>
-                           <td>
-                            <div className="flex space-x-2">
-                              <Link
-                                href={`/activities/edit/${activity.id}`}
-                                className="ti-btn ti-btn-primary ti-btn-sm"
-                                title="Edit"
-                              >
-                                <i className="ri-edit-line"></i>
-                              </Link>
-                              <button
-                                onClick={() => handleDelete(activity.id)}
-                                className="ti-btn ti-btn-danger ti-btn-sm"
-                                title="Delete"
-                              >
-                                <i className="ri-delete-bin-line"></i>
-                              </button>
+                          <td>{activity.name}</td>
+                          <td>
+                            {activity.subactivities && activity.subactivities.length > 0 ? (
+                              <div className="space-y-1">
+                                {activity.subactivities.map((subActivity, index) => (
+                                  <div key={index} className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                                    {subActivity.name}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 text-sm">No sub-activities</span>
+                            )}
+                          </td>
+                          <td>
+                            <div className="text-sm">
+                              <span className={`px-2 py-1 rounded-full text-xs ${
+                                activity.frequency 
+                                  ? 'bg-blue-100 text-blue-800' 
+                                  : 'bg-gray-100 text-gray-600'
+                              }`}>
+                                {formatFrequencyDisplay(activity)}
+                              </span>
                             </div>
                           </td>
+                          <td>
+                           <div className="flex space-x-2">
+                             <Link
+                               href={`/activities/edit/${activity.id}`}
+                               className="ti-btn ti-btn-primary ti-btn-sm"
+                               title="Edit"
+                             >
+                               <i className="ri-edit-line"></i>
+                             </Link>
+                             <button
+                               onClick={() => handleDelete(activity.id)}
+                               className="ti-btn ti-btn-danger ti-btn-sm"
+                               title="Delete"
+                             >
+                               <i className="ri-delete-bin-line"></i>
+                             </button>
+                           </div>
+                         </td>
                         </tr>
                       ))
                     )}

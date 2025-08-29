@@ -18,7 +18,7 @@ interface Client {
   district: string;
   state: string;
   country: string;
-
+  status: string;
   pan: string;
   dob: string;
   branch: string;
@@ -115,6 +115,7 @@ const ClientsPage = () => {
     district: "",
     state: "",
     country: "",
+    status: "",
     pan: "",
     branch: "",
     businessType: "",
@@ -222,6 +223,7 @@ const ClientsPage = () => {
         ...(filters.district && { district: filters.district }),
         ...(filters.state && { state: filters.state }),
         ...(filters.country && { country: filters.country }),
+        ...(filters.status && { status: filters.status }),
         ...(filters.pan && { pan: filters.pan }),
         ...(filters.branch && { branch: filters.branch }),
         ...(filters.businessType && { businessType: filters.businessType }),
@@ -336,6 +338,27 @@ const ClientsPage = () => {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // Handle clicking outside dropdowns to close them
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.status-dropdown')) {
+        // Close all status dropdowns
+        const dropdowns = document.querySelectorAll('[id^="status-dropdown-"]');
+        dropdowns.forEach(dropdown => {
+          if (dropdown instanceof HTMLElement) {
+            dropdown.classList.add('hidden');
+          }
+        });
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   // Separate useEffect for filters and search to update task statistics
   useEffect(() => {
     // Update task stats when filters change
@@ -426,6 +449,41 @@ const ClientsPage = () => {
     }
   };
 
+  // Function to handle client status change
+  const handleStatusChange = async (clientId: string, newStatus: string) => {
+    try {
+      // Convert status to lowercase for API
+      const apiStatus = newStatus.toLowerCase();
+      
+      const response = await fetch(`${Base_url}clients/${clientId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ status: apiStatus })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update client status');
+      }
+
+      toast.success(`Client status updated to ${newStatus}`);
+      
+      // Update the client status in the local state (keep display format)
+      setClients(prevClients => 
+        prevClients.map(client => 
+          client.id === clientId 
+            ? { ...client, status: apiStatus }
+            : client
+        )
+      );
+    } catch (err) {
+      console.error('Error updating client status:', err);
+      toast.error('Failed to update client status');
+    }
+  };
+
   const handleExport = async () => {
     try {
       let exportData;
@@ -444,6 +502,7 @@ const ClientsPage = () => {
             "Client State": client.state,
             "Client Country": client.country,
             "Branch": client.branch,
+            "Status": client.status,
 
             "PAN": client.pan,
             "Date of Birth": client.dob,
@@ -477,6 +536,7 @@ const ClientsPage = () => {
           "Client State": client.state,
           "Client Country": client.country,
           "Branch": client.branch,
+          "Status": client.status,
           
           "PAN": client.pan,
           "Date of Birth": client.dob,
@@ -505,6 +565,7 @@ const ClientsPage = () => {
         { wch: 20 }, // State
         { wch: 20 }, // Country
         { wch: 30 }, // Branch ID
+        { wch: 20 }, // Status
 
         { wch: 15 }, // PAN
         { wch: 15 }, // Date of Birth
@@ -990,6 +1051,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         district: "",
                         state: "",
                         country: "",
+                        status: "",
                         pan: "",
                         branch: "",
                         businessType: "",
@@ -1200,6 +1262,25 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         }}
                       />
                     </div>
+
+                    {/* Status Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Status
+                      </label>
+                      <select
+                        className="form-select w-full"
+                        value={filters.status}
+                        onChange={(e) => {
+                          setFilters(prev => ({ ...prev, status: e.target.value }));
+                          setCurrentPage(1);
+                        }}
+                      >
+                        <option value="">All Statuses</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                      </select>
+                    </div>
                   </div>
 
                   {/* Filter Actions */}
@@ -1218,7 +1299,8 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                           udyamNumber: "",
                           iecCode: "",
                           state: "",
-                          country: ""
+                          country: "",
+                          status: ""
                         }));
                         setCurrentPage(1);
                         // Load initial data without these filters
@@ -1263,7 +1345,8 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                           udyamNumber: "",
                           iecCode: "",
                           state: "",
-                          country: ""
+                          country: "",
+                          status: ""
                         }));
                         setCurrentPage(1);
                         // Load initial data without any filters
@@ -1389,6 +1472,17 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         </button>
                       </span>
                     )}
+                    {filters.status && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        Status: {filters.status}
+                        <button
+                          className="ml-1 text-blue-600 hover:text-blue-800"
+                          onClick={() => setFilters(prev => ({ ...prev, status: "" }))}
+                        >
+                          <i className="ri-close-line"></i>
+                        </button>
+                      </span>
+                    )}
                   </div>
                 </div>
               )}
@@ -1436,6 +1530,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                           <th className="px-4 py-3">City</th>
                           <th className="px-4 py-3">Business Type</th>
                           <th className="px-4 py-3">Entity Type</th>
+                          <th className="px-4 py-3">Status</th>
 
                           <th className="px-4 py-3">PAN</th>
                           <th className="px-4 py-3">Task Status</th>
@@ -1492,6 +1587,58 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                                   {client.entityType || 'N/A'}
                                 </span>
                               </td>
+                              <td>
+                                <div className="relative group">
+                                  <button
+                                    className={`px-2 py-1 text-xs rounded-full cursor-pointer transition-all duration-200 ${
+                                      client.status === 'active' ? 'bg-success text-white hover:bg-success-dark' : 
+                                      client.status === 'inactive' ? 'bg-danger text-white hover:bg-danger-dark' :
+                                      'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                                    }`}
+                                    onClick={() => {
+                                      // Toggle dropdown visibility
+                                      const dropdown = document.getElementById(`status-dropdown-${client.id}`);
+                                      if (dropdown) {
+                                        dropdown.classList.toggle('hidden');
+                                      }
+                                    }}
+                                  >
+                                    {client.status === 'active' ? 'Active' : 
+                                     client.status === 'inactive' ? 'Inactive' : 
+                                     client.status || 'N/A'}
+                                    <i className="ri-arrow-down-s-line ml-1"></i>
+                                  </button>
+                                  
+                                  {/* Status Dropdown */}
+                                  <div
+                                    id={`status-dropdown-${client.id}`}
+                                    className="status-dropdown hidden absolute z-10 mt-1 w-32 bg-white border border-gray-200 rounded-md shadow-lg"
+                                  >
+                                    <div className="py-1">
+                                      <button
+                                        className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                        onClick={() => {
+                                          handleStatusChange(client.id, 'Active');
+                                          document.getElementById(`status-dropdown-${client.id}`)?.classList.add('hidden');
+                                        }}
+                                      >
+                                        <span className="inline-block w-2 h-2 bg-success rounded-full mr-2"></span>
+                                        Active
+                                      </button>
+                                      <button
+                                        className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                        onClick={() => {
+                                          handleStatusChange(client.id, 'Inactive');
+                                          document.getElementById(`status-dropdown-${client.id}`)?.classList.add('hidden');
+                                        }}
+                                      >
+                                        <span className="inline-block w-2 h-2 bg-danger rounded-full mr-2"></span>
+                                        Inactive
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
 
                               <td>{client.pan || 'N/A'}</td>
                               <td>
@@ -1523,7 +1670,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                           ))
                         ) : (
                           <tr>
-                            <td colSpan={9} className="text-center py-8">
+                            <td colSpan={10} className="text-center py-8">
                               <div className="flex flex-col items-center justify-center">
                                 <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
                                   <i className="ri-folder-line text-4xl text-primary"></i>

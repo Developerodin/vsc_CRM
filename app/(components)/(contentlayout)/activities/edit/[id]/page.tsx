@@ -11,6 +11,7 @@ interface Activity {
   sortOrder: number;
   frequency?: string;
   frequencyConfig?: any;
+  subactivities?: Array<{ name: string }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -42,6 +43,7 @@ const EditActivityPage = ({ params }: { params: { id: string } }) => {
       yearlyDate: 1,
       yearlyTime: ''
     },
+    subactivities: [],
     createdAt: "",
     updatedAt: ""
   });
@@ -75,7 +77,8 @@ const EditActivityPage = ({ params }: { params: { id: string } }) => {
             yearlyMonth: '',
             yearlyDate: 1,
             yearlyTime: ''
-          }
+          },
+          subactivities: data.subactivities || []
         });
       } catch (err) {
         toast.error('Failed to fetch activity details');
@@ -246,7 +249,8 @@ const EditActivityPage = ({ params }: { params: { id: string } }) => {
         name: formData.name,
         sortOrder: formData.sortOrder,
         frequency: formData.frequency || undefined,
-        frequencyConfig: Object.keys(cleanedFrequencyConfig).length > 0 ? cleanedFrequencyConfig : undefined
+        frequencyConfig: Object.keys(cleanedFrequencyConfig).length > 0 ? cleanedFrequencyConfig : undefined,
+        subactivities: formData.subactivities || undefined
       });
 
       const response = await fetch(`${Base_url}activities/${params.id}`, {
@@ -281,6 +285,30 @@ const EditActivityPage = ({ params }: { params: { id: string } }) => {
       { value: 'Yearly', label: 'Yearly' }
     ];
     return options;
+  };
+
+  // Sub-activity functions
+  const addSubActivity = () => {
+    setFormData(prev => ({
+      ...prev,
+      subactivities: [...(prev.subactivities || []), { name: '' }]
+    }));
+  };
+
+  const removeSubActivity = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      subactivities: (prev.subactivities || []).filter((_, i) => i !== index)
+    }));
+  };
+
+  const updateSubActivity = (index: number, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      subactivities: (prev.subactivities || []).map((subActivity, i) => 
+        i === index ? { ...subActivity, name: value } : subActivity
+      )
+    }));
   };
 
   if (isLoading) {
@@ -373,6 +401,53 @@ const EditActivityPage = ({ params }: { params: { id: string } }) => {
                         </span>
                         <i className="ri-settings-3-line text-gray-400"></i>
                       </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Sub-Activities */}
+                <div className="form-group col-span-1 md:col-span-2">
+                  <div className="flex justify-between items-center mb-3">
+                    <label className="form-label">Sub-Activities</label>
+                    <button
+                      type="button"
+                      className="ti-btn ti-btn-primary text-sm"
+                      onClick={addSubActivity}
+                    >
+                      <i className="ri-add-line mr-1"></i>
+                      Add Sub-Activity
+                    </button>
+                  </div>
+                  
+                  {(formData.subactivities || []).length === 0 ? (
+                    <div className="text-center py-6 text-gray-500 border-2 border-dashed border-gray-300 rounded-lg">
+                      <i className="ri-list-check text-2xl mb-2 opacity-50"></i>
+                      <p className="text-sm">No sub-activities added yet</p>
+                      <p className="text-xs">Click "Add Sub-Activity" to get started</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {(formData.subactivities || []).map((subActivity, index) => (
+                        <div key={index} className="flex items-center space-x-3">
+                          <div className="flex-1">
+                            <input
+                              type="text"
+                              className="form-control"
+                              placeholder={`Enter sub-activity ${index + 1} name`}
+                              value={subActivity.name}
+                              onChange={(e) => updateSubActivity(index, e.target.value)}
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            className="ti-btn ti-btn-danger text-sm"
+                            onClick={() => removeSubActivity(index)}
+                            title="Remove sub-activity"
+                          >
+                            <i className="ri-delete-bin-line"></i>
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
