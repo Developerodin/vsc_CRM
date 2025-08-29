@@ -144,6 +144,20 @@ const TasksPage = () => {
 
   // Quick edit functions
   const openQuickEditModal = (task: Task) => {
+    // Check if task is delayed - prevent updates
+    if (task.status === 'delayed') {
+      toast.error('Cannot update delayed tasks. These tasks require supervisor intervention.', {
+        duration: 4000,
+        position: 'top-right',
+        style: {
+          background: '#fef2f2',
+          color: '#dc2626',
+          border: '1px solid #fecaca',
+        },
+      });
+      return;
+    }
+    
     setQuickEditTask(task);
     setQuickEditStatus(task.status);
     setQuickEditRemarks(task.remarks || "");
@@ -793,6 +807,21 @@ const TasksPage = () => {
         </div>
       </div>
 
+      {/* Delayed Tasks Warning */}
+      {tasks.some(task => task.status === 'delayed') && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center">
+            <i className="ri-error-warning-line text-red-500 text-xl mr-3"></i>
+            <div>
+              <h4 className="text-sm font-medium text-red-800">Delayed Tasks Notice</h4>
+              <p className="text-sm text-red-700 mt-1">
+                Tasks marked as "Delayed" cannot be updated by team members
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tasks Table */}
       <div className="table-responsive">
         <table className="table whitespace-nowrap table-bordered">
@@ -873,18 +902,26 @@ const TasksPage = () => {
                   </td>
                   <td>{task.branch?.name || "-"}</td>
                   <td>
-                    <span 
-                      className={`badge ${getStatusStyling(task.status)} cursor-pointer hover:opacity-80 transition-opacity`}
-                      onClick={() => openQuickEditModal(task)}
-                      title="Click to edit status and remarks"
-                    >
-                      {task.status.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span 
+                        className={`badge ${getStatusStyling(task.status)} ${task.status === 'delayed' ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:opacity-80'} transition-opacity`}
+                        onClick={() => task.status !== 'delayed' && openQuickEditModal(task)}
+                        title={task.status === 'delayed' ? 'Cannot edit delayed tasks - Contact supervisor' : 'Click to edit status and remarks'}
+                      >
+                        {task.status.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                      </span>
+                      {task.status === 'delayed' && (
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 border border-red-200">
+                          <i className="ri-lock-line mr-1"></i>
+                          Locked
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td 
-                    className="max-w-xs truncate cursor-pointer hover:bg-gray-50 transition-colors px-2 py-1 rounded" 
-                    title={`${task.remarks || "No remarks"} - Click to edit`}
-                    onClick={() => openQuickEditModal(task)}
+                    className={`max-w-xs truncate px-2 py-1 rounded ${task.status === 'delayed' ? 'cursor-not-allowed bg-gray-50 opacity-60' : 'cursor-pointer hover:bg-gray-50'} transition-colors`}
+                    title={task.status === 'delayed' ? `${task.remarks || "No remarks"} - Cannot edit delayed tasks` : `${task.remarks || "No remarks"} - Click to edit`}
+                    onClick={() => task.status !== 'delayed' && openQuickEditModal(task)}
                   >
                     {task.remarks || "-"}
                   </td>
@@ -1151,6 +1188,20 @@ const TaskDetailsModal = ({
   };
 
   const handleStatusUpdate = async () => {
+    // Check if task is delayed - prevent updates
+    if (task.status === 'delayed') {
+      toast.error('Cannot update delayed tasks. These tasks require supervisor intervention.', {
+        duration: 4000,
+        position: 'top-right',
+        style: {
+          background: '#fef2f2',
+          color: '#dc2626',
+          border: '1px solid #fecaca',
+        },
+      });
+      return;
+    }
+    
     if (selectedStatus !== task.status || remarks !== (task.remarks || '')) {
       await onUpdateStatus(task.id, selectedStatus, remarks);
     }
@@ -1373,40 +1424,55 @@ const TaskDetailsModal = ({
 
               <div>
                  <h3 className="text-sm font-medium text-gray-700 mb-2">Update Status</h3>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      New Status
-                    </label>
-                    <select
-                      className="form-select w-full"
-                      value={selectedStatus}
-                      onChange={(e) => setSelectedStatus(e.target.value as Task['status'])}
-                      disabled={isUpdating}
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="ongoing">Ongoing</option>
-                      <option value="completed">Completed</option>
-                      <option value="on_hold">On Hold</option>
-                      <option value="cancelled">Cancelled</option>
-                      <option value="delayed">Delayed</option>
-                    </select>
-                  </div>
+                 
+                 {task.status === 'delayed' ? (
+                   <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                     <div className="flex items-center">
+                       <i className="ri-lock-line text-red-500 text-xl mr-3"></i>
+                       <div>
+                         <h5 className="text-sm font-medium text-red-800">Task is Locked</h5>
+                         <p className="text-sm text-red-700 mt-1">
+                           This delayed task cannot be updated. Please contact your supervisor for assistance.
+                         </p>
+                       </div>
+                     </div>
+                   </div>
+                 ) : (
+                   <div className="space-y-3">
+                     <div>
+                       <label className="block text-sm font-medium text-gray-700 mb-1">
+                         New Status
+                       </label>
+                       <select
+                         className="form-select w-full"
+                         value={selectedStatus}
+                         onChange={(e) => setSelectedStatus(e.target.value as Task['status'])}
+                         disabled={isUpdating}
+                       >
+                         <option value="pending">Pending</option>
+                         <option value="ongoing">Ongoing</option>
+                         <option value="completed">Completed</option>
+                         <option value="on_hold">On Hold</option>
+                         <option value="cancelled">Cancelled</option>
+                         <option value="delayed">Delayed</option>
+                       </select>
+                     </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Remarks
-                    </label>
-                    <textarea
-                      className="form-control w-full"
-                      rows={3}
-                      placeholder="Add any additional notes or remarks..."
-                      value={remarks}
-                      onChange={(e) => setRemarks(e.target.value)}
-                      disabled={isUpdating}
-                    />
-                  </div>
-                </div>
+                     <div>
+                       <label className="block text-sm font-medium text-gray-700 mb-1">
+                         Remarks
+                       </label>
+                       <textarea
+                         className="form-control w-full"
+                         rows={3}
+                         placeholder="Add any additional notes or remarks..."
+                         value={remarks}
+                         onChange={(e) => setRemarks(e.target.value)}
+                         disabled={isUpdating}
+                       />
+                     </div>
+                   </div>
+                 )}
               </div>
 
                 <div>
@@ -1464,12 +1530,17 @@ const TaskDetailsModal = ({
           <button
             className="ti-btn ti-btn-primary"
             onClick={handleStatusUpdate}
-            disabled={isUpdating || (selectedStatus === task.status && remarks === (task.remarks || ''))}
+            disabled={isUpdating || task.status === 'delayed' || (selectedStatus === task.status && remarks === (task.remarks || ''))}
           >
             {isUpdating ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                 Updating...
+              </>
+            ) : task.status === 'delayed' ? (
+              <>
+                <i className="ri-lock-line mr-2"></i>
+                Task Locked
               </>
             ) : (
               'Update Task'

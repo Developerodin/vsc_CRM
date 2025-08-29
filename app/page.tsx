@@ -216,6 +216,28 @@ export default function Home() {
                   <div className="text-center">
                     <p className="text-[0.75rem] text-[#8c9097] dark:text-white/50 mt-4">Dont have an account? <Link href="#!" className="text-primary">Sign Up</Link></p>
                   </div>
+                  
+                  {/* Portal Navigation */}
+                  <div className="text-center my-4">
+                    <p className="text-[0.75rem] text-[#8c9097] dark:text-white/50 mb-3">Access Other Portals</p>
+                    <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                      <Link 
+                        href="/client-login" 
+                        className="ti-btn ti-btn-outline-primary !text-primary !border-primary hover:!bg-primary hover:!text-white text-xs px-3 py-2"
+                      >
+                        <i className="ri-user-line mr-1"></i>
+                        Client Portal
+                      </Link>
+                      <Link 
+                        href="/team-member-login" 
+                        className="ti-btn ti-btn-outline-secondary !text-secondary !border-secondary hover:!bg-secondary hover:!text-white text-xs px-3 py-2"
+                      >
+                        <i className="ri-team-line mr-1"></i>
+                        Team Portal
+                      </Link>
+                    </div>
+                  </div>
+                  
                   <div className="text-center my-4 authentication-barrier">
                     <span>OR</span>
                   </div>

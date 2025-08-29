@@ -30,6 +30,7 @@ interface Client {
   iecCode: string;
   entityType: string;
   activities: ActivityMapping[];
+  groups?: string[]; // Array of group IDs
   createdAt: string;
   updatedAt: string;
 }
@@ -47,6 +48,17 @@ interface TeamMember {
   phone: string;
 }
 
+interface Group {
+  id: string;
+  name: string;
+  numberOfClients: number;
+  clients: string[];
+  branch: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface ActivityMapping {
   activity: string;
   notes: string;
@@ -57,7 +69,7 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
   const { branches } = useBranchContext();
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'activity' | 'documents'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'activity' | 'group' | 'documents'>('general');
   
   // States for activities and team members
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -73,15 +85,26 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     }
   ]);
 
+  // States for groups
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [selectedGroups, setSelectedGroups] = useState<Group[]>([]);
+  const [isLoadingGroups, setIsLoadingGroups] = useState(false);
+  const [isLoadingClientGroups, setIsLoadingClientGroups] = useState(false);
+  const [groupCurrentPage, setGroupCurrentPage] = useState(1);
+  const [groupTotalPages, setGroupTotalPages] = useState(1);
+
   // States for modals
   const [showActivityModal, setShowActivityModal] = useState(false);
   const [showTeamMemberModal, setShowTeamMemberModal] = useState(false);
+  const [showGroupModal, setShowGroupModal] = useState(false);
   const [selectedActivityIndex, setSelectedActivityIndex] = useState<number>(-1);
   const [selectedTeamMemberIndex, setSelectedTeamMemberIndex] = useState<number>(-1);
   const [activitySearchQuery, setActivitySearchQuery] = useState('');
   const [teamMemberSearchQuery, setTeamMemberSearchQuery] = useState('');
+  const [groupSearchQuery, setGroupSearchQuery] = useState('');
   const [filteredActivities, setFilteredActivities] = useState<Activity[]>([]);
   const [filteredTeamMembers, setFilteredTeamMembers] = useState<TeamMember[]>([]);
+  const [filteredGroups, setFilteredGroups] = useState<Group[]>([]);
   
   // States for documents
   const [clientDocuments, setClientDocuments] = useState<any[]>([]);
@@ -181,6 +204,88 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
       console.error('Error fetching team members:', error);
     } finally {
       setIsLoadingTeamMembers(false);
+    }
+  };
+
+  // Fetch groups
+  const fetchGroups = async (page: number = 1, searchQueryParam?: string) => {
+    try {
+      setIsLoadingGroups(true);
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: "10",
+        sortBy: "name:asc",
+        ...((searchQueryParam || groupSearchQuery) && { name: searchQueryParam || groupSearchQuery })
+      });
+
+      const response = await fetch(`${Base_url}groups?${queryParams}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch groups');
+      }
+
+      const data = await response.json();
+      setGroups(data.results || []);
+      setFilteredGroups(data.results || []);
+      const totalResults = data.totalResults || data.total || 0;
+      const limit = 10;
+      setGroupTotalPages(Math.max(1, Math.ceil(totalResults / limit)));
+      setGroupCurrentPage(page);
+    } catch (err) {
+      console.error('Error fetching groups:', err);
+      toast.error('Failed to fetch groups');
+    } finally {
+      setIsLoadingGroups(false);
+    }
+  };
+
+  // Fetch client's existing groups
+  const fetchClientGroups = async (clientId: string) => {
+    try {
+      setIsLoadingClientGroups(true);
+      // First try to get groups from the client data itself
+      const response = await fetch(`${Base_url}clients/${clientId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (response.ok) {
+        const clientData = await response.json();
+        if (clientData.groups && Array.isArray(clientData.groups) && clientData.groups.length > 0) {
+          // If client has group IDs, fetch the full group details
+          const groupPromises = clientData.groups.map(async (groupId: string) => {
+            try {
+              const groupResponse = await fetch(`${Base_url}groups/${groupId}`, {
+                headers: {
+                  'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+              });
+              
+              if (groupResponse.ok) {
+                return await groupResponse.json();
+              }
+              return null;
+            } catch (error) {
+              console.error(`Error fetching group ${groupId}:`, error);
+              return null;
+            }
+          });
+          
+          const groupResults = await Promise.all(groupPromises);
+          const validGroups = groupResults.filter(group => group !== null);
+          setSelectedGroups(validGroups);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching client groups:', error);
+      // If the endpoint doesn't exist, we'll handle it gracefully
+    } finally {
+      setIsLoadingClientGroups(false);
     }
   };
 
@@ -341,6 +446,7 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
   useEffect(() => {
     fetchActivities();
     fetchTeamMembers();
+    fetchGroups();
   }, []);
 
   // Close context menu when clicking outside
@@ -372,6 +478,13 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     );
     setFilteredTeamMembers(filtered);
   }, [teamMembers, teamMemberSearchQuery]);
+
+  useEffect(() => {
+    const filtered = groups.filter(group =>
+      group.name.toLowerCase().includes(groupSearchQuery.toLowerCase())
+    );
+    setFilteredGroups(filtered);
+  }, [groups, groupSearchQuery]);
 
   // Document functions
   const handleFilesSelected = (files: FileList | null) => {
@@ -827,6 +940,12 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
           setActivityMappings(data.activities);
         }
         
+        // Set selected groups if they exist
+        if (data.groups && data.groups.length > 0) {
+          // Fetch the full group details to display them
+          fetchClientGroups(params.id);
+        }
+        
         // Fetch client documents
         fetchClientDocuments(params.id);
       } catch (err) {
@@ -914,6 +1033,55 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     setSelectedTeamMemberIndex(-1);
   };
 
+  // Group selection functions
+  const openGroupModal = () => {
+    setGroupSearchQuery('');
+    setGroupCurrentPage(1);
+    fetchGroups(1);
+    setShowGroupModal(true);
+  };
+
+  const handleGroupSelect = (group: Group) => {
+    setSelectedGroups(prev => {
+      const isSelected = prev.some(g => g.id === group.id);
+      if (isSelected) {
+        return prev.filter(g => g.id !== group.id);
+      } else {
+        return [...prev, group];
+      }
+    });
+  };
+
+  const handleGroupModalSubmit = () => {
+    setShowGroupModal(false);
+    if (selectedGroups.length > 0) {
+      toast.success(`${selectedGroups.length} group(s) assigned to client`);
+    }
+  };
+
+  const removeGroup = (groupId: string) => {
+    setSelectedGroups(prev => prev.filter(g => g.id !== groupId));
+    toast.success('Group removed from client');
+  };
+
+  // Group pagination and search
+  const handleGroupPageChange = (newPage: number) => {
+    setGroupCurrentPage(newPage);
+    fetchGroups(newPage);
+  };
+
+  const handleGroupSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    setGroupSearchQuery(query);
+    if (showGroupModal) {
+      // Debounced search
+      setTimeout(() => {
+        setGroupCurrentPage(1);
+        fetchGroups(1, query);
+      }, 500);
+    }
+  };
+
   const validateForm = () => {
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -969,48 +1137,61 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     }
     
     if (activeTab === 'activity') {
-    if (!validateForm()) return;
-
-    try {
-      setIsSubmitting(true);
-
-        const clientData = {
-          ...formData,
-          activities: activityMappings.filter(mapping => mapping.activity)
-        };
-
-      const response = await fetch(`${Base_url}clients/${params.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-          body: JSON.stringify(clientData)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update client');
-      }
-
-      toast.success('Client updated successfully');
-        setActiveTab('documents');
-        
-        // Load client documents
-        fetchClientDocuments(params.id);
-    } catch (err) {
-      console.error('Error updating client:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to update client');
-    } finally {
-      setIsSubmitting(false);
-      }
+      if (!validateForm()) return;
+      setActiveTab('group');
       return;
     }
     
-    // On documents tab, show success and redirect
+    if (activeTab === 'group') {
+      // Group assignment is optional, so we can proceed
+      setActiveTab('documents');
+      return;
+    }
+    
     if (activeTab === 'documents') {
-      toast.success('Client and documents updated successfully!');
-      router.push('/clients');
+      // Final submission with all data
+      if (!validateForm()) return;
+
+      try {
+        setIsSubmitting(true);
+
+        const clientData = {
+          ...formData,
+          activities: activityMappings.filter(mapping => mapping.activity),
+          groups: selectedGroups.map(group => group.id) // Include selected groups
+        };
+
+        const response = await fetch(`${Base_url}clients/${params.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify(clientData)
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to update client');
+        }
+
+        toast.success('Client updated successfully');
+        
+        // Load client documents
+        fetchClientDocuments(params.id);
+        
+        // Show final success and redirect
+        setTimeout(() => {
+          toast.success('Client and documents updated successfully!');
+          router.push('/clients');
+        }, 1000);
+        
+      } catch (err) {
+        console.error('Error updating client:', err);
+        toast.error(err instanceof Error ? err.message : 'Failed to update client');
+      } finally {
+        setIsSubmitting(false);
+      }
       return;
     }
   };
@@ -1082,6 +1263,17 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                     onClick={() => setActiveTab('activity')}
                   >
                     Activity Mapping
+                  </button>
+                  <button
+                    type="button"
+                    className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                      activeTab === 'group'
+                        ? 'bg-primary text-white'
+                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                    }`}
+                    onClick={() => setActiveTab('group')}
+                  >
+                    Group Assignment
                   </button>
                   <button
                     type="button"
@@ -1497,6 +1689,77 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                   </div>
                 )}
 
+                {/* Group Assignment Tab */}
+                {activeTab === 'group' && (
+                  <div className="space-y-6">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h3 className="text-lg font-medium text-gray-900">Group Assignment</h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Select which groups this client should belong to
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="ti-btn ti-btn-primary"
+                        onClick={openGroupModal}
+                      >
+                        <i className="ri-add-line mr-2"></i>
+                        Select Groups
+                      </button>
+                    </div>
+
+                    {/* Loading State */}
+                    {isLoadingClientGroups && (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mr-3"></div>
+                        <span className="text-gray-600">Loading existing group assignments...</span>
+                      </div>
+                    )}
+
+                    {/* Selected Groups Display */}
+                    {!isLoadingClientGroups && selectedGroups.length > 0 && (
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-medium text-gray-700">
+                          Current Group Assignments ({selectedGroups.length})
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {selectedGroups.map((group) => (
+                            <div
+                              key={group.id}
+                              className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg"
+                            >
+                              <div className="flex-1">
+                                <div className="font-medium text-blue-900">{group.name}</div>
+                                <div className="text-sm text-blue-700">
+                                  {group.numberOfClients} clients • {branches.find(b => b.id === group.branch)?.name || group.branch}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeGroup(group.id)}
+                                className="ml-2 text-blue-600 hover:text-blue-800 p-1"
+                                title="Remove from group"
+                              >
+                                <i className="ri-close-line text-lg"></i>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Empty State */}
+                    {!isLoadingClientGroups && selectedGroups.length === 0 && (
+                      <div className="text-center py-8 text-gray-500">
+                        <i className="ri-group-line text-4xl mb-4 opacity-50"></i>
+                        <p className="text-lg font-medium">No groups assigned</p>
+                        <p className="text-sm">This client is not currently assigned to any groups. Click "Select Groups" to assign them.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Documents Tab */}
                 {activeTab === 'documents' && (
                   <div className="space-y-6">
@@ -1591,7 +1854,7 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                         Saving...
                       </>
-                    ) : activeTab === 'general' || activeTab === 'activity' ? (
+                    ) : activeTab === 'general' || activeTab === 'activity' || activeTab === 'group' ? (
                       'Next'
                     ) : (
                       'Save Client'
@@ -1773,6 +2036,155 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                   </table>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Group Selection Modal */}
+      {showGroupModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg w-11/12 max-w-4xl max-h-[90vh] flex flex-col">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h2 className="text-xl font-semibold">Select Groups</h2>
+              <button
+                onClick={() => setShowGroupModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <i className="ri-close-line text-2xl"></i>
+              </button>
+            </div>
+
+            <div className="p-4 border-b bg-gray-50">
+              <div className="flex items-center space-x-4">
+                <div className="relative flex-1">
+                  <div className="flex items-center">
+                    <i className="ri-search-line text-gray-400 text-xl mr-3"></i>
+                    <input
+                      type="text"
+                      placeholder="Search groups by name..."
+                      className="form-control py-4 pr-20 text-lg border-2 border-gray-300 focus:border-primary focus:ring-2 focus:ring-primary/20 bg-white"
+                      value={groupSearchQuery}
+                      onChange={handleGroupSearchChange}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          setGroupCurrentPage(1);
+                          fetchGroups(1, groupSearchQuery);
+                        }
+                      }}
+                    />
+                  </div>
+                  <button 
+                    className="absolute end-0 top-0 px-6 h-full bg-primary text-white hover:bg-primary-dark rounded-r-md"
+                    onClick={() => {
+                      setGroupCurrentPage(1);
+                      fetchGroups(1, groupSearchQuery);
+                    }}
+                  >
+                    <i className="ri-search-line text-xl"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-auto p-4">
+              {isLoadingGroups ? (
+                <div className="flex items-center justify-center h-32">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Select
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Group Name
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Clients Count
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Branch
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Sort Order
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {filteredGroups.map((group) => (
+                        <tr key={group.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <input
+                              type="checkbox"
+                              className="form-checkbox h-5 w-5 text-primary"
+                              checked={selectedGroups.some(g => g.id === group.id)}
+                              onChange={() => handleGroupSelect(group)}
+                            />
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="font-medium text-gray-900">{group.name}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              {group.numberOfClients} clients
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {group.branch}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {group.sortOrder}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t flex justify-between items-center">
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => handleGroupPageChange(Math.max(groupCurrentPage - 1, 1))}
+                  disabled={groupCurrentPage === 1}
+                  className="ti-btn ti-btn-secondary"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-gray-500">
+                  {groupTotalPages > 0 ? (
+                    `Page ${groupCurrentPage} of ${groupTotalPages}`
+                  ) : (
+                    "No pages"
+                  )}
+                </span>
+                <button
+                  onClick={() => handleGroupPageChange(Math.min(groupCurrentPage + 1, groupTotalPages))}
+                  disabled={groupCurrentPage === groupTotalPages || groupTotalPages === 0}
+                  className="ti-btn ti-btn-secondary"
+                >
+                  Next
+                </button>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setShowGroupModal(false)}
+                  className="ti-btn ti-btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleGroupModalSubmit}
+                  className="ti-btn ti-btn-primary"
+                >
+                  Select ({selectedGroups.length})
+                </button>
+              </div>
             </div>
           </div>
         </div>
