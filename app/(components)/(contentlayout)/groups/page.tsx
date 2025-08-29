@@ -983,8 +983,8 @@ const GroupsPage = () => {
                     <button
                       onClick={() => {
                         setFilters(prev => ({ ...prev, name: "" }));
-                        setCurrentPage(1);
-                      }}
+                  setCurrentPage(1);
+                }}
                       className="text-green-600 hover:text-green-800 text-sm"
                     >
                       <i className="ri-close-line mr-1"></i>

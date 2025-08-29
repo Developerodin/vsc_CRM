@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { toast, Toaster } from 'react-hot-toast';
 import { Base_url } from '@/app/api/config/BaseUrl';
 import { useSelectedBranchId, useBranchContext } from "@/shared/contextapi";
+import StateSelectionModal from '@/app/(components)/StateSelectionModal';
 
 interface Client {
   id: string;
@@ -38,11 +39,32 @@ interface Activity {
   id: string;
   name: string;
   description?: string;
+  subactivities?: Array<{
+    _id: string;
+    name: string;
+    frequency?: string;
+    frequencyConfig?: any;
+    fields?: Array<{
+      _id: string;
+      name: string;
+      type: string;
+      required?: boolean;
+      options?: string[];
+    }>;
+    createdAt: string;
+    updatedAt: string;
+  }>;
 }
 
 interface ActivityMapping {
   activity: string;
+  subactivity: string;
   notes: string;
+}
+
+interface GstNumber {
+  state: string;
+  gstNumber: string;
 }
 
 const AddClientPage = () => {
@@ -53,7 +75,9 @@ const AddClientPage = () => {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
   const [showActivityModal, setShowActivityModal] = useState(false);
+  const [showSubActivityModal, setShowSubActivityModal] = useState(false);
   const [selectedActivityIndex, setSelectedActivityIndex] = useState<number>(-1);
+  const [selectedSubActivityIndex, setSelectedSubActivityIndex] = useState<number>(-1);
   const [activitySearchQuery, setActivitySearchQuery] = useState("");
   const [filteredActivities, setFilteredActivities] = useState<Activity[]>([]);
   const [activeTab, setActiveTab] = useState<'general' | 'activity' | 'documents'>('general');
@@ -89,7 +113,7 @@ const AddClientPage = () => {
     branch: selectedBranchId || '',
     sortOrder: 1,
     businessType: '',
-    gstNumber: '',
+    gstNumbers: [],
     tanNumber: '',
     cinNumber: '',
     udyamNumber: '',
@@ -97,9 +121,17 @@ const AddClientPage = () => {
     entityType: '',
   });
 
+  const [gstNumbers, setGstNumbers] = useState<GstNumber[]>([
+    {
+      state: '',
+      gstNumber: ''
+    }
+  ]);
+
   const [activityMappings, setActivityMappings] = useState<ActivityMapping[]>([
     {
       activity: '',
+      subactivity: '',
       notes: ''
     }
   ]);
@@ -107,6 +139,7 @@ const AddClientPage = () => {
   // Add these state variables after the existing useState declarations
   const [showBusinessTypeModal, setShowBusinessTypeModal] = useState(false);
   const [showEntityTypeModal, setShowEntityTypeModal] = useState(false);
+  const [showStateModal, setShowStateModal] = useState(false);
   const [businessTypes, setBusinessTypes] = useState<Array<{id: string, name: string}>>([]);
   const [entityTypes, setEntityTypes] = useState<Array<{id: string, name: string}>>([]);
   const [businessTypeSearch, setBusinessTypeSearch] = useState("");
@@ -117,6 +150,7 @@ const AddClientPage = () => {
   const [entityTypeTotalPages, setEntityTypeTotalPages] = useState(1);
   const [businessTypeLoading, setBusinessTypeLoading] = useState(false);
   const [entityTypeLoading, setEntityTypeLoading] = useState(false);
+  const [selectedStateIndex, setSelectedStateIndex] = useState<number>(-1);
 
   // Fetch activities
   useEffect(() => {
@@ -187,6 +221,7 @@ const AddClientPage = () => {
       ...activityMappings,
       {
         activity: '',
+        subactivity: '',
         notes: ''
       }
     ]);
@@ -197,10 +232,41 @@ const AddClientPage = () => {
     setActivityMappings(updatedMappings);
   };
 
+  const addGstNumber = () => {
+    setGstNumbers([
+      ...gstNumbers,
+      {
+        state: '',
+        gstNumber: ''
+      }
+    ]);
+  };
+
+  const removeGstNumber = (index: number) => {
+    if (gstNumbers.length > 1) {
+      const updatedGstNumbers = gstNumbers.filter((_, i) => i !== index);
+      setGstNumbers(updatedGstNumbers);
+    }
+  };
+
+  const handleGstNumberChange = (index: number, field: keyof GstNumber, value: string) => {
+    const updatedGstNumbers = [...gstNumbers];
+    updatedGstNumbers[index] = {
+      ...updatedGstNumbers[index],
+      [field]: value
+    };
+    setGstNumbers(updatedGstNumbers);
+  };
+
   const openActivityModal = (index: number) => {
     setSelectedActivityIndex(index);
     setActivitySearchQuery("");
     setShowActivityModal(true);
+  };
+
+  const openSubActivityModal = (index: number) => {
+    setSelectedSubActivityIndex(index);
+    setShowSubActivityModal(true);
   };
 
   const selectActivity = (activity: Activity) => {
@@ -208,12 +274,26 @@ const AddClientPage = () => {
       const updatedMappings = [...activityMappings];
       updatedMappings[selectedActivityIndex] = {
         ...updatedMappings[selectedActivityIndex],
-        activity: activity.id
+        activity: activity.id,
+        subactivity: '' // Reset sub-activity when activity changes
       };
       setActivityMappings(updatedMappings);
     }
     setShowActivityModal(false);
     setSelectedActivityIndex(-1);
+  };
+
+  const selectSubActivity = (subActivityId: string, subActivityName: string) => {
+    if (selectedSubActivityIndex >= 0) {
+      const updatedMappings = [...activityMappings];
+      updatedMappings[selectedSubActivityIndex] = {
+        ...updatedMappings[selectedSubActivityIndex],
+        subactivity: subActivityId
+      };
+      setActivityMappings(updatedMappings);
+    }
+    setShowSubActivityModal(false);
+    setSelectedSubActivityIndex(-1);
   };
 
   const validateForm = () => {
@@ -252,6 +332,29 @@ const AddClientPage = () => {
     return true;
   };
 
+  const validateActivityMapping = () => {
+    // Check if at least one activity mapping exists
+    if (activityMappings.length === 0) {
+      toast.error('Please add at least one activity mapping');
+      return false;
+    }
+
+    // Check if all activity mappings have both activity and sub-activity selected
+    for (let i = 0; i < activityMappings.length; i++) {
+      const mapping = activityMappings[i];
+      if (!mapping.activity) {
+        toast.error(`Please select an activity for mapping ${i + 1}`);
+        return false;
+      }
+      if (!mapping.subactivity) {
+        toast.error(`Please select a sub-activity for mapping ${i + 1}`);
+        return false;
+      }
+    }
+
+    return true;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -263,6 +366,7 @@ const AddClientPage = () => {
     
     if (activeTab === 'activity') {
       if (!validateForm()) return;
+      if (!validateActivityMapping()) return;
       
       // Check if client already exists to prevent duplicate creation
       if (savedClientId) {
@@ -278,7 +382,8 @@ const AddClientPage = () => {
 
         const clientData = {
           ...formData,
-          activities: activityMappings.filter(mapping => mapping.activity)
+          gstNumbers: gstNumbers.filter(gst => gst.state && gst.gstNumber),
+          activities: activityMappings.filter(mapping => mapping.activity && mapping.subactivity)
         };
 
         const response = await fetch(`${Base_url}clients`, {
@@ -854,6 +959,24 @@ const AddClientPage = () => {
     setShowEntityTypeModal(false);
   };
 
+  const openStateModal = (gstIndex: number) => {
+    setSelectedStateIndex(gstIndex);
+    setShowStateModal(true);
+  };
+
+  const handleStateSelect = (state: string) => {
+    if (selectedStateIndex >= 0) {
+      const updatedGstNumbers = [...gstNumbers];
+      updatedGstNumbers[selectedStateIndex] = {
+        ...updatedGstNumbers[selectedStateIndex],
+        state: state
+      };
+      setGstNumbers(updatedGstNumbers);
+    }
+    setShowStateModal(false);
+    setSelectedStateIndex(-1);
+  };
+
   return (
     <div className="main-content">
       <Toaster position="top-right" />
@@ -1173,18 +1296,55 @@ const AddClientPage = () => {
                       />
                     </div>
 
-                    {/* GST Number */}
-                    <div className="form-group">
-                      <label htmlFor="gstNumber" className="form-label">GST Number</label>
+                    {/* GST Numbers */}
+                    <div className="form-group md:col-span-2">
+                      <label className="form-label">GST Numbers</label>
+                      <div className="space-y-3">
+                        {gstNumbers.map((gst, index) => (
+                          <div key={index} className="flex items-center space-x-3">
+                            <div className="flex-1">
+                              <button
+                                type="button"
+                                className={`w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:bg-gray-50 ${
+                                  gst.state ? 'text-gray-900' : 'text-gray-500'
+                                }`}
+                                onClick={() => openStateModal(index)}
+                              >
+                                <span className="truncate">
+                                  {gst.state || "Select State"}
+                                </span>
+                                <i className="ri-arrow-down-s-line text-gray-400"></i>
+                              </button>
+                            </div>
+                            <div className="flex-1">
                       <input
                         type="text"
-                        id="gstNumber"
-                        name="gstNumber"
                         className="form-control"
                         placeholder="Enter GST Number"
-                        value={formData.gstNumber}
-                        onChange={handleInputChange}
-                      />
+                                value={gst.gstNumber}
+                                onChange={(e) => handleGstNumberChange(index, 'gstNumber', e.target.value)}
+                              />
+                            </div>
+                            {gstNumbers.length > 1 && (
+                              <button
+                                type="button"
+                                className="ti-btn ti-btn-danger ti-btn-sm"
+                                onClick={() => removeGstNumber(index)}
+                              >
+                                <i className="ri-delete-bin-line"></i>
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          className="ti-btn ti-btn-secondary mx-auto block"
+                          onClick={addGstNumber}
+                        >
+                          <i className="ri-add-line mr-1"></i>
+                          Add GST Number
+                        </button>
+                      </div>
                     </div>
 
                     {/* TAN Number */}
@@ -1305,11 +1465,11 @@ const AddClientPage = () => {
                             )}
                           </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             {/* Activity */}
-                                                            <div className="form-group">
-                                                            <label className="form-label">Activity<span className="text-red-500">*</span></label>
-                                  <div className="relative">
+                            <div className="form-group">
+                              <label className="form-label">Activity<span className="text-red-500">*</span></label>
+                              <div className="relative">
                                 <button
                                   type="button"
                                   className={`w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:bg-gray-50`}
@@ -1317,6 +1477,32 @@ const AddClientPage = () => {
                                 >
                                   <span className="truncate">
                                     {activities.find(a => a.id === mapping.activity)?.name || "Select Activity"}
+                                  </span>
+                                  <i className="ri-arrow-down-s-line text-gray-400"></i>
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Sub-Activity */}
+                            <div className="form-group">
+                              <label className="form-label">Sub-Activity<span className="text-red-500">*</span></label>
+                              <div className="relative">
+                                <button
+                                  type="button"
+                                  className={`w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:bg-gray-50 ${
+                                    !mapping.activity ? 'opacity-50 cursor-not-allowed' : ''
+                                  }`}
+                                  onClick={() => mapping.activity ? openSubActivityModal(index) : null}
+                                  disabled={!mapping.activity}
+                                >
+                                  <span className="truncate">
+                                    {(() => {
+                                      if (!mapping.activity) return "Select Activity First";
+                                      const activity = activities.find(a => a.id === mapping.activity);
+                                      if (!activity?.subactivities) return "No Sub-Activities";
+                                      const subActivity = activity.subactivities.find(sa => sa._id === mapping.subactivity);
+                                      return subActivity?.name || "Select Sub-Activity";
+                                    })()}
                                   </span>
                                   <i className="ri-arrow-down-s-line text-gray-400"></i>
                                 </button>
@@ -1556,6 +1742,9 @@ const AddClientPage = () => {
                           Activity Name
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Sub-Activities
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Action
                         </th>
                       </tr>
@@ -1565,6 +1754,15 @@ const AddClientPage = () => {
                         <tr key={activity.id} className="hover:bg-gray-50 cursor-pointer">
                           <td className="px-6 py-4 whitespace-nowrap">
                             {activity.name}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {activity.subactivities && activity.subactivities.length > 0 ? (
+                              <span className="text-sm text-blue-600">
+                                {activity.subactivities.length} sub-activit{activity.subactivities.length === 1 ? 'y' : 'ies'}
+                              </span>
+                            ) : (
+                              <span className="text-sm text-gray-500">No sub-activities</span>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <button
@@ -1580,6 +1778,71 @@ const AddClientPage = () => {
                   </table>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sub-Activity Selection Modal */}
+      {showSubActivityModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg w-11/12 max-w-2xl max-h-[80vh] flex flex-col">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h2 className="text-xl font-semibold">Select Sub-Activity</h2>
+              <button
+                onClick={() => setShowSubActivityModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <i className="ri-close-line text-2xl"></i>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto p-4">
+              {(() => {
+                const selectedMapping = activityMappings[selectedSubActivityIndex];
+                const selectedActivity = activities.find(a => a.id === selectedMapping?.activity);
+                
+                if (!selectedActivity || !selectedActivity.subactivities) {
+                  return (
+                    <div className="text-center py-8 text-gray-500">
+                      <i className="ri-information-line text-4xl mb-4 opacity-50"></i>
+                      <p>No sub-activities found for this activity.</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-3">
+                    {selectedActivity.subactivities.map((subActivity) => (
+                      <div
+                        key={subActivity._id}
+                        className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 cursor-pointer"
+                        onClick={() => selectSubActivity(subActivity._id, subActivity.name)}
+                      >
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <h4 className="font-medium text-gray-900">{subActivity.name}</h4>
+                            {subActivity.frequency && (
+                              <p className="text-sm text-gray-600 mt-1">
+                                Frequency: {subActivity.frequency}
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              selectSubActivity(subActivity._id, subActivity.name);
+                            }}
+                            className="ti-btn ti-btn-primary ti-btn-sm"
+                          >
+                            Select
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -1883,6 +2146,14 @@ const AddClientPage = () => {
           </div>
         </div>
       )}
+
+      {/* State Selection Modal */}
+      <StateSelectionModal
+        isOpen={showStateModal}
+        onClose={() => setShowStateModal(false)}
+        onSelect={handleStateSelect}
+        title="Select State for GST"
+      />
     </div>
   );
 };

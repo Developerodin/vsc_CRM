@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { toast, Toaster } from 'react-hot-toast';
 import { Base_url } from '@/app/api/config/BaseUrl';
 import { useBranchContext } from "@/shared/contextapi";
+import StateSelectionModal from '@/app/(components)/StateSelectionModal';
 
 interface Client {
   id: string;
@@ -23,7 +24,7 @@ interface Client {
   branch: string;
   sortOrder: number;
   businessType: string;
-  gstNumber: string;
+  gstNumbers: GstNumber[];
   tanNumber: string;
   cinNumber: string;
   udyamNumber: string;
@@ -33,6 +34,12 @@ interface Client {
   groups?: string[]; // Array of group IDs
   createdAt: string;
   updatedAt: string;
+}
+
+interface GstNumber {
+  _id?: string;
+  state: string;
+  gstNumber: string;
 }
 
 interface Activity {
@@ -147,7 +154,7 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     branch: '',
     sortOrder: 1,
     businessType: '',
-    gstNumber: '',
+    gstNumbers: [] as GstNumber[],
     tanNumber: '',
     cinNumber: '',
     udyamNumber: '',
@@ -155,9 +162,17 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     entityType: '',
   });
 
+  const [gstNumbers, setGstNumbers] = useState<GstNumber[]>([
+    {
+      state: '',
+      gstNumber: ''
+    }
+  ]);
+
   // Add these state variables after the existing useState declarations (around line 80)
   const [showBusinessTypeModal, setShowBusinessTypeModal] = useState(false);
   const [showEntityTypeModal, setShowEntityTypeModal] = useState(false);
+  const [showStateModal, setShowStateModal] = useState(false);
   const [businessTypes, setBusinessTypes] = useState<Array<{id: string, name: string}>>([]);
   const [entityTypes, setEntityTypes] = useState<Array<{id: string, name: string}>>([]);
   const [businessTypeSearch, setBusinessTypeSearch] = useState("");
@@ -168,6 +183,7 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
   const [entityTypeTotalPages, setEntityTypeTotalPages] = useState(1);
   const [businessTypeLoading, setBusinessTypeLoading] = useState(false);
   const [entityTypeLoading, setEntityTypeLoading] = useState(false);
+  const [selectedStateIndex, setSelectedStateIndex] = useState<number>(-1);
 
   // Fetch activities
   const fetchActivities = async () => {
@@ -445,6 +461,24 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
       entityType: entityType.name
     }));
     setShowEntityTypeModal(false);
+  };
+
+  const openStateModal = (gstIndex: number) => {
+    setSelectedStateIndex(gstIndex);
+    setShowStateModal(true);
+  };
+
+  const handleStateSelect = (state: string) => {
+    if (selectedStateIndex >= 0) {
+      const updatedGstNumbers = [...gstNumbers];
+      updatedGstNumbers[selectedStateIndex] = {
+        ...updatedGstNumbers[selectedStateIndex],
+        state: state
+      };
+      setGstNumbers(updatedGstNumbers);
+    }
+    setShowStateModal(false);
+    setSelectedStateIndex(-1);
   };
 
   useEffect(() => {
@@ -931,7 +965,7 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
           branch: data.branch || '',
           sortOrder: data.sortOrder || 1,
           businessType: data.businessType || '',
-          gstNumber: data.gstNumber || '',
+          gstNumbers: data.gstNumbers || [],
           tanNumber: data.tanNumber || '',
           cinNumber: data.cinNumber || '',
           udyamNumber: data.udyamNumber || '',
@@ -942,6 +976,11 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
         // Set activity mappings if they exist
         if (data.activities && data.activities.length > 0) {
           setActivityMappings(data.activities);
+        }
+        
+        // Set GST numbers if they exist
+        if (data.gstNumbers && data.gstNumbers.length > 0) {
+          setGstNumbers(data.gstNumbers);
         }
         
         // Set selected groups if they exist
@@ -1147,7 +1186,7 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     }
     
     if (activeTab === 'activity') {
-      if (!validateForm()) return;
+    if (!validateForm()) return;
       setActiveTab('group');
       return;
     }
@@ -1160,32 +1199,33 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     
     if (activeTab === 'documents') {
       // Final submission with all data
-      if (!validateForm()) return;
+    if (!validateForm()) return;
 
-      try {
-        setIsSubmitting(true);
+    try {
+      setIsSubmitting(true);
 
         const clientData = {
           ...formData,
+          gstNumbers: gstNumbers.filter(gst => gst.state && gst.gstNumber),
           activities: activityMappings.filter(mapping => mapping.activity),
           groups: selectedGroups.map(group => group.id) // Include selected groups
         };
 
-        const response = await fetch(`${Base_url}clients/${params.id}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
+      const response = await fetch(`${Base_url}clients/${params.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
           body: JSON.stringify(clientData)
-        });
+      });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to update client');
-        }
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update client');
+      }
 
-        toast.success('Client updated successfully');
+      toast.success('Client updated successfully');
         
         // Load client documents
         fetchClientDocuments(params.id);
@@ -1196,14 +1236,40 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
           router.push('/clients');
         }, 1000);
         
-      } catch (err) {
-        console.error('Error updating client:', err);
-        toast.error(err instanceof Error ? err.message : 'Failed to update client');
-      } finally {
-        setIsSubmitting(false);
+    } catch (err) {
+      console.error('Error updating client:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to update client');
+    } finally {
+      setIsSubmitting(false);
       }
       return;
     }
+  };
+
+  const addGstNumber = () => {
+    setGstNumbers([
+      ...gstNumbers,
+      {
+        state: '',
+        gstNumber: ''
+      }
+    ]);
+  };
+
+  const removeGstNumber = (index: number) => {
+    if (gstNumbers.length > 1) {
+      const updatedGstNumbers = gstNumbers.filter((_, i) => i !== index);
+      setGstNumbers(updatedGstNumbers);
+    }
+  };
+
+  const handleGstNumberChange = (index: number, field: keyof GstNumber, value: string) => {
+    const updatedGstNumbers = [...gstNumbers];
+    updatedGstNumbers[index] = {
+      ...updatedGstNumbers[index],
+      [field]: value
+    };
+    setGstNumbers(updatedGstNumbers);
   };
 
   if (isLoading) {
@@ -1547,18 +1613,55 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                       />
                     </div>
 
-                    {/* GST Number */}
-                    <div className="form-group">
-                      <label htmlFor="gstNumber" className="form-label">GST Number</label>
+                    {/* GST Numbers */}
+                    <div className="form-group md:col-span-2">
+                      <label className="form-label">GST Numbers</label>
+                      <div className="space-y-3">
+                        {gstNumbers.map((gst, index) => (
+                          <div key={index} className="flex items-center space-x-3">
+                            <div className="flex-1">
+                              <button
+                                type="button"
+                                className={`w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:bg-gray-50 ${
+                                  gst.state ? 'text-gray-900' : 'text-gray-500'
+                                }`}
+                                onClick={() => openStateModal(index)}
+                              >
+                                <span className="truncate">
+                                  {gst.state || "Select State"}
+                                </span>
+                                <i className="ri-arrow-down-s-line text-gray-400"></i>
+                              </button>
+                            </div>
+                            <div className="flex-1">
                       <input
                         type="text"
-                        id="gstNumber"
-                        name="gstNumber"
                         className="form-control"
                         placeholder="Enter GST Number"
-                        value={formData.gstNumber}
-                        onChange={handleInputChange}
-                      />
+                                value={gst.gstNumber}
+                                onChange={(e) => handleGstNumberChange(index, 'gstNumber', e.target.value)}
+                              />
+                            </div>
+                            {gstNumbers.length > 1 && (
+                              <button
+                                type="button"
+                                className="ti-btn ti-btn-danger ti-btn-sm"
+                                onClick={() => removeGstNumber(index)}
+                              >
+                                <i className="ri-delete-bin-line"></i>
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          className="ti-btn ti-btn-secondary mx-auto block"
+                          onClick={addGstNumber}
+                        >
+                          <i className="ri-add-line mr-1"></i>
+                          Add GST Number
+                        </button>
+                      </div>
                     </div>
 
                     {/* TAN Number */}
@@ -2520,6 +2623,14 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
           </div>
         </div>
       )}
+
+      {/* State Selection Modal */}
+      <StateSelectionModal
+        isOpen={showStateModal}
+        onClose={() => setShowStateModal(false)}
+        onSelect={handleStateSelect}
+        title="Select State for GST"
+      />
     </div>
   );
 };

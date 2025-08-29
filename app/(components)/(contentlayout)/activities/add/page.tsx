@@ -12,7 +12,15 @@ interface Activity {
   sortOrder: number;
   frequency?: string;
   frequencyConfig?: any;
-  subactivities?: Array<{ name: string }>;
+  subactivities?: Array<{ 
+    name: string;
+    frequency?: string;
+    frequencyConfig?: any;
+    fields?: Array<{
+      name: string;
+      type: string;
+    }>;
+  }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -23,26 +31,20 @@ const AddActivityPage = () => {
   
   // Frequency configuration modal state
   const [showFrequencyModal, setShowFrequencyModal] = useState(false);
+  const [selectedSubActivityIndex, setSelectedSubActivityIndex] = useState<number | null>(null);
   
   const [formData, setFormData] = useState({
     name: '',
     sortOrder: 1,
-    frequency: '',
-    subactivities: [] as Array<{ name: string }>,
-    frequencyConfig: {
-      hourlyInterval: 1,
-      dailyTime: '',
-      weeklyDays: [] as string[],
-      weeklyTime: '',
-      monthlyDay: 1,
-      monthlyTime: '',
-      quarterlyMonths: [] as string[],
-      quarterlyDay: 1,
-      quarterlyTime: '',
-      yearlyMonth: '',
-      yearlyDate: 1,
-      yearlyTime: ''
-    }
+    subactivities: [] as Array<{
+      name: string;
+      frequency?: string;
+      frequencyConfig?: any;
+      fields?: Array<{
+        name: string;
+        type: string;
+      }>;
+    }>
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -53,36 +55,139 @@ const AddActivityPage = () => {
     }));
   };
 
-  // Frequency configuration functions
-  const handleFrequencyConfigChange = (field: string, value: any) => {
+  // Sub-activity functions
+  const addSubActivity = () => {
     setFormData(prev => ({
       ...prev,
-      frequencyConfig: {
-        ...prev.frequencyConfig,
-        [field]: value
-      }
+      subactivities: [...prev.subactivities, { 
+        name: '',
+        frequency: '',
+        frequencyConfig: {
+          hourlyInterval: 1,
+          dailyTime: '',
+          weeklyDays: [] as string[],
+          weeklyTime: '',
+          monthlyDay: 1,
+          monthlyTime: '',
+          quarterlyMonths: [] as string[],
+          quarterlyDay: 1,
+          quarterlyTime: '',
+          yearlyMonth: '',
+          yearlyDate: 1,
+          yearlyTime: ''
+        },
+        fields: []
+      }]
     }));
   };
 
-  const validateFrequencyConfig = () => {
-    const { frequency, frequencyConfig } = formData;
-    
+  const removeSubActivity = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      subactivities: prev.subactivities.filter((_, i) => i !== index)
+    }));
+  };
+
+  const updateSubActivity = (index: number, field: string, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      subactivities: prev.subactivities.map((subActivity, i) => 
+        i === index ? { ...subActivity, [field]: value } : subActivity
+      )
+    }));
+  };
+
+  const updateSubActivityFrequencyConfig = (index: number, field: string, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      subactivities: prev.subactivities.map((subActivity, i) => 
+        i === index ? { 
+          ...subActivity, 
+          frequencyConfig: {
+            ...subActivity.frequencyConfig,
+            [field]: value
+          }
+        } : subActivity
+      )
+    }));
+  };
+
+  const handleFrequencyConfigChange = (field: string, value: any) => {
+    if (selectedSubActivityIndex !== null) {
+      updateSubActivityFrequencyConfig(selectedSubActivityIndex, field, value);
+    }
+  };
+
+  // Field management functions
+  const addField = (subActivityIndex: number) => {
+    setFormData(prev => ({
+      ...prev,
+      subactivities: prev.subactivities.map((subActivity, i) => 
+        i === subActivityIndex ? {
+          ...subActivity,
+          fields: [...(subActivity.fields || []), {
+            name: '',
+            type: 'text'
+          }]
+        } : subActivity
+      )
+    }));
+  };
+
+  const removeField = (subActivityIndex: number, fieldIndex: number) => {
+    setFormData(prev => ({
+      ...prev,
+      subactivities: prev.subactivities.map((subActivity, i) => 
+        i === subActivityIndex ? {
+          ...subActivity,
+          fields: (subActivity.fields || []).filter((_, fi) => fi !== fieldIndex)
+        } : subActivity
+      )
+    }));
+  };
+
+  const updateField = (subActivityIndex: number, fieldIndex: number, field: string, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      subactivities: prev.subactivities.map((subActivity, i) => 
+        i === subActivityIndex ? {
+          ...subActivity,
+          fields: (subActivity.fields || []).map((f, fi) => 
+            fi === fieldIndex ? { ...f, [field]: value } : f
+          )
+        } : subActivity
+      )
+    }));
+  };
+
+  const validateSubActivityFrequencyConfig = (frequency: string, config: any) => {
+    if (!config) return false;
     switch (frequency) {
       case 'Hourly':
-        return frequencyConfig.hourlyInterval > 0;
+        return config.hourlyInterval > 0;
       case 'Daily':
-        return frequencyConfig.dailyTime !== '';
+        return config.dailyTime !== '';
       case 'Weekly':
-        return frequencyConfig.weeklyDays.length > 0 && frequencyConfig.weeklyTime !== '';
+        return config.weeklyDays && config.weeklyDays.length > 0 && config.weeklyTime !== '';
       case 'Monthly':
-        return frequencyConfig.monthlyDay > 0 && frequencyConfig.monthlyDay <= 31 && frequencyConfig.monthlyTime !== '';
+        return config.monthlyDay > 0 && config.monthlyDay <= 31 && config.monthlyTime !== '';
       case 'Quarterly':
-        return frequencyConfig.quarterlyMonths.length > 0 && frequencyConfig.quarterlyDay > 0 && frequencyConfig.quarterlyDay <= 31 && frequencyConfig.quarterlyTime !== '';
+        return config.quarterlyMonths && config.quarterlyMonths.length > 0 && config.quarterlyDay > 0 && config.quarterlyDay <= 31 && config.quarterlyTime !== '';
       case 'Yearly':
-        return frequencyConfig.yearlyMonth !== '' && frequencyConfig.yearlyDate > 0 && frequencyConfig.yearlyDate <= 31 && frequencyConfig.yearlyTime !== '';
+        return config.yearlyMonth !== '' && config.yearlyDate > 0 && config.yearlyDate <= 31 && config.yearlyTime !== '';
       default:
         return false;
     }
+  };
+
+  const getSubActivityFrequencyConfigStatus = (subActivity: { frequency?: string; frequencyConfig?: any }) => {
+    if (!subActivity.frequency || subActivity.frequency === 'None') return 'Not configured';
+    return validateSubActivityFrequencyConfig(subActivity.frequency, subActivity.frequencyConfig) ? 'Configured' : 'Incomplete';
+  };
+
+  const getSubActivityFrequencyConfigStatusColor = (subActivity: { frequency?: string; frequencyConfig?: any }) => {
+    if (!subActivity.frequency || subActivity.frequency === 'None') return 'text-gray-500';
+    return validateSubActivityFrequencyConfig(subActivity.frequency, subActivity.frequencyConfig) ? 'text-green-600' : 'text-red-600';
   };
 
   const formatTimeForAPI = (timeString: string) => {
@@ -96,60 +201,7 @@ const AddActivityPage = () => {
     return `${displayHour.toString().padStart(2, '0')}:${minutes} ${ampm}`;
   };
 
-  const handleSaveFrequencyConfig = () => {
-    if (validateFrequencyConfig()) {
-      setShowFrequencyModal(false);
-      toast.success('Frequency configuration saved');
-    } else {
-      toast.error('Please fill in all required fields for the selected frequency');
-    }
-  };
 
-  const handleCancelFrequencyConfig = () => {
-    setShowFrequencyModal(false);
-  };
-
-  const getFrequencyConfigStatus = () => {
-    if (!formData.frequency) return 'Not configured';
-    return validateFrequencyConfig() ? 'Configured' : 'Incomplete';
-  };
-
-  const getFrequencyConfigStatusColor = () => {
-    if (!formData.frequency) return 'text-gray-500';
-    return validateFrequencyConfig() ? 'text-green-600' : 'text-red-600';
-  };
-
-  // Helper function to include selected frequency config
-  const includeSelectedFrequency = (frequency: string, frequencyConfig: any) => {
-    const frequencyConfigObject: any = {};
-    switch (frequency) {
-      case 'Hourly':
-        frequencyConfigObject['hourlyInterval'] = frequencyConfig.hourlyInterval;
-        break;
-      case 'Daily':
-        frequencyConfigObject['dailyTime'] = frequencyConfig.dailyTime;
-        break;
-      case 'Weekly':
-        frequencyConfigObject['weeklyDays'] = frequencyConfig.weeklyDays;
-        frequencyConfigObject['weeklyTime'] = frequencyConfig.weeklyTime;
-        break;
-      case 'Monthly':
-        frequencyConfigObject['monthlyDay'] = frequencyConfig.monthlyDay;
-        frequencyConfigObject['monthlyTime'] = frequencyConfig.monthlyTime;
-        break;
-      case 'Quarterly':
-        frequencyConfigObject['quarterlyMonths'] = frequencyConfig.quarterlyMonths;
-        frequencyConfigObject['quarterlyDay'] = frequencyConfig.quarterlyDay;
-        frequencyConfigObject['quarterlyTime'] = frequencyConfig.quarterlyTime;
-        break;
-      case 'Yearly':
-        frequencyConfigObject['yearlyMonth'] = frequencyConfig.yearlyMonth;
-        frequencyConfigObject['yearlyDate'] = frequencyConfig.yearlyDate;
-        frequencyConfigObject['yearlyTime'] = frequencyConfig.yearlyTime;
-        break;
-    }
-    return frequencyConfigObject;
-  };
 
   // Helper function to remove empty fields from request body
   const removeEmptyFields = (obj: any) => {
@@ -174,62 +226,90 @@ const AddActivityPage = () => {
     return cleaned;
   };
 
-  // Sub-activity functions
-  const addSubActivity = () => {
-    setFormData(prev => ({
-      ...prev,
-      subactivities: [...prev.subactivities, { name: '' }]
-    }));
-  };
-
-  const removeSubActivity = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      subactivities: prev.subactivities.filter((_, i) => i !== index)
-    }));
-  };
-
-  const updateSubActivity = (index: number, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      subactivities: prev.subactivities.map((subActivity, i) => 
-        i === index ? { ...subActivity, name: value } : subActivity
-      )
-    }));
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate frequency configuration if frequency is selected
-    if (formData.frequency && !validateFrequencyConfig()) {
-      toast.error('Please configure the frequency settings properly');
-      return;
-    }
     
     try {
       setIsLoading(true);
 
-      // Format frequency configuration for API
-      const formattedFrequencyConfig = {
-        ...formData.frequencyConfig,
-        dailyTime: formatTimeForAPI(formData.frequencyConfig.dailyTime),
-        weeklyTime: formatTimeForAPI(formData.frequencyConfig.weeklyTime),
-        monthlyTime: formatTimeForAPI(formData.frequencyConfig.monthlyTime),
-        quarterlyTime: formatTimeForAPI(formData.frequencyConfig.quarterlyTime),
-        yearlyTime: formatTimeForAPI(formData.frequencyConfig.yearlyTime)
-      };
-
-      const cleanedFrequencyConfig = formData.frequency ? includeSelectedFrequency(formData.frequency, formattedFrequencyConfig) : {};
-
       // Remove empty fields from request body
-      const cleanedFormData = removeEmptyFields({
+      const cleanedFormData = {
         name: formData.name,
         sortOrder: formData.sortOrder,
-        frequency: formData.frequency || undefined,
-        subactivities: formData.subactivities.filter(subActivity => subActivity.name.trim() !== ''),
-        frequencyConfig: Object.keys(cleanedFrequencyConfig).length > 0 ? cleanedFrequencyConfig : undefined
-      });
+        subactivities: formData.subactivities
+          .filter(subActivity => subActivity.name.trim() !== '')
+          .map(subActivity => {
+            // Only include frequency config if frequency is selected
+            let cleanFrequencyConfig: any = undefined;
+            if (subActivity.frequency && subActivity.frequency !== 'None') {
+              cleanFrequencyConfig = {};
+              
+              // Only include relevant config based on frequency type
+              switch (subActivity.frequency) {
+                case 'Hourly':
+                  if (subActivity.frequencyConfig?.hourlyInterval) {
+                    cleanFrequencyConfig.hourlyInterval = subActivity.frequencyConfig.hourlyInterval;
+                  }
+                  break;
+                case 'Daily':
+                  if (subActivity.frequencyConfig?.dailyTime) {
+                    cleanFrequencyConfig.dailyTime = subActivity.frequencyConfig.dailyTime;
+                  }
+                  break;
+                case 'Weekly':
+                  if (subActivity.frequencyConfig?.weeklyDays?.length > 0) {
+                    cleanFrequencyConfig.weeklyDays = subActivity.frequencyConfig.weeklyDays;
+                  }
+                  if (subActivity.frequencyConfig?.weeklyTime) {
+                    cleanFrequencyConfig.weeklyTime = subActivity.frequencyConfig.weeklyTime;
+                  }
+                  break;
+                case 'Monthly':
+                  if (subActivity.frequencyConfig?.monthlyDay) {
+                    cleanFrequencyConfig.monthlyDay = subActivity.frequencyConfig.monthlyDay;
+                  }
+                  if (subActivity.frequencyConfig?.monthlyTime) {
+                    cleanFrequencyConfig.monthlyTime = subActivity.frequencyConfig.monthlyTime;
+                  }
+                  break;
+                case 'Quarterly':
+                  if (subActivity.frequencyConfig?.quarterlyMonths?.length > 0) {
+                    cleanFrequencyConfig.quarterlyMonths = subActivity.frequencyConfig.quarterlyMonths;
+                  }
+                  if (subActivity.frequencyConfig?.quarterlyDay) {
+                    cleanFrequencyConfig.quarterlyDay = subActivity.frequencyConfig.quarterlyDay;
+                  }
+                  if (subActivity.frequencyConfig?.quarterlyTime) {
+                    cleanFrequencyConfig.quarterlyTime = subActivity.frequencyConfig.quarterlyTime;
+                  }
+                  break;
+                case 'Yearly':
+                  if (subActivity.frequencyConfig?.yearlyMonth) {
+                    cleanFrequencyConfig.yearlyMonth = subActivity.frequencyConfig.yearlyMonth;
+                  }
+                  if (subActivity.frequencyConfig?.yearlyDate) {
+                    cleanFrequencyConfig.yearlyDate = subActivity.frequencyConfig.yearlyDate;
+                  }
+                  if (subActivity.frequencyConfig?.yearlyTime) {
+                    cleanFrequencyConfig.yearlyTime = subActivity.frequencyConfig.yearlyTime;
+                  }
+                  break;
+              }
+              
+              // Only include frequencyConfig if it has properties
+              if (Object.keys(cleanFrequencyConfig).length === 0) {
+                cleanFrequencyConfig = undefined;
+              }
+            }
+
+            return {
+              name: subActivity.name,
+              frequency: subActivity.frequency || undefined,
+              frequencyConfig: cleanFrequencyConfig,
+              fields: subActivity.fields?.filter(field => field.name.trim() !== '') || undefined
+            };
+          })
+      };
 
       const response = await fetch(`${Base_url}activities`, {
         method: 'POST',
@@ -266,6 +346,21 @@ const AddActivityPage = () => {
       { value: 'Yearly', label: 'Yearly' }
     ];
     return options;
+  };
+
+  const getFieldTypeOptions = () => {
+    return [
+      { value: 'text', label: 'Text' },
+      { value: 'textarea', label: 'Text Area' },
+      { value: 'number', label: 'Number' },
+      { value: 'email', label: 'Email' },
+      { value: 'phone', label: 'Phone' },
+      { value: 'date', label: 'Date' },
+      { value: 'select', label: 'Select Dropdown' },
+      { value: 'checkbox', label: 'Checkbox' },
+      { value: 'radio', label: 'Radio Buttons' },
+      { value: 'file', label: 'File Upload' }
+    ];
   };
 
   return (
@@ -336,41 +431,9 @@ const AddActivityPage = () => {
 
 
 
-                  {/* Frequency */}
-                  <div className="form-group">
-                    <label htmlFor="frequency" className="form-label">Due Date Options</label>
-                    <select
-                      id="frequency"
-                      name="frequency"
-                      className="form-select"
-                      value={formData.frequency}
-                      onChange={handleInputChange}
-                    >
-                      <option value="">Select Frequency (Optional)</option>
-                      {getFrequencyOptions().map(option => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
 
-                  {/* Frequency Configuration */}
-                  {formData.frequency && (
-                    <div className="form-group col-span-1 md:col-span-2">
-                      <label className="form-label">Due Date</label>
-                      <button
-                        type="button"
-                        className={`w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:bg-gray-50`}
-                        onClick={() => setShowFrequencyModal(true)}
-                      >
-                        <span className={`${getFrequencyConfigStatusColor()}`}>
-                          {getFrequencyConfigStatus()}
-                        </span>
-                        <i className="ri-settings-3-line text-gray-400"></i>
-                      </button>
-                    </div>
-                  )}
+
+
 
                   {/* Sub-Activities */}
                   <div className="form-group col-span-1 md:col-span-2">
@@ -393,26 +456,143 @@ const AddActivityPage = () => {
                         <p className="text-xs">Click "Add Sub-Activity" to get started</p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-4">
                         {formData.subactivities.map((subActivity, index) => (
-                          <div key={index} className="flex items-center space-x-3">
-                            <div className="flex-1">
-                              <input
-                                type="text"
-                                className="form-control"
-                                placeholder={`Enter sub-activity ${index + 1} name`}
-                                value={subActivity.name}
-                                onChange={(e) => updateSubActivity(index, e.target.value)}
-                              />
+                          <div key={index} className="border border-gray-200 rounded-lg p-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                              {/* Sub-activity Name */}
+                              <div className="form-group">
+                                <label className="form-label">Sub-Activity Name <span className="text-red-500">*</span></label>
+                                <input
+                                  type="text"
+                                  className="form-control"
+                                  placeholder={`Enter sub-activity ${index + 1} name`}
+                                  value={subActivity.name}
+                                  onChange={(e) => updateSubActivity(index, 'name', e.target.value)}
+                                />
+                              </div>
+
+                              {/* Frequency */}
+                              <div className="form-group">
+                                <label className="form-label">Due Date Options</label>
+                                <select
+                                  className="form-select"
+                                  value={subActivity.frequency || ''}
+                                  onChange={(e) => updateSubActivity(index, 'frequency', e.target.value)}
+                                >
+                                  <option value="">Select Frequency (Optional)</option>
+                                  {getFrequencyOptions().map(option => (
+                                    <option key={option.value} value={option.value}>
+                                      {option.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
                             </div>
-                            <button
-                              type="button"
-                              className="ti-btn ti-btn-danger text-sm"
-                              onClick={() => removeSubActivity(index)}
-                              title="Remove sub-activity"
-                            >
-                              <i className="ri-delete-bin-line"></i>
-                            </button>
+
+                            {/* Frequency Configuration */}
+                            {subActivity.frequency && subActivity.frequency !== 'None' && (
+                              <div className="form-group mb-4">
+                                <label className="form-label">Due Date Configuration</label>
+                                <button
+                                  type="button"
+                                  className={`w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:bg-gray-50`}
+                                  onClick={() => {
+                                    setSelectedSubActivityIndex(index);
+                                    setShowFrequencyModal(true);
+                                  }}
+                                >
+                                  <span className={getSubActivityFrequencyConfigStatusColor(subActivity)}>
+                                    {getSubActivityFrequencyConfigStatus(subActivity)}
+                                  </span>
+                                  <i className="ri-settings-3-line text-gray-400"></i>
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Custom Fields */}
+                            <div className="form-group mb-4">
+                              <div className="flex justify-between items-center mb-3">
+                                <label className="form-label">Custom Fields</label>
+                                <button
+                                  type="button"
+                                  className="ti-btn ti-btn-outline-primary text-sm"
+                                  onClick={() => addField(index)}
+                                >
+                                  <i className="ri-add-line mr-1"></i>
+                                  Add More Fields
+                                </button>
+                              </div>
+                              
+                              {(subActivity.fields || []).length === 0 ? (
+                                <div className="text-center py-4 text-gray-400 border border-dashed border-gray-300 rounded-lg">
+                                  <i className="ri-form-line text-lg mb-1 opacity-50"></i>
+                                  <p className="text-xs">No custom fields added yet</p>
+                                </div>
+                              ) : (
+                                <div className="space-y-3">
+                                  {(subActivity.fields || []).map((field, fieldIndex) => (
+                                    <div key={fieldIndex} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {/* Field Name */}
+                                        <div className="form-group">
+                                          <label className="form-label text-sm">Field Name <span className="text-red-500">*</span></label>
+                                          <input
+                                            type="text"
+                                            className="form-control text-sm"
+                                            placeholder="e.g., Due Date, Priority, Notes"
+                                            value={field.name}
+                                            onChange={(e) => updateField(index, fieldIndex, 'name', e.target.value)}
+                                          />
+                                        </div>
+
+                                        {/* Field Type */}
+                                        <div className="form-group">
+                                          <label className="form-label text-sm">Field Type <span className="text-red-500">*</span></label>
+                                          <select
+                                            className="form-select text-sm"
+                                            value={field.type}
+                                            onChange={(e) => updateField(index, fieldIndex, 'type', e.target.value)}
+                                          >
+                                            {getFieldTypeOptions().map(option => (
+                                              <option key={option.value} value={option.value}>
+                                                {option.label}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                      </div>
+
+                                      {/* Remove Field Button */}
+                                      <div className="flex justify-end mt-3">
+                                        <button
+                                          type="button"
+                                          className="ti-btn ti-btn-danger text-xs"
+                                          onClick={() => removeField(index, fieldIndex)}
+                                          title="Remove field"
+                                        >
+                                          <i className="ri-delete-bin-line mr-1"></i>
+                                          Remove Field
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Remove Button */}
+                            <div className="flex justify-end">
+                              <button
+                                type="button"
+                                className="ti-btn ti-btn-danger text-sm"
+                                onClick={() => removeSubActivity(index)}
+                                title="Remove sub-activity"
+                              >
+                                <i className="ri-delete-bin-line mr-1"></i>
+                                Remove
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -459,10 +639,10 @@ const AddActivityPage = () => {
             <div className="relative bg-white rounded-lg shadow-xl w-full max-w-2xl">
               <div className="flex items-center justify-between p-4 border-b">
                 <h3 className="text-xl font-semibold">
-                  Configure {formData.frequency} Frequency
+                  Configure {selectedSubActivityIndex !== null && formData.subactivities[selectedSubActivityIndex]?.frequency} Frequency
                 </h3>
                 <button
-                  onClick={handleCancelFrequencyConfig}
+                  onClick={() => setShowFrequencyModal(false)}
                   className="text-gray-500 hover:text-gray-700"
                 >
                   <i className="ri-close-line text-2xl"></i>
@@ -470,13 +650,13 @@ const AddActivityPage = () => {
               </div>
 
               <div className="p-6">
-                {formData.frequency === 'Hourly' && (
+                {selectedSubActivityIndex !== null && formData.subactivities[selectedSubActivityIndex]?.frequency === 'Hourly' && (
                   <div className="space-y-4">
                     <div className="form-group">
                       <label className="form-label">Hourly Interval <span className="text-red-500">*</span></label>
                       <select
                         className="form-select"
-                        value={formData.frequencyConfig.hourlyInterval}
+                        value={formData.subactivities[selectedSubActivityIndex]?.frequencyConfig?.hourlyInterval || 1}
                         onChange={(e) => handleFrequencyConfigChange('hourlyInterval', parseInt(e.target.value) || 1)}
                       >
                         {Array.from({ length: 24 }, (_, i) => i + 1).map(hour => (
@@ -490,14 +670,14 @@ const AddActivityPage = () => {
                   </div>
                 )}
 
-                {formData.frequency === 'Daily' && (
+                {selectedSubActivityIndex !== null && formData.subactivities[selectedSubActivityIndex]?.frequency === 'Daily' && (
                   <div className="space-y-4">
                     <div className="form-group">
                       <label className="form-label">Daily Time <span className="text-red-500">*</span></label>
                       <input
                         type="time"
                         className="form-control"
-                        value={formData.frequencyConfig.dailyTime}
+                        value={formData.subactivities[selectedSubActivityIndex]?.frequencyConfig?.dailyTime || ''}
                         onChange={(e) => handleFrequencyConfigChange('dailyTime', e.target.value)}
                       />
                       <small className="text-gray-500">Time of day for the activity</small>
@@ -505,7 +685,7 @@ const AddActivityPage = () => {
                   </div>
                 )}
 
-                {formData.frequency === 'Weekly' && (
+                {selectedSubActivityIndex !== null && formData.subactivities[selectedSubActivityIndex]?.frequency === 'Weekly' && (
                   <div className="space-y-4">
                     <div className="form-group">
                       <label className="form-label">Days of Week <span className="text-red-500">*</span></label>
@@ -515,13 +695,13 @@ const AddActivityPage = () => {
                             <input
                               type="checkbox"
                               className="form-checkbox"
-                              checked={formData.frequencyConfig.weeklyDays.includes(day)}
+                              checked={formData.subactivities[selectedSubActivityIndex]?.frequencyConfig?.weeklyDays?.includes(day) || false}
                               onChange={(e) => {
-                                const currentDays = formData.frequencyConfig.weeklyDays;
+                                const currentDays = formData.subactivities[selectedSubActivityIndex]?.frequencyConfig?.weeklyDays || [];
                                 if (e.target.checked) {
                                   handleFrequencyConfigChange('weeklyDays', [...currentDays, day]);
                                 } else {
-                                  handleFrequencyConfigChange('weeklyDays', currentDays.filter(d => d !== day));
+                                  handleFrequencyConfigChange('weeklyDays', currentDays.filter((d: string) => d !== day));
                                 }
                               }}
                             />
@@ -535,7 +715,7 @@ const AddActivityPage = () => {
                       <input
                         type="time"
                         className="form-control"
-                        value={formData.frequencyConfig.weeklyTime}
+                        value={formData.subactivities[selectedSubActivityIndex]?.frequencyConfig?.weeklyTime || ''}
                         onChange={(e) => handleFrequencyConfigChange('weeklyTime', e.target.value)}
                       />
                       <small className="text-gray-500">Time of day for the activity</small>
@@ -543,13 +723,13 @@ const AddActivityPage = () => {
                   </div>
                 )}
 
-                {formData.frequency === 'Monthly' && (
+                {selectedSubActivityIndex !== null && formData.subactivities[selectedSubActivityIndex]?.frequency === 'Monthly' && (
                   <div className="space-y-4">
                     <div className="form-group">
                       <label className="form-label">Day of Month <span className="text-red-500">*</span></label>
                       <select
                         className="form-select"
-                        value={formData.frequencyConfig.monthlyDay}
+                        value={formData.subactivities[selectedSubActivityIndex]?.frequencyConfig?.monthlyDay || 1}
                         onChange={(e) => handleFrequencyConfigChange('monthlyDay', parseInt(e.target.value) || 1)}
                       >
                         {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
@@ -565,7 +745,7 @@ const AddActivityPage = () => {
                       <input
                         type="time"
                         className="form-control"
-                        value={formData.frequencyConfig.monthlyTime}
+                        value={formData.subactivities[selectedSubActivityIndex]?.frequencyConfig?.monthlyTime || ''}
                         onChange={(e) => handleFrequencyConfigChange('monthlyTime', e.target.value)}
                       />
                       <small className="text-gray-500">Time of day for the activity</small>
@@ -573,7 +753,7 @@ const AddActivityPage = () => {
                   </div>
                 )}
 
-                {formData.frequency === 'Quarterly' && (
+                {selectedSubActivityIndex !== null && formData.subactivities[selectedSubActivityIndex]?.frequency === 'Quarterly' && (
                   <div className="space-y-4">
                     <div className="form-group">
                       <label className="form-label">Quarterly Months <span className="text-red-500">*</span></label>
@@ -583,9 +763,9 @@ const AddActivityPage = () => {
                             <input
                               type="checkbox"
                               className="form-checkbox"
-                              checked={formData.frequencyConfig.quarterlyMonths.includes(month)}
+                              checked={formData.subactivities[selectedSubActivityIndex]?.frequencyConfig?.quarterlyMonths?.includes(month) || false}
                               onChange={(e) => {
-                                const currentMonths = formData.frequencyConfig.quarterlyMonths;
+                                const currentMonths = formData.subactivities[selectedSubActivityIndex]?.frequencyConfig?.quarterlyMonths || [];
                                 if (e.target.checked) {
                                   handleFrequencyConfigChange('quarterlyMonths', [...currentMonths, month]);
                                 } else {
@@ -602,7 +782,7 @@ const AddActivityPage = () => {
                       <label className="form-label">Day of Month <span className="text-red-500">*</span></label>
                       <select
                         className="form-select"
-                        value={formData.frequencyConfig.quarterlyDay}
+                        value={formData.subactivities[selectedSubActivityIndex]?.frequencyConfig?.quarterlyDay || 1}
                         onChange={(e) => handleFrequencyConfigChange('quarterlyDay', parseInt(e.target.value) || 1)}
                       >
                         {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
@@ -618,7 +798,7 @@ const AddActivityPage = () => {
                       <input
                         type="time"
                         className="form-control"
-                        value={formData.frequencyConfig.quarterlyTime}
+                        value={formData.subactivities[selectedSubActivityIndex]?.frequencyConfig?.quarterlyTime || ''}
                         onChange={(e) => handleFrequencyConfigChange('quarterlyTime', e.target.value)}
                       />
                       <small className="text-gray-500">Time of day for the activity</small>
@@ -626,13 +806,13 @@ const AddActivityPage = () => {
                   </div>
                 )}
 
-                {formData.frequency === 'Yearly' && (
+                {selectedSubActivityIndex !== null && formData.subactivities[selectedSubActivityIndex]?.frequency === 'Yearly' && (
                   <div className="space-y-4">
                     <div className="form-group">
                       <label className="form-label">Month <span className="text-red-500">*</span></label>
                       <select
                         className="form-select"
-                        value={formData.frequencyConfig.yearlyMonth}
+                        value={formData.subactivities[selectedSubActivityIndex]?.frequencyConfig?.yearlyMonth || ''}
                         onChange={(e) => handleFrequencyConfigChange('yearlyMonth', e.target.value)}
                       >
                         <option value="">Select Month</option>
@@ -648,7 +828,7 @@ const AddActivityPage = () => {
                       <label className="form-label">Day of Month <span className="text-red-500">*</span></label>
                       <select
                         className="form-select"
-                        value={formData.frequencyConfig.yearlyDate}
+                        value={formData.subactivities[selectedSubActivityIndex]?.frequencyConfig?.yearlyDate || 1}
                         onChange={(e) => handleFrequencyConfigChange('yearlyDate', parseInt(e.target.value) || 1)}
                       >
                         {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
@@ -664,7 +844,7 @@ const AddActivityPage = () => {
                       <input
                         type="time"
                         className="form-control"
-                        value={formData.frequencyConfig.yearlyTime}
+                        value={formData.subactivities[selectedSubActivityIndex]?.frequencyConfig?.yearlyTime || ''}
                         onChange={(e) => handleFrequencyConfigChange('yearlyTime', e.target.value)}
                       />
                       <small className="text-gray-500">Time of day for the activity</small>
@@ -677,14 +857,17 @@ const AddActivityPage = () => {
                   <button
                     type="button"
                     className="ti-btn ti-btn-secondary"
-                    onClick={handleCancelFrequencyConfig}
+                    onClick={() => setShowFrequencyModal(false)}
                   >
                     Cancel
                   </button>
                   <button
                     type="button"
                     className="ti-btn ti-btn-primary"
-                    onClick={handleSaveFrequencyConfig}
+                    onClick={() => {
+                      setShowFrequencyModal(false);
+                      toast.success('Frequency configuration saved');
+                    }}
                   >
                     Save Configuration
                   </button>

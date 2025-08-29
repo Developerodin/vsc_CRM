@@ -903,13 +903,13 @@ const TasksPage = () => {
                   <td>{task.branch?.name || "-"}</td>
                   <td>
                     <div className="flex items-center gap-2">
-                      <span 
+                    <span 
                         className={`badge ${getStatusStyling(task.status)} ${task.status === 'delayed' ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:opacity-80'} transition-opacity`}
                         onClick={() => task.status !== 'delayed' && openQuickEditModal(task)}
                         title={task.status === 'delayed' ? 'Cannot edit delayed tasks - Contact supervisor' : 'Click to edit status and remarks'}
-                      >
-                        {task.status.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                      </span>
+                    >
+                      {task.status.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                    </span>
                       {task.status === 'delayed' && (
                         <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 border border-red-200">
                           <i className="ri-lock-line mr-1"></i>
@@ -1438,40 +1438,40 @@ const TaskDetailsModal = ({
                      </div>
                    </div>
                  ) : (
-                   <div className="space-y-3">
-                     <div>
-                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                         New Status
-                       </label>
-                       <select
-                         className="form-select w-full"
-                         value={selectedStatus}
-                         onChange={(e) => setSelectedStatus(e.target.value as Task['status'])}
-                         disabled={isUpdating}
-                       >
-                         <option value="pending">Pending</option>
-                         <option value="ongoing">Ongoing</option>
-                         <option value="completed">Completed</option>
-                         <option value="on_hold">On Hold</option>
-                         <option value="cancelled">Cancelled</option>
-                         <option value="delayed">Delayed</option>
-                       </select>
-                     </div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      New Status
+                    </label>
+                    <select
+                      className="form-select w-full"
+                      value={selectedStatus}
+                      onChange={(e) => setSelectedStatus(e.target.value as Task['status'])}
+                      disabled={isUpdating}
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="ongoing">Ongoing</option>
+                      <option value="completed">Completed</option>
+                      <option value="on_hold">On Hold</option>
+                      <option value="cancelled">Cancelled</option>
+                      <option value="delayed">Delayed</option>
+                    </select>
+                  </div>
 
-                     <div>
-                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                         Remarks
-                       </label>
-                       <textarea
-                         className="form-control w-full"
-                         rows={3}
-                         placeholder="Add any additional notes or remarks..."
-                         value={remarks}
-                         onChange={(e) => setRemarks(e.target.value)}
-                         disabled={isUpdating}
-                       />
-                     </div>
-                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Remarks
+                    </label>
+                    <textarea
+                      className="form-control w-full"
+                      rows={3}
+                      placeholder="Add any additional notes or remarks..."
+                      value={remarks}
+                      onChange={(e) => setRemarks(e.target.value)}
+                      disabled={isUpdating}
+                    />
+                  </div>
+                </div>
                  )}
               </div>
 

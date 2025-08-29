@@ -10,9 +10,21 @@ interface Activity {
   id: string;
   name: string;
   sortOrder: number;
-  frequency?: string;
-  frequencyConfig?: any;
-  subactivities?: Array<{ name: string }>;
+  subactivities?: Array<{ 
+    _id: string;
+    name: string;
+    frequency?: string;
+    frequencyConfig?: any;
+    fields?: Array<{
+      _id: string;
+      name: string;
+      type: string;
+      required?: boolean;
+      options?: string[];
+    }>;
+    createdAt: string;
+    updatedAt: string;
+  }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -48,6 +60,8 @@ const ActivitiesPage = () => {
   const [filters, setFilters] = useState({
     name: ""
   });
+  const [showSubActivitiesModal, setShowSubActivitiesModal] = useState(false);
+  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
 
   const fetchActivities = async (page = 1, limit = itemsPerPage) => {
     setIsLoading(true);
@@ -147,6 +161,11 @@ const ActivitiesPage = () => {
     }
   };
 
+  const handleSubActivitiesClick = (activity: Activity) => {
+    setSelectedActivity(activity);
+    setShowSubActivitiesModal(true);
+  };
+
   const handleExport = async () => {
     try {
       let exportData;
@@ -159,7 +178,8 @@ const ActivitiesPage = () => {
             ID: activity.id,
             "Activity Name": activity.name,
             "Sort Order": activity.sortOrder,
-            "Frequency": activity.frequency || 'No frequency set',
+            "Frequency": activity.subactivities && activity.subactivities.length > 0 ? 
+              activity.subactivities.map(sub => `${sub.name} (${sub.frequency || 'No frequency'})`).join(', ') : 'No sub-activities',
             "Sub-Activities": activity.subactivities && activity.subactivities.length > 0 ? activity.subactivities.map(sub => sub.name).join(', ') : 'None'
           }));
         successMessage = "Selected activities exported successfully";
@@ -179,7 +199,8 @@ const ActivitiesPage = () => {
           ID: activity.id,
           "Activity Name": activity.name,
           "Sort Order": activity.sortOrder,
-          "Frequency": activity.frequency || 'No frequency set',
+          "Frequency": activity.subactivities && activity.subactivities.length > 0 ? 
+            activity.subactivities.map(sub => `${sub.name} (${sub.frequency || 'No frequency'})`).join(', ') : 'No sub-activities',
           "Sub-Activities": activity.subactivities && activity.subactivities.length > 0 ? activity.subactivities.map(sub => sub.name).join(', ') : 'None'
         }));
         successMessage = "All activities exported successfully";
@@ -271,49 +292,66 @@ const ActivitiesPage = () => {
 };
 
 
-  // Helper function to format frequency display
+  // Helper function to format frequency display for sub-activities
   const formatFrequencyDisplay = (activity: Activity) => {
-    if (!activity.frequency || !activity.frequencyConfig) {
+    if (!activity.subactivities || activity.subactivities.length === 0) {
+      return 'No sub-activities';
+    }
+
+    // Get all sub-activities with frequency
+    const subActivitiesWithFrequency = activity.subactivities.filter(sub => sub.frequency && sub.frequencyConfig);
+    
+    if (subActivitiesWithFrequency.length === 0) {
       return 'No frequency set';
     }
 
-    const { frequency, frequencyConfig } = activity;
-    
-    switch (frequency) {
-      case 'Hourly':
-        return `Every ${frequencyConfig.hourlyInterval} hour${frequencyConfig.hourlyInterval > 1 ? 's' : ''}`;
+    // Format each sub-activity's frequency
+    const frequencyDisplays = subActivitiesWithFrequency.map(sub => {
+      const { frequency, frequencyConfig } = sub;
       
-      case 'Daily':
-        return `Daily at ${frequencyConfig.dailyTime || 'specified time'}`;
-      
-      case 'Weekly':
-        const days = frequencyConfig.weeklyDays?.length > 0 
-          ? frequencyConfig.weeklyDays.join(', ') 
-          : 'specified days';
-        const time = frequencyConfig.weeklyTime || 'specified time';
-        return `Weekly on ${days} at ${time}`;
-      
-      case 'Monthly':
-        const day = frequencyConfig.monthlyDay || 'specified day';
-        const monthTime = frequencyConfig.monthlyTime || 'specified time';
-        return `Monthly on day ${day} at ${monthTime}`;
-      
-      case 'Quarterly':
-        const months = frequencyConfig.quarterlyMonths?.length > 0 
-          ? frequencyConfig.quarterlyMonths.join(', ') 
-          : 'specified months';
-        const quarterDay = frequencyConfig.quarterlyDay || 'specified day';
-        const quarterTime = frequencyConfig.quarterlyTime || 'specified time';
-        return `Quarterly on day ${quarterDay} of ${months} at ${quarterTime}`;
-      
-      case 'Yearly':
-        const yearMonth = frequencyConfig.yearlyMonth || 'specified month';
-        const yearDate = frequencyConfig.yearlyDate || 'specified date';
-        const yearTime = frequencyConfig.yearlyTime || 'specified time';
-        return `Yearly on ${yearDate} ${yearMonth} at ${yearTime}`;
-      
-      default:
-        return 'Frequency configured';
+      switch (frequency) {
+        case 'Hourly':
+          return `${sub.name}: Every ${frequencyConfig.hourlyInterval} hour${frequencyConfig.hourlyInterval > 1 ? 's' : ''}`;
+        
+        case 'Daily':
+          return `${sub.name}: Daily at ${frequencyConfig.dailyTime || 'specified time'}`;
+        
+        case 'Weekly':
+          const days = frequencyConfig.weeklyDays?.length > 0 
+            ? frequencyConfig.weeklyDays.join(', ') 
+            : 'specified days';
+          const time = frequencyConfig.weeklyTime || 'specified time';
+          return `${sub.name}: Weekly on ${days} at ${time}`;
+        
+        case 'Monthly':
+          const day = frequencyConfig.monthlyDay || 'specified day';
+          const monthTime = frequencyConfig.monthlyTime || 'specified time';
+          return `${sub.name}: Monthly on day ${day} at ${monthTime}`;
+        
+        case 'Quarterly':
+          const months = frequencyConfig.quarterlyMonths?.length > 0 
+            ? frequencyConfig.quarterlyMonths.join(', ') 
+            : 'specified months';
+          const quarterDay = frequencyConfig.quarterlyDay || 'specified day';
+          const quarterTime = frequencyConfig.quarterlyTime || 'specified time';
+          return `${sub.name}: Quarterly on day ${quarterDay} of ${months} at ${quarterTime}`;
+        
+        case 'Yearly':
+          const yearMonth = frequencyConfig.yearlyMonth || 'specified month';
+          const yearDate = frequencyConfig.yearlyDate || 'specified date';
+          const yearTime = frequencyConfig.yearlyTime || 'specified time';
+          return `${sub.name}: Yearly on ${yearDate} ${yearMonth} at ${yearTime}`;
+        
+        default:
+          return `${sub.name}: Frequency configured`;
+      }
+    });
+
+    // Return multiple lines if there are multiple sub-activities with frequency
+    if (frequencyDisplays.length === 1) {
+      return frequencyDisplays[0];
+    } else {
+      return frequencyDisplays.join(' | ');
     }
   };
 
@@ -498,24 +536,15 @@ const ActivitiesPage = () => {
                 <table className="table whitespace-nowrap table-bordered">
                   <thead>
                     <tr>
-                      <th className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          className="form-checkbox"
-                          checked={selectedActivities.length === activities.length}
-                          onChange={handleSelectAll}
-                        />
-                      </th>
-                      <th className="px-4 py-3">Name</th>
+                      <th className="px-4 py-3">Activity Name</th>
                       <th className="px-4 py-3">Sub-Activities</th>
-                      <th className="px-4 py-3">Due Date</th>
                       <th className="px-4 py-3">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {isLoading ? (
                       <tr>
-                        <td colSpan={5} className="text-center py-4">
+                        <td colSpan={3} className="text-center py-4">
                           <div className="flex justify-center">
                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                           </div>
@@ -523,70 +552,60 @@ const ActivitiesPage = () => {
                       </tr>
                     ) : error ? (
                       <tr>
-                        <td colSpan={5} className="text-center text-red-500 py-4">
+                        <td colSpan={3} className="text-center text-red-500 py-4">
                           {error}
                         </td>
                       </tr>
                     ) : activities.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="text-center py-4">
+                        <td colSpan={3} className="text-center py-4">
                           No activities found
                         </td>
                       </tr>
                     ) : (
                       activities.map((activity) => (
                         <tr key={activity.id}>
-                          <td>
-                            <input
-                              type="checkbox"
-                              checked={selectedActivities.includes(activity.id)}
-                              onChange={() => handleSelectActivity(activity.id)}
-                              className="form-checkbox"
-                            />
+                          <td className="px-4 py-3">
+                            <div className="flex items-center">
+                              <input
+                                type="checkbox"
+                                checked={selectedActivities.includes(activity.id)}
+                                onChange={() => handleSelectActivity(activity.id)}
+                                className="form-checkbox mr-3"
+                              />
+                              {activity.name}
+                            </div>
                           </td>
-                          <td>{activity.name}</td>
-                          <td>
+                          <td className="px-4 py-3">
                             {activity.subactivities && activity.subactivities.length > 0 ? (
-                              <div className="space-y-1">
-                                {activity.subactivities.map((subActivity, index) => (
-                                  <div key={index} className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
-                                    {subActivity.name}
-                                  </div>
-                                ))}
-                              </div>
+                              <button
+                                onClick={() => handleSubActivitiesClick(activity)}
+                                className="text-blue-600 hover:text-blue-800 font-medium cursor-pointer hover:underline"
+                              >
+                                {activity.subactivities.length} sub-activit{activity.subactivities.length === 1 ? 'y' : 'ies'}
+                              </button>
                             ) : (
                               <span className="text-gray-400 text-sm">No sub-activities</span>
                             )}
                           </td>
-                          <td>
-                            <div className="text-sm">
-                              <span className={`px-2 py-1 rounded-full text-xs ${
-                                activity.frequency 
-                                  ? 'bg-blue-100 text-blue-800' 
-                                  : 'bg-gray-100 text-gray-600'
-                              }`}>
-                                {formatFrequencyDisplay(activity)}
-                              </span>
+                          <td className="px-4 py-3">
+                            <div className="flex space-x-2">
+                              <Link
+                                href={`/activities/edit/${activity.id}`}
+                                className="ti-btn ti-btn-primary ti-btn-sm"
+                                title="Edit"
+                              >
+                                <i className="ri-edit-line"></i>
+                              </Link>
+                              <button
+                                onClick={() => handleDelete(activity.id)}
+                                className="ti-btn ti-btn-danger ti-btn-sm"
+                                title="Delete"
+                              >
+                                <i className="ri-delete-bin-line"></i>
+                              </button>
                             </div>
                           </td>
-                          <td>
-                           <div className="flex space-x-2">
-                             <Link
-                               href={`/activities/edit/${activity.id}`}
-                               className="ti-btn ti-btn-primary ti-btn-sm"
-                               title="Edit"
-                             >
-                               <i className="ri-edit-line"></i>
-                             </Link>
-                             <button
-                               onClick={() => handleDelete(activity.id)}
-                               className="ti-btn ti-btn-danger ti-btn-sm"
-                               title="Delete"
-                             >
-                               <i className="ri-delete-bin-line"></i>
-                             </button>
-                           </div>
-                         </td>
                         </tr>
                       ))
                     )}
@@ -670,6 +689,103 @@ const ActivitiesPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Sub-Activities Modal */}
+      {showSubActivitiesModal && selectedActivity && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden">
+            <div className="flex justify-between items-center p-6 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Sub-Activities: {selectedActivity.name}
+              </h3>
+              <button
+                onClick={() => setShowSubActivitiesModal(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              {selectedActivity.subactivities && selectedActivity.subactivities.length > 0 ? (
+                <div className="space-y-4">
+                  {selectedActivity.subactivities.map((subActivity, index) => (
+                    <div key={subActivity._id || index} className="border rounded-lg p-4 bg-gray-50">
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-medium text-gray-900 text-lg">
+                          {subActivity.name}
+                        </h4>
+                        {subActivity.frequency && (
+                          <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
+                            {subActivity.frequency}
+                          </span>
+                        )}
+                      </div>
+                      
+                      {subActivity.frequency && subActivity.frequencyConfig && (
+                        <div className="text-sm text-gray-600">
+                          {(() => {
+                            const { frequency, frequencyConfig } = subActivity;
+                            switch (frequency) {
+                              case 'Hourly':
+                                return `Every ${frequencyConfig.hourlyInterval} hour${frequencyConfig.hourlyInterval > 1 ? 's' : ''}`;
+                              case 'Daily':
+                                return `Daily at ${frequencyConfig.dailyTime || 'specified time'}`;
+                              case 'Weekly':
+                                const days = frequencyConfig.weeklyDays?.length > 0 
+                                  ? frequencyConfig.weeklyDays.join(', ') 
+                                  : 'specified days';
+                                const time = frequencyConfig.weeklyTime || 'specified time';
+                                return `Weekly on ${days} at ${time}`;
+                              case 'Monthly':
+                                const day = frequencyConfig.monthlyDay || 'specified day';
+                                const monthTime = frequencyConfig.monthlyTime || 'specified time';
+                                return `Monthly on day ${day} at ${monthTime}`;
+                              case 'Quarterly':
+                                const months = frequencyConfig.quarterlyMonths?.length > 0 
+                                  ? frequencyConfig.quarterlyMonths.join(', ') 
+                                  : 'specified months';
+                                const quarterDay = frequencyConfig.quarterlyDay || 'specified day';
+                                const quarterTime = frequencyConfig.quarterlyTime || 'specified time';
+                                return `Quarterly on day ${quarterDay} of ${months} at ${quarterTime}`;
+                              case 'Yearly':
+                                const yearMonth = frequencyConfig.yearlyMonth || 'specified month';
+                                const yearDate = frequencyConfig.yearlyDate || 'specified date';
+                                const yearTime = frequencyConfig.yearlyTime || 'specified time';
+                                return `Yearly on ${yearDate} ${yearMonth} at ${yearTime}`;
+                              default:
+                                return 'Frequency configured';
+                            }
+                          })()}
+                        </div>
+                      )}
+                      
+                      {(!subActivity.frequency || !subActivity.frequencyConfig) && (
+                        <div className="text-sm text-gray-500 italic">
+                          No frequency configured
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center text-gray-500 py-8">
+                  No sub-activities found for this activity.
+                </div>
+              )}
+            </div>
+            
+            <div className="flex justify-end p-6 border-t bg-gray-50">
+              <button
+                onClick={() => setShowSubActivitiesModal(false)}
+                className="ti-btn ti-btn-secondary"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
