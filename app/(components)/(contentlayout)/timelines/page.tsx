@@ -12,6 +12,18 @@ interface Timeline {
   activity: {
     id: string;
     name: string;
+    subactivities?: Array<{ 
+      _id: string;
+      name: string;
+      frequency?: string;
+      frequencyConfig?: any;
+    }>;
+  };
+  subactivity: {
+    _id: string;
+    name: string;
+    frequency: string;
+    frequencyConfig?: any;
   };
   client: {
     id: string;
@@ -35,9 +47,17 @@ interface Timeline {
     yearlyTime: string;
   };
   turnover?: number;
-
   startDate?: string;
   endDate?: string;
+  dueDate?: string;
+  period?: string;
+  financialYear?: string;
+  fields?: Array<{
+    _id: string;
+    fileName: string;
+    fieldType: string;
+    fieldValue: any;
+  }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -51,20 +71,12 @@ interface ApiResponse {
 }
 
 interface ExcelRow {
-  ID?: string;
-  "Activity ID"?: string;
-  "Activity Name": string;
-  "Client ID"?: string;
-  "Client Name": string;
-  "Client Email": string;
+  "Timeline ID": string;
+  "Name of Clients": string;
+  "Subactivity": string;
   "Frequency": string;
-  "Turnover"?: string;
-
-  "Start Date"?: string;
-  "End Date"?: string;
-  "Status": string;
-  "Created At"?: string;
-  "Updated At"?: string;
+  "Period": string;
+  [key: string]: string; // For dynamic field columns
 }
 
 const TimelinesPage = () => {
@@ -87,6 +99,38 @@ const TimelinesPage = () => {
     clientName: "",
     status: ""
   });
+  
+  // Export modal state
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportFilters, setExportFilters] = useState({
+    activity: '',
+    subActivity: '',
+    frequency: '',
+    period: ''
+  });
+  const [activities, setActivities] = useState<Array<{
+    id: string;
+    name: string;
+    subactivities?: Array<{ 
+      _id: string;
+      name: string;
+      frequency?: string;
+      frequencyConfig?: any;
+    }>;
+  }>>([]);
+  const [availablePeriods, setAvailablePeriods] = useState<Array<{
+    period: string;
+    quarter?: string;
+    months: string[];
+    startDate: string;
+    endDate: string;
+    displayName: string;
+    financialYear: string;
+  }>>([]);
+  const [isLoadingPeriods, setIsLoadingPeriods] = useState(false);
+  
+  // Import state
+  const [isProcessingImport, setIsProcessingImport] = useState(false);
 
   // Debounced search function for activity name
   const debouncedSearch = useCallback(
@@ -180,6 +224,60 @@ const TimelinesPage = () => {
     fetchTimelines(currentPage, itemsPerPage);
   }, [currentPage, sortBy, filters, itemsPerPage]);
 
+  // Fetch activities for export modal
+  const fetchActivities = async () => {
+    try {
+      const response = await fetch(`${Base_url}activities?limit=1000`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch activities');
+      }
+
+      const data = await response.json();
+      setActivities(data.results);
+    } catch (err) {
+      console.error('Error fetching activities:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchActivities();
+  }, []);
+
+  // Fetch frequency periods when frequency changes
+  const fetchFrequencyPeriods = async (frequency: string) => {
+    if (!frequency) {
+      setAvailablePeriods([]);
+      return;
+    }
+
+    setIsLoadingPeriods(true);
+    try {
+      const response = await fetch(`${Base_url}timelines/frequency-periods?frequency=${frequency}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch frequency periods');
+      }
+
+      const data = await response.json();
+      setAvailablePeriods(data.periods || []);
+    } catch (err) {
+      console.error('Error fetching frequency periods:', err);
+      toast.error('Failed to fetch frequency periods');
+      setAvailablePeriods([]);
+    } finally {
+      setIsLoadingPeriods(false);
+    }
+  };
+
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
       setSelectedTimelines(timelines.map(timeline => timeline.id));
@@ -241,78 +339,96 @@ const TimelinesPage = () => {
     }
   };
 
-  const handleExport = async () => {
+  const handleExport = () => {
+    setShowExportModal(true);
+  };
+
+  const performExport = async () => {
     try {
       let exportData;
       let successMessage;
 
-      if (selectedTimelines.length > 0) {
-        exportData = timelines
-          .filter(timeline => selectedTimelines.includes(timeline.id))
-          .map((timeline: Timeline) => ({
-            ID: timeline.id,
-            "Activity ID": timeline.activity?.id || "",
-            "Activity Name": timeline.activity?.name || "",
-            "Client ID": timeline.client?.id || "",
-            "Client Name": timeline.client?.name || "",
-            "Client Email": timeline.client?.email || "",
-            "Frequency": timeline.frequency,
-            "Turnover": timeline.turnover?.toString() || "",
+      // Build query parameters based on export filters
+      const queryParams = new URLSearchParams({
+        limit: '1000',
+        ...(exportFilters.activity && { activity: exportFilters.activity }),
+        ...(exportFilters.subActivity && { subactivity: exportFilters.subActivity }),
+        ...(exportFilters.frequency && { frequency: exportFilters.frequency }),
+        ...(exportFilters.period && { period: exportFilters.period })
+      });
 
-            "Start Date": timeline.startDate || "",
-            "End Date": timeline.endDate || "",
-            "Status": timeline.status
-          }));
-        successMessage = "Selected timelines exported successfully";
-      } else {
-        const response = await fetch(`${Base_url}timelines?limit=1000`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
+      console.log('Export API call:', `${Base_url}timelines?${queryParams}`);
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch timelines for export');
+      const response = await fetch(`${Base_url}timelines?${queryParams}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
+      });
 
-        const apiData: ApiResponse = await response.json();
-        exportData = apiData.results.map((timeline: Timeline) => ({
-          ID: timeline.id,
-          "Activity ID": timeline.activity?.id || "",
-          "Activity Name": timeline.activity?.name || "",
-          "Client ID": timeline.client?.id || "",
-          "Client Name": timeline.client?.name || "",
-          "Client Email": timeline.client?.email || "",
-          "Frequency": timeline.frequency,
-          "Turnover": timeline.turnover?.toString() || "",
-
-          "Start Date": timeline.startDate || "",
-          "End Date": timeline.endDate || "",
-          "Status": timeline.status
-        }));
-        successMessage = "All timelines exported successfully";
+      if (!response.ok) {
+        throw new Error('Failed to fetch timelines for export');
       }
 
+      const apiData: ApiResponse = await response.json();
+      
+      // Get unique field names from all timelines for dynamic columns
+      const allFieldNames = new Set<string>();
+      apiData.results.forEach((timeline: Timeline) => {
+        timeline.fields?.forEach(field => {
+          allFieldNames.add(field.fileName);
+        });
+      });
+
+      console.log('Dynamic field names found:', Array.from(allFieldNames));
+      console.log('Sample timeline data:', apiData.results[0]);
+
+      exportData = apiData.results.map((timeline: Timeline) => {
+        const baseData = {
+          "Timeline ID": timeline.id,
+          "Name of Clients": timeline.client?.name || "",
+          "Subactivity": timeline.subactivity?.name || "",
+          "Frequency": timeline.subactivity?.frequency || timeline.frequency || "",
+          "Period": timeline.period || ""
+        };
+
+        // Add dynamic field columns
+        const fieldData: any = {};
+        allFieldNames.forEach(fieldName => {
+          const field = timeline.fields?.find(f => f.fileName === fieldName);
+          fieldData[fieldName] = field?.fieldValue || "";
+        });
+
+        return { ...baseData, ...fieldData };
+      });
+
+      console.log('Final export data structure:', exportData[0]);
+
       const ws = XLSX.utils.json_to_sheet(exportData);
-      ws["!cols"] = [
-        { wch: 20 }, // ID
-        { wch: 25 }, // Activity ID
-        { wch: 30 }, // Activity Name
-        { wch: 25 }, // Client ID
-        { wch: 30 }, // Client Name
-        { wch: 30 }, // Client Email
+      
+      // Calculate column widths dynamically
+      const columnWidths = [
+        { wch: 20 }, // Timeline ID
+        { wch: 30 }, // Name of Clients
+        { wch: 25 }, // Subactivity
         { wch: 20 }, // Frequency
-        { wch: 25 }, // Turnover
-        { wch: 20 }, // Start Date
-        { wch: 20 }, // End Date
-        { wch: 20 }, // Status
+        { wch: 20 }  // Period
       ];
+
+      // Add widths for dynamic field columns
+      allFieldNames.forEach(fieldName => {
+        columnWidths.push({ wch: Math.max(20, fieldName.length + 2) });
+      });
+
+      ws["!cols"] = columnWidths;
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Timelines");
       const fileName = `timelines_${new Date().toISOString().split("T")[0]}.xlsx`;
       XLSX.writeFile(wb, fileName);
-      toast.success(successMessage);
+      
+      toast.success("Timelines exported successfully");
+      setShowExportModal(false);
+      setExportFilters({ activity: '', subActivity: '', frequency: '', period: '' });
     } catch (error) {
       console.error("Error exporting timelines:", error);
       toast.error("Failed to export timelines");
@@ -322,6 +438,9 @@ const TimelinesPage = () => {
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    setIsProcessingImport(true);
+    setImportProgress(0);
 
     try {
       const reader = new FileReader();
@@ -337,31 +456,57 @@ const TimelinesPage = () => {
             return;
           }
 
-          // Transform data for bulk import
-          const timelines = jsonData.map(row => ({
-            id: row["ID"] || undefined, // Only include if exists
-            activity: row["Activity ID"],
-            client: row["Client ID"],
-            status: row["Status"] as 'pending' | 'completed' | 'ongoing' | 'delayed',
-            frequency: row["Frequency"] as 'Hourly' | 'Daily' | 'Weekly' | 'Monthly' | 'Quarterly' | 'Yearly',
-            turnover: row["Turnover"] ? parseFloat(row["Turnover"]) : undefined,
+          console.log('Imported Excel data:', jsonData);
+          console.log('Sample row structure:', jsonData[0]);
+          console.log('Sample row keys:', Object.keys(jsonData[0]));
 
-            startDate: row["Start Date"] || undefined,
-            endDate: row["End Date"] || undefined,
-          }));
+          // Transform data for bulk import fields API
+          const timelineUpdates = jsonData.map(row => {
+            const timelineId = row["Timeline ID"];
+            if (!timelineId) {
+              throw new Error('Timeline ID is required for all rows');
+            }
 
-          // Single API call instead of multiple requests
-          const response = await fetch(`${Base_url}timelines/bulk-import`, {
+            // Extract all field columns (excluding the fixed columns)
+            const fixedColumns = ["Timeline ID", "Name of Clients", "Subactivity", "Frequency", "Period"];
+            const fields: Array<{ fileName: string; fieldValue: string }> = [];
+            
+            Object.keys(row).forEach(key => {
+              if (!fixedColumns.includes(key) && row[key] !== null && row[key] !== undefined) {
+                // Convert value to string and check if it's not empty
+                const fieldValue = String(row[key]).trim();
+                if (fieldValue !== '') {
+                  fields.push({
+                    fileName: key,
+                    fieldValue: fieldValue
+                  });
+                }
+              }
+            });
+
+            console.log(`Processing row for Timeline ID: ${timelineId}`);
+            console.log(`Extracted fields:`, fields);
+            
+            return {
+              timelineId: timelineId,
+              fields: fields
+            };
+          });
+
+          console.log('Transformed data for API:', timelineUpdates);
+
+          // Call the bulk import fields API
+          const response = await fetch(`${Base_url}timelines/bulk-import-fields`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${localStorage.getItem('token')}`
             },
-            body: JSON.stringify({ timelines })
+            body: JSON.stringify({ timelineUpdates })
           });
 
           if (!response.ok) {
-            throw new Error('Bulk import failed');
+            throw new Error('Bulk import fields failed');
           }
 
           const result = await response.json();
@@ -370,13 +515,18 @@ const TimelinesPage = () => {
             toast.error(`Import completed with ${result.errors.length} errors`);
             console.log('Import errors:', result.errors);
           } else {
-            toast.success(`Import completed: ${result.created} added, ${result.updated} updated`);
+            toast.success(`Import completed successfully! ${timelineUpdates.length} timelines updated`);
           }
 
-          fetchTimelines(); // Refresh the list
+          // Refresh the timelines list
+          fetchTimelines();
+          
         } catch (err) {
           console.error('Error processing file:', err);
-          toast.error('Failed to process file');
+          toast.error(err instanceof Error ? err.message : 'Failed to process file');
+        } finally {
+          setIsProcessingImport(false);
+          setImportProgress(null);
         }
       };
 
@@ -384,6 +534,8 @@ const TimelinesPage = () => {
     } catch (err) {
       console.error('Error reading file:', err);
       toast.error('Failed to read file');
+      setIsProcessingImport(false);
+      setImportProgress(null);
     }
   };
 
@@ -439,13 +591,14 @@ const TimelinesPage = () => {
                       accept=".xlsx,.xls"
                       className="hidden"
                     />
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="ti-btn ti-btn-success"
-                    >
-                      <i className="ri-download-2-line me-2"></i>
-                      Import
-                    </button>
+                                    <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="ti-btn ti-btn-success"
+                  disabled={isProcessingImport}
+                >
+                  <i className={`${isProcessingImport ? 'ri-loader-4-line animate-spin' : 'ri-download-2-line'} me-2`}></i>
+                  {isProcessingImport ? 'Processing...' : 'Import'}
+                </button>
                     {importProgress !== null && (
                       <div className="w-40 h-3 bg-gray-200 rounded-full overflow-hidden flex items-center ml-2">
                         <div
@@ -908,6 +1061,176 @@ const TimelinesPage = () => {
         )}
         </div>
       </div>
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Export Timelines</h3>
+              <button
+                onClick={() => {
+                  setShowExportModal(false);
+                  setExportFilters({ activity: '', subActivity: '', frequency: '', period: '' });
+                  setAvailablePeriods([]);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <i className="ri-close-line text-xl"></i>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Activity Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Activity
+                </label>
+                <select
+                  className="form-select w-full"
+                  value={exportFilters.activity}
+                  onChange={(e) => {
+                    setExportFilters(prev => ({
+                      ...prev,
+                      activity: e.target.value,
+                      subActivity: '', // Reset sub-activity when activity changes
+                      frequency: '', // Reset frequency when activity changes
+                      period: '' // Reset period when activity changes
+                    }));
+                    setAvailablePeriods([]); // Clear periods when activity changes
+                  }}
+                >
+                  <option value="">All Activities</option>
+                  {activities.map((activity) => (
+                    <option key={activity.id} value={activity.id}>
+                      {activity.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Sub-Activity Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Sub-Activity
+                </label>
+                <select
+                  className="form-select w-full"
+                  value={exportFilters.subActivity}
+                  onChange={(e) => {
+                    const selectedSubActivityId = e.target.value;
+                    const selectedActivity = activities.find(a => a.id === exportFilters.activity);
+                    const selectedSubActivity = selectedActivity?.subactivities?.find(sa => sa._id === selectedSubActivityId);
+                    
+                    setExportFilters(prev => ({ 
+                      ...prev, 
+                      subActivity: selectedSubActivityId,
+                      frequency: selectedSubActivity?.frequency || ''
+                    }));
+                    
+                    // Fetch periods for the selected frequency
+                    if (selectedSubActivity?.frequency) {
+                      fetchFrequencyPeriods(selectedSubActivity.frequency);
+                    } else {
+                      setAvailablePeriods([]);
+                    }
+                  }}
+                  disabled={!exportFilters.activity}
+                >
+                  <option value="">All Sub-Activities</option>
+                  {exportFilters.activity && activities.find(a => a.id === exportFilters.activity)?.subactivities?.map((subActivity) => (
+                    <option key={subActivity._id} value={subActivity._id}>
+                      {subActivity.name} ({subActivity.frequency || 'No frequency'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Frequency Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Frequency
+                </label>
+                <select
+                  className="form-select w-full"
+                  value={exportFilters.frequency}
+                  onChange={(e) => {
+                    setExportFilters(prev => ({ ...prev, frequency: e.target.value }));
+                    fetchFrequencyPeriods(e.target.value);
+                  }}
+                  disabled={!!exportFilters.subActivity} // Disabled when sub-activity is selected
+                >
+                  <option value="">All Frequencies</option>
+                  <option value="Hourly">Hourly</option>
+                  <option value="Daily">Daily</option>
+                  <option value="Weekly">Weekly</option>
+                  <option value="Monthly">Monthly</option>
+                  <option value="Quarterly">Quarterly</option>
+                  <option value="Yearly">Yearly</option>
+                </select>
+                {exportFilters.subActivity && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Frequency auto-selected from sub-activity
+                  </p>
+                )}
+              </div>
+
+              {/* Period Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Period
+                </label>
+                <select
+                  className="form-select w-full"
+                  value={exportFilters.period}
+                  onChange={(e) => setExportFilters(prev => ({ ...prev, period: e.target.value }))}
+                  disabled={!exportFilters.frequency}
+                >
+                  <option value="">All Periods</option>
+                  {isLoadingPeriods ? (
+                    <option value="" disabled>Loading periods...</option>
+                  ) : availablePeriods.length > 0 ? (
+                    availablePeriods.map((period) => (
+                      <option key={period.period} value={period.period}>
+                        {period.displayName}
+                      </option>
+                    ))
+                  ) : exportFilters.frequency ? (
+                    <option value="" disabled>No periods available for this frequency</option>
+                  ) : (
+                    <option value="" disabled>Select frequency first</option>
+                  )}
+                </select>
+                {exportFilters.frequency && !isLoadingPeriods && availablePeriods.length === 0 && (
+                  <p className="text-xs text-red-500 mt-1">
+                    No periods found for {exportFilters.frequency} frequency
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowExportModal(false);
+                  setExportFilters({ activity: '', subActivity: '', frequency: '', period: '' });
+                  setAvailablePeriods([]);
+                }}
+                className="ti-btn ti-btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={performExport}
+                className="ti-btn ti-btn-primary"
+              >
+                <i className="ri-download-2-line me-2"></i>
+                Export
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
