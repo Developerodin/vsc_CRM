@@ -8,51 +8,62 @@ import { Base_url } from '@/app/api/config/BaseUrl';
 import TaskManagement from './components/TaskManagement';
 
 interface Timeline {
+  _id: string;
   id: string;
   activity: {
+    _id: string;
     id: string;
     name: string;
-    subactivities?: Array<{ 
+    sortOrder: number;
+    subactivities: Array<{
       _id: string;
       name: string;
-      frequency?: string;
-      frequencyConfig?: any;
+      frequency: string;
+      frequencyConfig: any;
+      fields: Array<{
+        _id: string;
+        name: string;
+        type: string;
+        required: boolean;
+        options: string[];
+      }>;
+      createdAt: string;
+      updatedAt: string;
     }>;
   };
   subactivity: {
     _id: string;
     name: string;
     frequency: string;
-    frequencyConfig?: any;
+    frequencyConfig: any;
+    fields: Array<{
+      _id: string;
+      name: string;
+      type: string;
+      required: boolean;
+      options: string[];
+    }>;
+    createdAt: string;
+    updatedAt: string;
   };
   client: {
+    _id: string;
     id: string;
     name: string;
+    phone: string;
     email: string;
   };
   status: 'pending' | 'completed' | 'ongoing' | 'delayed';
   frequency: 'Hourly' | 'Daily' | 'Weekly' | 'Monthly' | 'Quarterly' | 'Yearly';
-  frequencyConfig: {
-    hourlyInterval: number;
-    dailyTime: string;
-    weeklyDays: string[];
-    weeklyTime: string;
-    monthlyDay: number;
-    monthlyTime: string;
-    quarterlyMonths: string[];
-    quarterlyDay: number;
-    quarterlyTime: string;
-    yearlyMonth: string[];
-    yearlyDate: number;
-    yearlyTime: string;
-  };
-  turnover?: number;
-  startDate?: string;
-  endDate?: string;
-  dueDate?: string;
-  period?: string;
-  financialYear?: string;
-  fields?: Array<{
+  timelineType: string;
+  period: string;
+  financialYear: string;
+  dueDate: string;
+  startDate: string;
+  endDate: string;
+  frequencyConfig: any;
+  branch: string;
+  fields: Array<{
     _id: string;
     fileName: string;
     fieldType: string;
@@ -222,7 +233,7 @@ const TimelinesPage = () => {
 
   useEffect(() => {
     fetchTimelines(currentPage, itemsPerPage);
-  }, [currentPage, sortBy, filters, itemsPerPage]);
+  }, [currentPage, sortBy, filters]);
 
   // Fetch activities for export modal
   const fetchActivities = async () => {
@@ -748,8 +759,11 @@ const TimelinesPage = () => {
                     className="form-select w-auto text-sm"
                     value={itemsPerPage}
                     onChange={(e) => {
-                      setItemsPerPage(Number(e.target.value));
+                      const newItemsPerPage = Number(e.target.value);
+                      setItemsPerPage(newItemsPerPage);
                       setCurrentPage(1);
+                      // Fetch data with new itemsPerPage
+                      fetchTimelines(1, newItemsPerPage);
                     }}
                   >
                     <option value={10}>10</option>
@@ -782,6 +796,21 @@ const TimelinesPage = () => {
                       value={clientSearchInputValue}
                       onChange={handleClientSearchChange}
                     />
+                  </div>
+
+                  {/* Status filter */}
+                  <div className="relative flex-grow sm:max-w-xs">
+                    <select
+                      className="form-select py-2 w-full"
+                      value={filters.status}
+                      onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                    >
+                      <option value="">All Status</option>
+                      <option value="pending">Pending</option>
+                      <option value="ongoing">Ongoing</option>
+                      <option value="completed">Completed</option>
+                      <option value="delayed">Delayed</option>
+                    </select>
                   </div>
 
                   {/* Sort dropdown */}
@@ -877,17 +906,17 @@ const TimelinesPage = () => {
                         />
                       </th>
                       <th className="px-4 py-3">Activity</th>
+                      <th className="px-4 py-3">Sub Activity</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Period</th>
                       <th className="px-4 py-3">Client Name</th>
-                      <th className="px-4 py-3">Client Email</th>
-                      <th className="px-4 py-3">Frequency</th>
-                      {/* Status column hidden */}
                       <th className="px-4 py-3">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {isLoading ? (
                       <tr>
-                        <td colSpan={6} className="text-center py-4">
+                        <td colSpan={7} className="text-center py-4">
                           <div className="flex justify-center">
                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                           </div>
@@ -895,13 +924,13 @@ const TimelinesPage = () => {
                       </tr>
                     ) : error ? (
                       <tr>
-                        <td colSpan={6} className="text-center text-red-500 py-4">
+                        <td colSpan={7} className="text-center text-red-500 py-4">
                           {error}
                         </td>
                       </tr>
                     ) : timelines.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="text-center py-8">
+                        <td colSpan={7} className="text-center py-8">
                           <div className="flex flex-col items-center justify-center">
                             <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
                               <i className="ri-time-line text-4xl text-primary"></i>
@@ -955,10 +984,20 @@ const TimelinesPage = () => {
                             />
                           </td>
                           <td>{timeline.activity?.name || "-"}</td>
+                          <td>{timeline.subactivity?.name || "-"}</td>
+                          <td>
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                              timeline.status === 'completed' ? 'bg-green-100 text-green-800' :
+                              timeline.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              timeline.status === 'ongoing' ? 'bg-blue-100 text-blue-800' :
+                              timeline.status === 'delayed' ? 'bg-red-100 text-red-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {timeline.status?.charAt(0).toUpperCase() + timeline.status?.slice(1) || "-"}
+                            </span>
+                          </td>
+                          <td>{timeline.period || "-"}</td>
                           <td>{timeline.client?.name || "-"}</td>
-                          <td>{timeline.client?.email || "-"}</td>
-                          <td>{timeline.frequency}</td>
-                          {/* Status column data hidden */}
                           <td>
                             <div className="flex space-x-2">
                               <Link
