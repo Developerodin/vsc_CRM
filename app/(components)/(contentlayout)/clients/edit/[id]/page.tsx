@@ -74,7 +74,7 @@ interface Group {
   id: string;
   name: string;
   numberOfClients: number;
-  clients: string[];
+  clients: string[] | Array<{ _id: string; [key: string]: any }>;
   branch: string;
   sortOrder: number;
   createdAt: string;
@@ -1235,17 +1235,81 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     }
     
     if (activeTab === 'group') {
-      // Group assignment is optional, so we can proceed
-      setActiveTab('documents');
+      // Update client with selected groups and update groups with this client
+      try {
+        setIsSubmitting(true);
+        
+        // First, update the client with selected groups
+        const clientResponse = await fetch(`${Base_url}clients/${params.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({ groups: selectedGroups.map(group => group.id) })
+        });
+        
+        if (!clientResponse.ok) {
+          const errorData = await clientResponse.json();
+          throw new Error(errorData.message || 'Failed to assign groups to client');
+        }
+
+        // Then, add this client to each selected group using the dedicated endpoint
+        const groupUpdatePromises = selectedGroups.map(async (group) => {
+          try {
+            // Use the dedicated endpoint to add client to group
+            const groupResponse = await fetch(`${Base_url}groups/${group.id}/clients`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              },
+              body: JSON.stringify({
+                clientId: params.id
+              })
+            });
+            
+            if (!groupResponse.ok) {
+              const errorData = await groupResponse.json();
+              console.warn(`Failed to add client to group ${group.name}:`, errorData.message);
+              return false;
+            }
+            
+            return true;
+          } catch (error) {
+            console.error(`Error adding client to group ${group.name}:`, error);
+            return false;
+          }
+        });
+
+        // Wait for all group updates to complete
+        const groupUpdateResults = await Promise.all(groupUpdatePromises);
+        const successfulUpdates = groupUpdateResults.filter(result => result).length;
+        
+        if (successfulUpdates === selectedGroups.length) {
+          toast.success(`Client successfully added to ${selectedGroups.length} group(s)`);
+        } else if (successfulUpdates > 0) {
+          toast.success(`Client added to ${successfulUpdates} out of ${selectedGroups.length} groups`);
+        } else {
+          toast('Client groups updated but group updates failed', { icon: '⚠️' });
+        }
+        
+        setActiveTab('documents');
+      } catch (err) {
+        console.error('Error assigning groups:', err);
+        toast.error(err instanceof Error ? err.message : 'Failed to assign groups');
+      } finally {
+        setIsSubmitting(false);
+      }
       return;
     }
     
     if (activeTab === 'documents') {
       // Final submission with all data
-    if (!validateForm()) return;
+      if (!validateForm()) return;
 
-    try {
-      setIsSubmitting(true);
+      try {
+        setIsSubmitting(true);
 
         const clientData = {
           ...formData,
@@ -1254,21 +1318,21 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
           groups: selectedGroups.map(group => group.id) // Include selected groups
         };
 
-      const response = await fetch(`${Base_url}clients/${params.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
+        const response = await fetch(`${Base_url}clients/${params.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
           body: JSON.stringify(clientData)
-      });
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update client');
-      }
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to update client');
+        }
 
-      toast.success('Client updated successfully');
+        toast.success('Client updated successfully');
         
         // Load client documents
         fetchClientDocuments(params.id);
@@ -1279,11 +1343,11 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
           router.push('/clients');
         }, 1000);
         
-    } catch (err) {
-      console.error('Error updating client:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to update client');
-    } finally {
-      setIsSubmitting(false);
+      } catch (err) {
+        console.error('Error updating client:', err);
+        toast.error(err instanceof Error ? err.message : 'Failed to update client');
+      } finally {
+        setIsSubmitting(false);
       }
       return;
     }

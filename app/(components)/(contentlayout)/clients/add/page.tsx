@@ -71,7 +71,7 @@ interface Group {
   id: string;
   name: string;
   numberOfClients: number;
-  clients: string[];
+  clients: string[] | Array<{ _id: string; [key: string]: any }>;
   branch: string;
   sortOrder: number;
   createdAt: string;
@@ -453,7 +453,9 @@ const AddClientPage = () => {
       }
       try {
         setIsLoading(true);
-        const response = await fetch(`${Base_url}clients/${savedClientId}`, {
+        
+        // First, update the client with selected groups
+        const clientResponse = await fetch(`${Base_url}clients/${savedClientId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -461,11 +463,52 @@ const AddClientPage = () => {
           },
           body: JSON.stringify({ groups: selectedGroups.map(g => g.id) })
         });
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to assign groups');
+        
+        if (!clientResponse.ok) {
+          const errorData = await clientResponse.json();
+          throw new Error(errorData.message || 'Failed to assign groups to client');
         }
-        toast.success('Groups assigned successfully');
+
+        // Then, add this client to each selected group using the dedicated endpoint
+        const groupUpdatePromises = selectedGroups.map(async (group) => {
+          try {
+            // Use the dedicated endpoint to add client to group
+            const groupResponse = await fetch(`${Base_url}groups/${group.id}/clients`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              },
+              body: JSON.stringify({
+                clientId: savedClientId
+              })
+            });
+            
+            if (!groupResponse.ok) {
+              const errorData = await groupResponse.json();
+              console.warn(`Failed to add client to group ${group.name}:`, errorData.message);
+              return false;
+            }
+            
+            return true;
+          } catch (error) {
+            console.error(`Error adding client to group ${group.name}:`, error);
+            return false;
+          }
+        });
+
+        // Wait for all group updates to complete
+        const groupUpdateResults = await Promise.all(groupUpdatePromises);
+        const successfulUpdates = groupUpdateResults.filter(result => result).length;
+        
+        if (successfulUpdates === selectedGroups.length) {
+          toast.success(`Client successfully added to ${selectedGroups.length} group(s)`);
+        } else if (successfulUpdates > 0) {
+          toast.success(`Client added to ${successfulUpdates} out of ${selectedGroups.length} groups`);
+        } else {
+          toast('Client groups updated but group updates failed', { icon: '⚠️' });
+        }
+        
         setActiveTab('documents');
       } catch (err) {
         console.error('Error assigning groups:', err);
