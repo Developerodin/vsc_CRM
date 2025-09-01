@@ -24,7 +24,7 @@ interface Client {
   branch: string;
   sortOrder: number;
   businessType: string;
-  gstNumber: string;
+  gstNumbers?: GstNumber[];
   tanNumber: string;
   cinNumber: string;
   udyamNumber: string;
@@ -33,6 +33,21 @@ interface Client {
   activities?: ActivityMapping[];
   createdAt: string;
   updatedAt: string;
+}
+
+interface GstNumber {
+  state: string;
+  gstNumber: string;
+  dateOfRegistration: string;
+  gstUserId: string;
+}
+
+interface ActivityMapping {
+  activity: string;
+  subactivity: string;
+  assignedTeamMember: string;
+  assignedDate?: string;
+  notes: string;
 }
 
 interface ActivityMapping {
@@ -81,13 +96,50 @@ interface ExcelRow {
   "Sort Order"?: string | number;
   "Business Type"?: string;
   "Entity Type"?: string;
-  "GST Number"?: string;
   "TAN Number"?: string;
   "CIN Number"?: string;
   "Udyam Number"?: string;
   "IEC Code"?: string;
-  "Activity Name"?: string;
-  "Activity Notes"?: string;
+  
+  // Multiple GST Numbers (up to 5)
+  "GST State 1"?: string;
+  "GST Number 1"?: string;
+  "GST Date of Registration 1"?: string;
+  "GST User ID 1"?: string;
+  "GST State 2"?: string;
+  "GST Number 2"?: string;
+  "GST Date of Registration 2"?: string;
+  "GST User ID 2"?: string;
+  "GST State 3"?: string;
+  "GST Number 3"?: string;
+  "GST Date of Registration 3"?: string;
+  "GST User ID 3"?: string;
+  "GST State 4"?: string;
+  "GST Number 4"?: string;
+  "GST Date of Registration 4"?: string;
+  "GST User ID 4"?: string;
+  "GST State 5"?: string;
+  "GST Number 5"?: string;
+  "GST Date of Registration 5"?: string;
+  "GST User ID 5"?: string;
+  
+  // Multiple Activities (up to 5)
+  "Activity 1"?: string;
+  "Subactivity 1"?: string;
+  "Activity Notes 1"?: string;
+  "Activity 2"?: string;
+  "Subactivity 2"?: string;
+  "Activity Notes 2"?: string;
+  "Activity 3"?: string;
+  "Subactivity 3"?: string;
+  "Activity Notes 3"?: string;
+  "Activity 4"?: string;
+  "Subactivity 4"?: string;
+  "Activity Notes 4"?: string;
+  "Activity 5"?: string;
+  "Subactivity 5"?: string;
+  "Activity Notes 5"?: string;
+  
   "Created At"?: string;
 }
 
@@ -491,7 +543,123 @@ const ClientsPage = () => {
         // Export selected clients
         exportData = clients
           .filter((client) => selectedClients.includes(client.id))
-          .map((client) => ({
+          .map((client) => {
+            // Helper function to get GST data for export
+            const getGstExportData = (gstNumbers: any[]) => {
+              const gstData: any = {};
+              for (let i = 0; i < 5; i++) {
+                const gst = gstNumbers[i];
+                if (gst) {
+                  gstData[`GST State ${i + 1}`] = gst.state || "";
+                  gstData[`GST Number ${i + 1}`] = gst.gstNumber || "";
+                  gstData[`GST Date of Registration ${i + 1}`] = gst.dateOfRegistration || "";
+                  gstData[`GST User ID ${i + 1}`] = gst.gstUserId || "";
+                } else {
+                  gstData[`GST State ${i + 1}`] = "";
+                  gstData[`GST Number ${i + 1}`] = "";
+                  gstData[`GST Date of Registration ${i + 1}`] = "";
+                  gstData[`GST User ID ${i + 1}`] = "";
+                }
+              }
+              return gstData;
+            };
+
+            // Helper function to get activity data for export
+            const getActivityExportData = (activities: any[]) => {
+              const activityData: any = {};
+              for (let i = 0; i < 5; i++) {
+                const activity = activities[i];
+                if (activity) {
+                  activityData[`Activity ${i + 1}`] = activity.activity || "";
+                  activityData[`Subactivity ${i + 1}`] = activity.subactivity || "";
+                  activityData[`Activity Notes ${i + 1}`] = activity.notes || "";
+                } else {
+                  activityData[`Activity ${i + 1}`] = "";
+                  activityData[`Subactivity ${i + 1}`] = "";
+                  activityData[`Activity Notes ${i + 1}`] = "";
+                }
+              }
+              return activityData;
+            };
+
+            return {
+              ID: client.id,
+              "Client Name": client.name,
+              "Client Phone": client.phone,
+              "Client Email": client.email,
+              "Client Email 2": client.email2,
+              "Client Address": client.address,
+              "Client District": client.district,
+              "Client State": client.state,
+              "Client Country": client.country,
+              "Branch": client.branch,
+              "Status": client.status,
+
+              "PAN": client.pan,
+              "Date of Birth": client.dob,
+              "Sort Order": client.sortOrder,
+              "Business Type": client.businessType,
+              "Entity Type": client.entityType,
+              "TAN Number": client.tanNumber,
+              "CIN Number": client.cinNumber,
+              "Udyam Number": client.udyamNumber,
+              "IEC Code": client.iecCode,
+              
+              // Multiple GST Numbers
+              ...getGstExportData(client.gstNumbers || []),
+              
+              // Multiple Activities
+              ...getActivityExportData(client.activities || []),
+            };
+          });
+      } else {
+        // Export all clients
+        const response = await fetch(`${Base_url}clients?limit=1000`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        const data = await response.json();
+        exportData = data.results.map((client: Client) => {
+          // Helper function to get GST data for export
+          const getGstExportData = (gstNumbers: any[]) => {
+            const gstData: any = {};
+            for (let i = 0; i < 5; i++) {
+              const gst = gstNumbers[i];
+              if (gst) {
+                gstData[`GST State ${i + 1}`] = gst.state || "";
+                gstData[`GST Number ${i + 1}`] = gst.gstNumber || "";
+                gstData[`GST Date of Registration ${i + 1}`] = gst.dateOfRegistration || "";
+                gstData[`GST User ID ${i + 1}`] = gst.gstUserId || "";
+              } else {
+                gstData[`GST State ${i + 1}`] = "";
+                gstData[`GST Number ${i + 1}`] = "";
+                gstData[`GST Date of Registration ${i + 1}`] = "";
+                gstData[`GST User ID ${i + 1}`] = "";
+              }
+            }
+            return gstData;
+          };
+
+          // Helper function to get activity data for export
+          const getActivityExportData = (activities: any[]) => {
+            const activityData: any = {};
+            for (let i = 0; i < 5; i++) {
+              const activity = activities[i];
+              if (activity) {
+                activityData[`Activity ${i + 1}`] = activity.activity || "";
+                activityData[`Subactivity ${i + 1}`] = activity.subactivity || "";
+                activityData[`Activity Notes ${i + 1}`] = activity.notes || "";
+              } else {
+                activityData[`Activity ${i + 1}`] = "";
+                activityData[`Subactivity ${i + 1}`] = "";
+                activityData[`Activity Notes ${i + 1}`] = "";
+              }
+            }
+            return activityData;
+          };
+
+          return {
             ID: client.id,
             "Client Name": client.name,
             "Client Phone": client.phone,
@@ -503,54 +671,24 @@ const ClientsPage = () => {
             "Client Country": client.country,
             "Branch": client.branch,
             "Status": client.status,
-
+            
             "PAN": client.pan,
             "Date of Birth": client.dob,
             "Sort Order": client.sortOrder,
             "Business Type": client.businessType,
             "Entity Type": client.entityType,
-            "GST Number": client.gstNumber,
             "TAN Number": client.tanNumber,
             "CIN Number": client.cinNumber,
             "Udyam Number": client.udyamNumber,
             "IEC Code": client.iecCode,
-            "Activity Name": client.activities && client.activities.length > 0 ? client.activities[0].activity : "",
-            "Activity Notes": client.activities && client.activities.length > 0 ? client.activities[0].notes : "",
-          }));
-      } else {
-        // Export all clients
-        const response = await fetch(`${Base_url}clients?limit=1000`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
+            
+            // Multiple GST Numbers
+            ...getGstExportData(client.gstNumbers || []),
+            
+            // Multiple Activities
+            ...getActivityExportData(client.activities || []),
+          };
         });
-        const data = await response.json();
-        exportData = data.results.map((client: Client) => ({
-          ID: client.id,
-          "Client Name": client.name,
-          "Client Phone": client.phone,
-          "Client Email": client.email,
-          "Client Email 2": client.email2,
-          "Client Address": client.address,
-          "Client District": client.district,
-          "Client State": client.state,
-          "Client Country": client.country,
-          "Branch": client.branch,
-          "Status": client.status,
-          
-          "PAN": client.pan,
-          "Date of Birth": client.dob,
-          "Sort Order": client.sortOrder,
-          "Business Type": client.businessType,
-          "Entity Type": client.entityType,
-          "GST Number": client.gstNumber,
-          "TAN Number": client.tanNumber,
-          "CIN Number": client.cinNumber,
-          "Udyam Number": client.udyamNumber,
-          "IEC Code": client.iecCode,
-          "Activity Name": client.activities && client.activities.length > 0 ? client.activities[0].activity : "",
-          "Activity Notes": client.activities && client.activities.length > 0 ? client.activities[0].notes : "",
-        }));
       }
 
       const ws = XLSX.utils.json_to_sheet(exportData);
@@ -572,20 +710,56 @@ const ClientsPage = () => {
         { wch: 10 }, // Sort Order
         { wch: 25 }, // Business Type
         { wch: 20 }, // Entity Type
-        { wch: 20 }, // GST Number
         { wch: 20 }, // TAN Number
         { wch: 20 }, // CIN Number
         { wch: 20 }, // Udyam Number
         { wch: 20 }, // IEC Code
-        { wch: 25 }, // Activity Name
-        { wch: 30 }, // Activity Notes
+        
+        // GST Numbers (5 sets)
+        { wch: 20 }, // GST State 1
+        { wch: 20 }, // GST Number 1
+        { wch: 20 }, // GST Date of Registration 1
+        { wch: 20 }, // GST User ID 1
+        { wch: 20 }, // GST State 2
+        { wch: 20 }, // GST Number 2
+        { wch: 20 }, // GST Date of Registration 2
+        { wch: 20 }, // GST User ID 2
+        { wch: 20 }, // GST State 3
+        { wch: 20 }, // GST Number 3
+        { wch: 20 }, // GST Date of Registration 3
+        { wch: 20 }, // GST User ID 3
+        { wch: 20 }, // GST State 4
+        { wch: 20 }, // GST Number 4
+        { wch: 20 }, // GST Date of Registration 4
+        { wch: 20 }, // GST User ID 4
+        { wch: 20 }, // GST State 5
+        { wch: 20 }, // GST Number 5
+        { wch: 20 }, // GST Date of Registration 5
+        { wch: 20 }, // GST User ID 5
+        
+        // Activities (5 sets)
+        { wch: 25 }, // Activity 1
+        { wch: 25 }, // Subactivity 1
+        { wch: 30 }, // Activity Notes 1
+        { wch: 25 }, // Activity 2
+        { wch: 25 }, // Subactivity 2
+        { wch: 30 }, // Activity Notes 2
+        { wch: 25 }, // Activity 3
+        { wch: 25 }, // Subactivity 3
+        { wch: 30 }, // Activity Notes 3
+        { wch: 25 }, // Activity 4
+        { wch: 25 }, // Subactivity 4
+        { wch: 30 }, // Activity Notes 4
+        { wch: 25 }, // Activity 5
+        { wch: 25 }, // Subactivity 5
+        { wch: 30 }, // Activity Notes 5
       ];
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Clients");
       const fileName = `clients_${new Date().toISOString().split("T")[0]}.xlsx`;
       XLSX.writeFile(wb, fileName);
-      toast.success(selectedClients.length > 0 ? "Selected clients exported successfully with activity fields" : "All clients exported successfully with activity fields");
+      toast.success(selectedClients.length > 0 ? "Selected clients exported successfully with multiple GST numbers and activities" : "All clients exported successfully with multiple GST numbers and activities");
     } catch (error) {
       console.error("Error exporting clients:", error);
       toast.error("Failed to export clients");
@@ -603,10 +777,15 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
   // Excel structure:
   // - First row should contain headers exactly as defined in ExcelRow interface
   // - ID column: Leave empty for new clients, include ID for updates
-  // - Activity fields: 
-  //   * "Activity Name" should contain the Activity ID (MongoDB ObjectId)
-  //   * "Team Member Name" should contain the Team Member ID (MongoDB ObjectId)
-  //   * "Activity Notes" should contain the activity notes text
+  // - GST Number fields (up to 5 sets):
+  //   * "GST State 1" to "GST State 5": State names
+  //   * "GST Number 1" to "GST Number 5": GST numbers
+  //   * "GST Date of Registration 1" to "GST Date of Registration 5": Dates
+  //   * "GST User ID 1" to "GST User ID 5": User IDs
+  // - Activity fields (up to 5 sets):
+  //   * "Activity 1" to "Activity 5": Activity IDs (MongoDB ObjectId)
+  //   * "Subactivity 1" to "Subactivity 5": Subactivity IDs (MongoDB ObjectId)
+  //   * "Activity Notes 1" to "Activity Notes 5": Activity notes text
   // - All other fields: Standard client information
 
   try {
@@ -684,6 +863,48 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
               return '';
             };
 
+            // Helper function to extract GST numbers from Excel
+            const extractGstNumbers = (row: ExcelRow) => {
+              const gstNumbers = [];
+              for (let i = 1; i <= 5; i++) {
+                const state = row[`GST State ${i}` as keyof ExcelRow]?.toString().trim();
+                const gstNumber = row[`GST Number ${i}` as keyof ExcelRow]?.toString().trim();
+                const dateOfRegistration = row[`GST Date of Registration ${i}` as keyof ExcelRow]?.toString().trim();
+                const gstUserId = row[`GST User ID ${i}` as keyof ExcelRow]?.toString().trim();
+                
+                // Only add if at least state and gstNumber are provided
+                if (state && gstNumber) {
+                  gstNumbers.push({
+                    state,
+                    gstNumber,
+                    dateOfRegistration: dateOfRegistration || "",
+                    gstUserId: gstUserId || ""
+                  });
+                }
+              }
+              return gstNumbers;
+            };
+
+            // Helper function to extract activities from Excel
+            const extractActivities = (row: ExcelRow) => {
+              const activities = [];
+              for (let i = 1; i <= 5; i++) {
+                const activity = row[`Activity ${i}` as keyof ExcelRow]?.toString().trim();
+                const subactivity = row[`Subactivity ${i}` as keyof ExcelRow]?.toString().trim();
+                const notes = row[`Activity Notes ${i}` as keyof ExcelRow]?.toString().trim();
+                
+                // Only add if at least activity is provided
+                if (activity) {
+                  activities.push({
+                    activity,
+                    subactivity: subactivity || "",
+                    notes: notes || ""
+                  });
+                }
+              }
+              return activities;
+            };
+
             const clientData = {
               name: (row["Client Name"]?.toString() || "").trim(),
               phone: String(row["Client Phone"] || "").replace(/[^0-9+]/g, ''),
@@ -700,24 +921,23 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
               sortOrder: parseInt(row["Sort Order"]?.toString() || "1"),
               businessType: row["Business Type"]?.toString().trim() || "",
               entityType: row["Entity Type"]?.toString().trim() || "",
-              gstNumber: row["GST Number"]?.toString().trim() || "",
               tanNumber: row["TAN Number"]?.toString().trim() || "",
               cinNumber: row["CIN Number"]?.toString().trim() || "",
               udyamNumber: row["Udyam Number"]?.toString().trim() || "",
               iecCode: row["IEC Code"]?.toString().trim() || ""
             };
 
-            // Handle activity mapping if provided
-            const activityMapping = {
-              activity: row["Activity Name"]?.toString().trim() || "",
-              notes: row["Activity Notes"]?.toString().trim() || ""
-            };
+            // Extract GST numbers and activities
+            const gstNumbers = extractGstNumbers(row);
+            const activities = extractActivities(row);
 
-            // Validate MongoDB ObjectId format for activity ID
+            // Validate MongoDB ObjectId format for activity IDs
             const isValidObjectId = (id: string) => /^[0-9a-fA-F]{24}$/.test(id);
             
-            const hasValidActivityId = activityMapping.activity && 
-                                      isValidObjectId(activityMapping.activity);
+            // Filter activities with valid IDs
+            const validActivities = activities.filter(act => 
+              act.activity && isValidObjectId(act.activity)
+            );
 
             let clientId = row["ID"];
             if (!clientId) {
@@ -730,20 +950,20 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
               if (found) clientId = found.id;
             }
 
-            // Debug logging for activity mapping
-            console.log('Row activity data:', {
-              activityId: activityMapping.activity,
-              notes: activityMapping.notes,
-              hasActivity: !!activityMapping.activity,
-              isValidActivityId: isValidObjectId(activityMapping.activity),
-              hasValidActivityId,
-              willIncludeActivities: hasValidActivityId
+            // Debug logging for activities and GST numbers
+            console.log('Row data:', {
+              gstNumbersCount: gstNumbers.length,
+              activitiesCount: activities.length,
+              validActivitiesCount: validActivities.length,
+              willIncludeGstNumbers: gstNumbers.length > 0,
+              willIncludeActivities: validActivities.length > 0
             });
 
             return {
               ...(clientId && { id: clientId }),
               ...clientData,
-              activities: hasValidActivityId ? [activityMapping] : []
+              gstNumbers,
+              activities: validActivities
             };
           } catch (error) {
             console.error(`Error processing row ${index + 1}:`, error);
@@ -781,7 +1001,11 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
           console.log('Import errors:', result.errors);
         } else {
           const activityCount = result.activitiesCreated || 0;
-          toast.success(`Import completed: ${result.created} clients added, ${result.updated} clients updated${activityCount > 0 ? `, ${activityCount} activities mapped` : ''}`);
+          const gstCount = result.gstNumbersCreated || 0;
+          let message = `Import completed: ${result.created} clients added, ${result.updated} clients updated`;
+          if (activityCount > 0) message += `, ${activityCount} activities mapped`;
+          if (gstCount > 0) message += `, ${gstCount} GST numbers added`;
+          toast.success(message);
         }
 
         // Refresh the clients list

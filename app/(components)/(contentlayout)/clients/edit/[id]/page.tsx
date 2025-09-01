@@ -40,6 +40,8 @@ interface GstNumber {
   _id?: string;
   state: string;
   gstNumber: string;
+  dateOfRegistration: string;
+  gstUserId: string;
 }
 
 interface Activity {
@@ -184,7 +186,9 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
   const [gstNumbers, setGstNumbers] = useState<GstNumber[]>([
     {
       state: '',
-      gstNumber: ''
+      gstNumber: '',
+      dateOfRegistration: '',
+      gstUserId: ''
     }
   ]);
 
@@ -999,7 +1003,12 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
         
         // Set GST numbers if they exist
         if (data.gstNumbers && data.gstNumbers.length > 0) {
-          setGstNumbers(data.gstNumbers);
+          // Convert ISO date strings to YYYY-MM-DD format for date inputs
+          const formattedGstNumbers = data.gstNumbers.map(gst => ({
+            ...gst,
+            dateOfRegistration: gst.dateOfRegistration ? new Date(gst.dateOfRegistration).toISOString().split('T')[0] : ''
+          }));
+          setGstNumbers(formattedGstNumbers);
         }
         
         // Set selected groups if they exist
@@ -1193,6 +1202,17 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
       return false;
     }
 
+    // GST Numbers validation - ensure all fields are filled if any GST number is provided
+    for (let i = 0; i < gstNumbers.length; i++) {
+      const gst = gstNumbers[i];
+      if (gst.state || gst.gstNumber || gst.dateOfRegistration || gst.gstUserId) {
+        if (!gst.state || !gst.gstNumber || !gst.dateOfRegistration || !gst.gstUserId) {
+          toast.error(`Please fill all fields for GST Number ${i + 1} (State, GST Number, Date of Registration, and GST User ID)`);
+          return false;
+        }
+      }
+    }
+
     // Branch validation
     if (!formData.branch) {
       toast.error('Please select a branch');
@@ -1313,7 +1333,7 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
 
         const clientData = {
           ...formData,
-          gstNumbers: gstNumbers.filter(gst => gst.state && gst.gstNumber),
+          gstNumbers: gstNumbers.filter(gst => gst.state && gst.gstNumber && gst.dateOfRegistration && gst.gstUserId),
           activities: activityMappings.filter(mapping => mapping.activity && mapping.subactivity),
           groups: selectedGroups.map(group => group.id) // Include selected groups
         };
@@ -1358,7 +1378,9 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
       ...gstNumbers,
       {
         state: '',
-        gstNumber: ''
+        gstNumber: '',
+        dateOfRegistration: '',
+        gstUserId: ''
       }
     ]);
   };
@@ -1725,8 +1747,8 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                       <label className="form-label">GST Numbers</label>
                       <div className="space-y-3">
                         {gstNumbers.map((gst, index) => (
-                          <div key={index} className="flex items-center space-x-3">
-                            <div className="flex-1">
+                          <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                            <div>
                               <button
                                 type="button"
                                 className={`w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary hover:bg-gray-50 ${
@@ -1740,24 +1762,45 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                                 <i className="ri-arrow-down-s-line text-gray-400"></i>
                               </button>
                             </div>
-                            <div className="flex-1">
-                      <input
-                        type="text"
-                        className="form-control"
-                        placeholder="Enter GST Number"
+                            <div>
+                              <input
+                                type="text"
+                                className="form-control"
+                                placeholder="Enter GST Number (e.g., 27ABCDE1234F1Z5)"
                                 value={gst.gstNumber}
                                 onChange={(e) => handleGstNumberChange(index, 'gstNumber', e.target.value)}
+                                title="Enter the 15-character GST number"
                               />
                             </div>
-                            {gstNumbers.length > 1 && (
-                              <button
-                                type="button"
-                                className="ti-btn ti-btn-danger ti-btn-sm"
-                                onClick={() => removeGstNumber(index)}
-                              >
-                                <i className="ri-delete-bin-line"></i>
-                              </button>
-                            )}
+                            <div>
+                              <input
+                                type="date"
+                                className="form-control"
+                                placeholder="Date of Registration"
+                                value={gst.dateOfRegistration}
+                                onChange={(e) => handleGstNumberChange(index, 'dateOfRegistration', e.target.value)}
+                                title="Select the date when GST was registered"
+                              />
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="text"
+                                className="form-control"
+                                placeholder="GST User ID (e.g., GST_MAH_001)"
+                                value={gst.gstUserId}
+                                onChange={(e) => handleGstNumberChange(index, 'gstUserId', e.target.value)}
+                                title="Enter the GST user identification code"
+                              />
+                              {gstNumbers.length > 1 && (
+                                <button
+                                  type="button"
+                                  className="ti-btn ti-btn-danger ti-btn-sm"
+                                  onClick={() => removeGstNumber(index)}
+                                >
+                                  <i className="ri-delete-bin-line"></i>
+                                </button>
+                              )}
+                            </div>
                           </div>
                         ))}
                         <button
