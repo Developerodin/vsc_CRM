@@ -144,20 +144,6 @@ const TasksPage = () => {
 
   // Quick edit functions
   const openQuickEditModal = (task: Task) => {
-    // Check if task is delayed - prevent updates
-    if (task.status === 'delayed') {
-      toast.error('Cannot update delayed tasks. These tasks require supervisor intervention.', {
-        duration: 4000,
-        position: 'top-right',
-        style: {
-          background: '#fef2f2',
-          color: '#dc2626',
-          border: '1px solid #fecaca',
-        },
-      });
-      return;
-    }
-    
     setQuickEditTask(task);
     setQuickEditStatus(task.status);
     setQuickEditRemarks(task.remarks || "");
@@ -180,18 +166,38 @@ const TasksPage = () => {
   const handleQuickEditSubmit = async () => {
     if (!quickEditTask) return;
 
+    // For delayed tasks, only allow status change to completed
+    if (quickEditTask.status === 'delayed' && quickEditStatus !== 'completed') {
+      toast.error('Delayed tasks can only be marked as completed', {
+        duration: 4000,
+        position: 'top-right',
+        style: {
+          background: '#fef2f2',
+          color: '#dc2626',
+          border: '1px solid #fecaca',
+        },
+      });
+      return;
+    }
+
     setIsUpdatingQuickEdit(true);
     try {
+      const updateData: any = {
+        status: quickEditStatus,
+      };
+
+      // Only include remarks if the task is not delayed
+      if (quickEditTask.status !== 'delayed') {
+        updateData.remarks = quickEditRemarks;
+      }
+
       const response = await fetch(`${Base_url}tasks/${quickEditTask.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({
-          status: quickEditStatus,
-          remarks: quickEditRemarks,
-        }),
+        body: JSON.stringify(updateData),
       });
 
       if (!response.ok) {
@@ -204,13 +210,13 @@ const TasksPage = () => {
       setTasks(prevTasks => 
         prevTasks.map(task => 
           task.id === quickEditTask.id 
-            ? { ...task, status: quickEditStatus as Task['status'], remarks: quickEditRemarks }
+            ? { ...task, status: quickEditStatus as Task['status'], remarks: quickEditTask.status === 'delayed' ? task.remarks : quickEditRemarks }
             : task
         )
       );
 
       closeQuickEditModal();
-      toast.success('Task updated successfully!');
+      toast.success(quickEditTask.status === 'delayed' ? 'Task marked as completed!' : 'Task updated successfully!');
       
       // Refresh task statistics
       await fetchTaskStats();
@@ -809,13 +815,13 @@ const TasksPage = () => {
 
       {/* Delayed Tasks Warning */}
       {tasks.some(task => task.status === 'delayed') && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <div className="flex items-center">
-            <i className="ri-error-warning-line text-red-500 text-xl mr-3"></i>
+            <i className="ri-information-line text-yellow-500 text-xl mr-3"></i>
             <div>
-              <h4 className="text-sm font-medium text-red-800">Delayed Tasks Notice</h4>
-              <p className="text-sm text-red-700 mt-1">
-                Tasks marked as "Delayed" cannot be updated by team members
+              <h4 className="text-sm font-medium text-yellow-800">Delayed Tasks Notice</h4>
+              <p className="text-sm text-yellow-700 mt-1">
+                Tasks marked as "Delayed" can only be updated to "Completed" status. Click on the status or remarks to mark as completed.
               </p>
             </div>
           </div>
@@ -904,24 +910,24 @@ const TasksPage = () => {
                   <td>
                     <div className="flex items-center gap-2">
                     <span 
-                        className={`badge ${getStatusStyling(task.status)} ${task.status === 'delayed' ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:opacity-80'} transition-opacity`}
-                        onClick={() => task.status !== 'delayed' && openQuickEditModal(task)}
-                        title={task.status === 'delayed' ? 'Cannot edit delayed tasks - Contact supervisor' : 'Click to edit status and remarks'}
+                        className={`badge ${getStatusStyling(task.status)} cursor-pointer hover:opacity-80 transition-opacity`}
+                        onClick={() => openQuickEditModal(task)}
+                        title={task.status === 'delayed' ? 'Click to mark as completed' : 'Click to edit status and remarks'}
                     >
                       {task.status.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                     </span>
                       {task.status === 'delayed' && (
-                        <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 border border-red-200">
-                          <i className="ri-lock-line mr-1"></i>
-                          Locked
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800 border border-yellow-200">
+                          <i className="ri-check-line mr-1"></i>
+                          Can Complete
                         </span>
                       )}
                     </div>
                   </td>
                   <td 
-                    className={`max-w-xs truncate px-2 py-1 rounded ${task.status === 'delayed' ? 'cursor-not-allowed bg-gray-50 opacity-60' : 'cursor-pointer hover:bg-gray-50'} transition-colors`}
-                    title={task.status === 'delayed' ? `${task.remarks || "No remarks"} - Cannot edit delayed tasks` : `${task.remarks || "No remarks"} - Click to edit`}
-                    onClick={() => task.status !== 'delayed' && openQuickEditModal(task)}
+                    className={`max-w-xs truncate px-2 py-1 rounded ${task.status === 'delayed' ? 'cursor-pointer hover:bg-yellow-50' : 'cursor-pointer hover:bg-gray-50'} transition-colors`}
+                    title={task.status === 'delayed' ? `${task.remarks || "No remarks"} - Click to mark as completed` : `${task.remarks || "No remarks"} - Click to edit`}
+                    onClick={() => openQuickEditModal(task)}
                   >
                     {task.remarks || "-"}
                   </td>
@@ -1058,20 +1064,42 @@ const TasksPage = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Status <span className="text-red-500">*</span>
                 </label>
-                <select
-                  className="form-select w-full"
-                  value={quickEditStatus}
-                  onChange={(e) => setQuickEditStatus(e.target.value)}
-                  required
-                >
-                  <option value="">Select Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="ongoing">Ongoing</option>
-                  <option value="completed">Completed</option>
-                  <option value="on_hold">On Hold</option>
-                  <option value="cancelled">Cancelled</option>
-                  <option value="delayed">Delayed</option>
-                </select>
+                {quickEditTask?.status === 'delayed' ? (
+                  <div className="space-y-2">
+                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <div className="flex items-center">
+                        <i className="ri-information-line text-yellow-500 text-lg mr-2"></i>
+                        <span className="text-sm text-yellow-800">
+                          Delayed tasks can only be marked as completed
+                        </span>
+                      </div>
+                    </div>
+                    <select
+                      className="form-select w-full"
+                      value={quickEditStatus}
+                      onChange={(e) => setQuickEditStatus(e.target.value)}
+                      required
+                    >
+                      <option value="delayed">Delayed</option>
+                      <option value="completed">Completed</option>
+                    </select>
+                  </div>
+                ) : (
+                  <select
+                    className="form-select w-full"
+                    value={quickEditStatus}
+                    onChange={(e) => setQuickEditStatus(e.target.value)}
+                    required
+                  >
+                    <option value="">Select Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="ongoing">Ongoing</option>
+                    <option value="completed">Completed</option>
+                    <option value="on_hold">On Hold</option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="delayed">Delayed</option>
+                  </select>
+                )}
               </div>
 
               {/* Remarks Field */}
@@ -1079,13 +1107,34 @@ const TasksPage = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Remarks
                 </label>
-                <textarea
-                  className="form-control w-full"
-                  rows={4}
-                  placeholder="Enter task remarks..."
-                  value={quickEditRemarks}
-                  onChange={(e) => setQuickEditRemarks(e.target.value)}
-                />
+                {quickEditTask?.status === 'delayed' ? (
+                  <div className="space-y-2">
+                    <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                      <div className="flex items-center">
+                        <i className="ri-information-line text-gray-500 text-lg mr-2"></i>
+                        <span className="text-sm text-gray-600">
+                          Remarks cannot be modified for delayed tasks
+                        </span>
+                      </div>
+                    </div>
+                    <textarea
+                      className="form-control w-full bg-gray-100"
+                      rows={4}
+                      placeholder="Remarks are locked for delayed tasks"
+                      value={quickEditRemarks}
+                      disabled
+                      readOnly
+                    />
+                  </div>
+                ) : (
+                  <textarea
+                    className="form-control w-full"
+                    rows={4}
+                    placeholder="Enter task remarks..."
+                    value={quickEditRemarks}
+                    onChange={(e) => setQuickEditRemarks(e.target.value)}
+                  />
+                )}
               </div>
             </div>
 
@@ -1103,7 +1152,7 @@ const TasksPage = () => {
                 type="button"
                 onClick={handleQuickEditSubmit}
                 className="ti-btn ti-btn-primary"
-                disabled={isUpdatingQuickEdit || !quickEditStatus}
+                disabled={isUpdatingQuickEdit || !quickEditStatus || (quickEditTask?.status === 'delayed' && quickEditStatus === 'delayed')}
               >
                 {isUpdatingQuickEdit ? (
                   <>
@@ -1113,7 +1162,7 @@ const TasksPage = () => {
                 ) : (
                   <>
                     <i className="ri-save-line me-2"></i>
-                    Update Task
+                    {quickEditTask?.status === 'delayed' ? 'Mark as Completed' : 'Update Task'}
                   </>
                 )}
               </button>
@@ -1188,9 +1237,9 @@ const TaskDetailsModal = ({
   };
 
   const handleStatusUpdate = async () => {
-    // Check if task is delayed - prevent updates
-    if (task.status === 'delayed') {
-      toast.error('Cannot update delayed tasks. These tasks require supervisor intervention.', {
+    // For delayed tasks, only allow status change to completed
+    if (task.status === 'delayed' && selectedStatus !== 'completed') {
+      toast.error('Delayed tasks can only be marked as completed', {
         duration: 4000,
         position: 'top-right',
         style: {
@@ -1202,8 +1251,8 @@ const TaskDetailsModal = ({
       return;
     }
     
-    if (selectedStatus !== task.status || remarks !== (task.remarks || '')) {
-      await onUpdateStatus(task.id, selectedStatus, remarks);
+    if (selectedStatus !== task.status || (task.status !== 'delayed' && remarks !== (task.remarks || ''))) {
+      await onUpdateStatus(task.id, selectedStatus, task.status === 'delayed' ? undefined : remarks);
     }
   };
 
@@ -1426,14 +1475,43 @@ const TaskDetailsModal = ({
                  <h3 className="text-sm font-medium text-gray-700 mb-2">Update Status</h3>
                  
                  {task.status === 'delayed' ? (
-                   <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                     <div className="flex items-center">
-                       <i className="ri-lock-line text-red-500 text-xl mr-3"></i>
-                       <div>
-                         <h5 className="text-sm font-medium text-red-800">Task is Locked</h5>
-                         <p className="text-sm text-red-700 mt-1">
-                           This delayed task cannot be updated. Please contact your supervisor for assistance.
-                         </p>
+                   <div className="space-y-3">
+                     <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                       <div className="flex items-center">
+                         <i className="ri-information-line text-yellow-500 text-xl mr-3"></i>
+                         <div>
+                           <h5 className="text-sm font-medium text-yellow-800">Delayed Task</h5>
+                           <p className="text-sm text-yellow-700 mt-1">
+                             This delayed task can only be marked as completed.
+                           </p>
+                         </div>
+                       </div>
+                     </div>
+                     <div>
+                       <label className="block text-sm font-medium text-gray-700 mb-1">
+                         New Status
+                       </label>
+                       <select
+                         className="form-select w-full"
+                         value={selectedStatus}
+                         onChange={(e) => setSelectedStatus(e.target.value as Task['status'])}
+                         disabled={isUpdating}
+                       >
+                         <option value="delayed">Delayed</option>
+                         <option value="completed">Completed</option>
+                       </select>
+                     </div>
+                     <div>
+                       <label className="block text-sm font-medium text-gray-700 mb-1">
+                         Remarks
+                       </label>
+                       <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                         <div className="flex items-center">
+                           <i className="ri-information-line text-gray-500 text-lg mr-2"></i>
+                           <span className="text-sm text-gray-600">
+                             Remarks cannot be modified for delayed tasks
+                           </span>
+                         </div>
                        </div>
                      </div>
                    </div>
@@ -1530,7 +1608,7 @@ const TaskDetailsModal = ({
           <button
             className="ti-btn ti-btn-primary"
             onClick={handleStatusUpdate}
-            disabled={isUpdating || task.status === 'delayed' || (selectedStatus === task.status && remarks === (task.remarks || ''))}
+            disabled={isUpdating || (task.status === 'delayed' && selectedStatus === 'delayed') || (task.status !== 'delayed' && selectedStatus === task.status && remarks === (task.remarks || ''))}
           >
             {isUpdating ? (
               <>
@@ -1539,8 +1617,8 @@ const TaskDetailsModal = ({
               </>
             ) : task.status === 'delayed' ? (
               <>
-                <i className="ri-lock-line mr-2"></i>
-                Task Locked
+                <i className="ri-check-line mr-2"></i>
+                Mark as Completed
               </>
             ) : (
               'Update Task'

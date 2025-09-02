@@ -228,20 +228,6 @@ const TeamMemberDashboard = () => {
   }
 
   const openUpdateModal = (task: Task) => {
-    // Check if task is delayed - prevent updates
-    if (task.status === 'delayed') {
-      toast.error('Cannot update delayed tasks. Please contact your supervisor for assistance.', {
-        duration: 4000,
-        position: 'top-right',
-        style: {
-          background: '#fef2f2',
-          color: '#dc2626',
-          border: '1px solid #fecaca',
-        },
-      });
-      return;
-    }
-    
     setSelectedTask(task)
     setUpdateForm({
       status: task.status,
@@ -262,12 +248,30 @@ const TeamMemberDashboard = () => {
   const handleUpdateTask = async () => {
     if (!selectedTask) return
     
+    // For delayed tasks, only allow status change to completed
+    if (selectedTask.status === 'delayed' && updateForm.status !== 'completed') {
+      toast.error('Delayed tasks can only be marked as completed', {
+        duration: 4000,
+        position: 'top-right',
+        style: {
+          background: '#fef2f2',
+          color: '#dc2626',
+          border: '1px solid #fecaca',
+        },
+      });
+      return;
+    }
+    
     setUpdatingTask(true)
     try {
       const token = localStorage.getItem('teamMemberToken')
       const updateData: any = {
         status: updateForm.status,
-        remarks: updateForm.remarks
+      }
+      
+      // Only include remarks if the task is not delayed
+      if (selectedTask.status !== 'delayed') {
+        updateData.remarks = updateForm.remarks
       }
       
       const response = await axios.patch(`${Base_url}team-member-auth/tasks/${selectedTask._id}`, updateData, {
@@ -275,7 +279,7 @@ const TeamMemberDashboard = () => {
       })
       
       if (response.data.success) {
-        setSuccess('Task updated successfully!')
+        setSuccess(selectedTask.status === 'delayed' ? 'Task marked as completed!' : 'Task updated successfully!')
         closeUpdateModal()
         fetchTasks() // Refresh tasks
         setTimeout(() => setSuccess(''), 3000)
@@ -404,7 +408,7 @@ const TeamMemberDashboard = () => {
                 >
                   {tasksLoading ? 'Loading...' : 'Refresh Tasks'}
                 </button>
-                <button
+                {/* <button
                   onClick={() => {
                     console.log('Testing API connectivity...')
                     console.log('Base_url:', Base_url)
@@ -414,7 +418,7 @@ const TeamMemberDashboard = () => {
                   className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors text-sm"
                 >
                   Debug API
-                </button>
+                </button> */}
               </div>
             </div>
             
@@ -476,13 +480,13 @@ const TeamMemberDashboard = () => {
 
             {/* Delayed Tasks Warning */}
             {tasks.some(task => task.status === 'delayed') && (
-              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                 <div className="flex items-center">
-                  <i className="ri-error-warning-line text-red-500 text-xl mr-3"></i>
+                  <i className="ri-information-line text-yellow-500 text-xl mr-3"></i>
                   <div>
-                    <h4 className="text-sm font-medium text-red-800">Delayed Tasks Notice</h4>
-                    <p className="text-sm text-red-700 mt-1">
-                      Tasks marked as "Delayed" cannot be updated by team members. Please contact your supervisor for assistance with these tasks.
+                    <h4 className="text-sm font-medium text-yellow-800">Delayed Tasks Notice</h4>
+                    <p className="text-sm text-yellow-700 mt-1">
+                      Tasks marked as "Delayed" can only be updated to "Completed" status. Click the "Update" button to mark them as completed.
                     </p>
                   </div>
                 </div>
@@ -556,9 +560,9 @@ const TeamMemberDashboard = () => {
                                 {task.status.replace('_', ' ')}
                               </span>
                               {task.status === 'delayed' && (
-                                <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200">
-                                  <i className="ri-error-warning-line mr-1"></i>
-                                  Locked
+                                <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200">
+                                  <i className="ri-check-line mr-1"></i>
+                                  Can Complete
                                 </span>
                               )}
                             </div>
@@ -574,29 +578,18 @@ const TeamMemberDashboard = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          {task.status === 'delayed' ? (
-                            <div className="flex flex-col items-center">
-                              <button
-                                disabled
-                                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-gray-400 cursor-not-allowed opacity-60"
-                                title="Cannot update delayed tasks. Contact supervisor for assistance."
-                              >
-                                <i className="ri-lock-line mr-1"></i>
-                                Locked
-                              </button>
-                              <span className="text-xs text-red-600 mt-1 font-medium">
-                                Contact Supervisor
-                              </span>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => openUpdateModal(task)}
-                              className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                            >
-                              <i className="ri-edit-line mr-1"></i>
-                              Update
-                            </button>
-                          )}
+                          <button
+                            onClick={() => openUpdateModal(task)}
+                            className={`inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                              task.status === 'delayed' 
+                                ? 'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500' 
+                                : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
+                            }`}
+                            title={task.status === 'delayed' ? 'Click to mark as completed' : 'Click to update task'}
+                          >
+                            <i className={task.status === 'delayed' ? 'ri-check-line mr-1' : 'ri-edit-line mr-1'}></i>
+                            {task.status === 'delayed' ? 'Mark Complete' : 'Update'}
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -624,29 +617,71 @@ const TeamMemberDashboard = () => {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
-                  <select
-                    value={updateForm.status}
-                    onChange={(e) => setUpdateForm({...updateForm, status: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="ongoing">Ongoing</option>
-                    <option value="completed">Completed</option>
-                    <option value="on_hold">On Hold</option>
-                    <option value="cancelled">Cancelled</option>
-                    <option value="delayed">Delayed</option>
-                  </select>
+                  {selectedTask?.status === 'delayed' ? (
+                    <div className="space-y-2">
+                      <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                        <div className="flex items-center">
+                          <i className="ri-information-line text-yellow-500 text-lg mr-2"></i>
+                          <span className="text-sm text-yellow-800 dark:text-yellow-200">
+                            Delayed tasks can only be marked as completed
+                          </span>
+                        </div>
+                      </div>
+                      <select
+                        value={updateForm.status}
+                        onChange={(e) => setUpdateForm({...updateForm, status: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="delayed">Delayed</option>
+                        <option value="completed">Completed</option>
+                      </select>
+                    </div>
+                  ) : (
+                    <select
+                      value={updateForm.status}
+                      onChange={(e) => setUpdateForm({...updateForm, status: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="ongoing">Ongoing</option>
+                      <option value="completed">Completed</option>
+                      <option value="on_hold">On Hold</option>
+                      <option value="cancelled">Cancelled</option>
+                      <option value="delayed">Delayed</option>
+                    </select>
+                  )}
                 </div>
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Remarks</label>
-                  <textarea
-                    value={updateForm.remarks}
-                    onChange={(e) => setUpdateForm({...updateForm, remarks: e.target.value})}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Update task remarks..."
-                  />
+                  {selectedTask?.status === 'delayed' ? (
+                    <div className="space-y-2">
+                      <div className="p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg">
+                        <div className="flex items-center">
+                          <i className="ri-information-line text-gray-500 text-lg mr-2"></i>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">
+                            Remarks cannot be modified for delayed tasks
+                          </span>
+                        </div>
+                      </div>
+                      <textarea
+                        value={updateForm.remarks}
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+                        placeholder="Remarks are locked for delayed tasks"
+                        disabled
+                        readOnly
+                      />
+                    </div>
+                  ) : (
+                    <textarea
+                      value={updateForm.remarks}
+                      onChange={(e) => setUpdateForm({...updateForm, remarks: e.target.value})}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Update task remarks..."
+                    />
+                  )}
                 </div>
                 
 
@@ -661,10 +696,10 @@ const TeamMemberDashboard = () => {
                 </button>
                 <button
                   onClick={handleUpdateTask}
-                  disabled={updatingTask}
+                  disabled={updatingTask || (selectedTask?.status === 'delayed' && updateForm.status === 'delayed')}
                   className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {updatingTask ? 'Updating...' : 'Update Task'}
+                  {updatingTask ? 'Updating...' : (selectedTask?.status === 'delayed' ? 'Mark as Completed' : 'Update Task')}
                 </button>
               </div>
             </div>

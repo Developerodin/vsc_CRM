@@ -850,6 +850,20 @@ const EditTaskPage = () => {
       return;
     }
 
+    // For delayed tasks, only allow status change to completed
+    if (task?.status === 'delayed' && formData.status !== 'completed') {
+      toast.error('Delayed tasks can only be marked as completed', {
+        duration: 4000,
+        position: 'top-right',
+        style: {
+          background: '#fef2f2',
+          color: '#dc2626',
+          border: '1px solid #fecaca',
+        },
+      });
+      return;
+    }
+
     setIsSaving(true);
     try {
       // Clean attachments data by removing _id fields
@@ -860,10 +874,26 @@ const EditTaskPage = () => {
       }));
 
       // Create clean form data without problematic fields
-      const cleanFormData = {
+      const cleanFormData: any = {
         ...formData,
         attachments: cleanAttachments
       };
+
+      // For delayed tasks, only send status update
+      if (task?.status === 'delayed') {
+        cleanFormData.status = formData.status;
+        // Remove other fields that shouldn't be updated for delayed tasks
+        delete cleanFormData.teamMember;
+        delete cleanFormData.startDate;
+        delete cleanFormData.endDate;
+        delete cleanFormData.priority;
+        delete cleanFormData.branch;
+        delete cleanFormData.assignedBy;
+        delete cleanFormData.timeline;
+        delete cleanFormData.remarks;
+        delete cleanFormData.metadata;
+        delete cleanFormData.attachments;
+      }
 
       // Debug log to verify clean data
       console.log('Original formData attachments:', formData.attachments);
@@ -884,7 +914,7 @@ const EditTaskPage = () => {
         throw new Error(errorData.message || 'Failed to update task');
       }
 
-      toast.success('Task updated successfully');
+      toast.success(task?.status === 'delayed' ? 'Task marked as completed!' : 'Task updated successfully');
       router.push('/timelines');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to update task');
@@ -1040,19 +1070,41 @@ const EditTaskPage = () => {
                   {/* Status */}
                   <div>
                     <label className="form-label">Status</label>
-                    <select
-                      name="status"
-                      value={formData.status}
-                      onChange={handleInputChange}
-                      className="form-select"
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="ongoing">Ongoing</option>
-                      <option value="completed">Completed</option>
-                      <option value="on_hold">On Hold</option>
-                      <option value="cancelled">Cancelled</option>
-                      <option value="delayed">Delayed</option>
-                    </select>
+                    {task?.status === 'delayed' ? (
+                      <div className="space-y-2">
+                        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                          <div className="flex items-center">
+                            <i className="ri-information-line text-yellow-500 text-lg mr-2"></i>
+                            <span className="text-sm text-yellow-800">
+                              Delayed tasks can only be marked as completed
+                            </span>
+                          </div>
+                        </div>
+                        <select
+                          name="status"
+                          value={formData.status}
+                          onChange={handleInputChange}
+                          className="form-select"
+                        >
+                          <option value="delayed">Delayed</option>
+                          <option value="completed">Completed</option>
+                        </select>
+                      </div>
+                    ) : (
+                      <select
+                        name="status"
+                        value={formData.status}
+                        onChange={handleInputChange}
+                        className="form-select"
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="ongoing">Ongoing</option>
+                        <option value="completed">Completed</option>
+                        <option value="on_hold">On Hold</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="delayed">Delayed</option>
+                      </select>
+                    )}
                   </div>
                 </div>
 
@@ -1108,14 +1160,36 @@ const EditTaskPage = () => {
                 {/* Remarks */}
                 <div>
                   <label className="form-label">Remarks</label>
-                  <textarea
-                    name="remarks"
-                    value={formData.remarks}
-                    onChange={handleInputChange}
-                    rows={4}
-                    className="form-control"
-                    placeholder="Enter task details, notes, or instructions..."
-                  />
+                  {task?.status === 'delayed' ? (
+                    <div className="space-y-2">
+                      <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                        <div className="flex items-center">
+                          <i className="ri-information-line text-gray-500 text-lg mr-2"></i>
+                          <span className="text-sm text-gray-600">
+                            Remarks cannot be modified for delayed tasks
+                          </span>
+                        </div>
+                      </div>
+                      <textarea
+                        name="remarks"
+                        value={formData.remarks}
+                        rows={4}
+                        className="form-control bg-gray-100"
+                        placeholder="Remarks are locked for delayed tasks"
+                        disabled
+                        readOnly
+                      />
+                    </div>
+                  ) : (
+                    <textarea
+                      name="remarks"
+                      value={formData.remarks}
+                      onChange={handleInputChange}
+                      rows={4}
+                      className="form-control"
+                      placeholder="Enter task details, notes, or instructions..."
+                    />
+                  )}
                 </div>
 
                 {/* Attachments */}
@@ -1240,12 +1314,17 @@ const EditTaskPage = () => {
                   <button
                     type="submit"
                     className="ti-btn ti-btn-primary"
-                    disabled={isSaving}
+                    disabled={isSaving || (task?.status === 'delayed' && formData.status === 'delayed')}
                   >
                     {isSaving ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                         Updating...
+                      </>
+                    ) : task?.status === 'delayed' ? (
+                      <>
+                        <i className="ri-check-line mr-2"></i>
+                        Mark as Completed
                       </>
                     ) : (
                       'Update Task'
