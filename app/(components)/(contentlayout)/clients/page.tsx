@@ -101,7 +101,7 @@ interface ExcelRow {
   "Udyam Number"?: string;
   "IEC Code"?: string;
   
-  // Multiple GST Numbers (up to 5)
+  // Multiple GST Numbers (up to 3)
   "GST State 1"?: string;
   "GST Number 1"?: string;
   "GST Date of Registration 1"?: string;
@@ -114,14 +114,6 @@ interface ExcelRow {
   "GST Number 3"?: string;
   "GST Date of Registration 3"?: string;
   "GST User ID 3"?: string;
-  "GST State 4"?: string;
-  "GST Number 4"?: string;
-  "GST Date of Registration 4"?: string;
-  "GST User ID 4"?: string;
-  "GST State 5"?: string;
-  "GST Number 5"?: string;
-  "GST Date of Registration 5"?: string;
-  "GST User ID 5"?: string;
   
   // Multiple Activities (up to 5)
   "Activity 1"?: string;
@@ -139,8 +131,6 @@ interface ExcelRow {
   "Activity 5"?: string;
   "Subactivity 5"?: string;
   "Activity Notes 5"?: string;
-  
-  "Created At"?: string;
 }
 
 const ClientsPage = () => {
@@ -536,6 +526,127 @@ const ClientsPage = () => {
     }
   };
 
+  const handleDownloadTemplate = () => {
+    // Sample data that matches the validation schema
+    const templateData = [
+      {
+        "ID": "", // Leave blank for new clients
+        "Client Name": "Sample Client Name",
+        "Client Phone": "9876543210",
+        "Client Email": "sample@example.com",
+        "Client Email 2": "sample2@example.com",
+        "Client Address": "123 Sample Street, Sample City",
+        "Client District": "Sample District",
+        "Client State": "Maharashtra",
+        "Client Country": "India",
+        "Branch": "685140f7a5039eb69705aed6", // Valid ObjectId format
+        "Status": "active",
+        "PAN": "ABCDE1234F", // Valid PAN format: 5 letters + 4 digits + 1 letter
+        "Date of Birth": "1990-01-01",
+        "Sort Order": 1,
+        "Business Type": "Banking",
+        "Entity Type": "Private Limited",
+        "TAN Number": "ABCD12345E", // Valid TAN format: 4 letters + 5 digits + 1 letter
+        "CIN Number": "A12345BC6789DEF123456", // Valid CIN format
+        "Udyam Number": "UDYAM-MH-12-1234567", // Valid Udyam format
+        "IEC Code": "1234567890", // Valid IEC format: 10 digits
+        
+        // GST Numbers (3 sets with valid formats)
+        "GST State 1": "Maharashtra",
+        "GST Number 1": "27ABCDE1234F1Z5", // Valid GST format: 2 digits + 5 letters + 4 digits + 1 letter + 1 letter + 1 letter + 1 letter
+        "GST Date of Registration 1": "2023-01-15",
+        "GST User ID 1": "GST_MAH_001",
+        "GST State 2": "Karnataka",
+        "GST Number 2": "29ABCDE1234F1Z5",
+        "GST Date of Registration 2": "2023-03-20",
+        "GST User ID 2": "GST_KAR_001",
+        "GST State 3": "Tamil Nadu",
+        "GST Number 3": "33ABCDE1234F1Z5",
+        "GST Date of Registration 3": "2023-06-10",
+        "GST User ID 3": "GST_TN_001",
+        
+        // Activities (5 sets with valid ObjectId formats)
+        "Activity 1": "68b1a141564f514accb9b501", // Valid MongoDB ObjectId
+        "Subactivity 1": "68b1a141564f514accb9b505", // Valid MongoDB ObjectId
+        "Activity Notes 1": "Sample activity notes for activity 1",
+        "Activity 2": "68b1a141564f514accb9b502",
+        "Subactivity 2": "68b1a141564f514accb9b506",
+        "Activity Notes 2": "Sample activity notes for activity 2",
+        "Activity 3": "68b1a141564f514accb9b503",
+        "Subactivity 3": "68b1a141564f514accb9b507",
+        "Activity Notes 3": "Sample activity notes for activity 3",
+        "Activity 4": "68b1a141564f514accb9b504",
+        "Subactivity 4": "68b1a141564f514accb9b508",
+        "Activity Notes 4": "Sample activity notes for activity 4",
+        "Activity 5": "68b1a141564f514accb9b509",
+        "Subactivity 5": "68b1a141564f514accb9b50A",
+        "Activity Notes 5": "Sample activity notes for activity 5"
+      }
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    ws["!cols"] = [
+      { wch: 20 }, // ID
+      { wch: 30 }, // Name
+      { wch: 20 }, // Phone
+      { wch: 30 }, // Email
+      { wch: 30 }, // Email 2
+      { wch: 40 }, // Address
+      { wch: 20 }, // District
+      { wch: 20 }, // State
+      { wch: 20 }, // Country
+      { wch: 30 }, // Branch ID
+      { wch: 20 }, // Status
+
+      { wch: 15 }, // PAN
+      { wch: 15 }, // Date of Birth
+      { wch: 10 }, // Sort Order
+      { wch: 25 }, // Business Type
+      { wch: 20 }, // Entity Type
+      { wch: 20 }, // TAN Number
+      { wch: 20 }, // CIN Number
+      { wch: 20 }, // Udyam Number
+      { wch: 20 }, // IEC Code
+      
+      // GST Numbers (3 sets)
+      { wch: 20 }, // GST State 1
+      { wch: 20 }, // GST Number 1
+      { wch: 20 }, // GST Date of Registration 1
+      { wch: 20 }, // GST User ID 1
+      { wch: 20 }, // GST State 2
+      { wch: 20 }, // GST Number 2
+      { wch: 20 }, // GST Date of Registration 2
+      { wch: 20 }, // GST User ID 2
+      { wch: 20 }, // GST State 3
+      { wch: 20 }, // GST Number 3
+      { wch: 20 }, // GST Date of Registration 3
+      { wch: 20 }, // GST User ID 3
+      
+      // Activities (5 sets)
+      { wch: 25 }, // Activity 1
+      { wch: 25 }, // Subactivity 1
+      { wch: 30 }, // Activity Notes 1
+      { wch: 25 }, // Activity 2
+      { wch: 25 }, // Subactivity 2
+      { wch: 25 }, // Activity Notes 2
+      { wch: 25 }, // Activity 3
+      { wch: 25 }, // Subactivity 3
+      { wch: 30 }, // Activity Notes 3
+      { wch: 25 }, // Activity 4
+      { wch: 25 }, // Subactivity 4
+      { wch: 30 }, // Activity Notes 4
+      { wch: 25 }, // Activity 5
+      { wch: 25 }, // Subactivity 5
+      { wch: 30 }, // Activity Notes 5
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Client Template");
+    const fileName = `client_import_template_${new Date().toISOString().split("T")[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+    toast.success("Template downloaded successfully with sample data");
+  };
+
   const handleExport = async () => {
     try {
       let exportData;
@@ -547,7 +658,7 @@ const ClientsPage = () => {
             // Helper function to get GST data for export
             const getGstExportData = (gstNumbers: any[]) => {
               const gstData: any = {};
-              for (let i = 0; i < 5; i++) {
+              for (let i = 0; i < 3; i++) {
                 const gst = gstNumbers[i];
                 if (gst) {
                   gstData[`GST State ${i + 1}`] = gst.state || "";
@@ -621,25 +732,25 @@ const ClientsPage = () => {
         });
         const data = await response.json();
         exportData = data.results.map((client: Client) => {
-          // Helper function to get GST data for export
-          const getGstExportData = (gstNumbers: any[]) => {
-            const gstData: any = {};
-            for (let i = 0; i < 5; i++) {
-              const gst = gstNumbers[i];
-              if (gst) {
-                gstData[`GST State ${i + 1}`] = gst.state || "";
-                gstData[`GST Number ${i + 1}`] = gst.gstNumber || "";
-                gstData[`GST Date of Registration ${i + 1}`] = gst.dateOfRegistration || "";
-                gstData[`GST User ID ${i + 1}`] = gst.gstUserId || "";
-              } else {
-                gstData[`GST State ${i + 1}`] = "";
-                gstData[`GST Number ${i + 1}`] = "";
-                gstData[`GST Date of Registration ${i + 1}`] = "";
-                gstData[`GST User ID ${i + 1}`] = "";
+                      // Helper function to get GST data for export
+            const getGstExportData = (gstNumbers: any[]) => {
+              const gstData: any = {};
+              for (let i = 0; i < 3; i++) {
+                const gst = gstNumbers[i];
+                if (gst) {
+                  gstData[`GST State ${i + 1}`] = gst.state || "";
+                  gstData[`GST Number ${i + 1}`] = gst.gstNumber || "";
+                  gstData[`GST Date of Registration ${i + 1}`] = gst.dateOfRegistration || "";
+                  gstData[`GST User ID ${i + 1}`] = gst.gstUserId || "";
+                } else {
+                  gstData[`GST State ${i + 1}`] = "";
+                  gstData[`GST Number ${i + 1}`] = "";
+                  gstData[`GST Date of Registration ${i + 1}`] = "";
+                  gstData[`GST User ID ${i + 1}`] = "";
+                }
               }
-            }
-            return gstData;
-          };
+              return gstData;
+            };
 
           // Helper function to get activity data for export
           const getActivityExportData = (activities: any[]) => {
@@ -715,7 +826,7 @@ const ClientsPage = () => {
         { wch: 20 }, // Udyam Number
         { wch: 20 }, // IEC Code
         
-        // GST Numbers (5 sets)
+        // GST Numbers (3 sets)
         { wch: 20 }, // GST State 1
         { wch: 20 }, // GST Number 1
         { wch: 20 }, // GST Date of Registration 1
@@ -728,14 +839,6 @@ const ClientsPage = () => {
         { wch: 20 }, // GST Number 3
         { wch: 20 }, // GST Date of Registration 3
         { wch: 20 }, // GST User ID 3
-        { wch: 20 }, // GST State 4
-        { wch: 20 }, // GST Number 4
-        { wch: 20 }, // GST Date of Registration 4
-        { wch: 20 }, // GST User ID 4
-        { wch: 20 }, // GST State 5
-        { wch: 20 }, // GST Number 5
-        { wch: 20 }, // GST Date of Registration 5
-        { wch: 20 }, // GST User ID 5
         
         // Activities (5 sets)
         { wch: 25 }, // Activity 1
@@ -759,7 +862,7 @@ const ClientsPage = () => {
       XLSX.utils.book_append_sheet(wb, ws, "Clients");
       const fileName = `clients_${new Date().toISOString().split("T")[0]}.xlsx`;
       XLSX.writeFile(wb, fileName);
-      toast.success(selectedClients.length > 0 ? "Selected clients exported successfully with multiple GST numbers and activities" : "All clients exported successfully with multiple GST numbers and activities");
+      toast.success(selectedClients.length > 0 ? "Selected clients exported successfully with 3 GST numbers and activities" : "All clients exported successfully with 3 GST numbers and activities");
     } catch (error) {
       console.error("Error exporting clients:", error);
       toast.error("Failed to export clients");
@@ -777,11 +880,11 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
   // Excel structure:
   // - First row should contain headers exactly as defined in ExcelRow interface
   // - ID column: Leave empty for new clients, include ID for updates
-  // - GST Number fields (up to 5 sets):
-  //   * "GST State 1" to "GST State 5": State names
-  //   * "GST Number 1" to "GST Number 5": GST numbers
-  //   * "GST Date of Registration 1" to "GST Date of Registration 5": Dates
-  //   * "GST User ID 1" to "GST User ID 5": User IDs
+  // - GST Number fields (up to 3 sets):
+  //   * "GST State 1" to "GST State 3": State names
+  //   * "GST Number 1" to "GST Number 3": GST numbers
+  //   * "GST Date of Registration 1" to "GST Date of Registration 3": Dates
+  //   * "GST User ID 1" to "GST User ID 3": User IDs
   // - Activity fields (up to 5 sets):
   //   * "Activity 1" to "Activity 5": Activity IDs (MongoDB ObjectId)
   //   * "Subactivity 1" to "Subactivity 5": Subactivity IDs (MongoDB ObjectId)
@@ -866,7 +969,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
             // Helper function to extract GST numbers from Excel
             const extractGstNumbers = (row: ExcelRow) => {
               const gstNumbers = [];
-              for (let i = 1; i <= 5; i++) {
+              for (let i = 1; i <= 3; i++) {
                 const state = row[`GST State ${i}` as keyof ExcelRow]?.toString().trim();
                 const gstNumber = row[`GST Number ${i}` as keyof ExcelRow]?.toString().trim();
                 const dateOfRegistration = row[`GST Date of Registration ${i}` as keyof ExcelRow]?.toString().trim();
@@ -1158,6 +1261,14 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                     </span>
                   </div>
                 )}
+                <button
+                  type="button"
+                  className="ti-btn ti-btn-secondary"
+                  onClick={handleDownloadTemplate}
+                  title="Download Excel template with sample data"
+                >
+                  <i className="ri-file-download-line me-2"></i> Template
+                </button>
                 <button
                   type="button"
                   className="ti-btn ti-btn-primary"
