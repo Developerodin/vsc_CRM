@@ -173,6 +173,7 @@ const ClientsPage = () => {
   const [taskStatsMap, setTaskStatsMap] = useState<Map<string, TaskStats>>(new Map());
   const [isLoadingTaskStats, setIsLoadingTaskStats] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   console.log(selectedBranchId, "selectedBranchId");
 
@@ -471,23 +472,37 @@ const ClientsPage = () => {
   const handleDeleteSelected = async () => {
     if (!confirm(`Are you sure you want to delete ${selectedClients.length} clients?`)) return;
 
+    setIsDeleting(true);
     try {
-      const deletePromises = selectedClients.map(clientId =>
-        fetch(`${Base_url}clients/${clientId}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        })
-      );
+      console.log('Bulk deleting clients:', selectedClients);
+      
+      const response = await fetch(`${Base_url}clients/bulk-delete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ clientIds: selectedClients })
+      });
 
-      await Promise.all(deletePromises);
-      toast.success('Selected clients deleted successfully');
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Bulk delete error:', errorText);
+        throw new Error(`Failed to delete clients: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('Bulk delete result:', result);
+      
+      toast.success(`Successfully deleted ${selectedClients.length} client(s)`);
       setSelectedClients([]);
+      setSelectAll(false);
       fetchClients();
     } catch (err) {
       console.error('Error deleting clients:', err);
-      toast.error('Failed to delete selected clients');
+      toast.error(err instanceof Error ? err.message : 'Failed to delete selected clients');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -914,6 +929,8 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
         }
 
         // Debug: Log the first few rows to see the structure
+        console.log('=== BULK IMPORT START ===');
+        console.log('Total rows in Excel:', jsonData.length);
         console.log('First 3 rows from Excel:', jsonData.slice(0, 3));
         console.log('Excel column names:', Object.keys(jsonData[0] || {}));
 
@@ -925,9 +942,23 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
         });
         const allData = await allResponse.json();
         const allClients: Client[] = allData.results || [];
+        console.log('Existing clients fetched for matching:', allClients.length);
+
+        // Track processing stats
+        const processingStats = {
+          total: jsonData.length,
+          processed: 0,
+          skipped: 0,
+          errors: [] as Array<{ row: number; error: string; data: any }>,
+          warnings: [] as Array<{ row: number; warning: string; data: any }>
+        };
 
         // Transform data for bulk import
         const clients = jsonData.map((row, index) => {
+          const rowNumber = index + 1;
+          console.log(`\n--- Processing Row ${rowNumber}/${jsonData.length} ---`);
+          console.log('Raw row data:', row);
+          
           try {
             // Convert date format from "26.09.1991" to "1990-01-01"
             const convertDateFormat = (dateString: string): string => {
@@ -1030,86 +1061,276 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
               iecCode: row["IEC Code"]?.toString().trim() || ""
             };
 
+            // Validation checks with warnings
+            const validationIssues: string[] = [];
+            if (!clientData.name) {
+              validationIssues.push('Missing Client Name');
+            }
+            if (!clientData.email && !clientData.phone) {
+              validationIssues.push('Missing both Email and Phone');
+            }
+            if (clientData.branch && !/^[0-9a-fA-F]{24}$/.test(clientData.branch)) {
+              validationIssues.push(`Invalid Branch ID format: ${clientData.branch}`);
+            }
+            if (clientData.dob && !clientData.dob.match(/^\d{4}-\d{2}-\d{2}$/)) {
+              validationIssues.push(`Invalid Date of Birth format: ${row["Date of Birth"]} -> ${clientData.dob}`);
+            }
+            
+            if (validationIssues.length > 0) {
+              console.warn(`⚠️ Row ${rowNumber} validation issues:`, validationIssues);
+              processingStats.warnings.push({
+                row: rowNumber,
+                warning: validationIssues.join(', '),
+                data: { name: clientData.name, email: clientData.email, phone: clientData.phone }
+              });
+            }
+
+            console.log(`Row ${rowNumber} - Client Name: "${clientData.name}"`);
+            console.log(`Row ${rowNumber} - Email: "${clientData.email}" | Phone: "${clientData.phone}"`);
+            console.log(`Row ${rowNumber} - Branch: "${clientData.branch}"`);
+
             // Extract GST numbers and activities
             const gstNumbers = extractGstNumbers(row);
             const activities = extractActivities(row);
+            
+            console.log(`Row ${rowNumber} - GST Numbers found: ${gstNumbers.length}`);
+            if (gstNumbers.length > 0) {
+              console.log(`Row ${rowNumber} - GST Numbers:`, gstNumbers);
+            }
 
             // Validate MongoDB ObjectId format for activity IDs
             const isValidObjectId = (id: string) => /^[0-9a-fA-F]{24}$/.test(id);
             
             // Filter activities with valid IDs
-            const validActivities = activities.filter(act => 
-              act.activity && isValidObjectId(act.activity)
-            );
+            const validActivities = activities.filter(act => {
+              if (!act.activity) return false;
+              const isValid = isValidObjectId(act.activity);
+              if (!isValid) {
+                console.warn(`⚠️ Row ${rowNumber} - Invalid Activity ID: "${act.activity}" (must be 24 char MongoDB ObjectId)`);
+              }
+              return isValid;
+            });
+
+            // Log activity validation
+            console.log(`Row ${rowNumber} - Activities found: ${activities.length}, Valid: ${validActivities.length}`);
+            if (activities.length > validActivities.length) {
+              const invalidActivities = activities.filter(act => !act.activity || !isValidObjectId(act.activity));
+              console.warn(`⚠️ Row ${rowNumber} - Invalid Activity IDs:`, invalidActivities.map(a => a.activity));
+            }
+            if (validActivities.length > 0) {
+              console.log(`Row ${rowNumber} - Valid Activities:`, validActivities);
+            }
 
             let clientId = row["ID"];
-            if (!clientId) {
+            let isUpdate = false;
+            let matchMethod = '';
+            
+            if (clientId) {
+              isUpdate = true;
+              matchMethod = 'ID provided in Excel';
+              console.log(`Row ${rowNumber} - UPDATE mode (ID provided): ${clientId}`);
+            } else {
               // Try to find by name (case-insensitive)
               const found = allClients.find(
                 (c) =>
                   c.name.trim().toLowerCase() ===
                   clientData.name.trim().toLowerCase()
               );
-              if (found) clientId = found.id;
+              if (found) {
+                clientId = found.id;
+                isUpdate = true;
+                matchMethod = 'Matched by name';
+                console.log(`Row ${rowNumber} - UPDATE mode (matched by name): ${clientId} for "${clientData.name}"`);
+              } else {
+                isUpdate = false;
+                matchMethod = 'New client';
+                console.log(`Row ${rowNumber} - CREATE mode (new client): "${clientData.name}"`);
+              }
             }
 
-            // Debug logging for activities and GST numbers
-            console.log('Row data:', {
-              gstNumbersCount: gstNumbers.length,
-              activitiesCount: activities.length,
-              validActivitiesCount: validActivities.length,
-              willIncludeGstNumbers: gstNumbers.length > 0,
-              willIncludeActivities: validActivities.length > 0
-            });
-
-            return {
+            const finalClientData = {
               ...(clientId && { id: clientId }),
               ...clientData,
               gstNumbers,
               activities: validActivities
             };
+
+            console.log(`Row ${rowNumber} - Final client data:`, {
+              id: finalClientData.id || 'NEW',
+              name: finalClientData.name,
+              email: finalClientData.email,
+              phone: finalClientData.phone,
+              branch: finalClientData.branch,
+              gstNumbersCount: finalClientData.gstNumbers?.length || 0,
+              activitiesCount: finalClientData.activities?.length || 0,
+              mode: isUpdate ? 'UPDATE' : 'CREATE',
+              matchMethod
+            });
+
+            processingStats.processed++;
+            return finalClientData;
           } catch (error) {
-            console.error(`Error processing row ${index + 1}:`, error);
-            console.error('Row data:', row);
-            throw new Error(`Error processing row ${index + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error(`❌ ERROR processing row ${rowNumber}:`, errorMessage);
+            console.error('Row data that caused error:', row);
+            processingStats.errors.push({
+              row: rowNumber,
+              error: errorMessage,
+              data: row
+            });
+            processingStats.skipped++;
+            // Return null to filter out failed rows
+            return null;
           }
         });
 
+        // Filter out null entries (failed rows)
+        const validClients = clients.filter((client, index) => {
+          if (!client) {
+            console.warn(`Row ${index + 1} was skipped due to processing error`);
+            return false;
+          }
+          return true;
+        });
+
+        console.log('\n=== PROCESSING SUMMARY ===');
+        console.log(`Total rows: ${processingStats.total}`);
+        console.log(`Successfully processed: ${processingStats.processed}`);
+        console.log(`Skipped due to errors: ${processingStats.skipped}`);
+        console.log(`Warnings: ${processingStats.warnings.length}`);
+        console.log(`Valid clients to import: ${validClients.length}`);
+
+        if (processingStats.errors.length > 0) {
+          console.error('\n=== ERRORS DURING PROCESSING ===');
+          processingStats.errors.forEach(err => {
+            console.error(`Row ${err.row}: ${err.error}`);
+          });
+        }
+
+        if (processingStats.warnings.length > 0) {
+          console.warn('\n=== WARNINGS DURING PROCESSING ===');
+          processingStats.warnings.forEach(warn => {
+            console.warn(`Row ${warn.row}: ${warn.warning}`);
+          });
+        }
+
+        if (validClients.length === 0) {
+          throw new Error('No valid clients to import after processing');
+        }
+
         // Debug logging for the final data being sent
-        console.log('Final clients data being sent to API:', clients);
-        console.log('Sample client with activities:', clients.find(c => c.activities && c.activities.length > 0));
+        console.log('\n=== FINAL PAYLOAD TO API ===');
+        console.log(`Total clients in payload: ${validClients.length}`);
+        console.log('Sample clients (first 3):', validClients.slice(0, 3));
+        
+        const createCount = validClients.filter(c => !c.id).length;
+        const updateCount = validClients.filter(c => c.id).length;
+        console.log(`Will CREATE: ${createCount} clients`);
+        console.log(`Will UPDATE: ${updateCount} clients`);
+        
+        const clientsWithActivities = validClients.filter(c => c.activities && c.activities.length > 0);
+        const clientsWithGst = validClients.filter(c => c.gstNumbers && c.gstNumbers.length > 0);
+        console.log(`Clients with activities: ${clientsWithActivities.length}`);
+        console.log(`Clients with GST numbers: ${clientsWithGst.length}`);
 
         // Single API call instead of multiple requests
+        console.log('\n=== SENDING TO API ===');
+        console.log(`API Endpoint: ${Base_url}clients/bulk-import`);
+        console.log(`Payload size: ${JSON.stringify({ clients: validClients }).length} bytes`);
+        
         const response = await fetch(`${Base_url}clients/bulk-import`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           },
-          body: JSON.stringify({ clients })
+          body: JSON.stringify({ clients: validClients })
         });
 
+        console.log(`API Response Status: ${response.status} ${response.statusText}`);
+
         if (!response.ok) {
-          throw new Error('Bulk import failed');
+          const errorText = await response.text();
+          console.error('❌ API Error Response:', errorText);
+          try {
+            const errorJson = JSON.parse(errorText);
+            console.error('❌ Parsed Error:', errorJson);
+          } catch (e) {
+            // Not JSON, already logged as text
+          }
+          throw new Error(`Bulk import failed: ${response.status} ${response.statusText}`);
         }
 
         const result = await response.json();
+        
+        console.log('\n=== API RESPONSE ===');
+        console.log('Full API Response:', JSON.stringify(result, null, 2));
+        console.log(`Created: ${result.created || 0}`);
+        console.log(`Updated: ${result.updated || 0}`);
+        console.log(`Failed: ${result.failed || 0}`);
+        console.log(`Activities Created: ${result.activitiesCreated || 0}`);
+        console.log(`GST Numbers Created: ${result.gstNumbersCreated || 0}`);
+
+        if (result.errors && result.errors.length > 0) {
+          console.error('\n=== API ERRORS (Entries that failed to create/update) ===');
+          result.errors.forEach((error: any, index: number) => {
+            console.error(`\nError ${index + 1}:`);
+            console.error('  Entry:', error.entry || error.client || error.data);
+            console.error('  Error Message:', error.message || error.error || error);
+            console.error('  Error Details:', error.details || error.stack || 'No additional details');
+          });
+          
+          // Try to match errors back to rows
+          console.error('\n=== MATCHING ERRORS TO ROWS ===');
+          result.errors.forEach((error: any, index: number) => {
+            const entry = error.entry || error.client || error.data || {};
+            const clientName = entry.name || 'Unknown';
+            const matchingRow = jsonData.findIndex((row: ExcelRow) => 
+              (row["Client Name"]?.toString() || "").trim().toLowerCase() === clientName.toLowerCase()
+            );
+            if (matchingRow >= 0) {
+              console.error(`  Error ${index + 1} corresponds to Row ${matchingRow + 1} (${clientName})`);
+            } else {
+              console.error(`  Error ${index + 1} could not be matched to a row`);
+            }
+          });
+        }
+
+        if (result.warnings && result.warnings.length > 0) {
+          console.warn('\n=== API WARNINGS ===');
+          result.warnings.forEach((warning: any, index: number) => {
+            console.warn(`Warning ${index + 1}:`, warning);
+          });
+        }
 
         if (fileInputRef.current) fileInputRef.current.value = "";
         setImportProgress(null);
         toast.dismiss(loadingToast);
 
         if (result.errors && result.errors.length > 0) {
-          toast.error(`Import completed with ${result.errors.length} errors`);
-          console.log('Import errors:', result.errors);
+          const errorDetails = result.errors
+            .map((err: any, idx: number) => {
+              const entry = err.entry || err.client || err.data || {};
+              const name = entry.name || 'Unknown';
+              const msg = err.message || err.error || 'Unknown error';
+              return `${idx + 1}. ${name}: ${msg}`;
+            })
+            .join('\n');
+          
+          console.error('Detailed error summary for user:', errorDetails);
+          toast.error(`Import completed with ${result.errors.length} errors. Check console for details.`, {
+            duration: 5000
+          });
         } else {
           const activityCount = result.activitiesCreated || 0;
           const gstCount = result.gstNumbersCreated || 0;
-          let message = `Import completed: ${result.created} clients added, ${result.updated} clients updated`;
+          let message = `Import completed: ${result.created || 0} clients added, ${result.updated || 0} clients updated`;
           if (activityCount > 0) message += `, ${activityCount} activities mapped`;
           if (gstCount > 0) message += `, ${gstCount} GST numbers added`;
           toast.success(message);
         }
+        
+        console.log('\n=== BULK IMPORT COMPLETE ===\n');
 
         // Refresh the clients list
         fetchClients();
@@ -1228,9 +1449,19 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                     type="button"
                     className="ti-btn ti-btn-danger"
                     onClick={handleDeleteSelected}
+                    disabled={isDeleting}
                   >
-                    <i className="ri-delete-bin-line me-2"></i>
-                    Delete Selected ({selectedClients.length})
+                    {isDeleting ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white me-2 inline-block"></div>
+                        Deleting...
+                      </>
+                    ) : (
+                      <>
+                        <i className="ri-delete-bin-line me-2"></i>
+                        Delete Selected ({selectedClients.length})
+                      </>
+                    )}
                   </button>
                 )}
                 {/* Import/Export Buttons */}
