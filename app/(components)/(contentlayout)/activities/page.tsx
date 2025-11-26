@@ -174,14 +174,37 @@ const ActivitiesPage = () => {
       if (selectedActivities.length > 0) {
         exportData = activities
           .filter(activity => selectedActivities.includes(activity.id))
-          .map((activity: Activity) => ({
-            ID: activity.id,
-            "Activity Name": activity.name,
-            "Sort Order": activity.sortOrder,
-            "Frequency": activity.subactivities && activity.subactivities.length > 0 ? 
-              activity.subactivities.map(sub => `${sub.name} (${sub.frequency || 'No frequency'})`).join(', ') : 'No sub-activities',
-            "Sub-Activities": activity.subactivities && activity.subactivities.length > 0 ? activity.subactivities.map(sub => sub.name).join(', ') : 'None'
-          }));
+          .map((activity: Activity) => {
+            // Helper to get subactivity ID (check both _id and id)
+            const getSubActivityIds = () => {
+              if (!activity.subactivities || activity.subactivities.length === 0) {
+                return 'None';
+              }
+              return activity.subactivities
+                .map(sub => {
+                  // Try _id first, then id, then return empty string if neither exists
+                  const subId = (sub as any)._id || (sub as any).id || '';
+                  return subId;
+                })
+                .filter(id => id !== '') // Remove empty IDs
+                .join(', ') || 'None';
+            };
+
+            console.log(`Exporting activity "${activity.name}":`, {
+              subactivities: activity.subactivities,
+              subactivityIds: getSubActivityIds()
+            });
+
+            return {
+              ID: activity.id,
+              "Activity Name": activity.name,
+              "Sort Order": activity.sortOrder,
+              "Frequency": activity.subactivities && activity.subactivities.length > 0 ? 
+                activity.subactivities.map(sub => `${sub.name} (${sub.frequency || 'No frequency'})`).join(', ') : 'No sub-activities',
+              "Sub-Activities": activity.subactivities && activity.subactivities.length > 0 ? activity.subactivities.map(sub => sub.name).join(', ') : 'None',
+              "Sub-Activity IDs": getSubActivityIds()
+            };
+          });
         successMessage = "Selected activities exported successfully";
       } else {
         const response = await fetch(`${Base_url}activities?limit=1000`, {
@@ -195,16 +218,44 @@ const ActivitiesPage = () => {
         }
 
         const apiData: ApiResponse = await response.json();
-        exportData = apiData.results.map((activity: Activity) => ({
-          ID: activity.id,
-          "Activity Name": activity.name,
-          "Sort Order": activity.sortOrder,
-          "Frequency": activity.subactivities && activity.subactivities.length > 0 ? 
-            activity.subactivities.map(sub => `${sub.name} (${sub.frequency || 'No frequency'})`).join(', ') : 'No sub-activities',
-          "Sub-Activities": activity.subactivities && activity.subactivities.length > 0 ? activity.subactivities.map(sub => sub.name).join(', ') : 'None'
-        }));
+        console.log('API Data for export:', apiData.results);
+        
+        exportData = apiData.results.map((activity: Activity) => {
+          // Helper to get subactivity ID (check both _id and id)
+          const getSubActivityIds = () => {
+            if (!activity.subactivities || activity.subactivities.length === 0) {
+              return 'None';
+            }
+            return activity.subactivities
+              .map(sub => {
+                // Try _id first, then id, then return empty string if neither exists
+                const subId = (sub as any)._id || (sub as any).id || '';
+                return subId;
+              })
+              .filter(id => id !== '') // Remove empty IDs
+              .join(', ') || 'None';
+          };
+
+          console.log(`Exporting activity "${activity.name}":`, {
+            subactivities: activity.subactivities,
+            subactivityIds: getSubActivityIds(),
+            firstSubactivity: activity.subactivities?.[0]
+          });
+
+          return {
+            ID: activity.id,
+            "Activity Name": activity.name,
+            "Sort Order": activity.sortOrder,
+            "Frequency": activity.subactivities && activity.subactivities.length > 0 ? 
+              activity.subactivities.map(sub => `${sub.name} (${sub.frequency || 'No frequency'})`).join(', ') : 'No sub-activities',
+            "Sub-Activities": activity.subactivities && activity.subactivities.length > 0 ? activity.subactivities.map(sub => sub.name).join(', ') : 'None',
+            "Sub-Activity IDs": getSubActivityIds()
+          };
+        });
         successMessage = "All activities exported successfully";
       }
+
+      console.log('Final export data:', exportData);
 
       const ws = XLSX.utils.json_to_sheet(exportData);
       ws["!cols"] = [
@@ -213,6 +264,7 @@ const ActivitiesPage = () => {
         { wch: 15 }, // Sort Order
         { wch: 20 }, // Frequency
         { wch: 40 }, // Sub-Activities
+        { wch: 40 }, // Sub-Activity IDs
       ];
 
       const wb = XLSX.utils.book_new();
@@ -536,6 +588,14 @@ const ActivitiesPage = () => {
                 <table className="table whitespace-nowrap table-bordered">
                   <thead>
                     <tr>
+                      <th className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          className="form-checkbox"
+                          checked={selectedActivities.length === activities.length && activities.length > 0}
+                          onChange={handleSelectAll}
+                        />
+                      </th>
                       <th className="px-4 py-3">Activity Name</th>
                       <th className="px-4 py-3">Sub-Activities</th>
                       <th className="px-4 py-3">Actions</th>
@@ -544,7 +604,7 @@ const ActivitiesPage = () => {
                   <tbody>
                     {isLoading ? (
                       <tr>
-                        <td colSpan={3} className="text-center py-4">
+                        <td colSpan={4} className="text-center py-4">
                           <div className="flex justify-center">
                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                           </div>
@@ -552,13 +612,13 @@ const ActivitiesPage = () => {
                       </tr>
                     ) : error ? (
                       <tr>
-                        <td colSpan={3} className="text-center text-red-500 py-4">
+                        <td colSpan={4} className="text-center text-red-500 py-4">
                           {error}
                         </td>
                       </tr>
                     ) : activities.length === 0 ? (
                       <tr>
-                        <td colSpan={3} className="text-center py-4">
+                        <td colSpan={4} className="text-center py-4">
                           No activities found
                         </td>
                       </tr>
@@ -566,15 +626,15 @@ const ActivitiesPage = () => {
                       activities.map((activity) => (
                         <tr key={activity.id}>
                           <td className="px-4 py-3">
-                            <div className="flex items-center">
-                              <input
-                                type="checkbox"
-                                checked={selectedActivities.includes(activity.id)}
-                                onChange={() => handleSelectActivity(activity.id)}
-                                className="form-checkbox mr-3"
-                              />
-                              {activity.name}
-                            </div>
+                            <input
+                              type="checkbox"
+                              className="form-checkbox"
+                              checked={selectedActivities.includes(activity.id)}
+                              onChange={() => handleSelectActivity(activity.id)}
+                            />
+                          </td>
+                          <td className="px-4 py-3">
+                            {activity.name}
                           </td>
                           <td className="px-4 py-3">
                             {activity.subactivities && activity.subactivities.length > 0 ? (
