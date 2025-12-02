@@ -44,17 +44,31 @@ interface GstNumber {
 
 interface ActivityMapping {
   activity: string;
-  subactivity: string;
-  assignedTeamMember: string;
+  subactivity?: string;
+  assignedTeamMember?: string;
   assignedDate?: string;
-  notes: string;
+  notes?: string;
 }
 
-interface ActivityMapping {
-  activity: string;
-  assignedTeamMember: string;
-  assignedDate?: string;
-  notes: string;
+interface Activity {
+  id: string;
+  name: string;
+  description?: string;
+  subactivities?: Array<{
+    _id: string;
+    name: string;
+    frequency?: string;
+    frequencyConfig?: any;
+    fields?: Array<{
+      _id: string;
+      name: string;
+      type: string;
+      required?: boolean;
+      options?: string[];
+    }>;
+    createdAt: string;
+    updatedAt: string;
+  }>;
 }
 
 interface TaskStats {
@@ -174,8 +188,82 @@ const ClientsPage = () => {
   const [isLoadingTaskStats, setIsLoadingTaskStats] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [isLoadingActivities, setIsLoadingActivities] = useState(false);
 
   console.log(selectedBranchId, "selectedBranchId");
+
+  // Function to fetch activities (same as add page)
+  const fetchActivities = async (): Promise<Activity[]> => {
+    try {
+      setIsLoadingActivities(true);
+      console.log('🔍 [FETCH ACTIVITIES] Fetching activities from API...');
+      const response = await fetch(`${Base_url}activities?limit=1000`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch activities');
+      }
+      
+      const data = await response.json();
+      const activitiesList = data.results || [];
+      console.log(`✅ [FETCH ACTIVITIES] Fetched ${activitiesList.length} activities`);
+      setActivities(activitiesList);
+      return activitiesList;
+    } catch (error) {
+      console.error('❌ [FETCH ACTIVITIES] Error fetching activities:', error);
+      toast.error('Failed to fetch activities');
+      return [];
+    } finally {
+      setIsLoadingActivities(false);
+    }
+  };
+
+  // Function to find activity ID by name
+  const findActivityIdByName = (activityName: string, activitiesList: Activity[]): string | null => {
+    if (!activityName || !activityName.trim()) return null;
+    
+    const trimmedName = activityName.trim();
+    const found = activitiesList.find(act => 
+      act.name.trim().toLowerCase() === trimmedName.toLowerCase()
+    );
+    
+    if (found) {
+      console.log(`✅ [FIND ACTIVITY] Found activity "${trimmedName}" -> ID: ${found.id}`);
+      return found.id;
+    } else {
+      console.warn(`⚠️ [FIND ACTIVITY] Activity not found: "${trimmedName}"`);
+      return null;
+    }
+  };
+
+  // Function to find subactivity ID by name within an activity
+  const findSubactivityIdByName = (activityId: string, subactivityName: string, activitiesList: Activity[]): string | null => {
+    if (!subactivityName || !subactivityName.trim()) return null;
+    if (!activityId) return null;
+    
+    const activity = activitiesList.find(act => act.id === activityId);
+    if (!activity || !activity.subactivities) {
+      console.warn(`⚠️ [FIND SUBACTIVITY] Activity ${activityId} not found or has no subactivities`);
+      return null;
+    }
+    
+    const trimmedName = subactivityName.trim();
+    const found = activity.subactivities.find(sub => 
+      sub.name.trim().toLowerCase() === trimmedName.toLowerCase()
+    );
+    
+    if (found) {
+      console.log(`✅ [FIND SUBACTIVITY] Found subactivity "${trimmedName}" -> ID: ${found._id}`);
+      return found._id;
+    } else {
+      console.warn(`⚠️ [FIND SUBACTIVITY] Subactivity "${trimmedName}" not found in activity "${activity.name}"`);
+      return null;
+    }
+  };
 
   // Function to fetch task statistics for all clients
   const fetchClientTaskStats = async (): Promise<Map<string, TaskStats>> => {
@@ -901,12 +989,23 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
   //   * "GST Date of Registration 1" to "GST Date of Registration 3": Dates
   //   * "GST User ID 1" to "GST User ID 3": User IDs
   // - Activity fields (up to 5 sets):
-  //   * "Activity 1" to "Activity 5": Activity IDs (MongoDB ObjectId)
-  //   * "Subactivity 1" to "Subactivity 5": Subactivity IDs (MongoDB ObjectId)
+  //   * "Activity 1" to "Activity 5": Activity NAMES (will be converted to IDs)
+  //   * "Subactivity 1" to "Subactivity 5": Subactivity NAMES (will be converted to IDs)
   //   * "Activity Notes 1" to "Activity Notes 5": Activity notes text
   // - All other fields: Standard client information
 
   try {
+    // First, fetch activities to convert names to IDs
+    console.log('🔍 [IMPORT] Fetching activities before processing Excel...');
+    const activitiesList = await fetchActivities();
+    
+    if (activitiesList.length === 0) {
+      toast.error("Failed to fetch activities. Please try again.", { id: loadingToast });
+      return;
+    }
+    
+    console.log(`✅ [IMPORT] Fetched ${activitiesList.length} activities. Proceeding with Excel processing...`);
+    
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
@@ -929,10 +1028,29 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
         }
 
         // Debug: Log the first few rows to see the structure
-        console.log('=== BULK IMPORT START ===');
-        console.log('Total rows in Excel:', jsonData.length);
-        console.log('First 3 rows from Excel:', jsonData.slice(0, 3));
-        console.log('Excel column names:', Object.keys(jsonData[0] || {}));
+        console.log('\n========================================');
+        console.log('📥 BULK IMPORT START');
+        console.log('========================================');
+        console.log(`📊 Total rows in Excel: ${jsonData.length}`);
+        console.log(`\n📋 Excel Column Names:`);
+        const columnNames = Object.keys(jsonData[0] || {});
+        columnNames.forEach((col, idx) => {
+          console.log(`   ${idx + 1}. "${col}"`);
+        });
+        console.log(`\n🔍 Activity/Subactivity Columns Found:`);
+        const activityColumns = columnNames.filter(col => col.toLowerCase().includes('activity'));
+        activityColumns.forEach(col => {
+          console.log(`   ✓ "${col}"`);
+        });
+        if (activityColumns.length === 0) {
+          console.warn(`   ⚠️ NO ACTIVITY COLUMNS FOUND!`);
+        }
+        console.log(`\n📝 First 2 Rows Data:`);
+        jsonData.slice(0, 2).forEach((row, idx) => {
+          console.log(`\n   Row ${idx + 1}:`);
+          console.log(JSON.stringify(row, null, 2));
+        });
+        console.log('========================================\n');
 
         // Fetch all clients for upsert by name
         const allResponse = await fetch(`${Base_url}clients?limit=1000`, {
@@ -1019,23 +1137,72 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
               return gstNumbers;
             };
 
-            // Helper function to extract activities from Excel
-            const extractActivities = (row: ExcelRow) => {
+            // Helper function to extract activities from Excel and convert names to IDs
+            const extractActivities = (row: ExcelRow, activitiesList: Activity[]) => {
               const activities = [];
+              console.log(`🔍 [EXTRACT ACTIVITIES] Starting extraction for row ${rowNumber}`);
+              console.log(`🔍 [EXTRACT ACTIVITIES] Row keys:`, Object.keys(row));
+              console.log(`🔍 [EXTRACT ACTIVITIES] Available activities count: ${activitiesList.length}`);
+              
               for (let i = 1; i <= 5; i++) {
-                const activity = row[`Activity ${i}` as keyof ExcelRow]?.toString().trim();
-                const subactivity = row[`Subactivity ${i}` as keyof ExcelRow]?.toString().trim();
-                const notes = row[`Activity Notes ${i}` as keyof ExcelRow]?.toString().trim();
+                const activityKey = `Activity ${i}` as keyof ExcelRow;
+                const subactivityKey = `Subactivity ${i}` as keyof ExcelRow;
+                const notesKey = `Activity Notes ${i}` as keyof ExcelRow;
                 
-                // Only add if at least activity is provided
-                if (activity) {
-                  activities.push({
-                    activity,
-                    subactivity: subactivity || "",
-                    notes: notes || ""
-                  });
+                const activityName = row[activityKey]?.toString().trim();
+                const subactivityName = row[subactivityKey]?.toString().trim();
+                const notes = row[notesKey]?.toString().trim();
+                
+                console.log(`🔍 [EXTRACT ACTIVITIES] Activity ${i} - Raw values:`, {
+                  activityKey,
+                  activityName: activityName,
+                  subactivityKey,
+                  subactivityName: subactivityName,
+                  notesKey,
+                  notesValue: notes
+                });
+                
+                // Only process if at least activity name is provided
+                if (activityName) {
+                  // Convert activity name to ID
+                  const activityId = findActivityIdByName(activityName, activitiesList);
+                  
+                  if (!activityId) {
+                    console.warn(`❌ [EXTRACT ACTIVITIES] Activity ${i} - Could not find ID for name: "${activityName}"`);
+                    // Still add it but log warning - backend will handle validation
+                    continue; // Skip this activity if name not found
+                  }
+                  
+                  const activityData: any = {
+                    activity: activityId
+                  };
+                  
+                  // Convert subactivity name to ID if provided
+                  if (subactivityName) {
+                    const subactivityId = findSubactivityIdByName(activityId, subactivityName, activitiesList);
+                    if (subactivityId) {
+                      activityData.subactivity = subactivityId;
+                      console.log(`✅ [EXTRACT ACTIVITIES] Activity ${i} - Mapped subactivity: "${subactivityName}" -> ${subactivityId}`);
+                    } else {
+                      console.warn(`⚠️ [EXTRACT ACTIVITIES] Activity ${i} - Could not find subactivity ID for name: "${subactivityName}"`);
+                      // Don't add subactivity if not found
+                    }
+                  }
+                  
+                  // Only include notes if it has a value
+                  if (notes) {
+                    activityData.notes = notes;
+                  }
+                  
+                  console.log(`✅ [EXTRACT ACTIVITIES] Activity ${i} - Final data:`, activityData);
+                  activities.push(activityData);
+                } else {
+                  console.log(`⚠️ [EXTRACT ACTIVITIES] Skipping activity ${i} - no activity name provided`);
                 }
               }
+              
+              console.log(`📊 [EXTRACT ACTIVITIES] Total activities extracted: ${activities.length}`);
+              console.log(`📊 [EXTRACT ACTIVITIES] Final activities array:`, JSON.stringify(activities, null, 2));
               return activities;
             };
 
@@ -1091,34 +1258,31 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
 
             // Extract GST numbers and activities
             const gstNumbers = extractGstNumbers(row);
-            const activities = extractActivities(row);
+            const activities = extractActivities(row, activitiesList);
             
             console.log(`Row ${rowNumber} - GST Numbers found: ${gstNumbers.length}`);
             if (gstNumbers.length > 0) {
               console.log(`Row ${rowNumber} - GST Numbers:`, gstNumbers);
             }
 
-            // Validate MongoDB ObjectId format for activity IDs
-            const isValidObjectId = (id: string) => /^[0-9a-fA-F]{24}$/.test(id);
-            
-            // Filter activities with valid IDs
+            // Activities are already validated and converted to IDs in extractActivities
+            // Filter out any activities that don't have an activity ID (name not found)
             const validActivities = activities.filter(act => {
-              if (!act.activity) return false;
-              const isValid = isValidObjectId(act.activity);
-              if (!isValid) {
-                console.warn(`⚠️ Row ${rowNumber} - Invalid Activity ID: "${act.activity}" (must be 24 char MongoDB ObjectId)`);
+              if (!act.activity) {
+                console.warn(`⚠️ Row ${rowNumber} - Activity missing ID (name not found in activities list)`);
+                return false;
               }
-              return isValid;
+              return true;
             });
 
             // Log activity validation
-            console.log(`Row ${rowNumber} - Activities found: ${activities.length}, Valid: ${validActivities.length}`);
+            console.log(`Row ${rowNumber} - Activities extracted: ${activities.length}, Valid (with IDs): ${validActivities.length}`);
             if (activities.length > validActivities.length) {
-              const invalidActivities = activities.filter(act => !act.activity || !isValidObjectId(act.activity));
-              console.warn(`⚠️ Row ${rowNumber} - Invalid Activity IDs:`, invalidActivities.map(a => a.activity));
+              const invalidCount = activities.length - validActivities.length;
+              console.warn(`⚠️ Row ${rowNumber} - ${invalidCount} activity(ies) skipped due to name not found in activities list`);
             }
             if (validActivities.length > 0) {
-              console.log(`Row ${rowNumber} - Valid Activities:`, validActivities);
+              console.log(`✅ Row ${rowNumber} - Valid Activities (with IDs):`, validActivities);
             }
 
             let clientId = row["ID"];
@@ -1155,17 +1319,30 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
               activities: validActivities
             };
 
-            console.log(`Row ${rowNumber} - Final client data:`, {
-              id: finalClientData.id || 'NEW',
-              name: finalClientData.name,
-              email: finalClientData.email,
-              phone: finalClientData.phone,
-              branch: finalClientData.branch,
-              gstNumbersCount: finalClientData.gstNumbers?.length || 0,
-              activitiesCount: finalClientData.activities?.length || 0,
-              mode: isUpdate ? 'UPDATE' : 'CREATE',
-              matchMethod
-            });
+            console.log(`\n========== ROW ${rowNumber} - FINAL CLIENT DATA ==========`);
+            console.log(`📝 Client Name: ${finalClientData.name}`);
+            console.log(`📧 Email: ${finalClientData.email}`);
+            console.log(`📞 Phone: ${finalClientData.phone}`);
+            console.log(`🏢 Branch: ${finalClientData.branch}`);
+            console.log(`📊 Mode: ${isUpdate ? 'UPDATE' : 'CREATE'} (${matchMethod})`);
+            console.log(`\n🔍 ACTIVITIES DATA:`);
+            console.log(`   - Raw activities count: ${activities.length}`);
+            console.log(`   - Valid activities count: ${validActivities.length}`);
+            console.log(`   - Activities in finalClientData: ${finalClientData.activities?.length || 0}`);
+            console.log(`\n📋 Activities Details:`);
+            if (finalClientData.activities && finalClientData.activities.length > 0) {
+              finalClientData.activities.forEach((act: any, idx: number) => {
+                console.log(`   Activity ${idx + 1}:`);
+                console.log(`      - activity ID: ${act.activity}`);
+                console.log(`      - subactivity ID: ${act.subactivity || 'N/A'}`);
+                console.log(`      - notes: ${act.notes || 'N/A'}`);
+              });
+            } else {
+              console.log(`   ⚠️ NO ACTIVITIES IN FINAL DATA!`);
+            }
+            console.log(`\n🏢 GST Numbers: ${finalClientData.gstNumbers?.length || 0}`);
+            console.log(`\n📦 Full finalClientData object:`, JSON.stringify(finalClientData, null, 2));
+            console.log(`========================================\n`);
 
             processingStats.processed++;
             return finalClientData;
@@ -1223,20 +1400,42 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
         console.log(`Total clients in payload: ${validClients.length}`);
         console.log('Sample clients (first 3):', validClients.slice(0, 3));
         
-        const createCount = validClients.filter(c => !c.id).length;
-        const updateCount = validClients.filter(c => c.id).length;
+        const createCount = validClients.filter(c => c && !c.id).length;
+        const updateCount = validClients.filter(c => c && c.id).length;
         console.log(`Will CREATE: ${createCount} clients`);
         console.log(`Will UPDATE: ${updateCount} clients`);
         
-        const clientsWithActivities = validClients.filter(c => c.activities && c.activities.length > 0);
-        const clientsWithGst = validClients.filter(c => c.gstNumbers && c.gstNumbers.length > 0);
+        const clientsWithActivities = validClients.filter(c => c && c.activities && c.activities.length > 0);
+        const clientsWithGst = validClients.filter(c => c && c.gstNumbers && c.gstNumbers.length > 0);
         console.log(`Clients with activities: ${clientsWithActivities.length}`);
         console.log(`Clients with GST numbers: ${clientsWithGst.length}`);
 
         // Single API call instead of multiple requests
-        console.log('\n=== SENDING TO API ===');
-        console.log(`API Endpoint: ${Base_url}clients/bulk-import`);
-        console.log(`Payload size: ${JSON.stringify({ clients: validClients }).length} bytes`);
+        console.log('\n========================================');
+        console.log('🚀 SENDING TO API - BULK IMPORT');
+        console.log('========================================');
+        console.log(`📍 API Endpoint: ${Base_url}clients/bulk-import`);
+        console.log(`📊 Total clients in payload: ${validClients.length}`);
+        console.log(`📦 Payload size: ${JSON.stringify({ clients: validClients }).length} bytes`);
+        
+        // Log activity data for each client before sending
+        console.log(`\n🔍 ACTIVITIES CHECK BEFORE API CALL:`);
+        validClients.forEach((client: any, idx: number) => {
+          console.log(`\n   Client ${idx + 1}: ${client.name}`);
+          console.log(`   - Has activities field: ${!!client.activities}`);
+          console.log(`   - Activities count: ${client.activities?.length || 0}`);
+          if (client.activities && client.activities.length > 0) {
+            console.log(`   - Activities data:`, JSON.stringify(client.activities, null, 2));
+          }
+        });
+        
+        // Log first 2 clients full data
+        console.log(`\n📝 SAMPLE CLIENT DATA (First 2 clients):`);
+        validClients.slice(0, 2).forEach((client: any, idx: number) => {
+          console.log(`\n   === Client ${idx + 1} Full Data ===`);
+          console.log(JSON.stringify(client, null, 2));
+        });
+        console.log('========================================\n');
         
         const response = await fetch(`${Base_url}clients/bulk-import`, {
           method: 'POST',
@@ -2350,3 +2549,4 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
 };
 
 export default ClientsPage;
+
