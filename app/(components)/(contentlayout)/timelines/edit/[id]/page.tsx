@@ -256,11 +256,11 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
         console.log('Branch from API:', timelineData.branch);
 
         setFormData({
-          activityId: timelineData.activity.id,
+          activityId: timelineData.activity?.id || '',
           groupId: '',
-          clientId: timelineData.client.id,
-          clientName: timelineData.client.name,
-          clientEmail: timelineData.client.email,
+          clientId: timelineData.client?.id || '',
+          clientName: timelineData.client?.name || '',
+          clientEmail: timelineData.client?.email || '',
           branch: timelineData.branch || '',
           frequency: timelineData.frequency,
           frequencyConfig: timelineData.frequencyConfig,
