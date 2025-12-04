@@ -161,8 +161,10 @@ const AddActivityPage = () => {
   };
 
   const validateSubActivityFrequencyConfig = (frequency: string, config: any) => {
-    if (!config) return false;
+    if (!config && frequency !== 'OneTime') return false;
     switch (frequency) {
+      case 'OneTime':
+        return true; // One Time doesn't need configuration
       case 'Hourly':
         return config.hourlyInterval > 0;
       case 'Daily':
@@ -182,11 +184,13 @@ const AddActivityPage = () => {
 
   const getSubActivityFrequencyConfigStatus = (subActivity: { frequency?: string; frequencyConfig?: any }) => {
     if (!subActivity.frequency || subActivity.frequency === 'None') return 'Not configured';
+    if (subActivity.frequency === 'OneTime') return 'Configured';
     return validateSubActivityFrequencyConfig(subActivity.frequency, subActivity.frequencyConfig) ? 'Configured' : 'Incomplete';
   };
 
   const getSubActivityFrequencyConfigStatusColor = (subActivity: { frequency?: string; frequencyConfig?: any }) => {
     if (!subActivity.frequency || subActivity.frequency === 'None') return 'text-gray-500';
+    if (subActivity.frequency === 'OneTime') return 'text-green-600';
     return validateSubActivityFrequencyConfig(subActivity.frequency, subActivity.frequencyConfig) ? 'text-green-600' : 'text-red-600';
   };
 
@@ -246,6 +250,9 @@ const AddActivityPage = () => {
               
               // Only include relevant config based on frequency type
               switch (subActivity.frequency) {
+                case 'OneTime':
+                  // One Time doesn't need any configuration
+                  break;
                 case 'Hourly':
                   if (subActivity.frequencyConfig?.hourlyInterval) {
                     cleanFrequencyConfig.hourlyInterval = subActivity.frequencyConfig.hourlyInterval;
@@ -338,6 +345,7 @@ const AddActivityPage = () => {
 
   const getFrequencyOptions = () => {
     const options = [
+      { value: 'OneTime', label: 'One Time' },
       { value: 'Hourly', label: 'Hourly' },
       { value: 'Daily', label: 'Daily' },
       { value: 'Weekly', label: 'Weekly' },
@@ -491,7 +499,7 @@ const AddActivityPage = () => {
                             </div>
 
                             {/* Frequency Configuration */}
-                            {subActivity.frequency && subActivity.frequency !== 'None' && (
+                            {subActivity.frequency && subActivity.frequency !== 'None' && subActivity.frequency !== 'OneTime' && (
                               <div className="form-group mb-4">
                                 <label className="form-label">Due Date Configuration</label>
                                 <button

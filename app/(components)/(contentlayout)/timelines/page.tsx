@@ -908,7 +908,7 @@ const TimelinesPage = () => {
                       <th className="px-4 py-3">Activity</th>
                       <th className="px-4 py-3">Sub Activity</th>
                       <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">Period</th>
+                      <th className="px-4 py-3">Due Date</th>
                       <th className="px-4 py-3">Client Name</th>
                       <th className="px-4 py-3">Actions</th>
                     </tr>
@@ -996,7 +996,7 @@ const TimelinesPage = () => {
                               {timeline.status?.charAt(0).toUpperCase() + timeline.status?.slice(1) || "-"}
                             </span>
                           </td>
-                          <td>{timeline.period || "-"}</td>
+                          <td>{timeline.subactivity?.frequency || "-"}</td>
                           <td>{timeline.client?.name || "-"}</td>
                           <td>
                             <div className="flex space-x-2">
