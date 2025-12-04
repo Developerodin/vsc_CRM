@@ -908,6 +908,7 @@ const TimelinesPage = () => {
                       <th className="px-4 py-3">Activity</th>
                       <th className="px-4 py-3">Sub Activity</th>
                       <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Period</th>
                       <th className="px-4 py-3">Due Date</th>
                       <th className="px-4 py-3">Client Name</th>
                       <th className="px-4 py-3">Actions</th>
@@ -916,7 +917,7 @@ const TimelinesPage = () => {
                   <tbody>
                     {isLoading ? (
                       <tr>
-                        <td colSpan={7} className="text-center py-4">
+                        <td colSpan={8} className="text-center py-4">
                           <div className="flex justify-center">
                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                           </div>
@@ -924,13 +925,13 @@ const TimelinesPage = () => {
                       </tr>
                     ) : error ? (
                       <tr>
-                        <td colSpan={7} className="text-center text-red-500 py-4">
+                        <td colSpan={8} className="text-center text-red-500 py-4">
                           {error}
                         </td>
                       </tr>
                     ) : timelines.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="text-center py-8">
+                        <td colSpan={8} className="text-center py-8">
                           <div className="flex flex-col items-center justify-center">
                             <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
                               <i className="ri-time-line text-4xl text-primary"></i>
@@ -996,6 +997,7 @@ const TimelinesPage = () => {
                               {timeline.status?.charAt(0).toUpperCase() + timeline.status?.slice(1) || "-"}
                             </span>
                           </td>
+                          <td>{timeline.period || "-"}</td>
                           <td>{timeline.subactivity?.frequency || "-"}</td>
                           <td>{timeline.client?.name || "-"}</td>
                           <td>
