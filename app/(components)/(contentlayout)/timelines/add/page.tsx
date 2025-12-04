@@ -376,6 +376,11 @@ const AddTimelinePage = () => {
   const validateFrequencyConfig = () => {
     const { frequency, frequencyConfig } = formData;
     
+    // OneTime frequency doesn't require configuration
+    if (frequency === 'OneTime') {
+      return true;
+    }
+    
     switch (frequency) {
       case 'Hourly':
         return frequencyConfig.hourlyInterval > 0;
@@ -420,11 +425,13 @@ const AddTimelinePage = () => {
 
   const getFrequencyConfigStatus = () => {
     if (!formData.frequency) return 'Not configured';
+    if (formData.frequency === 'OneTime') return 'Not required';
     return validateFrequencyConfig() ? 'Configured' : 'Incomplete';
   };
 
   const getFrequencyConfigStatusColor = () => {
     if (!formData.frequency) return 'text-gray-500';
+    if (formData.frequency === 'OneTime') return 'text-gray-500';
     return validateFrequencyConfig() ? 'text-green-600' : 'text-red-600';
   };
 
@@ -466,6 +473,9 @@ const AddTimelinePage = () => {
     const { frequencyConfig } = formData;
 
     switch (formData.frequency) {
+      case 'OneTime':
+        frequencyText = `one time`;
+        break;
       case 'Hourly':
         frequencyText = `every ${frequencyConfig.hourlyInterval} hour${frequencyConfig.hourlyInterval > 1 ? 's' : ''}`;
         break;
@@ -558,38 +568,35 @@ const AddTimelinePage = () => {
     try {
       setIsLoading(true);
 
-      // Format frequency configuration for API
-      const formattedFrequencyConfig = {
-        ...formData.frequencyConfig,
-        dailyTime: formatTimeForAPI(formData.frequencyConfig.dailyTime),
-        weeklyTime: formatTimeForAPI(formData.frequencyConfig.weeklyTime),
-        monthlyTime: formatTimeForAPI(formData.frequencyConfig.monthlyTime),
-        quarterlyTime: formatTimeForAPI(formData.frequencyConfig.quarterlyTime),
-        yearlyTime: formatTimeForAPI(formData.frequencyConfig.yearlyTime)
-      };
-
-      const cleanedFrequencyConfig = includeSelectedFrequency(formData.frequency, formattedFrequencyConfig);
-      formData.frequencyConfig = cleanedFrequencyConfig;
-
-      // Remove empty fields from request body
-      const cleanedFormData = removeEmptyFields({
+      // Prepare the request body
+      const requestBody: any = {
         activity: formData.activityId,
         client: formData.clientId, // Send array of client IDs - backend will handle creating multiple timelines
         branch: formData.branch,
         frequency: formData.frequency,
-        frequencyConfig: formData.frequencyConfig,
         status: formData.status
-      });
+      };
 
-      console.log('Form Data before cleaning:', {
-        activity: formData.activityId,
-        client: formData.clientId,
-        branch: formData.branch,
-        frequency: formData.frequency,
-        frequencyConfig: formData.frequencyConfig,
-        status: formData.status
-      });
+      // Only include frequencyConfig if not "OneTime"
+      if (formData.frequency !== 'OneTime') {
+        // Format frequency configuration for API
+        const formattedFrequencyConfig = {
+          ...formData.frequencyConfig,
+          dailyTime: formatTimeForAPI(formData.frequencyConfig.dailyTime),
+          weeklyTime: formatTimeForAPI(formData.frequencyConfig.weeklyTime),
+          monthlyTime: formatTimeForAPI(formData.frequencyConfig.monthlyTime),
+          quarterlyTime: formatTimeForAPI(formData.frequencyConfig.quarterlyTime),
+          yearlyTime: formatTimeForAPI(formData.frequencyConfig.yearlyTime)
+        };
 
+        const cleanedFrequencyConfig = includeSelectedFrequency(formData.frequency, formattedFrequencyConfig);
+        requestBody.frequencyConfig = cleanedFrequencyConfig;
+      }
+
+      // Remove empty fields from request body
+      const cleanedFormData = removeEmptyFields(requestBody);
+
+      console.log('Request body before cleaning:', requestBody);
       console.log('Cleaned Form Data being sent to API:', cleanedFormData);
       console.log('Request body (stringified):', JSON.stringify(cleanedFormData));
 
@@ -630,6 +637,7 @@ const AddTimelinePage = () => {
 
   const getFrequencyOptions = () => {
     const options = [
+      { value: 'OneTime', label: 'One Time' },
       { value: 'Hourly', label: 'Hourly' },
       { value: 'Daily', label: 'Daily' },
       { value: 'Weekly', label: 'Weekly' },
@@ -729,7 +737,7 @@ const AddTimelinePage = () => {
                       <option value="none">All Clients</option>
                       {groups.map(group => (
                         <option key={group.id} value={group.id}>
-                          {group.name} ({group.numberOfClients} clients)
+                          {group.name}
                         </option>
                       ))}
                     </select>
@@ -793,18 +801,18 @@ const AddTimelinePage = () => {
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">Frequency Configuration <span className="text-red-500">*</span></label>
+                    <label className="form-label">Frequency Configuration {formData.frequency !== 'OneTime' && <span className="text-red-500">*</span>}</label>
                     <button
                       type="button"
                       className={`w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-left focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary ${
-                        !formData.frequency ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
+                        !formData.frequency || formData.frequency === 'OneTime' ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
                       }`}
                       onClick={() => {
-                        if (formData.frequency) {
+                        if (formData.frequency && formData.frequency !== 'OneTime') {
                           setShowFrequencyModal(true);
                         }
                       }}
-                      disabled={!formData.frequency}
+                      disabled={!formData.frequency || formData.frequency === 'OneTime'}
                     >
                       <span className="truncate">
                         {formData.frequency ? (

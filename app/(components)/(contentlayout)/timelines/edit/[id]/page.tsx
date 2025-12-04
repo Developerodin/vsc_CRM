@@ -263,7 +263,20 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
           clientEmail: timelineData.client?.email || '',
           branch: timelineData.branch || '',
           frequency: timelineData.frequency,
-          frequencyConfig: timelineData.frequencyConfig,
+          frequencyConfig: {
+            hourlyInterval: timelineData.frequencyConfig?.hourlyInterval || 1,
+            dailyTime: formatTimeForInput(timelineData.frequencyConfig?.dailyTime) || '',
+            weeklyDays: timelineData.frequencyConfig?.weeklyDays || [],
+            weeklyTime: formatTimeForInput(timelineData.frequencyConfig?.weeklyTime) || '',
+            monthlyDay: timelineData.frequencyConfig?.monthlyDay || 1,
+            monthlyTime: formatTimeForInput(timelineData.frequencyConfig?.monthlyTime) || '',
+            quarterlyMonths: timelineData.frequencyConfig?.quarterlyMonths || [],
+            quarterlyDay: timelineData.frequencyConfig?.quarterlyDay || 1,
+            quarterlyTime: formatTimeForInput(timelineData.frequencyConfig?.quarterlyTime) || '',
+            yearlyMonth: timelineData.frequencyConfig?.yearlyMonth || [],
+            yearlyDate: timelineData.frequencyConfig?.yearlyDate || 1,
+            yearlyTime: formatTimeForInput(timelineData.frequencyConfig?.yearlyTime) || ''
+          },
           status: timelineData.status,
           turnover: timelineData.turnover?.toString() || '',
           startDate: formatDateForInput(timelineData.startDate),
@@ -469,13 +482,13 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
       case 'Daily':
         return frequencyConfig.dailyTime !== '';
       case 'Weekly':
-        return frequencyConfig.weeklyDays.length > 0 && frequencyConfig.weeklyTime !== '';
+        return (frequencyConfig.weeklyDays?.length || 0) > 0 && frequencyConfig.weeklyTime !== '';
       case 'Monthly':
         return frequencyConfig.monthlyDay > 0 && frequencyConfig.monthlyDay <= 31 && frequencyConfig.monthlyTime !== '';
       case 'Quarterly':
-        return frequencyConfig.quarterlyMonths.length > 0 && frequencyConfig.quarterlyDay > 0 && frequencyConfig.quarterlyDay <= 31 && frequencyConfig.quarterlyTime !== '';
+        return (frequencyConfig.quarterlyMonths?.length || 0) > 0 && frequencyConfig.quarterlyDay > 0 && frequencyConfig.quarterlyDay <= 31 && frequencyConfig.quarterlyTime !== '';
       case 'Yearly':
-        return frequencyConfig.yearlyMonth.length > 0 && frequencyConfig.yearlyDate > 0 && frequencyConfig.yearlyDate <= 31 && frequencyConfig.yearlyTime !== '';
+        return (frequencyConfig.yearlyMonth?.length || 0) > 0 && frequencyConfig.yearlyDate > 0 && frequencyConfig.yearlyDate <= 31 && frequencyConfig.yearlyTime !== '';
       default:
         return false;
     }
@@ -725,7 +738,7 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
                       <option value="none">All Clients</option>
                       {groups.map(group => (
                         <option key={group.id} value={group.id}>
-                          {group.name} ({group.numberOfClients} clients)
+                          {group.name}
                         </option>
                       ))}
                     </select>

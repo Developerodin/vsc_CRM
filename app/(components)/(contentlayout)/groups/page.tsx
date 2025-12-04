@@ -216,6 +216,14 @@ const GroupsPage = () => {
         return { ...group, taskStats };
       });
       
+      // Check if any advanced filters are active
+      const hasAdvancedFilters = advancedFilters.clientName || 
+        advancedFilters.minClients || 
+        advancedFilters.maxClients || 
+        advancedFilters.minTasks || 
+        advancedFilters.maxTasks ||
+        (advancedFilters.taskStatus && Object.values(advancedFilters.taskStatus).some(v => v === true));
+      
       // Apply client name filter after fetching groups
       if (advancedFilters.clientName) {
         groupsWithTasks = groupsWithTasks.filter(group => 
@@ -230,8 +238,16 @@ const GroupsPage = () => {
       const filteredGroups = applyAdvancedFilters(groupsWithTasks);
       
       setGroups(filteredGroups);
-      setTotalResults(filteredGroups.length);
-      setTotalPages(Math.ceil(filteredGroups.length / limit));
+      
+      // Only use filtered results for pagination if advanced filters are active
+      // Otherwise, use the API's pagination data
+      if (hasAdvancedFilters) {
+        setTotalResults(filteredGroups.length);
+        setTotalPages(Math.ceil(filteredGroups.length / limit));
+      } else {
+        setTotalResults(data.totalResults);
+        setTotalPages(data.totalPages);
+      }
     } catch (err) {
       console.error('Error fetching groups:', err);
       setError('Failed to fetch groups');
@@ -277,7 +293,22 @@ const GroupsPage = () => {
         }
         
         // Then apply other advanced filters
-        return applyAdvancedFilters(filteredGroups);
+        const finalFiltered = applyAdvancedFilters(filteredGroups);
+        
+        // Update pagination counts when advanced filters are active
+        const hasAdvancedFilters = advancedFilters.clientName || 
+          advancedFilters.minClients || 
+          advancedFilters.maxClients || 
+          advancedFilters.minTasks || 
+          advancedFilters.maxTasks ||
+          (advancedFilters.taskStatus && Object.values(advancedFilters.taskStatus).some(v => v === true));
+        
+        if (hasAdvancedFilters) {
+          setTotalResults(finalFiltered.length);
+          setTotalPages(Math.ceil(finalFiltered.length / itemsPerPage));
+        }
+        
+        return finalFiltered;
       });
     };
 

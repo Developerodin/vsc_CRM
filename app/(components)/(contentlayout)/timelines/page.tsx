@@ -1200,6 +1200,7 @@ const TimelinesPage = () => {
                   disabled={!!exportFilters.subActivity} // Disabled when sub-activity is selected
                 >
                   <option value="">All Frequencies</option>
+                  <option value="OneTime">One Time</option>
                   <option value="Hourly">Hourly</option>
                   <option value="Daily">Daily</option>
                   <option value="Weekly">Weekly</option>
