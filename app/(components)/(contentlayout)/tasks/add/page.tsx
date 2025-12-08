@@ -82,6 +82,7 @@ const AddTaskPage = () => {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [timelines, setTimelines] = useState<Timeline[]>([]);
+  const [allFilteredTimelines, setAllFilteredTimelines] = useState<Timeline[]>([]); // Store all filtered timelines for client-side pagination
   const [selectedTimelines, setSelectedTimelines] = useState<Timeline[]>([]);
   const [showTimelineModal, setShowTimelineModal] = useState(false);
   const [isLoadingTimelines, setIsLoadingTimelines] = useState(false);
@@ -252,27 +253,34 @@ const AddTaskPage = () => {
     try {
       setIsLoadingTimelines(true);
       
+      // Get activity name if activity filter is selected
+      const selectedActivityData = selectedActivity && !forceClearFilters
+        ? activities.find(a => a.id === selectedActivity)
+        : null;
+      const activityName = selectedActivityData?.name;
+      
+      // Get group name if group filter is selected
+      const selectedGroupData = selectedGroup && !forceClearFilters
+        ? groups.find(g => g.id === selectedGroup)
+        : null;
+      const groupName = selectedGroupData?.name;
+      
       // Build query parameters with proper pagination
       const queryParams = new URLSearchParams({
         page: page.toString(),
         limit: timelineItemsPerPage.toString(),
-        sortBy: "title:asc",
+        sortBy: activityName ? "activityName:asc" : "title:asc",
         ...((searchQueryParam || timelineSearchQuery) && { search: searchQueryParam || timelineSearchQuery })
       });
 
-      // Add activity filter if selected
-      if (selectedActivity && !forceClearFilters) {
-        queryParams.append('activity', selectedActivity);
+      // Add activity filter using activityName parameter
+      if (activityName && !forceClearFilters) {
+        queryParams.append('activityName', activityName);
       }
 
-      // For group filtering, we need to fetch all timelines and filter client-side
-      // because the API doesn't support group filtering directly
-      const needsClientSideFiltering = selectedGroup && !forceClearFilters;
-      
-      // If group filtering is needed, fetch more records to filter
-      if (needsClientSideFiltering) {
-        queryParams.set('limit', '1000'); // Fetch more for client-side filtering
-        queryParams.set('page', '1'); // Start from page 1 when filtering
+      // Add group filter using group parameter (backend API now supports it)
+      if (groupName && !forceClearFilters) {
+        queryParams.append('group', groupName);
       }
 
       const response = await fetch(`${Base_url}timelines?${queryParams}`, {
@@ -286,34 +294,13 @@ const AddTaskPage = () => {
       }
 
       const data = await response.json();
-      let allTimelines = data.results || [];
       
-      // Apply client-side filtering for group if needed
-      if (needsClientSideFiltering) {
-        const selectedGroupData = groups.find(g => g.id === selectedGroup);
-        if (selectedGroupData) {
-          const clientIds = selectedGroupData.clients.map(client => client.id);
-          allTimelines = allTimelines.filter((timeline: Timeline) => {
-            return timeline.client?.id && clientIds.includes(timeline.client.id);
-          });
-        }
-        
-        // Apply pagination to filtered results
-        const startIndex = (page - 1) * timelineItemsPerPage;
-        const endIndex = startIndex + timelineItemsPerPage;
-        const paginatedTimelines = allTimelines.slice(startIndex, endIndex);
-        
-        setTimelines(paginatedTimelines);
-        setTimelineTotalResults(allTimelines.length);
-        setTimelineTotalPages(Math.max(1, Math.ceil(allTimelines.length / timelineItemsPerPage)));
-        setTimelineCurrentPage(page);
-      } else {
-        // Server-side pagination when no group filter
-        setTimelines(allTimelines);
-        setTimelineTotalResults(data.totalResults || 0);
-        setTimelineTotalPages(data.totalPages || 1);
-        setTimelineCurrentPage(page);
-      }
+      // Server-side pagination (backend handles filtering)
+      setAllFilteredTimelines([]); // Clear stored filtered timelines
+      setTimelines(data.results || []);
+      setTimelineTotalResults(data.totalResults || 0);
+      setTimelineTotalPages(data.totalPages || 1);
+      setTimelineCurrentPage(page);
     } catch (err) {
       console.error('Error fetching timelines:', err);
       toast.error('Failed to fetch timelines');
@@ -365,7 +352,17 @@ const AddTaskPage = () => {
   };
 
   const handleTimelinePageChange = (newPage: number) => {
-    fetchTimelines(newPage, timelineSearchQuery);
+    const hasGroupFilter = !!selectedGroup;
+    
+    // If group filter is applied, use client-side pagination (no refetch needed)
+    if (hasGroupFilter && allFilteredTimelines.length > 0) {
+      setTimelineCurrentPage(newPage);
+      // Pagination will be handled by getPaginatedTimelines
+    } else {
+      // Activity filter only or no filters - use server-side pagination
+      setTimelineCurrentPage(newPage);
+      fetchTimelines(newPage, timelineSearchQuery);
+    }
   };
 
   // Filter change handlers
@@ -382,12 +379,20 @@ const AddTaskPage = () => {
     setSelectedGroup("");
     setTimelineSearchQuery("");
     setTimelineCurrentPage(1);
+    setAllFilteredTimelines([]); // Clear stored filtered timelines
     // Fetch timelines without any filters
     fetchTimelines(1, "", true);
   };
 
-  // Get paginated timelines for display (now handled in fetchTimelines)
+  // Get paginated timelines for display
   const getPaginatedTimelines = () => {
+    // If group filter is applied, paginate from stored filtered timelines
+    if (selectedGroup && allFilteredTimelines.length > 0) {
+      const startIndex = (timelineCurrentPage - 1) * timelineItemsPerPage;
+      const endIndex = startIndex + timelineItemsPerPage;
+      return allFilteredTimelines.slice(startIndex, endIndex);
+    }
+    // Otherwise, return timelines as-is (already paginated by server or fetchTimelines)
     return timelines;
   };
 
