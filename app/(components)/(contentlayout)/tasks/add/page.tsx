@@ -110,6 +110,16 @@ const AddTaskPage = () => {
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   
+  // Form validation errors
+  const [formErrors, setFormErrors] = useState<{
+    teamMember?: string;
+    startDate?: string;
+    endDate?: string;
+    branch?: string;
+    remarks?: string;
+    general?: string;
+  }>({});
+  
   const [formData, setFormData] = useState({
     teamMember: "",
     startDate: "",
@@ -324,10 +334,52 @@ const AddTaskPage = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    
+    // Clear error for this field when user starts typing
+    if (formErrors[name as keyof typeof formErrors]) {
+      setFormErrors(prev => ({
+        ...prev,
+        [name]: undefined
+      }));
+    }
+    
+    setFormData(prev => {
+      const newData = {
+        ...prev,
+        [name]: value
+      };
+      
+      // Validate date range when dates change
+      if (name === 'startDate' && newData.endDate) {
+        if (new Date(value) >= new Date(newData.endDate)) {
+          setFormErrors(prev => ({
+            ...prev,
+            endDate: 'End date must be after start date'
+          }));
+        } else {
+          setFormErrors(prev => ({
+            ...prev,
+            endDate: undefined
+          }));
+        }
+      }
+      
+      if (name === 'endDate' && newData.startDate) {
+        if (new Date(value) <= new Date(newData.startDate)) {
+          setFormErrors(prev => ({
+            ...prev,
+            endDate: 'End date must be after start date'
+          }));
+        } else {
+          setFormErrors(prev => ({
+            ...prev,
+            endDate: undefined
+          }));
+        }
+      }
+      
+      return newData;
+    });
   };
 
   const handleTimelineSelect = (timeline: Timeline) => {
@@ -416,6 +468,11 @@ const AddTaskPage = () => {
       setFormData(prev => ({
         ...prev,
         teamMember: selectedTeamMember.id
+      }));
+      // Clear team member error when selected
+      setFormErrors(prev => ({
+        ...prev,
+        teamMember: undefined
       }));
     }
     setShowTeamMemberModal(false);
@@ -565,17 +622,44 @@ const AddTaskPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.teamMember || !formData.startDate || !formData.endDate || !formData.branch || !formData.remarks.trim()) {
-      toast.error('Please fill in all required fields');
-      return;
+    // Clear previous errors
+    setFormErrors({});
+    
+    // Validate all required fields
+    const errors: typeof formErrors = {};
+    
+    if (!formData.teamMember) {
+      errors.teamMember = 'Team member is required';
     }
-
-    if (new Date(formData.endDate) <= new Date(formData.startDate)) {
-      toast.error('End date must be after start date');
+    
+    if (!formData.startDate) {
+      errors.startDate = 'Start date is required';
+    }
+    
+    if (!formData.endDate) {
+      errors.endDate = 'End date is required';
+    } else if (formData.startDate && new Date(formData.endDate) <= new Date(formData.startDate)) {
+      errors.endDate = 'End date must be after start date';
+    }
+    
+    if (!formData.branch) {
+      errors.branch = 'Branch is required';
+    }
+    
+    if (!formData.remarks.trim()) {
+      errors.remarks = 'Remarks are required';
+    }
+    
+    // If there are validation errors, show them and stop
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      toast.error('Please fix the errors in the form');
       return;
     }
 
     setIsLoading(true);
+    setFormErrors({}); // Clear errors before submission
+    
     try {
       const response = await fetch(`${Base_url}tasks`, {
         method: 'POST',
@@ -587,14 +671,44 @@ const AddTaskPage = () => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create task');
+        let errorMessage = 'Failed to create task';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+          
+          // Handle field-specific errors from API
+          if (errorData.errors) {
+            const apiErrors: typeof formErrors = {};
+            if (errorData.errors.teamMember) apiErrors.teamMember = errorData.errors.teamMember;
+            if (errorData.errors.startDate) apiErrors.startDate = errorData.errors.startDate;
+            if (errorData.errors.endDate) apiErrors.endDate = errorData.errors.endDate;
+            if (errorData.errors.branch) apiErrors.branch = errorData.errors.branch;
+            if (errorData.errors.remarks) apiErrors.remarks = errorData.errors.remarks;
+            
+            if (Object.keys(apiErrors).length > 0) {
+              setFormErrors(apiErrors);
+            }
+          }
+        } catch (parseError) {
+          // If response is not JSON, try to get text
+          const errorText = await response.text();
+          if (errorText) {
+            errorMessage = errorText;
+          }
+        }
+        throw new Error(errorMessage);
       }
 
+      const result = await response.json();
       toast.success('Task created successfully');
       router.push('/timelines');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to create task');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create task';
+      setFormErrors(prev => ({
+        ...prev,
+        general: errorMessage
+      }));
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -617,6 +731,16 @@ const AddTaskPage = () => {
           <div className="box">
             <div className="box-body">
               <form onSubmit={handleSubmit} className="space-y-6">
+                {/* General Error Display */}
+                {formErrors.general && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div className="flex items-center">
+                      <i className="ri-error-warning-line text-red-600 text-xl mr-3"></i>
+                      <p className="text-sm text-red-800">{formErrors.general}</p>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Team Member */}
                   <div>
@@ -653,12 +777,19 @@ const AddTaskPage = () => {
                                 ...prev,
                                 teamMember: ""
                               }));
+                              setFormErrors(prev => ({
+                                ...prev,
+                                teamMember: undefined
+                              }));
                             }}
                           >
                             <i className="ri-close-line"></i>
                           </button>
                         </span>
                       </div>
+                    )}
+                    {formErrors.teamMember && (
+                      <p className="mt-1 text-sm text-red-600">{formErrors.teamMember}</p>
                     )}
                   </div>
 
@@ -669,7 +800,7 @@ const AddTaskPage = () => {
                       name="branch"
                       value={formData.branch}
                       onChange={handleInputChange}
-                      className="form-select"
+                      className={`form-select ${formErrors.branch ? 'border-red-500' : ''}`}
                       required
                     >
                       <option value="">Select Branch</option>
@@ -679,6 +810,9 @@ const AddTaskPage = () => {
                         </option>
                       ))}
                     </select>
+                    {formErrors.branch && (
+                      <p className="mt-1 text-sm text-red-600">{formErrors.branch}</p>
+                    )}
                   </div>
 
                   {/* Start Date */}
@@ -689,9 +823,12 @@ const AddTaskPage = () => {
                       name="startDate"
                       value={formData.startDate}
                       onChange={handleInputChange}
-                      className="form-control"
+                      className={`form-control ${formErrors.startDate ? 'border-red-500' : ''}`}
                       required
                     />
+                    {formErrors.startDate && (
+                      <p className="mt-1 text-sm text-red-600">{formErrors.startDate}</p>
+                    )}
                   </div>
 
                   {/* End Date */}
@@ -702,9 +839,17 @@ const AddTaskPage = () => {
                       name="endDate"
                       value={formData.endDate}
                       onChange={handleInputChange}
-                      className="form-control"
+                      min={formData.startDate || undefined}
+                      className={`form-control ${formErrors.endDate ? 'border-red-500' : ''}`}
                       required
+                      disabled={!formData.startDate}
                     />
+                    {formErrors.endDate && (
+                      <p className="mt-1 text-sm text-red-600">{formErrors.endDate}</p>
+                    )}
+                    {!formData.startDate && (
+                      <p className="mt-1 text-sm text-gray-500">Please select start date first</p>
+                    )}
                   </div>
 
                   {/* Priority */}
@@ -801,10 +946,13 @@ const AddTaskPage = () => {
                     value={formData.remarks}
                     onChange={handleInputChange}
                     rows={4}
-                    className="form-control"
+                    className={`form-control ${formErrors.remarks ? 'border-red-500' : ''}`}
                     placeholder="Enter task details, notes, or instructions..."
                     required
                   />
+                  {formErrors.remarks && (
+                    <p className="mt-1 text-sm text-red-600">{formErrors.remarks}</p>
+                  )}
                 </div>
 
                 {/* Attachments */}

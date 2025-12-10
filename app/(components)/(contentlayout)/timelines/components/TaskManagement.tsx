@@ -129,8 +129,13 @@ const TaskManagement = () => {
       if (processedFilters.startDate && processedFilters.endDate) {
         // Validate date range
         if (!validateDateRange(processedFilters.startDate, processedFilters.endDate)) {
-          toast.error('Start date must be before or equal to end date');
+          toast.error('Start date must be before or equal to end date. Please adjust your date filters.');
           setIsLoading(false);
+          // Clear invalid end date
+          setFilters(prev => ({
+            ...prev,
+            endDate: ""
+          }));
           return;
         }
         
@@ -647,9 +652,19 @@ const TaskManagement = () => {
               className={`form-control py-2 w-full sm:w-auto ${!filters.startDate ? 'text-transparent' : ''} ${filters.startDate ? 'border-primary' : ''}`}
               value={filters.startDate}
               onChange={(e) => {
-                setFilters(prev => ({ ...prev, startDate: e.target.value }));
+                const newStartDate = e.target.value;
+                setFilters(prev => {
+                  // If new start date is after end date, clear end date
+                  const updatedFilters = { ...prev, startDate: newStartDate };
+                  if (newStartDate && prev.endDate && new Date(newStartDate) > new Date(prev.endDate)) {
+                    updatedFilters.endDate = "";
+                    toast.error('Start date cannot be after end date. End date has been cleared.');
+                  }
+                  return updatedFilters;
+                });
                 setCurrentPage(1);
               }}
+              max={filters.endDate || undefined}
               title="Start Date From"
               style={!filters.startDate ? { color: 'transparent' } : {}}
             />
@@ -678,24 +693,36 @@ const TaskManagement = () => {
               className={`form-control py-2 w-full sm:w-auto ${!filters.endDate ? 'text-transparent' : ''} ${filters.endDate ? 'border-primary' : ''}`}
               value={filters.endDate}
               onChange={(e) => {
-                setFilters(prev => ({ ...prev, endDate: e.target.value }));
+                const newEndDate = e.target.value;
+                setFilters(prev => {
+                  // Validate that end date is not before start date
+                  if (prev.startDate && new Date(newEndDate) < new Date(prev.startDate)) {
+                    toast.error('End date cannot be before start date');
+                    return prev;
+                  }
+                  return { ...prev, endDate: newEndDate };
+                });
                 setCurrentPage(1);
               }}
+              min={filters.startDate || undefined}
+              disabled={!filters.startDate}
               title="End Date Until"
               style={!filters.endDate ? { color: 'transparent' } : {}}
             />
             {!filters.endDate && (
               <div 
-                className="absolute inset-0 flex items-center px-3 text-gray-500 bg-white cursor-pointer"
+                className={`absolute inset-0 flex items-center px-3 text-gray-500 bg-white ${!filters.startDate ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
                 onClick={(e) => {
-                  const input = e.currentTarget.previousElementSibling as HTMLInputElement;
-                  if (input) {
-                    input.focus();
-                    input.showPicker();
+                  if (filters.startDate) {
+                    const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                    if (input) {
+                      input.focus();
+                      input.showPicker();
+                    }
                   }
                 }}
               >
-                End Date
+                End Date {!filters.startDate && '(Select start date first)'}
               </div>
             )}
             {filters.endDate && (
