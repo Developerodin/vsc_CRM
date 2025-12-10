@@ -117,6 +117,7 @@ const GroupsPage = () => {
   const [clientTotalResults, setClientTotalResults] = useState(0);
   const [taskStatsMap, setTaskStatsMap] = useState<Map<string, any>>(new Map());
   const [isLoadingTaskStats, setIsLoadingTaskStats] = useState(false);
+  const [totalClients, setTotalClients] = useState(0);
 
   // Use the custom hook for filters
   const {
@@ -129,6 +130,55 @@ const GroupsPage = () => {
     updateFilter,
     updateTaskStatusFilter
   } = useGroupFilters();
+
+  // Function to fetch total clients count
+  const fetchTotalClients = async () => {
+    try {
+      // Fetch all groups to calculate total clients
+      const response = await fetch(`${Base_url}groups?limit=1000`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (response.ok) {
+        const data: ApiResponse = await response.json();
+        // Calculate total unique clients across all groups
+        // clients can be an array of client ID strings or an array of client objects
+        const allClientIds = new Set<string>();
+        data.results.forEach(group => {
+          if (group.clients && Array.isArray(group.clients)) {
+            group.clients.forEach(client => {
+              // Handle both cases: string ID or object with id property
+              if (typeof client === 'string') {
+                allClientIds.add(client);
+              } else if (client && typeof client === 'object' && 'id' in client) {
+                allClientIds.add(client.id);
+              }
+            });
+          }
+        });
+        setTotalClients(allClientIds.size);
+      }
+    } catch (error) {
+      console.error('Error fetching total clients:', error);
+      // Calculate from current groups if API fails
+      const allClientIds = new Set<string>();
+      groups.forEach(group => {
+        if (group.clients && Array.isArray(group.clients)) {
+          group.clients.forEach(client => {
+            // Handle both cases: string ID or object with id property
+            if (typeof client === 'string') {
+              allClientIds.add(client);
+            } else if (client && typeof client === 'object' && 'id' in client) {
+              allClientIds.add(client.id);
+            }
+          });
+        }
+      });
+      setTotalClients(allClientIds.size);
+    }
+  };
 
   // Function to fetch task statistics for all groups
   const fetchGroupTaskStats = async (): Promise<Map<string, any>> => {
@@ -227,10 +277,19 @@ const GroupsPage = () => {
       // Apply client name filter after fetching groups
       if (advancedFilters.clientName) {
         groupsWithTasks = groupsWithTasks.filter(group => 
-          group.clients && group.clients.some(client => 
-            client.name.toLowerCase().includes(advancedFilters.clientName.toLowerCase()) ||
-            client.email.toLowerCase().includes(advancedFilters.clientName.toLowerCase())
-          )
+          group.clients && group.clients.some(client => {
+            // Handle both cases: string ID or object with properties
+            if (typeof client === 'string') {
+              return false; // Skip string IDs as they don't have name/email
+            }
+            if (client && typeof client === 'object') {
+              const clientName = client.name?.toLowerCase() || '';
+              const clientEmail = client.email?.toLowerCase() || '';
+              const searchTerm = advancedFilters.clientName.toLowerCase();
+              return clientName.includes(searchTerm) || clientEmail.includes(searchTerm);
+            }
+            return false;
+          })
         );
       }
       
@@ -258,6 +317,7 @@ const GroupsPage = () => {
 
   useEffect(() => {
     fetchGroups(currentPage, itemsPerPage);
+    fetchTotalClients();
   }, [currentPage, itemsPerPage, sortBy, filters.name, advancedFilters.clientName]);
 
   // Separate useEffect for advanced filters to update task statistics and reapply filters
@@ -285,10 +345,19 @@ const GroupsPage = () => {
         let filteredGroups = updatedGroups;
         if (advancedFilters.clientName) {
           filteredGroups = updatedGroups.filter(group => 
-            group.clients && group.clients.some(client => 
-              client.name.toLowerCase().includes(advancedFilters.clientName.toLowerCase()) ||
-              client.email.toLowerCase().includes(advancedFilters.clientName.toLowerCase())
-            )
+            group.clients && group.clients.some(client => {
+              // Handle both cases: string ID or object with properties
+              if (typeof client === 'string') {
+                return false; // Skip string IDs as they don't have name/email
+              }
+              if (client && typeof client === 'object') {
+                const clientName = client.name?.toLowerCase() || '';
+                const clientEmail = client.email?.toLowerCase() || '';
+                const searchTerm = advancedFilters.clientName.toLowerCase();
+                return clientName.includes(searchTerm) || clientEmail.includes(searchTerm);
+              }
+              return false;
+            })
           );
         }
         
@@ -925,6 +994,39 @@ const GroupsPage = () => {
             </div>
           </div>
 
+          {/* Statistics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            {/* Total Groups Card */}
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-medium text-primary">Total Groups</span>
+                  <p className="text-2xl font-bold text-primary mt-1">
+                    {totalResults}
+                  </p>
+                </div>
+                <div className="bg-primary/20 p-3 rounded-full">
+                  <i className="ri-folder-line text-primary text-xl"></i>
+                </div>
+              </div>
+            </div>
+
+            {/* Total Clients Card */}
+            <div className="bg-success/10 border border-success/20 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-medium text-success">Total Clients</span>
+                  <p className="text-2xl font-bold text-success mt-1">
+                    {totalClients}
+                  </p>
+                </div>
+                <div className="bg-success/20 p-3 rounded-full">
+                  <i className="ri-user-line text-success text-xl"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Content Box */}
           <div className="box">
             <div className="box-body">
@@ -1052,7 +1154,7 @@ const GroupsPage = () => {
                         </th>
                         <th className="px-4 py-3">Group Name</th>
                         <th className="px-4 py-3">Number of Clients</th>
-                        <th className="px-4 py-3">Created At</th>
+                        <th className="px-4 py-3">Created Date</th>
                         <th className="px-4 py-3">Tasks</th>
                         <th className="px-4 py-3">Actions</th>
                       </tr>

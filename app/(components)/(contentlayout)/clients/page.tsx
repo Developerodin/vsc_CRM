@@ -1570,6 +1570,21 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     return pages;
   }
 
+  // Function to format date
+  const formatDate = (dateString: string | undefined): string => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      return 'N/A';
+    }
+  };
+
   // Function to render task status badges
   const renderTaskStatus = (taskStats: TaskStats, clientId: string) => {
     if (isLoadingTaskStats) {
@@ -1735,6 +1750,14 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                     <option value={500}>500</option>
                     <option value={1000}>1000</option>
                   </select>
+                </div>
+
+                {/* Total clients count */}
+                <div className="flex items-center">
+                  <span className="text-sm font-medium text-gray-700">
+                    <i className="ri-group-line mr-1 text-primary"></i>
+                    Total Clients: <span className="text-primary font-semibold">{totalResults}</span>
+                  </span>
                 </div>
 
                 {/* Search and filters */}
@@ -2293,11 +2316,8 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                           </th>
                           <th className="px-4 py-3">Client</th>
                           <th className="px-4 py-3">City</th>
-                          <th className="px-4 py-3">Business Type</th>
-                          <th className="px-4 py-3">Entity Type</th>
+                          <th className="px-4 py-3">Created Date</th>
                           <th className="px-4 py-3">Status</th>
-
-                          <th className="px-4 py-3">PAN</th>
                           <th className="px-4 py-3">Task Status</th>
                           <th className="px-4 py-3">Actions</th>
                         </tr>
@@ -2335,22 +2355,38 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                                     <i className="ri-phone-line mr-1 text-gray-400"></i>
                                     {client.phone}
                                   </div>
+                                  {client.businessType && (
+                                    <div className="text-sm text-gray-500 flex items-center mt-1">
+                                      <i className="ri-building-line mr-1 text-gray-400"></i>
+                                      <span className="mr-1">Business Type:</span>
+                                      <span className={`px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-800`}>
+                                        {client.businessType}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {client.entityType && (
+                                    <div className="text-sm text-gray-500 flex items-center mt-1">
+                                      <i className="ri-file-list-line mr-1 text-gray-400"></i>
+                                      <span className="mr-1">Entity Type:</span>
+                                      <span className={`px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800`}>
+                                        {client.entityType}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {client.pan && (
+                                    <div className="text-sm text-gray-500 flex items-center mt-1">
+                                      <i className="ri-id-card-line mr-1 text-gray-400"></i>
+                                      PAN: {client.pan}
+                                    </div>
+                                  )}
                                 </div>
                               </td>
                               <td>{client.district || 'N/A'}</td>
                               <td>
-                                <span className={`px-2 py-1 text-xs rounded-full ${
-                                  client.businessType ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
-                                }`}>
-                                  {client.businessType || 'N/A'}
-                                </span>
-                              </td>
-                              <td>
-                                <span className={`px-2 py-1 text-xs rounded-full ${
-                                  client.entityType ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
-                                }`}>
-                                  {client.entityType || 'N/A'}
-                                </span>
+                                <div className="text-sm text-gray-700">
+                                  <i className="ri-calendar-line mr-1 text-gray-400"></i>
+                                  {formatDate(client.createdAt)}
+                                </div>
                               </td>
                               <td>
                                 <div className="relative group">
@@ -2404,8 +2440,6 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                                   </div>
                                 </div>
                               </td>
-
-                              <td>{client.pan || 'N/A'}</td>
                               <td>
                                 {renderTaskStatus(client.taskStats, client.id)}
                               </td>
@@ -2435,7 +2469,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                           ))
                         ) : (
                           <tr>
-                            <td colSpan={10} className="text-center py-8">
+                            <td colSpan={8} className="text-center py-8">
                               <div className="flex flex-col items-center justify-center">
                                 <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
                                   <i className="ri-folder-line text-4xl text-primary"></i>

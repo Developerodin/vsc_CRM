@@ -65,8 +65,8 @@ export const useGroupFilters = () => {
   });
 
   // Check if any advanced filters are active
-  const hasActiveAdvancedFilters = useCallback(() => {
-    return (
+  const hasActiveAdvancedFilters = useCallback((): boolean => {
+    return !!(
       advancedFilters.clientName
       // || advancedFilters.minTasks
       // || advancedFilters.maxTasks

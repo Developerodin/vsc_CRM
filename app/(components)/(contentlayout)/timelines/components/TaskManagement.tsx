@@ -866,8 +866,8 @@ const TaskManagement = () => {
               <th className="px-4 py-3">Team Member</th>
               <th className="px-4 py-3">Start Date</th>
               <th className="px-4 py-3">End Date</th>
+              <th className="px-4 py-3">Created Date</th>
               <th className="px-4 py-3">Priority</th>
-              <th className="px-4 py-3">Branch</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Remarks</th>
               <th className="px-4 py-3">Actions</th>
@@ -925,16 +925,31 @@ const TaskManagement = () => {
                     <div>
                       <div className="font-medium">{task.teamMember?.name || "-"}</div>
                       <div className="text-sm text-gray-500">{task.teamMember?.email || "-"}</div>
+                      {task.branch?.name && (
+                        <div className="text-sm text-black flex items-center mt-1">
+                          <i className="ri-building-line mr-1"></i>
+                          {task.branch.name}
+                        </div>
+                      )}
                     </div>
                   </td>
                   <td>{task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : "-"}</td>
                   <td>{task.endDate ? new Date(task.endDate).toISOString().split('T')[0] : "-"}</td>
                   <td>
+                    {task.createdAt ? (
+                      <div>
+                        <div>{new Date(task.createdAt).toISOString().split('T')[0]}</div>
+                        <div className="text-xs text-gray-500">
+                          {new Date(task.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+                    ) : "-"}
+                  </td>
+                  <td>
                     <span className={`badge ${getPriorityColor(task.priority)} text-white`}>
                       {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
                     </span>
                   </td>
-                  <td>{task.branch?.name || "-"}</td>
                   <td>
                     <span className={`badge ${getStatusColor(task.status)}`}>
                       {task.status.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}

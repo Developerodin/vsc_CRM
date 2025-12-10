@@ -313,7 +313,6 @@ const TasksPage = () => {
       setTaskStats(response.data);
     } catch (err) {
       console.error('Error fetching task statistics:', err);
-      toast.error('Failed to load task statistics');
     } finally {
       setIsLoadingStats(false);
     }
@@ -844,8 +843,8 @@ const TasksPage = () => {
               <th className="px-4 py-3">Team Member</th>
               <th className="px-4 py-3">Start Date</th>
               <th className="px-4 py-3">End Date</th>
+              <th className="px-4 py-3">Created Date</th>
               <th className="px-4 py-3">Priority</th>
-              <th className="px-4 py-3">Branch</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Remarks</th>
               <th className="px-4 py-3">Actions</th>
@@ -897,16 +896,29 @@ const TasksPage = () => {
                     <div>
                       <div className="font-medium">{task.teamMember?.name || "-"}</div>
                       <div className="text-sm text-gray-500">{task.teamMember?.email || "-"}</div>
+                      <div className="text-xs text-gray-900 mt-1">
+                        <i className="ri-building-line me-1"></i>
+                        {task.branch?.name || "-"}
+                      </div>
                     </div>
                   </td>
                   <td>{task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : "-"}</td>
                   <td>{task.endDate ? new Date(task.endDate).toISOString().split('T')[0] : "-"}</td>
                   <td>
+                    {task.createdAt ? (
+                      <div>
+                        <div>{new Date(task.createdAt).toISOString().split('T')[0]}</div>
+                        <div className="text-xs text-gray-500">
+                          {new Date(task.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+                    ) : "-"}
+                  </td>
+                  <td>
                     <span className={`badge ${getPriorityColor(task.priority)} text-white`}>
                       {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
                     </span>
                   </td>
-                  <td>{task.branch?.name || "-"}</td>
                   <td>
                     <div className="flex items-center gap-2">
                     <span 

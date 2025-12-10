@@ -552,6 +552,23 @@ const TimelinesPage = () => {
     }
   };
 
+  // Format date helper
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return "-";
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      return "-";
+    }
+  };
+
   // Condensed pagination helper
   function getPagination(currentPage: number, totalPages: number) {
     const pages = [];
@@ -838,7 +855,8 @@ const TimelinesPage = () => {
                       setFilters({
                         activityName: "",
                         clientName: "",
-                        status: ""
+                        status: "",
+                        group: ""
                       });
                       setSortBy("activityName:asc");
                     }}
@@ -881,7 +899,8 @@ const TimelinesPage = () => {
                         setFilters({
                           activityName: "",
                           clientName: "",
-                          status: ""
+                          status: "",
+                          group: ""
                         });
                         setCurrentPage(1);
                       }}
@@ -913,13 +932,14 @@ const TimelinesPage = () => {
                       <th className="px-4 py-3">Period</th>
                       <th className="px-4 py-3">Due Date</th>
                       <th className="px-4 py-3">Client Name</th>
+                      <th className="px-4 py-3">Created Date</th>
                       <th className="px-4 py-3">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {isLoading ? (
                       <tr>
-                        <td colSpan={8} className="text-center py-4">
+                        <td colSpan={9} className="text-center py-4">
                           <div className="flex justify-center">
                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                           </div>
@@ -927,13 +947,13 @@ const TimelinesPage = () => {
                       </tr>
                     ) : error ? (
                       <tr>
-                        <td colSpan={8} className="text-center text-red-500 py-4">
+                        <td colSpan={9} className="text-center text-red-500 py-4">
                           {error}
                         </td>
                       </tr>
                     ) : timelines.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="text-center py-8">
+                        <td colSpan={9} className="text-center py-8">
                           <div className="flex flex-col items-center justify-center">
                             <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
                               <i className="ri-time-line text-4xl text-primary"></i>
@@ -955,7 +975,8 @@ const TimelinesPage = () => {
                                   setFilters({
                                     activityName: "",
                                     clientName: "",
-                                    status: ""
+                                    status: "",
+                                    group: ""
                                   });
                                   setCurrentPage(1);
                                 }}
@@ -1002,6 +1023,7 @@ const TimelinesPage = () => {
                           <td>{timeline.period || "-"}</td>
                           <td>{timeline.subactivity?.frequency || "-"}</td>
                           <td>{timeline.client?.name || "-"}</td>
+                          <td>{formatDate(timeline.createdAt)}</td>
                           <td>
                             <div className="flex space-x-2">
                               <Link

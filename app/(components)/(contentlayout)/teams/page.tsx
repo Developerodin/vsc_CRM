@@ -627,6 +627,13 @@ const TeamsPage = () => {
                   </select>
                 </div>
 
+                {/* Total Team Member Display */}
+                <div className="flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-lg border border-primary/20">
+                  <i className="ri-group-line text-primary text-lg"></i>
+                  <span className="text-sm text-gray-700 font-medium">Total Team Member:</span>
+                  <span className="text-lg font-bold text-primary">{totalResults}</span>
+                </div>
+
                 {/* Search and filters */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
                   {/* Search bar */}
@@ -708,7 +715,6 @@ const TeamsPage = () => {
                           />
                         </th>
                         <th scope="col" className="text-start">Team Member</th>
-                        <th scope="col" className="text-start">Branch</th>
                         <th scope="col" className="text-start">Address</th>
                         <th scope="col" className="text-start">Skills</th>
                         <th scope="col" className="text-start">Created Date</th>
@@ -742,9 +748,12 @@ const TeamsPage = () => {
                                 </button>
                                 <div className="text-sm text-gray-500">{teamMember.email}</div>
                                 <div className="text-sm text-gray-500">{teamMember.phone}</div>
+                                <div className="text-sm text-black flex items-center">
+                                  <i className="ri-building-line mr-1"></i>
+                                  {teamMember?.branch?.name || '-'}
+                                </div>
                               </div>
                             </td>
-                            <td>{teamMember?.branch?.name || '-'}</td>
                             <td>
                               <div className="flex flex-col">
                                 <div className="text-sm">{teamMember.city}</div>
@@ -792,7 +801,7 @@ const TeamsPage = () => {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={7} className="text-center py-8">
+                          <td colSpan={6} className="text-center py-8">
                             <div className="flex flex-col items-center justify-center">
                               <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
                                 <i className="ri-folder-line text-4xl text-primary"></i>
