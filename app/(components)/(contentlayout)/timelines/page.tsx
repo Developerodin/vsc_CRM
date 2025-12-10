@@ -108,7 +108,8 @@ const TimelinesPage = () => {
   const [filters, setFilters] = useState({
     activityName: "",
     clientName: "",
-    status: ""
+    status: "",
+    group: ""
   });
   
   // Export modal state
@@ -203,6 +204,7 @@ const TimelinesPage = () => {
         ...(filters.activityName && { activityName: filters.activityName }),
         ...(filters.clientName && { client: filters.clientName }),
         ...(filters.status && { status: filters.status }),
+        ...(filters.group && { group: filters.group }),
         ...(sortBy && { sortBy })
       });
 

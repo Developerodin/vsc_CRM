@@ -398,6 +398,7 @@ const GroupsPage = () => {
             "Created Date": new Date(group.createdAt).toLocaleDateString(),
             "Sort Order": group.sortOrder,
             "Client IDs": group.clients?.map(client => client.id).join(',') || '',
+            "Client Names": group.clients?.map(client => client.name).join(',') || '',
             "Total Tasks": group.taskStats.total,
             "Pending": group.taskStats.pending,
             "Completed": group.taskStats.completed,
@@ -436,6 +437,7 @@ const GroupsPage = () => {
           "Created Date": new Date(group.createdAt).toLocaleDateString(),
           "Sort Order": group.sortOrder,
           "Client IDs": group.clients?.map(client => client.id).join(',') || '',
+          "Client Names": group.clients?.map(client => client.name).join(',') || '',
             "Total Tasks": taskStats.total,
             "Pending": taskStats.pending,
             "Completed": taskStats.completed,
@@ -456,6 +458,7 @@ const GroupsPage = () => {
         { wch: 20 }, // Created Date
         { wch: 10 }, // Sort Order
         { wch: 50 }, // Client IDs
+        { wch: 50 }, // Client Names
         { wch: 10 }, // Total Tasks
         { wch: 10 }, // Pending
         { wch: 10 }, // Completed

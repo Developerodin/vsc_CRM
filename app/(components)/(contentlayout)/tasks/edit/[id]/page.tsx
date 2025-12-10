@@ -131,12 +131,15 @@ const EditTaskPage = () => {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [timelines, setTimelines] = useState<Timeline[]>([]);
+  const [allFilteredTimelines, setAllFilteredTimelines] = useState<Timeline[]>([]); // Store all filtered timelines for client-side pagination
   const [selectedTimelines, setSelectedTimelines] = useState<Timeline[]>([]);
   const [showTimelineModal, setShowTimelineModal] = useState(false);
   const [isLoadingTimelines, setIsLoadingTimelines] = useState(false);
   const [timelineSearchQuery, setTimelineSearchQuery] = useState("");
   const [timelineCurrentPage, setTimelineCurrentPage] = useState(1);
   const [timelineTotalPages, setTimelineTotalPages] = useState(1);
+  const [timelineItemsPerPage, setTimelineItemsPerPage] = useState(10);
+  const [timelineTotalResults, setTimelineTotalResults] = useState(0);
   const [selectedTeamMember, setSelectedTeamMember] = useState<TeamMember | null>(null);
   const [showTeamMemberModal, setShowTeamMemberModal] = useState(false);
   const [isLoadingTeamMembers, setIsLoadingTeamMembers] = useState(false);
@@ -472,38 +475,35 @@ const EditTaskPage = () => {
     try {
       setIsLoadingTimelines(true);
       
-      // If no filters are applied or force clear is requested, fetch all timelines with pagination
-      if ((!selectedActivity && !selectedGroup && !searchQueryParam && !timelineSearchQuery) || forceClearFilters) {
-        const queryParams = new URLSearchParams({
-          page: page.toString(),
-          limit: "100", // Fetch more timelines per page
-          sortBy: "title:asc"
-        });
-
-        const response = await fetch(`${Base_url}timelines?${queryParams}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch timelines');
-        }
-
-        const data = await response.json();
-        setTimelines(data.results || []);
-        setTimelineTotalPages(data.totalPages || 1);
-        setTimelineCurrentPage(page);
-        return;
-      }
-
-      // If filters are applied, fetch all timelines first then filter
+      // Get activity name if activity filter is selected
+      const selectedActivityData = selectedActivity && !forceClearFilters
+        ? activities.find(a => a.id === selectedActivity)
+        : null;
+      const activityName = selectedActivityData?.name;
+      
+      // Get group name if group filter is selected
+      const selectedGroupData = selectedGroup && !forceClearFilters
+        ? groups.find(g => g.id === selectedGroup)
+        : null;
+      const groupName = selectedGroupData?.name;
+      
+      // Build query parameters with proper pagination
       const queryParams = new URLSearchParams({
-        page: "1",
-        limit: "1000", // Fetch all timelines for filtering
-        sortBy: "title:asc",
+        page: page.toString(),
+        limit: timelineItemsPerPage.toString(),
+        sortBy: activityName ? "activityName:asc" : "title:asc",
         ...((searchQueryParam || timelineSearchQuery) && { search: searchQueryParam || timelineSearchQuery })
       });
+
+      // Add activity filter using activityName parameter
+      if (activityName && !forceClearFilters) {
+        queryParams.append('activityName', activityName);
+      }
+
+      // Add group filter using group parameter (backend API now supports it)
+      if (groupName && !forceClearFilters) {
+        queryParams.append('group', groupName);
+      }
 
       const response = await fetch(`${Base_url}timelines?${queryParams}`, {
         headers: {
@@ -516,53 +516,12 @@ const EditTaskPage = () => {
       }
 
       const data = await response.json();
-      let allTimelines = data.results || [];
       
-      // Apply client-side filtering only if filters are selected
-      let filteredTimelines = allTimelines;
-      
-      if (selectedActivity || selectedGroup) {
-        console.log('Filtering timelines with:', { selectedActivity, selectedGroup });
-        console.log('Available groups:', groups);
-        console.log('All timelines:', allTimelines);
-        
-        filteredTimelines = allTimelines.filter((timeline: Timeline) => {
-          let matchesActivity = true;
-          let matchesGroup = true;
-          
-          // Filter by activity
-          if (selectedActivity) {
-            matchesActivity = timeline.activity?.id === selectedActivity;
-            console.log(`Timeline ${timeline.id} activity match:`, matchesActivity, timeline.activity?.id, selectedActivity);
-          }
-          
-          // Filter by group (check if client belongs to selected group)
-          if (selectedGroup) {
-            const selectedGroupData = groups.find(g => g.id === selectedGroup);
-            console.log('Selected group data:', selectedGroupData);
-            if (selectedGroupData && timeline.client?.id) {
-              // Check if the timeline's client is in the selected group's clients array
-              const clientIds = selectedGroupData.clients.map(client => client.id);
-              console.log('Group client IDs:', clientIds, 'Timeline client ID:', timeline.client.id);
-              matchesGroup = clientIds.includes(timeline.client.id);
-            } else {
-              matchesGroup = false;
-            }
-            console.log(`Timeline ${timeline.id} group match:`, matchesGroup);
-          }
-          
-          const finalMatch = matchesActivity && matchesGroup;
-          console.log(`Timeline ${timeline.id} final match:`, finalMatch);
-          return finalMatch;
-        });
-        
-        console.log('Filtered timelines:', filteredTimelines);
-      }
-      
-      setTimelines(filteredTimelines);
-      const totalResults = filteredTimelines.length;
-      const limit = 10;
-      setTimelineTotalPages(Math.max(1, Math.ceil(totalResults / limit)));
+      // Server-side pagination (backend handles filtering)
+      setAllFilteredTimelines([]); // Clear stored filtered timelines
+      setTimelines(data.results || []);
+      setTimelineTotalResults(data.totalResults || 0);
+      setTimelineTotalPages(data.totalPages || 1);
       setTimelineCurrentPage(page);
     } catch (err) {
       console.error('Error fetching timelines:', err);
@@ -616,13 +575,8 @@ const EditTaskPage = () => {
 
   const handleTimelinePageChange = (newPage: number) => {
     setTimelineCurrentPage(newPage);
-    // If filters are applied, we need to fetch all data first then paginate client-side
-    if (selectedActivity || selectedGroup) {
-      fetchTimelines(1, timelineSearchQuery); // Fetch all data
-      setTimelineCurrentPage(newPage); // Update page for display
-    } else {
-      fetchTimelines(newPage, timelineSearchQuery);
-    }
+    // Backend handles all filtering and pagination
+    fetchTimelines(newPage, timelineSearchQuery);
   };
 
   // Filter change handlers
@@ -644,14 +598,8 @@ const EditTaskPage = () => {
   };
 
   // Get paginated timelines for display
+  // Backend handles all filtering and pagination, so just return the timelines
   const getPaginatedTimelines = () => {
-    if (selectedActivity || selectedGroup) {
-      // Client-side pagination for filtered results
-      const startIndex = (timelineCurrentPage - 1) * 10;
-      const endIndex = startIndex + 10;
-      return timelines.slice(startIndex, endIndex);
-    }
-    // Server-side pagination for unfiltered results
     return timelines;
   };
 
@@ -1566,6 +1514,25 @@ const EditTaskPage = () => {
 
             <div className="p-4 border-t flex justify-between items-center">
               <div className="flex items-center space-x-2">
+                <div className="flex items-center mr-4">
+                  <label className="mr-2 text-sm text-gray-600 whitespace-nowrap">Rows per page:</label>
+                  <select
+                    className="form-select w-auto text-sm"
+                    value={timelineItemsPerPage}
+                    onChange={(e) => {
+                      const newItemsPerPage = Number(e.target.value);
+                      setTimelineItemsPerPage(newItemsPerPage);
+                      setTimelineCurrentPage(1);
+                      fetchTimelines(1, timelineSearchQuery);
+                    }}
+                  >
+                    <option value={10}>10</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                    <option value={500}>500</option>
+                    <option value={1000}>1000</option>
+                  </select>
+                </div>
                 <button
                   onClick={() => handleTimelinePageChange(Math.max(timelineCurrentPage - 1, 1))}
                   disabled={timelineCurrentPage === 1 || timelines.length === 0}
@@ -1574,12 +1541,8 @@ const EditTaskPage = () => {
                   Previous
                 </button>
                 <span className="text-sm text-gray-500">
-                  {timelines.length > 0 ? (
-                    timelineTotalPages > 0 ? (
-                      `Page ${timelineCurrentPage} of ${timelineTotalPages} (${timelines.length} total)`
-                    ) : (
-                      "No pages"
-                    )
+                  {timelineTotalResults > 0 ? (
+                    `Showing ${(timelineCurrentPage - 1) * timelineItemsPerPage + 1} to ${Math.min(timelineCurrentPage * timelineItemsPerPage, timelineTotalResults)} of ${timelineTotalResults} entries`
                   ) : (
                     "No results"
                   )}
