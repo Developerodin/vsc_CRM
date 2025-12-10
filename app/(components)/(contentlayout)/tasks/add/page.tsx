@@ -338,10 +338,10 @@ const AddTaskPage = () => {
       
       // Validate date range when dates change
       if (name === 'startDate' && newData.endDate) {
-        if (new Date(value) >= new Date(newData.endDate)) {
+        if (new Date(value) > new Date(newData.endDate)) {
           setFormErrors(prev => ({
             ...prev,
-            endDate: 'End date must be after start date'
+            endDate: 'End date must be on or after start date'
           }));
         } else {
           setFormErrors(prev => ({
@@ -352,10 +352,10 @@ const AddTaskPage = () => {
       }
       
       if (name === 'endDate' && newData.startDate) {
-        if (new Date(value) <= new Date(newData.startDate)) {
+        if (new Date(value) < new Date(newData.startDate)) {
           setFormErrors(prev => ({
             ...prev,
-            endDate: 'End date must be after start date'
+            endDate: 'End date must be on or after start date'
           }));
         } else {
           setFormErrors(prev => ({
@@ -643,8 +643,8 @@ const AddTaskPage = () => {
     
     if (!formData.endDate) {
       errors.endDate = 'End date is required';
-    } else if (formData.startDate && new Date(formData.endDate) <= new Date(formData.startDate)) {
-      errors.endDate = 'End date must be after start date';
+    } else if (formData.startDate && new Date(formData.endDate) < new Date(formData.startDate)) {
+      errors.endDate = 'End date must be on or after start date';
     }
     
     if (!formData.branch) {
