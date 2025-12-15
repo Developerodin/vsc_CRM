@@ -259,7 +259,7 @@ const AddTaskPage = () => {
     }
   };
 
-  const fetchTimelines = async (page: number = 1, searchQueryParam?: string, forceClearFilters: boolean = false) => {
+  const fetchTimelines = async (page: number = 1, searchQueryParam?: string, forceClearFilters: boolean = false, itemsPerPage?: number) => {
     try {
       setIsLoadingTimelines(true);
       
@@ -275,12 +275,21 @@ const AddTaskPage = () => {
         : null;
       const groupName = selectedGroupData?.name;
       
+      // Use provided itemsPerPage or fall back to state value
+      const limit = itemsPerPage ?? timelineItemsPerPage;
+      
       // Build query parameters with proper pagination
+      // If forceClearFilters is true, ignore state and use only the provided searchQueryParam
+      // Otherwise, use searchQueryParam if provided, or fall back to state value
+      const searchValue = forceClearFilters 
+        ? (searchQueryParam !== undefined ? searchQueryParam : "")
+        : (searchQueryParam !== undefined ? searchQueryParam : timelineSearchQuery);
+      
       const queryParams = new URLSearchParams({
         page: page.toString(),
-        limit: timelineItemsPerPage.toString(),
+        limit: limit.toString(),
         sortBy: activityName ? "activityName:asc" : "title:asc",
-        ...((searchQueryParam || timelineSearchQuery) && { search: searchQueryParam || timelineSearchQuery })
+        ...(searchValue && { search: searchValue })
       });
 
       // Add activity filter using activityName parameter
@@ -427,12 +436,13 @@ const AddTaskPage = () => {
   };
 
   const clearFilters = () => {
+    // Clear all filter states
     setSelectedActivity("");
     setSelectedGroup("");
     setTimelineSearchQuery("");
     setTimelineCurrentPage(1);
     setAllFilteredTimelines([]); // Clear stored filtered timelines
-    // Fetch timelines without any filters
+    // Fetch timelines without any filters - forceClearFilters ensures state is ignored
     fetchTimelines(1, "", true);
   };
 
@@ -1339,7 +1349,7 @@ const AddTaskPage = () => {
                       const newItemsPerPage = Number(e.target.value);
                       setTimelineItemsPerPage(newItemsPerPage);
                       setTimelineCurrentPage(1);
-                      fetchTimelines(1, timelineSearchQuery);
+                      fetchTimelines(1, timelineSearchQuery, false, newItemsPerPage);
                     }}
                   >
                     <option value={10}>10</option>
