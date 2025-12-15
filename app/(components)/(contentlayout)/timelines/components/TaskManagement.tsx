@@ -583,27 +583,27 @@ const TaskManagement = () => {
       </div>
 
       {/* Search and Sort */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
-        <div className="flex items-center w-full lg:w-auto">
-          <label className="mr-2 text-sm text-gray-600 whitespace-nowrap">Rows per page:</label>
-          <select
-            className="form-select w-auto text-sm"
-            value={itemsPerPage}
-            onChange={(e) => {
-              setItemsPerPage(Number(e.target.value));
-              setCurrentPage(1);
-            }}
-          >
-            <option value={10}>10</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-            <option value={500}>500</option>
-            <option value={1000}>1000</option>
-          </select>
-        </div>
+      <div className="flex flex-col gap-4 mb-4">
+        <div className="flex flex-wrap items-center gap-3 w-full">
+          <div className="flex items-center flex-shrink-0">
+            <label className="mr-2 text-sm text-gray-600 whitespace-nowrap">Rows per page:</label>
+            <select
+              className="form-select text-sm min-w-[80px]"
+              value={itemsPerPage}
+              onChange={(e) => {
+                setItemsPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+            >
+              <option value={10}>10</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={500}>500</option>
+              <option value={1000}>1000</option>
+            </select>
+          </div>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
-          <div className="relative flex-grow sm:max-w-xs">
+          <div className="relative flex-grow min-w-[150px] sm:min-w-[200px]">
             <input
               type="text"
               className="form-control py-2 w-full"
@@ -614,7 +614,7 @@ const TaskManagement = () => {
           </div>
 
           <select
-            className="form-select py-2 w-full sm:w-auto"
+            className="form-select py-2 w-full sm:w-auto min-w-[120px]"
             value={filters.status}
             onChange={(e) => {
               setFilters(prev => ({ ...prev, status: e.target.value }));
@@ -631,7 +631,7 @@ const TaskManagement = () => {
           </select>
 
           <select
-            className="form-select py-2 w-full sm:w-auto"
+            className="form-select py-2 w-full sm:w-auto min-w-[120px]"
             value={filters.priority}
             onChange={(e) => {
               setFilters(prev => ({ ...prev, priority: e.target.value }));
@@ -646,10 +646,10 @@ const TaskManagement = () => {
             <option value="critical">Critical</option>
           </select>
 
-          <div className="relative">
+          <div className="relative w-full sm:w-auto min-w-[140px]">
             <input
               type="date"
-              className={`form-control py-2 w-full sm:w-auto ${!filters.startDate ? 'text-transparent' : ''} ${filters.startDate ? 'border-primary' : ''}`}
+              className={`form-control py-2 w-full ${!filters.startDate ? 'text-transparent' : ''} ${filters.startDate ? 'border-primary' : ''}`}
               value={filters.startDate}
               onChange={(e) => {
                 const newStartDate = e.target.value;
@@ -670,7 +670,7 @@ const TaskManagement = () => {
             />
             {!filters.startDate && (
               <div 
-                className="absolute inset-0 flex items-center px-3 text-gray-500 bg-white cursor-pointer"
+                className="absolute inset-0 flex items-center px-3 text-gray-500 bg-white cursor-pointer pointer-events-none"
                 onClick={(e) => {
                   const input = e.currentTarget.previousElementSibling as HTMLInputElement;
                   if (input) {
@@ -679,7 +679,7 @@ const TaskManagement = () => {
                   }
                 }}
               >
-                Start Date
+                <span className="text-xs sm:text-sm">Start Date</span>
               </div>
             )}
             {filters.startDate && (
@@ -687,10 +687,10 @@ const TaskManagement = () => {
             )}
           </div>
 
-          <div className="relative">
+          <div className="relative w-full sm:w-auto min-w-[140px]">
             <input
               type="date"
-              className={`form-control py-2 w-full sm:w-auto ${!filters.endDate ? 'text-transparent' : ''} ${filters.endDate ? 'border-primary' : ''}`}
+              className={`form-control py-2 w-full ${!filters.endDate ? 'text-transparent' : ''} ${filters.endDate ? 'border-primary' : ''}`}
               value={filters.endDate}
               onChange={(e) => {
                 const newEndDate = e.target.value;
@@ -711,7 +711,7 @@ const TaskManagement = () => {
             />
             {!filters.endDate && (
               <div 
-                className={`absolute inset-0 flex items-center px-3 text-gray-500 bg-white ${!filters.startDate ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                className={`absolute inset-0 flex items-center px-3 text-gray-500 bg-white ${!filters.startDate ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'} pointer-events-none`}
                 onClick={(e) => {
                   if (filters.startDate) {
                     const input = e.currentTarget.previousElementSibling as HTMLInputElement;
@@ -722,7 +722,7 @@ const TaskManagement = () => {
                   }
                 }}
               >
-                End Date {!filters.startDate && '(Select start date first)'}
+                <span className="text-xs sm:text-sm">End Date {!filters.startDate && '(Select start date first)'}</span>
               </div>
             )}
             {filters.endDate && (
@@ -731,7 +731,7 @@ const TaskManagement = () => {
           </div>
 
           <select
-            className="form-select py-2 w-full sm:w-32"
+            className="form-select py-2 w-full sm:w-auto min-w-[140px]"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
           >
@@ -744,7 +744,7 @@ const TaskManagement = () => {
           </select>
 
           <button
-            className="ti-btn ti-btn-secondary py-2 w-full sm:w-auto"
+            className="ti-btn ti-btn-secondary py-2 w-full sm:w-auto whitespace-nowrap"
             onClick={() => {
               setSearchInputValue("");
               setFilters({
@@ -852,10 +852,10 @@ const TaskManagement = () => {
 
       {/* Tasks Table */}
       <div className="table-responsive">
-        <table className="table whitespace-nowrap table-bordered">
+        <table className="table table-bordered border-collapse">
           <thead>
-            <tr>
-              <th className="px-4 py-3">
+            <tr className="bg-gray-100">
+              <th className="px-4 py-3 border border-gray-300">
                 <input
                   type="checkbox"
                   className="form-checkbox"
@@ -863,20 +863,18 @@ const TaskManagement = () => {
                   onChange={handleSelectAll}
                 />
               </th>
-              <th className="px-4 py-3">Team Member</th>
-              <th className="px-4 py-3">Start Date</th>
-              <th className="px-4 py-3">End Date</th>
-              <th className="px-4 py-3">Created Date</th>
-              <th className="px-4 py-3">Priority</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Remarks</th>
-              <th className="px-4 py-3">Actions</th>
+              <th className="px-4 py-3 border border-gray-300">Team Member</th>
+              <th className="px-4 py-3 border border-gray-300">Dates</th>
+              <th className="px-4 py-3 border border-gray-300">Priority</th>
+              <th className="px-4 py-3 border border-gray-300">Status</th>
+              <th className="px-4 py-3 border border-gray-300">Remarks</th>
+              <th className="px-4 py-3 border border-gray-300">Actions</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={9} className="text-center py-4">
+                <td colSpan={7} className="text-center py-4 border border-gray-300 bg-white">
                   <div className="flex justify-center">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                   </div>
@@ -884,13 +882,13 @@ const TaskManagement = () => {
               </tr>
             ) : error ? (
               <tr>
-                <td colSpan={9} className="text-center text-red-500 py-4">
+                <td colSpan={7} className="text-center text-red-500 py-4 border border-gray-300 bg-white">
                   {error}
                 </td>
               </tr>
             ) : tasks.length === 0 ? (
               <tr>
-                <td colSpan={9} className="text-center py-8">
+                <td colSpan={7} className="text-center py-8 border border-gray-300 bg-white">
                   <div className="flex flex-col items-center justify-center">
                     <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
                       <i className="ri-task-line text-4xl text-primary"></i>
@@ -911,9 +909,9 @@ const TaskManagement = () => {
                 </td>
               </tr>
             ) : (
-              tasks.map((task) => (
-                <tr key={task.id}>
-                  <td>
+              tasks.map((task, index) => (
+                <tr key={task.id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                  <td className="border border-gray-300">
                     <input
                       type="checkbox"
                       checked={selectedTasks.includes(task.id)}
@@ -921,7 +919,7 @@ const TaskManagement = () => {
                       className="form-checkbox"
                     />
                   </td>
-                  <td>
+                  <td className="border border-gray-300">
                     <div>
                       <div className="font-medium">{task.teamMember?.name || "-"}</div>
                       <div className="text-sm text-gray-500">{task.teamMember?.email || "-"}</div>
@@ -933,32 +931,49 @@ const TaskManagement = () => {
                       )}
                     </div>
                   </td>
-                  <td>{task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : "-"}</td>
-                  <td>{task.endDate ? new Date(task.endDate).toISOString().split('T')[0] : "-"}</td>
-                  <td>
-                    {task.createdAt ? (
-                      <div>
-                        <div>{new Date(task.createdAt).toISOString().split('T')[0]}</div>
-                        <div className="text-xs text-gray-500">
-                          {new Date(task.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                  <td className="border border-gray-300">
+                    <div className="space-y-1 text-sm">
+                      <div className="flex items-start">
+                        <span className="text-xs font-medium text-gray-600 min-w-[90px]">Start Date:</span>
+                        <span className="text-xs text-gray-900 ml-2">
+                          {task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : "-"}
+                        </span>
+                      </div>
+                      <div className="flex items-start">
+                        <span className="text-xs font-medium text-gray-600 min-w-[90px]">End Date:</span>
+                        <span className="text-xs text-gray-900 ml-2">
+                          {task.endDate ? new Date(task.endDate).toISOString().split('T')[0] : "-"}
+                        </span>
+                      </div>
+                      <div className="flex items-start">
+                        <span className="text-xs font-medium text-gray-600 min-w-[90px]">Created Date:</span>
+                        <div className="text-xs text-gray-900 ml-2">
+                          {task.createdAt ? (
+                            <>
+                              <div>{new Date(task.createdAt).toISOString().split('T')[0]}</div>
+                              <div className="text-xs text-gray-500">
+                                {new Date(task.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                            </>
+                          ) : "-"}
                         </div>
                       </div>
-                    ) : "-"}
+                    </div>
                   </td>
-                  <td>
+                  <td className="border border-gray-300">
                     <span className={`badge ${getPriorityColor(task.priority)} text-white`}>
                       {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
                     </span>
                   </td>
-                  <td>
+                  <td className="border border-gray-300">
                     <span className={`badge ${getStatusColor(task.status)}`}>
                       {task.status.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                     </span>
                   </td>
-                  <td className="max-w-xs truncate" title={task.remarks || "-"}>
+                  <td className="max-w-xs truncate border border-gray-300" title={task.remarks || "-"}>
                     {task.remarks || "-"}
                   </td>
-                  <td>
+                  <td className="border border-gray-300">
                     <div className="flex space-x-2">
                       <Link
                         href={`/tasks/edit/${task.id}`}

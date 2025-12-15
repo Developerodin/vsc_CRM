@@ -915,10 +915,10 @@ const TimelinesPage = () => {
 
               {/* Timelines Table */}
               <div className="table-responsive">
-                <table className="table whitespace-nowrap table-bordered">
+                <table className="table table-bordered border-collapse">
                   <thead>
-                    <tr>
-                      <th className="px-4 py-3">
+                    <tr className="bg-gray-100">
+                      <th className="px-4 py-3 border border-gray-300">
                         <input
                           type="checkbox"
                           className="form-checkbox"
@@ -926,20 +926,17 @@ const TimelinesPage = () => {
                           onChange={handleSelectAll}
                         />
                       </th>
-                      <th className="px-4 py-3">Activity</th>
-                      <th className="px-4 py-3">Sub Activity</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">Period</th>
-                      <th className="px-4 py-3">Due Date</th>
-                      <th className="px-4 py-3">Client Name</th>
-                      <th className="px-4 py-3">Created Date</th>
-                      <th className="px-4 py-3">Actions</th>
+                      <th className="px-4 py-3 border border-gray-300">Activity</th>
+                      <th className="px-4 py-3 border border-gray-300">Sub Activity</th>
+                      <th className="px-4 py-3 border border-gray-300">Client Name</th>
+                      <th className="px-4 py-3 border border-gray-300">Status & Dates</th>
+                      <th className="px-4 py-3 border border-gray-300">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {isLoading ? (
                       <tr>
-                        <td colSpan={9} className="text-center py-4">
+                        <td colSpan={5} className="text-center py-4 border border-gray-300 bg-white">
                           <div className="flex justify-center">
                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                           </div>
@@ -947,13 +944,13 @@ const TimelinesPage = () => {
                       </tr>
                     ) : error ? (
                       <tr>
-                        <td colSpan={9} className="text-center text-red-500 py-4">
+                        <td colSpan={5} className="text-center text-red-500 py-4 border border-gray-300 bg-white">
                           {error}
                         </td>
                       </tr>
                     ) : timelines.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="text-center py-8">
+                        <td colSpan={5} className="text-center py-8 border border-gray-300 bg-white">
                           <div className="flex flex-col items-center justify-center">
                             <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
                               <i className="ri-time-line text-4xl text-primary"></i>
@@ -997,9 +994,9 @@ const TimelinesPage = () => {
                         </td>
                       </tr>
                     ) : (
-                      timelines.map((timeline) => (
-                        <tr key={timeline.id}>
-                          <td>
+                      timelines.map((timeline, index) => (
+                        <tr key={timeline.id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                          <td className="border border-gray-300">
                             <input
                               type="checkbox"
                               checked={selectedTimelines.includes(timeline.id)}
@@ -1007,24 +1004,53 @@ const TimelinesPage = () => {
                               className="form-checkbox"
                             />
                           </td>
-                          <td>{timeline.activity?.name || "-"}</td>
-                          <td>{timeline.subactivity?.name || "-"}</td>
-                          <td>
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                              timeline.status === 'completed' ? 'bg-green-100 text-green-800' :
-                              timeline.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                              timeline.status === 'ongoing' ? 'bg-blue-100 text-blue-800' :
-                              timeline.status === 'delayed' ? 'bg-red-100 text-red-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {timeline.status?.charAt(0).toUpperCase() + timeline.status?.slice(1) || "-"}
-                            </span>
+                          <td className="border border-gray-300">{timeline.activity?.name || "-"}</td>
+                          <td className="border border-gray-300">{timeline.subactivity?.name || "-"}</td>
+                          <td className="border border-gray-300">{timeline.client?.name || "-"}</td>
+                          <td className="border border-gray-300">
+                            <div className="space-y-1 text-sm">
+                              <div className="flex items-start">
+                                <span className="text-xs font-medium text-gray-600 min-w-[80px]">Status:</span>
+                                <span className="text-xs ml-2">
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                    timeline.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                    timeline.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                    timeline.status === 'ongoing' ? 'bg-blue-100 text-blue-800' :
+                                    timeline.status === 'delayed' ? 'bg-red-100 text-red-800' :
+                                    'bg-gray-100 text-gray-800'
+                                  }`}>
+                                    {timeline.status?.charAt(0).toUpperCase() + timeline.status?.slice(1) || "-"}
+                                  </span>
+                                </span>
+                              </div>
+                              <div className="flex items-start">
+                                <span className="text-xs font-medium text-gray-600 min-w-[80px]">Period:</span>
+                                <span className="text-xs text-gray-900 ml-2">
+                                  {timeline.period || "-"}
+                                </span>
+                              </div>
+                              <div className="flex items-start">
+                                <span className="text-xs font-medium text-gray-600 min-w-[80px]">Due Date:</span>
+                                <span className="text-xs text-gray-900 ml-2">
+                                  {timeline.dueDate ? new Date(timeline.dueDate).toISOString().split('T')[0] : "-"}
+                                </span>
+                              </div>
+                              <div className="flex items-start">
+                                <span className="text-xs font-medium text-gray-600 min-w-[80px]">Created Date:</span>
+                                <div className="text-xs text-gray-900 ml-2">
+                                  {timeline.createdAt ? (
+                                    <>
+                                      <div>{new Date(timeline.createdAt).toISOString().split('T')[0]}</div>
+                                      <div className="text-xs text-gray-500">
+                                        {new Date(timeline.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                      </div>
+                                    </>
+                                  ) : "-"}
+                                </div>
+                              </div>
+                            </div>
                           </td>
-                          <td>{timeline.period || "-"}</td>
-                          <td>{timeline.subactivity?.frequency || "-"}</td>
-                          <td>{timeline.client?.name || "-"}</td>
-                          <td>{formatDate(timeline.createdAt)}</td>
-                          <td>
+                          <td className="border border-gray-300">
                             <div className="flex space-x-2">
                               <Link
                                 href={`/timelines/edit/${timeline.id}`}
