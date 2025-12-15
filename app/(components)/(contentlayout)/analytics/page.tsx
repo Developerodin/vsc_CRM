@@ -302,12 +302,14 @@ const AnalyticsPage = () => {
   const [topByBranch, setTopByBranch] = useState<TopByBranchResponse['data'] | null>(null);
   const [globalTeamMembers, setGlobalTeamMembers] = useState<GlobalTeamMembersResponse['data'] | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
+  const [groups, setGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [trendsLoading, setTrendsLoading] = useState(true);
   const [topCompletionLoading, setTopCompletionLoading] = useState(true);
   const [topBranchLoading, setTopBranchLoading] = useState(true);
   const [globalTeamLoading, setGlobalTeamLoading] = useState(true);
   const [clientsLoading, setClientsLoading] = useState(true);
+  const [groupsLoading, setGroupsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedMonths, setSelectedMonths] = useState(6);
   const [chartType, setChartType] = useState<'combined' | 'separate'>('combined');
@@ -326,6 +328,7 @@ const AnalyticsPage = () => {
     fetchTopByBranch();
     fetchGlobalTeamMembers();
     fetchClients();
+    fetchGroups();
   }, []);
 
   useEffect(() => {
@@ -484,6 +487,24 @@ const AnalyticsPage = () => {
       console.error('Error fetching clients:', err);
     } finally {
       setClientsLoading(false);
+    }
+  };
+
+  const fetchGroups = async () => {
+    try {
+      setGroupsLoading(true);
+      const response = await axios.get(`${Base_url}groups/analytics`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      console.log('Groups API response:', response.data);
+      setGroups(response.data.groups || []);
+    } catch (err) {
+      console.error('Error fetching groups:', err);
+    } finally {
+      setGroupsLoading(false);
     }
   };
 
@@ -1427,6 +1448,144 @@ const AnalyticsPage = () => {
             </div>
           </div>
                  )}
+       </div>
+
+       {/* Groups Table */}
+       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
+         <div className="flex items-center justify-between mb-6">
+           <h2 className="text-xl font-semibold text-gray-900">Groups Overview</h2>
+           <button
+             onClick={() => router.push('/analytics/groups')}
+             className="ti-btn ti-btn-primary"
+           >
+             Explore All Groups
+           </button>
+         </div>
+
+         {groupsLoading ? (
+           <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
+             <div className="text-center">
+               <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                 <i className="ri-loader-4-line text-xl text-gray-400 animate-spin"></i>
+               </div>
+               <p className="text-gray-500">Loading groups...</p>
+             </div>
+           </div>
+         ) : groups && groups.length > 0 ? (
+           <div className="overflow-x-auto">
+             <table className="w-full">
+               <thead className="bg-gray-50">
+                 <tr>
+                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                     Group Name
+                   </th>
+                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                     Branch
+                   </th>
+                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                     Clients
+                   </th>
+                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                     Task Status
+                   </th>
+                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                     Timeline Status
+                   </th>
+                 </tr>
+               </thead>
+               <tbody className="bg-white divide-y divide-gray-200">
+                 {groups.slice(0, 5).map((group) => (
+                   <tr key={group.groupId} className="hover:bg-gray-50">
+                     <td className="px-6 py-4 whitespace-nowrap">
+                       <button
+                         onClick={() => router.push(`/analytics/groups/${group.groupId}/overview`)}
+                         className="text-sm font-medium text-gray-900 hover:text-blue-600 hover:underline cursor-pointer"
+                       >
+                         {group.groupName || 'N/A'}
+                       </button>
+                     </td>
+                     <td className="px-6 py-4 whitespace-nowrap">
+                       <div className="text-sm text-gray-900">{group.branch?.name || 'N/A'}</div>
+                     </td>
+                     <td className="px-6 py-4 whitespace-nowrap">
+                       <div className="text-sm text-gray-900">{group.numberOfClients || 0} Clients</div>
+                     </td>
+                     <td className="px-6 py-4 whitespace-nowrap">
+                       <div className="text-sm text-gray-900">
+                         {group.taskStatus?.pending > 0 && (
+                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-warning text-black mr-1">
+                             {group.taskStatus.pending} Pending
+                           </span>
+                         )}
+                         {group.taskStatus?.ongoing > 0 && (
+                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary text-black mr-1">
+                             {group.taskStatus.ongoing} Ongoing
+                           </span>
+                         )}
+                         {group.taskStatus?.completed > 0 && (
+                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success text-black mr-1">
+                             {group.taskStatus.completed} Completed
+                           </span>
+                         )}
+                         {group.taskStatus?.on_hold > 0 && (
+                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 mr-1">
+                             {group.taskStatus.on_hold} On Hold
+                           </span>
+                         )}
+                         {group.taskStatus?.delayed > 0 && (
+                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-danger text-black mr-1">
+                             {group.taskStatus.delayed} Delayed
+                           </span>
+                         )}
+                         {(!group.taskStatus || group.taskStatus.total === 0) && (
+                           <span className="text-gray-400 text-xs">No tasks</span>
+                         )}
+                       </div>
+                     </td>
+                     <td className="px-6 py-4 whitespace-nowrap">
+                       <div className="text-sm text-gray-900">
+                         {group.timelineStatus?.pending > 0 && (
+                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-warning text-black mr-1">
+                             {group.timelineStatus.pending} Pending
+                           </span>
+                         )}
+                         {group.timelineStatus?.ongoing > 0 && (
+                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary text-black mr-1">
+                             {group.timelineStatus.ongoing} Ongoing
+                           </span>
+                         )}
+                         {group.timelineStatus?.completed > 0 && (
+                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success text-black mr-1">
+                             {group.timelineStatus.completed} Completed
+                           </span>
+                         )}
+                         {group.timelineStatus?.delayed > 0 && (
+                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-danger text-black mr-1">
+                             {group.timelineStatus.delayed} Delayed
+                           </span>
+                         )}
+                         {(!group.timelineStatus || group.timelineStatus.total === 0) && (
+                           <span className="text-gray-400 text-xs">No timelines</span>
+                         )}
+                       </div>
+                     </td>
+                   </tr>
+                 ))}
+               </tbody>
+             </table>
+           </div>
+         ) : (
+           <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
+             <div className="text-center">
+               <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                 <i className="ri-group-line text-xl text-gray-400"></i>
+               </div>
+               <p className="text-gray-500">
+                 {groupsLoading ? 'Loading groups...' : 'No groups data available'}
+               </p>
+             </div>
+           </div>
+         )}
        </div>
 
        {/* Clients Table */}
