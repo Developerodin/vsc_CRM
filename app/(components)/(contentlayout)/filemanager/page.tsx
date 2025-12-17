@@ -55,6 +55,7 @@ const Filemanager = () => {
     const [fileRowsPerPage, setFileRowsPerPage] = useState(100); // Match API limit
     const [expandedFolders, setExpandedFolders] = useState<string[]>([]);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
+    const [folderHistory, setFolderHistory] = useState<string[]>([]); // Track folder navigation history
     const [contextMenu, setContextMenu] = useState<{
         visible: boolean;
         x: number;
@@ -247,11 +248,26 @@ const Filemanager = () => {
     };
 
     // Handle folder navigation with auto-expand
-    const handleFolderClick = (folderId: string) => {
+    const handleFolderClick = (folderId: string, addToHistory: boolean = true) => {
+        // Add current folder to history before navigating (if we have a current folder and addToHistory is true)
+        if (currentFolder && addToHistory && currentFolder.id !== folderId) {
+            setFolderHistory(prev => [...prev, currentFolder.id]);
+        }
         // Auto-expand parent folders to show the path to the selected folder
         expandParentFolders(folderId, folderTree);
         loadFolderContents(folderId, 1);
         setFilePage(1);
+    };
+
+    // Handle back navigation
+    const handleBackToParent = () => {
+        if (folderHistory.length > 0) {
+            const previousFolderId = folderHistory[folderHistory.length - 1];
+            setFolderHistory(prev => prev.slice(0, -1)); // Remove last item from history
+            loadFolderContents(previousFolderId, 1);
+            setFilePage(1);
+            expandParentFolders(previousFolderId, folderTree);
+        }
     };
 
     // Handle item clicks (both files and folders)
@@ -668,7 +684,9 @@ const Filemanager = () => {
     const handleSelectSearchResult = (item: Folder | FileItem) => {
         if (item.type === 'folder') {
             // Navigate to the selected folder and expand the folder tree to show its location
-            handleFolderClick(item.id);
+            // Clear history when navigating from search to avoid confusion
+            setFolderHistory([]);
+            handleFolderClick(item.id, false);
             closeSearchModal();
         } else {
             // If it's a file, maybe download it or show details
@@ -740,6 +758,8 @@ const Filemanager = () => {
             };
             const firstFolderId = findFirstFolder(folderTree);
             if (firstFolderId) {
+                // Clear history on initial load
+                setFolderHistory([]);
                 loadFolderContents(firstFolderId, 1);
             }
         }
@@ -883,19 +903,37 @@ const Filemanager = () => {
                     {currentFolder ? (
                         <>
                             {/* Folder name header and upload button */}
-                            <div className="flex items-center justify-between border-b border-defaultborder dark:border-defaultborder/10 px-5 py-2 bg-light/60 rounded-t-lg">
-                                <div className="flex items-center gap-3">
-                                    <h2 className="text-lg font-semibold text-defaulttextcolor m-0">{currentFolder.folder.name}</h2>
-                                    {currentFolder.folder.description && (
-                                        <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                                            {currentFolder.folder.description}
-                                        </span>
-                                    )}
-                                    <span className="text-xs text-gray-400">
-                                        Created by: {getUserDisplayName(currentFolder.folder.createdBy)}
-                                    </span>
-                                </div>
-                                <div className="flex gap-2">
+                            <div className="border-b border-defaultborder dark:border-defaultborder/10 px-5 py-3 bg-light/60 rounded-t-lg">
+                                <div className="flex items-center justify-between gap-4">
+                                    {/* Left section: Back button and folder info */}
+                                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                                        {/* Back Button */}
+                                        {folderHistory.length > 0 && (
+                                            <button
+                                                className="ti-btn ti-btn-light ti-btn-sm flex items-center gap-1 px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-gray-200 transition flex-shrink-0 mr-3"
+                                                onClick={handleBackToParent}
+                                                title="Back to parent folder"
+                                            >
+                                                <i className="ri-arrow-left-line text-base"></i>
+                                                <span className="hidden sm:inline">Back</span>
+                                            </button>
+                                        )}
+                                        <div className="flex flex-col min-w-0">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <h2 className="text-lg font-semibold text-defaulttextcolor m-0 truncate">{currentFolder.folder.name}</h2>
+                                                {currentFolder.folder.description && (
+                                                    <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded whitespace-nowrap">
+                                                        {currentFolder.folder.description}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <span className="text-xs text-gray-400 mt-1">
+                                                Created by: {getUserDisplayName(currentFolder.folder.createdBy)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    {/* Right section: Action buttons */}
+                                    <div className="flex gap-2 flex-shrink-0">
                                     <button
                                         className="ti-btn ti-btn-danger flex items-center gap-2 px-4 py-2 text-sm font-medium shadow-sm transition disabled:opacity-50"
                                         disabled={selectedIds.length === 0}
@@ -923,6 +961,7 @@ const Filemanager = () => {
                                     >
                                         <i className="ri-upload-2-line text-lg"></i> Upload
                                     </button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1360,7 +1399,7 @@ const Filemanager = () => {
                             <button
                                 className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
                                 onClick={() => {
-                                    handleFolderClick(contextMenu.itemId);
+                                    handleFolderClick(contextMenu.itemId, true);
                                     closeContextMenu();
                                 }}
                             >
