@@ -54,7 +54,7 @@ const Filemanager = () => {
     const [filePage, setFilePage] = useState(1);
     const [fileRowsPerPage, setFileRowsPerPage] = useState(100); // Match API limit
     const [expandedFolders, setExpandedFolders] = useState<string[]>([]);
-    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
     const [contextMenu, setContextMenu] = useState<{
         visible: boolean;
         x: number;
@@ -1609,27 +1609,27 @@ const Filemanager = () => {
                                 )}
 
                                 {searchModal.results.length > 0 && (
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 p-4">
+                                    <div className="space-y-2 p-4">
                                         {searchModal.results.map((item) => (
                                             <div
                                                 key={item.id}
-                                                className="group relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-all duration-200 cursor-pointer"
+                                                className="group relative flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-all duration-200 cursor-pointer"
                                                 onClick={() => handleSelectSearchResult(item)}
                                             >
-                                                {/* Icon - Exactly like main grid view */}
-                                                <div className="flex items-center justify-center w-16 h-16 mb-3">
+                                                {/* Icon */}
+                                                <div className="flex items-center justify-center w-10 h-10">
                                                     <div className="w-full h-full rounded-lg flex items-center justify-center bg-blue-100 dark:bg-blue-900/30">
                                                         <i className="ri-folder-2-line text-2xl text-blue-600 dark:text-blue-400"></i>
                                                     </div>
                                                 </div>
 
-                                                {/* Content - Exactly like main grid view */}
-                                                <div className="flex-1 min-w-0 text-center">
+                                                {/* Content */}
+                                                <div className="flex-1 min-w-0">
                                                     <div className="font-medium text-sm truncate">
                                                         {item.type === 'folder' ? (item.folder?.name || (item as any).name) : item.file?.fileName}
                                                     </div>
-                                                    <div className="text-xs text-gray-500 mt-1">
-                                                        Folder
+                                                    <div className="text-xs text-gray-500">
+                                                        Folder • {new Date(item.updatedAt).toLocaleDateString()}
                                                     </div>
                                                 </div>
                                             </div>
