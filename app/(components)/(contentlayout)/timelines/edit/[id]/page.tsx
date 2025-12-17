@@ -73,6 +73,7 @@ interface Timeline {
   turnover?: number;
   startDate?: string;
   endDate?: string;
+  completedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -122,7 +123,8 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
     status: 'pending' as 'pending' | 'completed' | 'ongoing' | 'delayed',
     turnover: '',
     startDate: '',
-    endDate: ''
+    endDate: '',
+    completedAt: ''
   });
 
   // State for managing selected client in modal
@@ -280,7 +282,8 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
           status: timelineData.status,
           turnover: timelineData.turnover?.toString() || '',
           startDate: formatDateForInput(timelineData.startDate),
-          endDate: formatDateForInput(timelineData.endDate)
+          endDate: formatDateForInput(timelineData.endDate),
+          completedAt: formatDateForInput(timelineData.completedAt)
         });
 
         console.log('Form Data after setting:', {
@@ -601,7 +604,8 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
         status: formData.status,
         turnover: formData.turnover ? parseFloat(formData.turnover) : undefined,
         startDate: formatDateToISO(formData.startDate),
-        endDate: formatDateToISO(formData.endDate)
+        endDate: formatDateToISO(formData.endDate),
+        completedAt: formatDateToISO(formData.completedAt)
       });
 
       const response = await fetch(`${Base_url}timelines/${params.id}`, {
@@ -902,6 +906,22 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
                       value={formData.endDate}
                       onChange={handleInputChange}
                     />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+                  {/* Fifth Row: Completed At */}
+                  <div className="form-group">
+                    <label htmlFor="completedAt" className="form-label">Completed At</label>
+                    <input
+                      type="date"
+                      id="completedAt"
+                      name="completedAt"
+                      className="form-control"
+                      value={formData.completedAt}
+                      onChange={handleInputChange}
+                    />
+                    <small className="text-gray-500">Date when the timeline was completed</small>
                   </div>
                 </div>
 

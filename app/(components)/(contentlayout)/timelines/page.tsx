@@ -61,6 +61,7 @@ interface Timeline {
   dueDate: string;
   startDate: string;
   endDate: string;
+  completedAt?: string;
   frequencyConfig: any;
   branch: string;
   fields: Array<{
@@ -87,6 +88,8 @@ interface ExcelRow {
   "Subactivity": string;
   "Frequency": string;
   "Period": string;
+  "Status": string;
+  "Completed At": string;
   [key: string]: string; // For dynamic field columns
 }
 
@@ -401,7 +404,9 @@ const TimelinesPage = () => {
           "Name of Clients": timeline.client?.name || "",
           "Subactivity": timeline.subactivity?.name || "",
           "Frequency": timeline.subactivity?.frequency || timeline.frequency || "",
-          "Period": timeline.period || ""
+          "Period": timeline.period || "",
+          "Status": timeline.status || "",
+          "Completed At": timeline.completedAt ? new Date(timeline.completedAt).toLocaleDateString('en-GB').replace(/\//g, '-') : ""
         };
 
         // Add dynamic field columns
@@ -424,7 +429,9 @@ const TimelinesPage = () => {
         { wch: 30 }, // Name of Clients
         { wch: 25 }, // Subactivity
         { wch: 20 }, // Frequency
-        { wch: 20 }  // Period
+        { wch: 20 }, // Period
+        { wch: 15 }, // Status
+        { wch: 20 }  // Completed At
       ];
 
       // Add widths for dynamic field columns
@@ -445,6 +452,65 @@ const TimelinesPage = () => {
     } catch (error) {
       console.error("Error exporting timelines:", error);
       toast.error("Failed to export timelines");
+    }
+  };
+
+  // Helper function to parse date in various formats (DD-MM-YYYY, DD/MM/YYYY, or Excel serial number)
+  const parseDate = (dateValue: any): string | undefined => {
+    if (dateValue === null || dateValue === undefined || dateValue === '') return undefined;
+    
+    try {
+      // Handle Excel serial date numbers (e.g., 46008)
+      if (typeof dateValue === 'number') {
+        // Excel date serial number (days since 1900-01-01, with leap year bug)
+        // JavaScript equivalent: subtract 25569 days and multiply by milliseconds per day
+        const excelEpoch = new Date(1899, 11, 30); // December 30, 1899 (accounting for Excel's leap year bug)
+        const dateObj = new Date(excelEpoch.getTime() + dateValue * 86400000);
+        
+        if (!isNaN(dateObj.getTime())) {
+          return dateObj.toISOString();
+        }
+      }
+      
+      // Handle string dates
+      if (typeof dateValue === 'string') {
+        const trimmedDate = dateValue.trim();
+        if (trimmedDate === '') return undefined;
+        
+        // Handle DD-MM-YYYY or DD/MM/YYYY format
+        const dateRegex = /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/;
+        const match = trimmedDate.match(dateRegex);
+        
+        if (match) {
+          const day = match[1].padStart(2, '0');
+          const month = match[2].padStart(2, '0');
+          const year = match[3];
+          
+          // Create ISO date string (YYYY-MM-DD)
+          const isoDate = `${year}-${month}-${day}`;
+          
+          // Validate the date
+          const dateObj = new Date(isoDate);
+          if (isNaN(dateObj.getTime())) {
+            console.warn(`Invalid date: ${dateValue}`);
+            return undefined;
+          }
+          
+          return dateObj.toISOString();
+        }
+        
+        // Try parsing as ISO date or other standard formats
+        const dateObj = new Date(trimmedDate);
+        if (!isNaN(dateObj.getTime())) {
+          return dateObj.toISOString();
+        }
+      }
+      
+      console.warn(`Could not parse date: ${dateValue}`);
+      return undefined;
+    } catch (error) {
+      console.error(`Error parsing date ${dateValue}:`, error);
+      return undefined;
     }
   };
 
@@ -481,7 +547,7 @@ const TimelinesPage = () => {
             }
 
             // Extract all field columns (excluding the fixed columns)
-            const fixedColumns = ["Timeline ID", "Name of Clients", "Subactivity", "Frequency", "Period"];
+            const fixedColumns = ["Timeline ID", "Name of Clients", "Subactivity", "Frequency", "Period", "Status", "Completed At"];
             const fields: Array<{ fileName: string; fieldValue: string }> = [];
             
             Object.keys(row).forEach(key => {
@@ -497,13 +563,34 @@ const TimelinesPage = () => {
               }
             });
 
+            // Prepare the update object with status and completedAt
+            const updateData: any = {
+              timelineId: timelineId,
+              fields: fields  // Always include fields array (can be empty)
+            };
+
+            // Add status if present
+            if (row["Status"]) {
+              const statusValue = typeof row["Status"] === 'string' ? row["Status"].trim().toLowerCase() : String(row["Status"]).toLowerCase();
+              if (statusValue && ['pending', 'completed', 'ongoing', 'delayed'].includes(statusValue)) {
+                updateData.status = statusValue;
+              }
+            }
+
+            // Add completedAt if present (can be Excel serial number or string)
+            if (row["Completed At"] !== null && row["Completed At"] !== undefined && row["Completed At"] !== '') {
+              const parsedDate = parseDate(row["Completed At"]);
+              if (parsedDate) {
+                updateData.completedAt = parsedDate;
+              }
+            }
+
             console.log(`Processing row for Timeline ID: ${timelineId}`);
             console.log(`Extracted fields:`, fields);
+            console.log(`Status:`, updateData.status);
+            console.log(`CompletedAt:`, updateData.completedAt);
             
-            return {
-              timelineId: timelineId,
-              fields: fields
-            };
+            return updateData;
           });
 
           console.log('Transformed data for API:', timelineUpdates);
