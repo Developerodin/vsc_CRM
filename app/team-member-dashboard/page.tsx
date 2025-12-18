@@ -7,6 +7,7 @@ import { toast } from 'react-hot-toast'
 
 interface TeamMemberData {
   id: string
+  _id?: string
   name: string
   email?: string
   phone?: string
@@ -24,49 +25,71 @@ interface TeamMemberData {
     description: string
     category: string
   }>
+  accessibleTeamMembers?: Array<{
+    _id?: string
+    id?: string
+    name: string
+    email: string
+    phone?: string
+  }>
+}
+
+interface TimelineItem {
+  _id?: string
+  id?: string
+  status?: string
+  client?: {
+    _id?: string
+    id?: string
+    name: string
+    email: string
+    phone: string
+  }
+  activity?: {
+    _id?: string
+    id?: string
+    name: string
+  }
+  startDate?: string
+  endDate?: string
+  frequency?: string
 }
 
 interface Task {
-  _id: string
+  _id?: string
+  id?: string
   status: string
   priority: string
   startDate: string
   endDate: string
   remarks: string
-  teamMember: string
-  branch: {
-    _id: string
+  teamMember: string | {
+    _id?: string
+    id?: string
     name: string
-    address: string
-    city: string
-    state: string
+    email: string
+    phone?: string
   }
-  timeline: Array<{
-    _id: string
-    status: string
-    client: {
-      _id: string
-      name: string
-      email: string
-      phone: string
-    }
-    activity: {
-      _id: string
-      name: string
-    }
-    startDate: string
-    endDate: string
-    frequency: string
-  }>
+  branch: {
+    _id?: string
+    id?: string
+    name: string
+    address?: string
+    city?: string
+    state?: string
+  }
+  timeline: Array<string | TimelineItem>
   attachments: Array<{
-    _id: string
+    _id?: string
+    id?: string
     fileName: string
     fileUrl: string
     uploadedAt: string
   }>
   createdAt: string
-  updatedAt: string
-  metadata: any
+  updatedAt?: string
+  metadata?: any
+  assignedBy?: any
 }
 
 interface TaskResponse {
@@ -97,6 +120,7 @@ const TeamMemberDashboard = () => {
   const [priorityFilter, setPriorityFilter] = useState<string>('all')
   const [startDateFilter, setStartDateFilter] = useState<string>('')
   const [endDateFilter, setEndDateFilter] = useState<string>('')
+  const [viewAccessibleTasks, setViewAccessibleTasks] = useState(false)
   
   // Task update modal
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
@@ -106,6 +130,35 @@ const TeamMemberDashboard = () => {
     status: '',
     remarks: ''
   })
+
+  // View details modal
+  const [showViewDetailsModal, setShowViewDetailsModal] = useState(false)
+  const [viewTaskDetails, setViewTaskDetails] = useState<Task | null>(null)
+
+  // Assign task modal state
+  const [showAssignTaskModal, setShowAssignTaskModal] = useState(false)
+  const [assigningTask, setAssigningTask] = useState(false)
+  const [accessibleTeamMembers, setAccessibleTeamMembers] = useState<Array<{
+    _id?: string
+    id?: string
+    name: string
+    email: string
+    phone?: string
+  }>>([])
+  const [assignTaskForm, setAssignTaskForm] = useState({
+    teamMember: '',
+    startDate: '',
+    endDate: '',
+    priority: 'medium',
+    branch: '',
+    remarks: '',
+    status: 'pending'
+  })
+  const [branches, setBranches] = useState<Array<{
+    _id: string
+    id: string
+    name: string
+  }>>([])
 
   useEffect(() => {
     const token = localStorage.getItem('teamMemberToken')
@@ -120,6 +173,30 @@ const TeamMemberDashboard = () => {
       const teamMember = JSON.parse(teamMemberDataStr)
       console.log('Team member data loaded:', teamMember)
       setTeamMemberData(teamMember)
+      
+      // Extract accessible team members from the profile
+      if (teamMember.accessibleTeamMembers && Array.isArray(teamMember.accessibleTeamMembers)) {
+        const accessibleMembers = teamMember.accessibleTeamMembers.map((tm: any) => ({
+          _id: tm._id || tm.id,
+          id: tm.id || tm._id,
+          name: tm.name || '',
+          email: tm.email || '',
+          phone: tm.phone || ''
+        }))
+        setAccessibleTeamMembers(accessibleMembers)
+        
+        // If any members are missing name/email (just IDs), fetch full profile
+        const needsFetch = accessibleMembers.some(m => !m.name || !m.email)
+        if (needsFetch && token) {
+          fetchAccessibleTeamMembersFromProfile(token)
+        }
+      } else {
+        // If accessibleTeamMembers not in login data, try fetching from profile
+        if (token) {
+          fetchAccessibleTeamMembersFromProfile(token)
+        }
+      }
+      
       setLoading(false)
       // Don't call fetchTasks here - let the other useEffect handle it
     } catch (error) {
@@ -131,6 +208,55 @@ const TeamMemberDashboard = () => {
       }, 2000)
     }
   }, [router])
+
+  // Fetch accessible team members from profile if needed
+  const fetchAccessibleTeamMembersFromProfile = async (token: string) => {
+    try {
+      const response = await axios.get(`${Base_url}team-member-auth/profile`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      
+      if (response.data && response.data.data) {
+        const profile = response.data.data
+        if (profile.accessibleTeamMembers && Array.isArray(profile.accessibleTeamMembers)) {
+          const accessibleMembers = profile.accessibleTeamMembers.map((tm: any) => ({
+            _id: tm._id || tm.id,
+            id: tm.id || tm._id,
+            name: tm.name || '',
+            email: tm.email || '',
+            phone: tm.phone || ''
+          }))
+          setAccessibleTeamMembers(accessibleMembers)
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching accessible team members from profile:', error)
+    }
+  }
+
+  // Fetch branches for task assignment
+  useEffect(() => {
+    const fetchBranches = async () => {
+      try {
+        const token = localStorage.getItem('teamMemberToken')
+        if (!token) return
+        
+        const response = await axios.get(`${Base_url}branches`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        
+        if (response.data && response.data.results) {
+          setBranches(response.data.results)
+        }
+      } catch (error) {
+        console.error('Error fetching branches:', error)
+      }
+    }
+    
+    if (teamMemberData && !loading) {
+      fetchBranches()
+    }
+  }, [teamMemberData, loading])
 
   const fetchTasks = async () => {
     // Don't fetch if still loading or no team member data
@@ -159,7 +285,10 @@ const TeamMemberDashboard = () => {
       if (startDateFilter) params.append('startDate', startDateFilter)
       if (endDateFilter) params.append('endDate', endDateFilter)
       
-      const apiUrl = `${Base_url}team-member-auth/tasks?${params}`
+      // Use accessible team members endpoint if enabled
+      const apiUrl = viewAccessibleTasks 
+        ? `${Base_url}team-member-auth/tasks/accessible-team-members?${params}`
+        : `${Base_url}team-member-auth/tasks?${params}`
       console.log('Fetching tasks with URL:', apiUrl)
       console.log('Token:', token)
       console.log('Base_url:', Base_url)
@@ -182,8 +311,27 @@ const TeamMemberDashboard = () => {
       console.log('Tasks API response:', response.data)
       
       if (response.data.success) {
-        const taskData: TaskResponse = response.data.data
-        setTasks(taskData.tasks)
+        // Handle both response formats
+        const taskData = response.data.data || response.data
+        let tasksList: Task[] = []
+        
+        if (taskData.tasks) {
+          // Own tasks format
+          tasksList = taskData.tasks
+        } else if (taskData.results) {
+          // Accessible team members tasks format
+          tasksList = taskData.results
+        }
+        
+        // Normalize task IDs and ensure timeline is handled correctly
+        const normalizedTasks = tasksList.map((task: any) => ({
+          ...task,
+          _id: task._id || task.id,
+          id: task.id || task._id,
+          timeline: task.timeline || []
+        }))
+        
+        setTasks(normalizedTasks)
       }
     } catch (error: any) {
       console.error('Error fetching tasks:', error)
@@ -236,6 +384,16 @@ const TeamMemberDashboard = () => {
     setShowUpdateModal(true)
   }
 
+  const openViewDetailsModal = (task: Task) => {
+    setViewTaskDetails(task)
+    setShowViewDetailsModal(true)
+  }
+
+  const closeViewDetailsModal = () => {
+    setShowViewDetailsModal(false)
+    setViewTaskDetails(null)
+  }
+
   const closeUpdateModal = () => {
     setShowUpdateModal(false)
     setSelectedTask(null)
@@ -265,29 +423,31 @@ const TeamMemberDashboard = () => {
     setUpdatingTask(true)
     try {
       const token = localStorage.getItem('teamMemberToken')
+      // Team members can only update status, not remarks
       const updateData: any = {
         status: updateForm.status,
       }
       
-      // Only include remarks if the task is not delayed
-      if (selectedTask.status !== 'delayed') {
-        updateData.remarks = updateForm.remarks
-      }
-      
-      const response = await axios.patch(`${Base_url}team-member-auth/tasks/${selectedTask._id}`, updateData, {
+      const taskId = selectedTask._id || selectedTask.id
+      const response = await axios.patch(`${Base_url}team-member-auth/tasks/${taskId}`, updateData, {
         headers: { Authorization: `Bearer ${token}` }
       })
       
       if (response.data.success) {
-        setSuccess(selectedTask.status === 'delayed' ? 'Task marked as completed!' : 'Task updated successfully!')
+        toast.success(selectedTask.status === 'delayed' ? 'Task marked as completed!' : 'Task status updated successfully!', {
+          duration: 3000,
+          position: 'top-right'
+        })
         closeUpdateModal()
         fetchTasks() // Refresh tasks
-        setTimeout(() => setSuccess(''), 3000)
       }
     } catch (error: any) {
       console.error('Error updating task:', error)
-      setError('Failed to update task')
-      setTimeout(() => setError(''), 3000)
+      const errorMessage = error.response?.data?.message || 'Failed to update task'
+      toast.error(errorMessage, {
+        duration: 4000,
+        position: 'top-right'
+      })
     } finally {
       setUpdatingTask(false)
     }
@@ -320,12 +480,128 @@ const TeamMemberDashboard = () => {
     return new Date(dateString).toLocaleDateString()
   }
 
+  const openAssignTaskModal = () => {
+    // Set default branch from team member's branch if available
+    if (teamMemberData?.branch?.id) {
+      setAssignTaskForm(prev => ({
+        ...prev,
+        branch: teamMemberData.branch!.id
+      }))
+    }
+    setShowAssignTaskModal(true)
+  }
+
+  const closeAssignTaskModal = () => {
+    setShowAssignTaskModal(false)
+    setAssignTaskForm({
+      teamMember: '',
+      startDate: '',
+      endDate: '',
+      priority: 'medium',
+      branch: teamMemberData?.branch?.id || '',
+      remarks: '',
+      status: 'pending'
+    })
+  }
+
+  const handleAssignTask = async () => {
+    if (!assignTaskForm.teamMember) {
+      toast.error('Please select a team member', {
+        duration: 3000,
+        position: 'top-right'
+      })
+      return
+    }
+    if (!assignTaskForm.startDate) {
+      toast.error('Please select a start date', {
+        duration: 3000,
+        position: 'top-right'
+      })
+      return
+    }
+    if (!assignTaskForm.endDate) {
+      toast.error('Please select an end date', {
+        duration: 3000,
+        position: 'top-right'
+      })
+      return
+    }
+    if (!assignTaskForm.branch) {
+      toast.error('Please select a branch', {
+        duration: 3000,
+        position: 'top-right'
+      })
+      return
+    }
+    if (new Date(assignTaskForm.startDate) > new Date(assignTaskForm.endDate)) {
+      toast.error('End date must be after start date', {
+        duration: 3000,
+        position: 'top-right'
+      })
+      return
+    }
+
+    setAssigningTask(true)
+    try {
+      const token = localStorage.getItem('teamMemberToken')
+      if (!token) {
+        toast.error('Authentication token not found')
+        return
+      }
+
+      const taskData = {
+        teamMember: assignTaskForm.teamMember,
+        startDate: new Date(assignTaskForm.startDate).toISOString(),
+        endDate: new Date(assignTaskForm.endDate).toISOString(),
+        priority: assignTaskForm.priority,
+        branch: assignTaskForm.branch,
+        remarks: assignTaskForm.remarks || '',
+        status: assignTaskForm.status,
+        timeline: [],
+        metadata: {},
+        attachments: []
+      }
+
+      const response = await axios.post(
+        `${Base_url}team-member-auth/tasks/assign`,
+        taskData,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      )
+
+      if (response.data && response.data.success) {
+        toast.success('Task assigned successfully!', {
+          duration: 3000,
+          position: 'top-right'
+        })
+        closeAssignTaskModal()
+        // Optionally refresh tasks if viewing accessible team members' tasks
+        // fetchTasks()
+      } else {
+        toast.error(response.data?.message || 'Failed to assign task', {
+          duration: 3000,
+          position: 'top-right'
+        })
+      }
+    } catch (error: any) {
+      console.error('Error assigning task:', error)
+      const errorMessage = error.response?.data?.message || 'Failed to assign task'
+      toast.error(errorMessage, {
+        duration: 4000,
+        position: 'top-right'
+      })
+    } finally {
+      setAssigningTask(false)
+    }
+  }
+
   // Refresh tasks when filters change
   useEffect(() => {
     if (teamMemberData && !loading) {
       fetchTasks()
     }
-  }, [currentPage, itemsPerPage, statusFilter, priorityFilter, startDateFilter, endDateFilter, teamMemberData, loading])
+  }, [currentPage, itemsPerPage, statusFilter, priorityFilter, startDateFilter, endDateFilter, viewAccessibleTasks, teamMemberData, loading])
 
   if (loading || !teamMemberData) {
     return (
@@ -395,12 +671,36 @@ const TeamMemberDashboard = () => {
           <div className="p-6">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">My Tasks</h2>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  {viewAccessibleTasks ? 'Accessible Team Members\' Tasks' : 'My Tasks'}
+                </h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                   {tasks.length > 0 ? `${tasks.length} task(s) found` : 'No tasks available'}
                 </p>
               </div>
               <div className="flex gap-2">
+                {accessibleTeamMembers.length > 0 && (
+                  <>
+                    <button
+                      onClick={openAssignTaskModal}
+                      className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm"
+                    >
+                      <i className="ri-add-line mr-1"></i>
+                      Assign Task
+                    </button>
+                    <button
+                      onClick={() => setViewAccessibleTasks(!viewAccessibleTasks)}
+                      className={`px-4 py-2 rounded-md transition-colors text-sm ${
+                        viewAccessibleTasks
+                          ? 'bg-purple-600 text-white hover:bg-purple-700'
+                          : 'bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
+                      }`}
+                    >
+                      <i className={`ri-${viewAccessibleTasks ? 'user-line' : 'team-line'} mr-1`}></i>
+                      {viewAccessibleTasks ? 'My Tasks' : 'View All Accessible'}
+                    </button>
+                  </>
+                )}
                 <button
                   onClick={fetchTasks}
                   disabled={tasksLoading}
@@ -512,7 +812,7 @@ const TeamMemberDashboard = () => {
                   </thead>
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {tasks.map((task) => (
-                      <tr key={task._id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <tr key={task._id || task.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                         <td className="px-6 py-4">
                           <div className="text-sm font-medium text-gray-900 dark:text-white">{task.remarks}</div>
                           <div className="text-sm text-gray-500 dark:text-gray-400">
@@ -530,22 +830,43 @@ const TeamMemberDashboard = () => {
                         <td className="px-6 py-4">
                           {task.timeline && task.timeline.length > 0 ? (
                             <div className="space-y-2">
-                              {task.timeline.slice(0, 3).map((timeline, index) => (
-                                <div key={timeline._id} className="border-l-2 border-gray-200 pl-2">
-                                  <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                    {timeline.client.name}
+                              {task.timeline.slice(0, 3).map((timeline, index) => {
+                                // Check if timeline is an ID (string) or populated object
+                                const isPopulated = typeof timeline === 'object' && timeline !== null && 'client' in timeline
+                                const timelineId = typeof timeline === 'string' ? timeline : (timeline._id || timeline.id || `timeline-${index}`)
+                                
+                                if (!isPopulated) {
+                                  return (
+                                    <div key={timelineId} className="border-l-2 border-gray-200 pl-2">
+                                      <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                        Timeline ID: {timelineId.substring(0, 8)}...
+                                      </div>
+                                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                                        Click "View" to see details
+                                      </div>
+                                    </div>
+                                  )
+                                }
+                                
+                                return (
+                                  <div key={timelineId} className="border-l-2 border-gray-200 pl-2">
+                                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                      {timeline.client?.name || 'N/A'}
+                                    </div>
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                      {timeline.activity?.name || 'N/A'} • {timeline.frequency || 'N/A'}
+                                    </div>
+                                    {timeline.status && (
+                                      <div className="text-xs text-gray-400 dark:text-gray-500">
+                                        {timeline.status}
+                                      </div>
+                                    )}
                                   </div>
-                                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                                    {timeline.activity.name} • {timeline.frequency}
-                                  </div>
-                                  <div className="text-xs text-gray-400 dark:text-gray-500">
-                                    {timeline.status}
-                                  </div>
-                                </div>
-                              ))}
+                                )
+                              })}
                               {task.timeline.length > 3 && (
                                 <div className="text-xs text-gray-500 dark:text-gray-400">
-                                  +{task.timeline.length - 3} more clients
+                                  +{task.timeline.length - 3} more timeline{task.timeline.length - 3 !== 1 ? 's' : ''}
                                 </div>
                               )}
                             </div>
@@ -578,18 +899,28 @@ const TeamMemberDashboard = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <button
-                            onClick={() => openUpdateModal(task)}
-                            className={`inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                              task.status === 'delayed' 
-                                ? 'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500' 
-                                : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
-                            }`}
-                            title={task.status === 'delayed' ? 'Click to mark as completed' : 'Click to update task'}
-                          >
-                            <i className={task.status === 'delayed' ? 'ri-check-line mr-1' : 'ri-edit-line mr-1'}></i>
-                            {task.status === 'delayed' ? 'Mark Complete' : 'Update'}
-                          </button>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => openViewDetailsModal(task)}
+                              className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                              title="View task details"
+                            >
+                              <i className="ri-eye-line mr-1"></i>
+                              View
+                            </button>
+                            <button
+                              onClick={() => openUpdateModal(task)}
+                              className={`inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                                task.status === 'delayed' 
+                                  ? 'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500' 
+                                  : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
+                              }`}
+                              title={task.status === 'delayed' ? 'Click to mark as completed' : 'Click to update task status'}
+                            >
+                              <i className={task.status === 'delayed' ? 'ri-check-line mr-1' : 'ri-edit-line mr-1'}></i>
+                              {task.status === 'delayed' ? 'Mark Complete' : 'Update Status'}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -610,13 +941,98 @@ const TeamMemberDashboard = () => {
       {/* Update Task Modal */}
       {showUpdateModal && selectedTask && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-800">
+          <div className="relative top-10 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white dark:bg-gray-800 max-h-[90vh] overflow-y-auto">
             <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Update Task</h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Update Task Status</h3>
+                <button
+                  onClick={() => setShowUpdateModal(false)}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  <i className="ri-close-line text-2xl"></i>
+                </button>
+              </div>
               
+              {/* Task Details (Read-Only) */}
+              <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg space-y-4">
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Task Details (View Only)</h4>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Remarks</label>
+                    <p className="text-sm text-gray-900 dark:text-white">{selectedTask.remarks || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Priority</label>
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(selectedTask.priority)}`}>
+                      {selectedTask.priority}
+                    </span>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Start Date</label>
+                    <p className="text-sm text-gray-900 dark:text-white">{formatDate(selectedTask.startDate)}</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">End Date</label>
+                    <p className="text-sm text-gray-900 dark:text-white">{formatDate(selectedTask.endDate)}</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Branch</label>
+                    <p className="text-sm text-gray-900 dark:text-white">{selectedTask.branch?.name || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Current Status</label>
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(selectedTask.status)}`}>
+                      {selectedTask.status.replace('_', ' ')}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Clients & Timeline (Read-Only) */}
+                {selectedTask.timeline && selectedTask.timeline.length > 0 && (
+                  <div className="mt-4">
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Clients & Timeline</label>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {selectedTask.timeline.map((timeline, index) => {
+                        const isPopulated = typeof timeline === 'object' && timeline !== null && 'client' in timeline
+                        const timelineId = typeof timeline === 'string' ? timeline : (timeline._id || timeline.id || `timeline-${index}`)
+                        
+                        if (!isPopulated) {
+                          return (
+                            <div key={timelineId} className="p-2 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-600">
+                              <div className="text-sm font-medium text-gray-900 dark:text-white">Timeline ID: {timelineId}</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                Timeline details not loaded. Please contact administrator for more information.
+                              </div>
+                            </div>
+                          )
+                        }
+                        
+                        return (
+                          <div key={timelineId} className="p-2 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-600">
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">{timeline.client?.name || 'N/A'}</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              {timeline.client?.email && <div>Email: {timeline.client.email}</div>}
+                              {timeline.client?.phone && <div>Phone: {timeline.client.phone}</div>}
+                              {timeline.activity?.name && <div>Activity: {timeline.activity.name}</div>}
+                              {timeline.frequency && <div>Frequency: {timeline.frequency}</div>}
+                              {timeline.status && <div>Status: {timeline.status}</div>}
+                              {timeline.startDate && timeline.endDate && (
+                                <div>Timeline: {formatDate(timeline.startDate)} - {formatDate(timeline.endDate)}</div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Status Update Section */}
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Update Status <span className="text-red-500">*</span></label>
                   {selectedTask?.status === 'delayed' ? (
                     <div className="space-y-2">
                       <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
@@ -651,40 +1067,6 @@ const TeamMemberDashboard = () => {
                     </select>
                   )}
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Remarks</label>
-                  {selectedTask?.status === 'delayed' ? (
-                    <div className="space-y-2">
-                      <div className="p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg">
-                        <div className="flex items-center">
-                          <i className="ri-information-line text-gray-500 text-lg mr-2"></i>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">
-                            Remarks cannot be modified for delayed tasks
-                          </span>
-                        </div>
-                      </div>
-                      <textarea
-                        value={updateForm.remarks}
-                        rows={3}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
-                        placeholder="Remarks are locked for delayed tasks"
-                        disabled
-                        readOnly
-                      />
-                    </div>
-                  ) : (
-                    <textarea
-                      value={updateForm.remarks}
-                      onChange={(e) => setUpdateForm({...updateForm, remarks: e.target.value})}
-                      rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Update task remarks..."
-                    />
-                  )}
-                </div>
-                
-
               </div>
               
               <div className="flex justify-end gap-3 mt-6">
@@ -700,6 +1082,384 @@ const TeamMemberDashboard = () => {
                   className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
                 >
                   {updatingTask ? 'Updating...' : (selectedTask?.status === 'delayed' ? 'Mark as Completed' : 'Update Task')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Task Details Modal */}
+      {showViewDetailsModal && viewTaskDetails && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-10 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white dark:bg-gray-800 max-h-[90vh] overflow-y-auto">
+            <div className="mt-3">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Task Details (View Only)</h3>
+                <button
+                  onClick={closeViewDetailsModal}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  <i className="ri-close-line text-2xl"></i>
+                </button>
+              </div>
+              
+              <div className="space-y-6">
+                {/* Basic Task Information */}
+                <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Task Information</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Remarks</label>
+                      <p className="text-sm text-gray-900 dark:text-white">{viewTaskDetails.remarks || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Status</label>
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(viewTaskDetails.status)}`}>
+                        {viewTaskDetails.status.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Priority</label>
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(viewTaskDetails.priority)}`}>
+                        {viewTaskDetails.priority}
+                      </span>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Branch</label>
+                      <p className="text-sm text-gray-900 dark:text-white">
+                        {viewTaskDetails.branch?.name || 'N/A'}
+                        {viewTaskDetails.branch?.address && (
+                          <span className="text-xs text-gray-500 dark:text-gray-400 block">
+                            {viewTaskDetails.branch.address}, {viewTaskDetails.branch.city}, {viewTaskDetails.branch.state}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Start Date</label>
+                      <p className="text-sm text-gray-900 dark:text-white">{formatDate(viewTaskDetails.startDate)}</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">End Date</label>
+                      <p className="text-sm text-gray-900 dark:text-white">{formatDate(viewTaskDetails.endDate)}</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Created At</label>
+                      <p className="text-sm text-gray-900 dark:text-white">{formatDate(viewTaskDetails.createdAt)}</p>
+                    </div>
+                    {viewTaskDetails.updatedAt && (
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Last Updated</label>
+                        <p className="text-sm text-gray-900 dark:text-white">{formatDate(viewTaskDetails.updatedAt)}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Clients & Timeline Details */}
+                {viewTaskDetails.timeline && viewTaskDetails.timeline.length > 0 && (
+                  <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Clients & Timeline Details</h4>
+                    <div className="space-y-4">
+                      {viewTaskDetails.timeline.map((timeline, index) => {
+                        const isPopulated = typeof timeline === 'object' && timeline !== null && 'client' in timeline
+                        const timelineId = typeof timeline === 'string' ? timeline : (timeline._id || timeline.id || `timeline-${index}`)
+                        
+                        if (!isPopulated) {
+                          return (
+                            <div key={timelineId} className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <h5 className="text-base font-semibold text-gray-900 dark:text-white mb-1">
+                                    Timeline ID: {timelineId}
+                                  </h5>
+                                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    Timeline details are not loaded. Please contact administrator for more information.
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        }
+                        
+                        return (
+                          <div key={timelineId} className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600">
+                            <div className="flex items-start justify-between mb-3">
+                              <div>
+                                <h5 className="text-base font-semibold text-gray-900 dark:text-white mb-1">
+                                  {timeline.client?.name || 'N/A'}
+                                </h5>
+                                {timeline.client && (
+                                  <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                                    {timeline.client.email && (
+                                      <div className="flex items-center">
+                                        <i className="ri-mail-line mr-1"></i>
+                                        {timeline.client.email}
+                                      </div>
+                                    )}
+                                    {timeline.client.phone && (
+                                      <div className="flex items-center">
+                                        <i className="ri-phone-line mr-1"></i>
+                                        {timeline.client.phone}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              {timeline.status && (
+                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(timeline.status)}`}>
+                                  {timeline.status}
+                                </span>
+                              )}
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                              {timeline.activity?.name && (
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Activity</label>
+                                  <p className="text-sm text-gray-900 dark:text-white">{timeline.activity.name}</p>
+                                </div>
+                              )}
+                              {timeline.frequency && (
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Frequency</label>
+                                  <p className="text-sm text-gray-900 dark:text-white">{timeline.frequency}</p>
+                                </div>
+                              )}
+                              {timeline.startDate && (
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Timeline Start</label>
+                                  <p className="text-sm text-gray-900 dark:text-white">{formatDate(timeline.startDate)}</p>
+                                </div>
+                              )}
+                              {timeline.endDate && (
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Timeline End</label>
+                                  <p className="text-sm text-gray-900 dark:text-white">{formatDate(timeline.endDate)}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Attachments */}
+                {viewTaskDetails.attachments && viewTaskDetails.attachments.length > 0 && (
+                  <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Attachments</h4>
+                    <div className="space-y-2">
+                      {viewTaskDetails.attachments.map((attachment) => (
+                        <div key={attachment._id} className="flex items-center justify-between p-2 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-600">
+                          <div className="flex items-center">
+                            <i className="ri-file-line text-gray-400 mr-2"></i>
+                            <span className="text-sm text-gray-900 dark:text-white">{attachment.fileName}</span>
+                          </div>
+                          <a
+                            href={attachment.fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm"
+                          >
+                            <i className="ri-download-line mr-1"></i>
+                            Download
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Metadata */}
+                {viewTaskDetails.metadata && Object.keys(viewTaskDetails.metadata).length > 0 && (
+                  <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Additional Information</h4>
+                    <div className="space-y-2">
+                      {Object.entries(viewTaskDetails.metadata).map(([key, value]) => (
+                        <div key={key} className="flex">
+                          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 w-32">{key}:</span>
+                          <span className="text-sm text-gray-900 dark:text-white flex-1">{String(value)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={closeViewDetailsModal}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => {
+                    closeViewDetailsModal()
+                    openUpdateModal(viewTaskDetails)
+                  }}
+                  className={`px-4 py-2 text-sm font-medium text-white rounded-md ${
+                    viewTaskDetails.status === 'delayed' 
+                      ? 'bg-yellow-600 hover:bg-yellow-700' 
+                      : 'bg-blue-600 hover:bg-blue-700'
+                  }`}
+                >
+                  <i className={`ri-${viewTaskDetails.status === 'delayed' ? 'check-line' : 'edit-line'} mr-1`}></i>
+                  {viewTaskDetails.status === 'delayed' ? 'Mark Complete' : 'Update Status'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Task Modal */}
+      {showAssignTaskModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white dark:bg-gray-800">
+            <div className="mt-3">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Assign Task to Team Member</h3>
+                <button
+                  onClick={closeAssignTaskModal}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  <i className="ri-close-line text-2xl"></i>
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                {/* Team Member Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Team Member <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={assignTaskForm.teamMember}
+                    onChange={(e) => setAssignTaskForm({...assignTaskForm, teamMember: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Select a team member</option>
+                    {accessibleTeamMembers.map((member) => (
+                      <option key={member._id || member.id} value={member._id || member.id}>
+                        {member.name} ({member.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Start Date */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Start Date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={assignTaskForm.startDate}
+                    onChange={(e) => setAssignTaskForm({...assignTaskForm, startDate: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    min={new Date().toISOString().split('T')[0]}
+                  />
+                </div>
+
+                {/* End Date */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    End Date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={assignTaskForm.endDate}
+                    onChange={(e) => setAssignTaskForm({...assignTaskForm, endDate: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    min={assignTaskForm.startDate || new Date().toISOString().split('T')[0]}
+                  />
+                </div>
+
+                {/* Priority */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Priority <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={assignTaskForm.priority}
+                    onChange={(e) => setAssignTaskForm({...assignTaskForm, priority: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                    <option value="critical">Critical</option>
+                  </select>
+                </div>
+
+                {/* Branch */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Branch <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={assignTaskForm.branch}
+                    onChange={(e) => setAssignTaskForm({...assignTaskForm, branch: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Select a branch</option>
+                    {branches.map((branch) => (
+                      <option key={branch._id || branch.id} value={branch._id || branch.id}>
+                        {branch.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Remarks */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Remarks
+                  </label>
+                  <textarea
+                    value={assignTaskForm.remarks}
+                    onChange={(e) => setAssignTaskForm({...assignTaskForm, remarks: e.target.value})}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter task remarks..."
+                  />
+                </div>
+
+                {/* Status */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Status
+                  </label>
+                  <select
+                    value={assignTaskForm.status}
+                    onChange={(e) => setAssignTaskForm({...assignTaskForm, status: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="ongoing">Ongoing</option>
+                    <option value="on_hold">On Hold</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={closeAssignTaskModal}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAssignTask}
+                  disabled={assigningTask}
+                  className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
+                >
+                  {assigningTask ? 'Assigning...' : 'Assign Task'}
                 </button>
               </div>
             </div>

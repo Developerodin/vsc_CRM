@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Seo from "@/shared/layout-components/seo/seo";
 import { toast, Toaster } from "react-hot-toast";
@@ -17,6 +17,12 @@ interface Activity {
   name: string;
 }
 
+interface TeamMemberForSelection {
+  id: string;
+  name: string;
+  email: string;
+}
+
 interface TeamMemberData {
   name: string;
   email: string;
@@ -29,6 +35,7 @@ interface TeamMemberData {
   branch: string;
   sortOrder: number;
   skills: string[];
+  accessibleTeamMembers: string[];
 }
 
 interface TeamMember {
@@ -61,7 +68,17 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
     branch: '',
     sortOrder: 1,
     skills: [],
+    accessibleTeamMembers: [],
   });
+
+  // Team member selection modal state
+  const [showTeamMemberModal, setShowTeamMemberModal] = useState(false);
+  const [isLoadingTeamMembers, setIsLoadingTeamMembers] = useState(false);
+  const [teamMemberSearchQuery, setTeamMemberSearchQuery] = useState("");
+  const [teamMemberCurrentPage, setTeamMemberCurrentPage] = useState(1);
+  const [teamMemberTotalPages, setTeamMemberTotalPages] = useState(1);
+  const [allTeamMembers, setAllTeamMembers] = useState<TeamMemberForSelection[]>([]);
+  const [selectedAccessibleTeamMembers, setSelectedAccessibleTeamMembers] = useState<TeamMemberForSelection[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -87,6 +104,34 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
         );
         setActivities(activitiesResponse.data.results || []);
 
+        // Handle accessibleTeamMembers - could be populated objects or just IDs
+        let accessibleTeamMemberIds: string[] = [];
+        let accessibleTeamMemberObjects: TeamMemberForSelection[] = [];
+        
+        if (teamMemberData.accessibleTeamMembers && teamMemberData.accessibleTeamMembers.length > 0) {
+          accessibleTeamMemberIds = teamMemberData.accessibleTeamMembers.map((tm: any) => {
+            // If it's a populated object, use the id property
+            if (typeof tm === 'object' && tm !== null && tm.id) {
+              accessibleTeamMemberObjects.push({
+                id: tm.id,
+                name: tm.name || '',
+                email: tm.email || ''
+              });
+              return tm.id;
+            }
+            // If it's just an ID string
+            if (typeof tm === 'string') {
+              accessibleTeamMemberObjects.push({
+                id: tm,
+                name: '',
+                email: ''
+              });
+              return tm;
+            }
+            return '';
+          }).filter((id: string) => id !== '');
+        }
+
         // Set form data
         setFormData({
           name: teamMemberData.name || '',
@@ -100,7 +145,11 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
           branch: teamMemberData.branch.id,
           sortOrder: teamMemberData.sortOrder || 1,
           skills: teamMemberData.skills.map((skill: Activity) => skill.id),
+          accessibleTeamMembers: accessibleTeamMemberIds,
         });
+
+        // Set selected accessible team members
+        setSelectedAccessibleTeamMembers(accessibleTeamMemberObjects);
       } catch (error) {
         console.error("Error fetching data:", error);
         toast.error("Failed to fetch data");
@@ -130,6 +179,112 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
         : [...prev.skills, skillId],
     }));
   };
+
+  // Team member selection handlers
+  const fetchTeamMembersModal = async (page: number = 1, searchQueryParam?: string) => {
+    try {
+      setIsLoadingTeamMembers(true);
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: "10",
+        sortBy: "name:asc",
+        ...((searchQueryParam || teamMemberSearchQuery) && { search: searchQueryParam || teamMemberSearchQuery })
+      });
+
+      const response = await fetch(`${Base_url}team-members?${queryParams}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch team members');
+      }
+
+      const data = await response.json();
+      const fetchedMembers = data.results || [];
+      setAllTeamMembers(fetchedMembers);
+      
+      // Update selected accessible team members with full details if we only had IDs
+      setSelectedAccessibleTeamMembers(prev => {
+        return prev.map(selected => {
+          const fullDetails = fetchedMembers.find((tm: TeamMemberForSelection) => tm.id === selected.id);
+          if (fullDetails) {
+            return {
+              id: fullDetails.id,
+              name: fullDetails.name,
+              email: fullDetails.email
+            };
+          }
+          return selected;
+        });
+      });
+      
+      const totalResults = data.totalResults || 0;
+      const limit = 10;
+      setTeamMemberTotalPages(Math.max(1, Math.ceil(totalResults / limit)));
+      setTeamMemberCurrentPage(page);
+    } catch (err) {
+      console.error('Error fetching team members:', err);
+      toast.error('Failed to fetch team members');
+    } finally {
+      setIsLoadingTeamMembers(false);
+    }
+  };
+
+  const handleTeamMemberSelect = (teamMember: TeamMemberForSelection) => {
+    setSelectedAccessibleTeamMembers(prev => {
+      const isSelected = prev.some(tm => tm.id === teamMember.id);
+      if (isSelected) {
+        return prev.filter(tm => tm.id !== teamMember.id);
+      } else {
+        return [...prev, teamMember];
+      }
+    });
+  };
+
+  const handleTeamMemberModalSubmit = () => {
+    setFormData(prev => ({
+      ...prev,
+      accessibleTeamMembers: selectedAccessibleTeamMembers.map(tm => tm.id)
+    }));
+    setShowTeamMemberModal(false);
+  };
+
+  const handleTeamMemberSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    setTeamMemberSearchQuery(query);
+    if (showTeamMemberModal) {
+      debouncedTeamMemberSearch(query);
+    }
+  };
+
+  const handleTeamMemberSearchClick = () => {
+    if (showTeamMemberModal) {
+      setTeamMemberCurrentPage(1);
+      fetchTeamMembersModal(1, teamMemberSearchQuery);
+    }
+  };
+
+  const handleTeamMemberPageChange = (newPage: number) => {
+    setTeamMemberCurrentPage(newPage);
+    fetchTeamMembersModal(newPage, teamMemberSearchQuery);
+  };
+
+  // Debounced search function for team members
+  const debouncedTeamMemberSearch = useCallback(
+    (() => {
+      let timeoutId: NodeJS.Timeout;
+      return (searchQuery: string) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          setTeamMemberCurrentPage(1);
+          fetchTeamMembersModal(1, searchQuery);
+        }, 500);
+      };
+    })(),
+    []
+  );
 
   const validateForm = () => {
     if (!formData.name.trim()) {
@@ -207,6 +362,7 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
         branch: formData.branch,
         sortOrder: parseInt(formData.sortOrder.toString()),
         skills: formData.skills,
+        accessibleTeamMembers: formData.accessibleTeamMembers,
       };
 
       await axios.patch(
@@ -430,6 +586,52 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
               </div>
             </div>
 
+            {/* Accessible Team Members */}
+            <div className="form-group">
+              <label className="form-label">Accessible Team Members</label>
+              <div className="flex items-center space-x-4">
+                <button
+                  type="button"
+                  className="ti-btn ti-btn-primary"
+                  onClick={() => {
+                    setShowTeamMemberModal(true);
+                    setTeamMemberSearchQuery("");
+                    setTeamMemberCurrentPage(1);
+                    fetchTeamMembersModal(1);
+                  }}
+                >
+                  Select Team Members ({selectedAccessibleTeamMembers.length} selected)
+                </button>
+                {selectedAccessibleTeamMembers.length > 0 && (
+                  <span className="text-sm text-gray-500">
+                    {selectedAccessibleTeamMembers.length} team member{selectedAccessibleTeamMembers.length !== 1 ? 's' : ''} selected
+                  </span>
+                )}
+              </div>
+              {selectedAccessibleTeamMembers.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {selectedAccessibleTeamMembers.map(teamMember => (
+                    <span key={teamMember.id} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800">
+                      {teamMember.name || teamMember.email}
+                      <button
+                        type="button"
+                        className="ml-2 text-blue-600 hover:text-blue-800"
+                        onClick={() => {
+                          setSelectedAccessibleTeamMembers(prev => prev.filter(tm => tm.id !== teamMember.id));
+                          setFormData(prev => ({
+                            ...prev,
+                            accessibleTeamMembers: prev.accessibleTeamMembers.filter(id => id !== teamMember.id)
+                          }));
+                        }}
+                      >
+                        <i className="ri-close-line"></i>
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="flex justify-end space-x-4">
               <button
                 type="button"
@@ -456,6 +658,185 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
           </form>
         </div>
       </div>
+
+      {/* Team Member Selection Modal */}
+      {showTeamMemberModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg w-11/12 max-w-4xl max-h-[90vh] flex flex-col">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h2 className="text-xl font-semibold">Select Accessible Team Members</h2>
+              <button
+                onClick={() => setShowTeamMemberModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <i className="ri-close-line text-2xl"></i>
+              </button>
+            </div>
+
+            <div className="p-4 border-b bg-gray-50">
+              <div className="flex items-center space-x-4">
+                <div className="relative flex-1">
+                  <div className="flex items-center">
+                    <i className="ri-search-line text-gray-400 text-xl mr-3"></i>
+                    <input
+                      type="text"
+                      placeholder="Search team members by name or email..."
+                      className="form-control py-4 pr-20 text-lg border-2 border-gray-300 focus:border-primary focus:ring-2 focus:ring-primary/20 bg-white"
+                      value={teamMemberSearchQuery}
+                      onChange={handleTeamMemberSearchChange}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleTeamMemberSearchClick();
+                        }
+                      }}
+                    />
+                  </div>
+                  <button 
+                    className="absolute end-0 top-0 px-6 h-full bg-primary text-white hover:bg-primary-dark rounded-r-md"
+                    onClick={handleTeamMemberSearchClick}
+                  >
+                    <i className="ri-search-line text-xl"></i>
+                  </button>
+                </div>
+                {teamMemberSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTeamMemberSearchQuery("");
+                      fetchTeamMembersModal(1, "");
+                    }}
+                    className="ti-btn ti-btn-secondary"
+                  >
+                    <i className="ri-close-line me-2"></i>
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-auto p-4">
+              {isLoadingTeamMembers ? (
+                <div className="flex items-center justify-center h-32">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Select
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Name
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Email
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {allTeamMembers.length === 0 ? (
+                        <tr>
+                          <td colSpan={3} className="px-6 py-8 text-center">
+                            <div className="flex flex-col items-center justify-center">
+                              <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                                <i className="ri-search-line text-2xl text-gray-400"></i>
+                              </div>
+                              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                {teamMemberSearchQuery ? 'No Team Members Found' : 'No Team Members Available'}
+                              </h3>
+                              <p className="text-gray-500 text-center mb-4">
+                                {teamMemberSearchQuery 
+                                  ? `No team members found matching "${teamMemberSearchQuery}". Try adjusting your search terms.`
+                                  : 'No team members available at the moment.'
+                                }
+                              </p>
+                              {teamMemberSearchQuery && (
+                                <button
+                                  onClick={() => {
+                                    setTeamMemberSearchQuery("");
+                                    fetchTeamMembersModal(1, "");
+                                  }}
+                                  className="ti-btn ti-btn-primary"
+                                >
+                                  <i className="ri-refresh-line me-2"></i>
+                                  Clear Search
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        allTeamMembers
+                          .filter(tm => tm.id !== params.id) // Exclude current team member
+                          .map((teamMember) => (
+                            <tr key={teamMember.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <input
+                                  type="checkbox"
+                                  className="form-checkbox h-5 w-5 text-primary"
+                                  checked={selectedAccessibleTeamMembers.some(tm => tm.id === teamMember.id)}
+                                  onChange={() => handleTeamMemberSelect(teamMember)}
+                                />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">{teamMember.name}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{teamMember.email}</div>
+                              </td>
+                            </tr>
+                          ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t flex justify-between items-center">
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => handleTeamMemberPageChange(Math.max(teamMemberCurrentPage - 1, 1))}
+                  disabled={teamMemberCurrentPage === 1}
+                  className="ti-btn ti-btn-secondary"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-gray-500">
+                  {teamMemberTotalPages > 0 ? (
+                    `Page ${teamMemberCurrentPage} of ${teamMemberTotalPages}`
+                  ) : (
+                    "No pages"
+                  )}
+                </span>
+                <button
+                  onClick={() => handleTeamMemberPageChange(Math.min(teamMemberCurrentPage + 1, teamMemberTotalPages))}
+                  disabled={teamMemberCurrentPage === teamMemberTotalPages || teamMemberTotalPages === 0}
+                  className="ti-btn ti-btn-secondary"
+                >
+                  Next
+                </button>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setShowTeamMemberModal(false)}
+                  className="ti-btn ti-btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleTeamMemberModalSubmit}
+                  className="ti-btn ti-btn-primary"
+                >
+                  Select ({selectedAccessibleTeamMembers.length})
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
