@@ -12,6 +12,7 @@ export default function ClientLogin() {
   const [err, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [email, setEmail] = useState("");
+  const [pan, setPan] = useState("");
   const [otp, setOtp] = useState("");
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
 
@@ -53,10 +54,22 @@ export default function ClientLogin() {
       return;
     }
 
+    if (!pan.trim()) {
+      setError("PAN is required");
+      return;
+    }
+
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       setError("Please enter a valid email address");
+      return;
+    }
+
+    // PAN validation (10 characters, alphanumeric)
+    const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+    if (!panRegex.test(pan.trim().toUpperCase())) {
+      setError("Please enter a valid PAN (e.g., ABCDE1234F)");
       return;
     }
 
@@ -66,7 +79,8 @@ export default function ClientLogin() {
 
     try {
       const response = await axios.post(`${Base_url}client-auth/generate-otp`, {
-        email: email.trim()
+        email: email.trim(),
+        pan: pan.trim().toUpperCase()
       });
 
       if (response.data && response.data.success) {
@@ -105,6 +119,7 @@ export default function ClientLogin() {
     try {
       const response = await axios.post(`${Base_url}client-auth/verify-otp`, {
         email: email.trim(),
+        pan: pan.trim().toUpperCase(),
         otp: otp
       });
 
@@ -143,7 +158,8 @@ export default function ClientLogin() {
 
     try {
       const response = await axios.post(`${Base_url}client-auth/generate-otp`, {
-        email: email.trim()
+        email: email.trim(),
+        pan: pan.trim().toUpperCase()
       });
 
       if (response.data && response.data.success) {
@@ -186,7 +202,7 @@ export default function ClientLogin() {
                       </div>
                     )}
                     <p className="mb-4 text-[#8c9097] dark:text-white/50 opacity-[0.7] font-normal text-center">
-                      Enter your email to receive a one-time password
+                      Enter your email and PAN to receive a one-time password
                     </p>
                     
                     <form onSubmit={handleGenerateOtp}>
@@ -201,6 +217,20 @@ export default function ClientLogin() {
                              value={email}
                              onChange={(e) => setEmail(e.target.value)}
                              placeholder="Enter your email address"
+                             required
+                           />
+                        </div>
+                        <div className="xl:col-span-12 col-span-12">
+                          <label htmlFor="client-pan" className="form-label text-default">PAN Number</label>
+                                                     <input 
+                             type="text" 
+                             name="pan" 
+                             className="form-control w-full !rounded-md h-9 sm:h-10 md:h-12 text-sm sm:text-base uppercase" 
+                             id="client-pan" 
+                             value={pan}
+                             onChange={(e) => setPan(e.target.value.toUpperCase())}
+                             placeholder="Enter your PAN (e.g., ABCDE1234F)"
+                             maxLength={10}
                              required
                            />
                         </div>
@@ -286,6 +316,7 @@ export default function ClientLogin() {
                           setSuccess("");
                           setOtpDigits(['', '', '', '', '', '']);
                           setOtp("");
+                          setPan("");
                         }}
                         className="text-gray-500 hover:text-gray-700 text-sm"
                       >

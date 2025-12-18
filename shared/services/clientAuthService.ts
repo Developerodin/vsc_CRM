@@ -36,10 +36,11 @@ export interface LogoutResponse {
 
 class ClientAuthService {
   // Generate OTP for client login
-  async generateOtp(email: string): Promise<GenerateOtpResponse> {
+  async generateOtp(email: string, pan: string): Promise<GenerateOtpResponse> {
     try {
       const response = await axios.post(`${Base_url}client-auth/generate-otp`, {
-        email: email.trim()
+        email: email.trim(),
+        pan: pan.trim().toUpperCase()
       });
       return response.data;
     } catch (error: any) {
@@ -48,10 +49,11 @@ class ClientAuthService {
   }
 
   // Verify OTP and login
-  async verifyOtp(email: string, otp: string): Promise<VerifyOtpResponse> {
+  async verifyOtp(email: string, pan: string, otp: string): Promise<VerifyOtpResponse> {
     try {
       const response = await axios.post(`${Base_url}client-auth/verify-otp`, {
         email: email.trim(),
+        pan: pan.trim().toUpperCase(),
         otp: otp
       });
       return response.data;

@@ -311,8 +311,15 @@ const TasksPage = () => {
         }
       });
       setTaskStats(response.data);
-    } catch (err) {
-      console.error('Error fetching task statistics:', err);
+    } catch (err: any) {
+      // Handle 400 error gracefully - backend incorrectly validates taskId for this endpoint
+      if (err?.response?.status === 400 && err?.response?.data?.message?.includes('taskId')) {
+        // Backend validation issue - silently fail and don't update stats
+        setTaskStats(null);
+      } else {
+        // Other errors - could show a toast or handle differently
+        setTaskStats(null);
+      }
     } finally {
       setIsLoadingStats(false);
     }

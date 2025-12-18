@@ -223,7 +223,6 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
         setFilteredActivities(data.results || []);
       }
     } catch (error) {
-      console.error('Error fetching activities:', error);
     } finally {
       setIsLoadingActivities(false);
     }
@@ -244,7 +243,6 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
         setFilteredTeamMembers(data.results || []);
       }
     } catch (error) {
-      console.error('Error fetching team members:', error);
     } finally {
       setIsLoadingTeamMembers(false);
     }
@@ -279,7 +277,6 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
       setGroupTotalPages(Math.max(1, Math.ceil(totalResults / limit)));
       setGroupCurrentPage(page);
     } catch (err) {
-      console.error('Error fetching groups:', err);
       toast.error('Failed to fetch groups');
     } finally {
       setIsLoadingGroups(false);
@@ -314,7 +311,6 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
               }
               return null;
             } catch (error) {
-              console.error(`Error fetching group ${groupId}:`, error);
               return null;
             }
           });
@@ -325,7 +321,6 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
         }
       }
     } catch (error) {
-      console.error('Error fetching client groups:', error);
       // If the endpoint doesn't exist, we'll handle it gracefully
     } finally {
       setIsLoadingClientGroups(false);
@@ -336,7 +331,6 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
   const fetchBusinessTypes = async (page = 1, search = "") => {
     setBusinessTypeLoading(true);
     try {
-      console.log('Fetching business types...', { page, search });
       
       const queryParams = new URLSearchParams({
         page: page.toString(),
@@ -346,7 +340,6 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
       });
 
       const url = `${Base_url}business-master?${queryParams}`;
-      console.log('API URL:', url);
 
       const response = await fetch(url, {
         headers: {
@@ -354,24 +347,17 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
         }
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers);
-
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('API Error Response:', errorText);
         throw new Error(`Failed to fetch business types: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
-      console.log('API Response Data:', data);
       
       if (data && data.results && Array.isArray(data.results)) {
         setBusinessTypes(data.results);
         setBusinessTypeTotalPages(data.totalPages || 1);
-        console.log('Business types set:', data.results);
       } else {
-        console.error('Invalid data structure:', data);
         // Fallback to some default business types if API fails
         setBusinessTypes([
           { id: '1', name: 'Information Technology' },
@@ -383,7 +369,6 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
         setBusinessTypeTotalPages(1);
       }
     } catch (err) {
-      console.error('Error fetching business types:', err);
       toast.error(`Failed to fetch business types: ${err instanceof Error ? err.message : 'Unknown error'}`);
       
       // Fallback to default business types on error
@@ -404,7 +389,6 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
   const fetchEntityTypes = async (page = 1, search = "") => {
     setEntityTypeLoading(true);
     try {
-      console.log('Fetching entity types...', { page, search });
       
       const queryParams = new URLSearchParams({
         page: page.toString(),
@@ -414,7 +398,6 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
       });
 
       const url = `${Base_url}entity-master?${queryParams}`;
-      console.log('API URL:', url);
 
       const response = await fetch(url, {
         headers: {
@@ -422,24 +405,17 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
         }
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers);
-
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('API Error Response:', errorText);
         throw new Error(`Failed to fetch entity types: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
-      console.log('API Response Data:', data);
       
       if (data && data.results && Array.isArray(data.results)) {
         setEntityTypes(data.results);
         setEntityTypeTotalPages(data.totalPages || 1);
-        console.log('Entity types set:', data.results);
       } else {
-        console.error('Invalid data structure:', data);
         // Fallback to some default entity types if API fails
         setEntityTypes([
           { id: '1', name: 'Private Limited' },
@@ -451,7 +427,6 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
         setEntityTypeTotalPages(1);
       }
     } catch (err) {
-      console.error('Error fetching entity types:', err);
       toast.error(`Failed to fetch entity types: ${err instanceof Error ? err.message : 'Unknown error'}`);
       
       // Fallback to default entity types on error
@@ -585,7 +560,6 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
         setClientDocuments(data.results || []);
       }
     } catch (error) {
-      console.error('Error fetching client documents:', error);
     } finally {
       setIsLoadingDocuments(false);
     }
@@ -607,14 +581,11 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     setDocumentContextMenu(null);
   };
 
-
-
   const handleDownloadDocument = (docItem: any) => {
     const fileUrl = docItem.file?.fileUrl || docItem.fileUrl;
     const fileName = docItem.file?.fileName || docItem.fileName;
     
     if (!fileUrl || !fileName) {
-      console.error('File URL or name is missing');
       toast.error('File information is missing');
       return;
     }
@@ -644,10 +615,8 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
       link.click();
       document.body.removeChild(link);
       
-      console.log(`Downloading: ${fileName} from ${link.href}`);
       toast.success(`Downloading ${fileName}`);
     } catch (error) {
-      console.error('Failed to download file:', error);
       toast.error('Failed to download file');
     } finally {
       setDownloadingFile(null);
@@ -655,8 +624,6 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     
     closeDocumentContextMenu();
   };
-
-
 
   const handleDeleteDocument = async (docItem: any) => {
     const fileName = docItem.file?.fileName || docItem.fileName;
@@ -667,7 +634,6 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
         // Refresh documents list
         fetchClientDocuments(params.id);
       } catch (error) {
-        console.error('Failed to delete document:', error);
         toast.error('Failed to delete document');
       }
     }
@@ -698,9 +664,6 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
         ]
       };
 
-      console.log('Sending email with data:', requestBody);
-      console.log('Email will be sent to:', formData.email);
-
       const response = await fetch(`${Base_url}common-email/send-with-attachments`, {
         method: 'POST',
         headers: {
@@ -709,21 +672,16 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
         body: JSON.stringify(requestBody)
       });
 
-      console.log('Response status:', response.status);
-
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('API Error Response:', errorText);
         throw new Error(`Failed to send email: ${response.status} - ${errorText}`);
       }
 
       const result = await response.json();
-      console.log('Email sent successfully:', result);
       
       toast.success(`File "${docItem.file?.fileName || docItem.fileName}" sent to ${formData.email} successfully!`);
       closeDocumentContextMenu();
     } catch (error) {
-      console.error('Failed to send email:', error);
       toast.error(`Failed to send email: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setSendingEmail(null);
@@ -899,7 +857,6 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
         }
 
         const uploadResult = await response.json();
-        console.log('Upload response from /common/upload:', uploadResult);
         
         // Extract file data from the response
         const fileData = uploadResult.data || uploadResult;
@@ -917,10 +874,6 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
           }
         };
 
-        console.log('File info being sent to client upload endpoint:', fileInfo);
-        console.log('Client ID:', params.id);
-        console.log('Upload URL:', `${Base_url}file-manager/clients/${params.id}/upload`);
-
         const saveResponse = await fetch(`${Base_url}file-manager/clients/${params.id}/upload`, {
           method: 'POST',
           headers: {
@@ -932,11 +885,6 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
 
         if (!saveResponse.ok) {
           const errorText = await saveResponse.text();
-          console.error('Save response error:', {
-            status: saveResponse.status,
-            statusText: saveResponse.statusText,
-            error: errorText
-          });
           throw new Error(`Failed to save file info for ${file.name}: ${errorText}`);
         }
 
@@ -952,7 +900,6 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
       // Refresh documents list
       fetchClientDocuments(params.id);
     } catch (error) {
-      console.error('Upload error:', error);
       toast.error('Failed to upload files');
     } finally {
       setIsUploading(false);
@@ -1020,7 +967,6 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
         // Fetch client documents
         fetchClientDocuments(params.id);
       } catch (err) {
-        console.error('Error fetching client:', err);
         toast.error('Failed to fetch client details');
         router.push('/clients');
       } finally {
@@ -1291,13 +1237,11 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
             
             if (!groupResponse.ok) {
               const errorData = await groupResponse.json();
-              console.warn(`Failed to add client to group ${group.name}:`, errorData.message);
               return false;
             }
             
             return true;
           } catch (error) {
-            console.error(`Error adding client to group ${group.name}:`, error);
             return false;
           }
         });
@@ -1316,7 +1260,6 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
         
         setActiveTab('documents');
       } catch (err) {
-        console.error('Error assigning groups:', err);
         toast.error(err instanceof Error ? err.message : 'Failed to assign groups');
       } finally {
         setIsSubmitting(false);
@@ -1364,7 +1307,6 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
         }, 1000);
         
       } catch (err) {
-        console.error('Error updating client:', err);
         toast.error(err instanceof Error ? err.message : 'Failed to update client');
       } finally {
         setIsSubmitting(false);
@@ -1672,11 +1614,8 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                           placeholder="Select Business Type"
                           readOnly
                           onClick={() => {
-                            console.log('Opening business type modal...');
                             setShowBusinessTypeModal(true);
-                            console.log('Modal state set to true');
                             fetchBusinessTypes(1, "");
-                            console.log('Fetch business types called');
                           }}
                         />
                         <button
@@ -1705,11 +1644,8 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                           placeholder="Select Entity Type"
                           readOnly
                           onClick={() => {
-                            console.log('Opening entity type modal...');
                             setShowEntityTypeModal(true);
-                            console.log('Modal state set to true');
                             fetchEntityTypes(1, "");
-                            console.log('Fetch entity types called');
                           }}
                         />
                         <button
@@ -1724,8 +1660,6 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                         </button>
                       </div>
                     </div>
-
-
 
                     {/* PAN */}
                     <div className="form-group">
