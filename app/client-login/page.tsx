@@ -20,16 +20,22 @@ export default function ClientLogin() {
 
   // Handle OTP input changes
   const handleOtpChange = (index: number, value: string) => {
-    if (value.length > 1) return; // Only allow single digit
+    // Filter to only allow numeric characters
+    const numericValue = value.replace(/\D/g, '');
+    
+    // Only allow single digit
+    const digit = numericValue.slice(-1);
     
     const newOtpDigits = [...otpDigits];
-    newOtpDigits[index] = value;
+    newOtpDigits[index] = digit;
     setOtpDigits(newOtpDigits);
     
     // Auto-focus next input
-    if (value && index < 5) {
-      const nextInput = document.getElementById(`otp-${index + 1}`);
-      if (nextInput) nextInput.focus();
+    if (digit && index < 5) {
+      setTimeout(() => {
+        const nextInput = document.getElementById(`otp-${index + 1}`);
+        if (nextInput) nextInput.focus();
+      }, 0);
     }
     
     // Update OTP string with the new array
@@ -37,11 +43,48 @@ export default function ClientLogin() {
     setOtp(newOtp);
   };
 
+  // Handle paste event for OTP
+  const handleOtpPaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    
+    if (pastedData.length > 0) {
+      const newOtpDigits = [...otpDigits];
+      for (let i = 0; i < Math.min(pastedData.length, 6); i++) {
+        newOtpDigits[i] = pastedData[i];
+      }
+      setOtpDigits(newOtpDigits);
+      setOtp(newOtpDigits.join(''));
+      
+      // Focus the next empty input or the last one
+      const nextIndex = Math.min(pastedData.length, 5);
+      setTimeout(() => {
+        const nextInput = document.getElementById(`otp-${nextIndex}`);
+        if (nextInput) nextInput.focus();
+      }, 0);
+    }
+  };
+
   // Handle backspace in OTP input
   const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
-    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
-      const prevInput = document.getElementById(`otp-${index - 1}`);
-      if (prevInput) prevInput.focus();
+    if (e.key === 'Backspace') {
+      if (otpDigits[index]) {
+        // Clear current input
+        const newOtpDigits = [...otpDigits];
+        newOtpDigits[index] = '';
+        setOtpDigits(newOtpDigits);
+        setOtp(newOtpDigits.join(''));
+      } else if (index > 0) {
+        // Move to previous input and clear it
+        const prevInput = document.getElementById(`otp-${index - 1}`);
+        if (prevInput) {
+          const newOtpDigits = [...otpDigits];
+          newOtpDigits[index - 1] = '';
+          setOtpDigits(newOtpDigits);
+          setOtp(newOtpDigits.join(''));
+          prevInput.focus();
+        }
+      }
     }
   };
 
@@ -246,22 +289,25 @@ export default function ClientLogin() {
                       <div className="grid grid-cols-12 gap-y-4">
                         <div className="xl:col-span-12 col-span-12">
                           <label className="form-label text-default">Enter 6-digit OTP</label>
-                                                                                <div className="grid grid-cols-6 gap-1 sm:gap-2 md:gap-3 mb-4 max-w-xs mx-auto">
-                             {otpDigits.map((digit, index) => (
-                               <input
-                                 key={index}
-                                 type="text"
-                                 id={`otp-${index}`}
-                                 className="form-control w-full aspect-square text-center text-sm sm:text-base md:text-lg font-semibold !rounded-md border-2 focus:border-primary"
-                                 value={digit}
-                                 onChange={(e) => handleOtpChange(index, e.target.value)}
-                                 onKeyDown={(e) => handleOtpKeyDown(index, e)}
-                                 maxLength={1}
-                                 inputMode="numeric"
-                                 pattern="[0-9]*"
-                               />
-                             ))}
-                           </div>
+                          <div className="grid grid-cols-6 gap-1 sm:gap-2 md:gap-3 mb-4 max-w-xs mx-auto">
+                            {otpDigits.map((digit, index) => (
+                              <input
+                                key={index}
+                                type="tel"
+                                id={`otp-${index}`}
+                                className="form-control w-full h-10 sm:h-12 md:h-14 text-center text-base sm:text-lg md:text-xl font-bold !rounded-md border-2 focus:border-primary !text-defaulttextcolor dark:!text-white !p-0 overflow-visible"
+                                style={{ minWidth: '40px', minHeight: '40px' }}
+                                value={digit}
+                                onChange={(e) => handleOtpChange(index, e.target.value)}
+                                onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                                onPaste={handleOtpPaste}
+                                maxLength={1}
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                autoComplete="off"
+                              />
+                            ))}
+                          </div>
                         </div>
                         <div className="xl:col-span-12 col-span-12 grid mt-2">
                                                      <button 
