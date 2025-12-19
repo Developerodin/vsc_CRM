@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { Base_url } from '@/app/api/config/BaseUrl';
@@ -64,6 +65,7 @@ interface ExcelRow {
 }
 
 const TaskManagement = () => {
+  const router = useRouter();
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -169,7 +171,12 @@ const TaskManagement = () => {
       }
 
       const data: ApiResponse = await response.json();
-      setTasks(data.results);
+      // Transform _id to id for consistency
+      const transformedTasks = data.results.map((task: any) => ({
+        ...task,
+        id: task._id || task.id
+      }));
+      setTasks(transformedTasks);
       setTotalPages(data.totalPages);
       setTotalResults(data.totalResults);
     } catch (err) {
@@ -276,8 +283,8 @@ const TaskManagement = () => {
         }
 
         const apiData: ApiResponse = await response.json();
-        exportData = apiData.results.map((task: Task) => ({
-          ID: task.id,
+        exportData = apiData.results.map((task: any) => ({
+          ID: task._id || task.id,
           "Team Member": task.teamMember?.name || "",
           "Start Date": task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : "",
           "End Date": task.endDate ? new Date(task.endDate).toISOString().split('T')[0] : "",
@@ -966,13 +973,23 @@ const TaskManagement = () => {
                   </td>
                   <td className="border border-gray-300">
                     <div className="flex space-x-2">
-                      <Link
-                        href={`/tasks/edit/${task.id}`}
+                      <button
+                        type="button"
                         className="ti-btn ti-btn-primary ti-btn-sm"
+                        onClick={() => {
+                          const taskId = task.id || (task as any)._id;
+                          console.log('Task ID=========================================>:', taskId);
+                          console.log('Full task object:', task);
+                          if (!taskId) {
+                            toast.error('Task ID is missing. Cannot navigate to edit page.');
+                            return;
+                          }
+                          router.push(`/tasks/edit/${taskId}`);
+                        }}
                         title="Edit"
                       >
                         <i className="ri-edit-line"></i>
-                      </Link>
+                      </button>
                       <button
                         onClick={() => handleDelete(task.id)}
                         className="ti-btn ti-btn-danger ti-btn-sm"

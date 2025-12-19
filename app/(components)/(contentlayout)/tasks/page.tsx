@@ -360,6 +360,7 @@ const TasksPage = () => {
   };
 
   const handleSelectTask = (taskId: string) => {
+    console.log('Task ID:', taskId);
     setSelectedTasks(prev =>
       prev.includes(taskId)
         ? prev.filter(id => id !== taskId)
@@ -961,6 +962,17 @@ const TasksPage = () => {
                          title="View Task Details"
                        >
                          <i className="ri-eye-line"></i>
+                       </button>
+                       <button
+                         type="button"
+                         className="ti-btn ti-btn-sm ti-btn-secondary"
+                         onClick={() => {
+                           console.log('Task ID=========================================>:', task.id);
+                           router.push(`/tasks/edit/${task.id}`);
+                         }}
+                         title="Edit Task"
+                       >
+                         <i className="ri-edit-line"></i>
                        </button>
                      </div>
                   </td>
