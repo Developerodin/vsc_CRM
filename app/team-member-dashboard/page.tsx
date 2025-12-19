@@ -50,6 +50,12 @@ interface TimelineItem {
     id?: string
     name: string
   }
+  subactivity?: {
+    _id?: string
+    id?: string
+    name: string
+    frequency?: string
+  }
   startDate?: string
   endDate?: string
   frequency?: string
@@ -448,8 +454,8 @@ const TeamMemberDashboard = () => {
       if (startDateFilter) params.append('startDate', startDateFilter)
       if (endDateFilter) params.append('endDate', endDateFilter)
       
-      // Use accessible team members endpoint if enabled
-      const apiUrl = viewAccessibleTasks 
+      // Use accessible team members endpoint if enabled and there are accessible team members
+      const apiUrl = (viewAccessibleTasks && accessibleTeamMembers.length > 0)
         ? `${Base_url}team-member-auth/tasks/accessible-team-members?${params}`
         : `${Base_url}team-member-auth/tasks?${params}`
       console.log('Fetching tasks with URL:', apiUrl)
@@ -837,6 +843,13 @@ const TeamMemberDashboard = () => {
     }
   }
 
+  // Ensure viewAccessibleTasks is false when there are no accessible team members
+  useEffect(() => {
+    if (accessibleTeamMembers.length === 0) {
+      setViewAccessibleTasks(false)
+    }
+  }, [accessibleTeamMembers.length])
+
   // Refresh tasks when filters change
   useEffect(() => {
     if (teamMemberData && !loading) {
@@ -913,7 +926,7 @@ const TeamMemberDashboard = () => {
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  {viewAccessibleTasks ? 'Accessible Team Members\' Tasks' : 'My Tasks'}
+                  {accessibleTeamMembers.length > 0 && viewAccessibleTasks ? 'Accessible Team Members\' Tasks' : 'My Tasks'}
                 </h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                   {tasks.length > 0 ? `${tasks.length} task(s) found` : 'No tasks available'}
@@ -1095,7 +1108,9 @@ const TeamMemberDashboard = () => {
                                       {timeline.client?.name || 'N/A'}
                                     </div>
                                     <div className="text-xs text-gray-500 dark:text-gray-400">
-                                      {timeline.activity?.name || 'N/A'} • {timeline.frequency || 'N/A'}
+                                      {timeline.activity?.name || 'N/A'}
+                                      {timeline.subactivity?.name && ` • ${timeline.subactivity.name}`}
+                                      {timeline.frequency && ` • ${timeline.frequency}`}
                                     </div>
                                     {timeline.status && (
                                       <div className="text-xs text-gray-400 dark:text-gray-500">
@@ -1256,6 +1271,7 @@ const TeamMemberDashboard = () => {
                               {timeline.client?.email && <div>Email: {timeline.client.email}</div>}
                               {timeline.client?.phone && <div>Phone: {timeline.client.phone}</div>}
                               {timeline.activity?.name && <div>Activity: {timeline.activity.name}</div>}
+                              {timeline.subactivity?.name && <div>Subactivity: {timeline.subactivity.name}</div>}
                               {timeline.frequency && <div>Frequency: {timeline.frequency}</div>}
                               {timeline.status && <div>Status: {timeline.status}</div>}
                               {timeline.startDate && timeline.endDate && (
@@ -1460,6 +1476,12 @@ const TeamMemberDashboard = () => {
                                 <div>
                                   <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Activity</label>
                                   <p className="text-sm text-gray-900 dark:text-white">{timeline.activity.name}</p>
+                                </div>
+                              )}
+                              {timeline.subactivity?.name && (
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Subactivity</label>
+                                  <p className="text-sm text-gray-900 dark:text-white">{timeline.subactivity.name}</p>
                                 </div>
                               )}
                               {timeline.frequency && (
