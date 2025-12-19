@@ -152,13 +152,62 @@ const TeamMemberDashboard = () => {
     priority: 'medium',
     branch: '',
     remarks: '',
-    status: 'pending'
+    status: 'pending',
+    timeline: [] as string[]
   })
   const [branches, setBranches] = useState<Array<{
     _id: string
     id: string
     name: string
   }>>([])
+
+  // Timeline selection state for assign task modal
+  const [timelines, setTimelines] = useState<Array<{
+    id: string
+    title?: string
+    activity?: {
+      id: string
+      name: string
+    }
+    client?: {
+      id: string
+      name: string
+    }
+    status?: string
+    priority?: string
+  }>>([])
+  const [selectedTimelines, setSelectedTimelines] = useState<Array<{
+    id: string
+    title?: string
+    activity?: {
+      id: string
+      name: string
+    }
+    client?: {
+      id: string
+      name: string
+    }
+  }>>([])
+  const [showTimelineModal, setShowTimelineModal] = useState(false)
+  const [isLoadingTimelines, setIsLoadingTimelines] = useState(false)
+  const [timelineSearchQuery, setTimelineSearchQuery] = useState("")
+  const [timelineCurrentPage, setTimelineCurrentPage] = useState(1)
+  const [timelineTotalPages, setTimelineTotalPages] = useState(1)
+  const [timelineItemsPerPage, setTimelineItemsPerPage] = useState(10)
+  const [timelineTotalResults, setTimelineTotalResults] = useState(0)
+  const [activities, setActivities] = useState<Array<{
+    id: string
+    name: string
+  }>>([])
+  const [groups, setGroups] = useState<Array<{
+    id: string
+    name: string
+    numberOfClients: number
+  }>>([])
+  const [selectedActivity, setSelectedActivity] = useState<string>("")
+  const [selectedGroup, setSelectedGroup] = useState<string>("")
+  const [isLoadingActivities, setIsLoadingActivities] = useState(false)
+  const [isLoadingGroups, setIsLoadingGroups] = useState(false)
 
   useEffect(() => {
     const token = localStorage.getItem('teamMemberToken')
@@ -255,8 +304,122 @@ const TeamMemberDashboard = () => {
     
     if (teamMemberData && !loading) {
       fetchBranches()
+      fetchActivities()
+      fetchGroups()
     }
   }, [teamMemberData, loading])
+
+  // Fetch activities
+  const fetchActivities = async () => {
+    try {
+      setIsLoadingActivities(true)
+      const token = localStorage.getItem('teamMemberToken')
+      if (!token) return
+      
+      const response = await axios.get(`${Base_url}activities`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      
+      if (response.data && response.data.results) {
+        setActivities(response.data.results)
+      }
+    } catch (error) {
+      console.error('Error fetching activities:', error)
+    } finally {
+      setIsLoadingActivities(false)
+    }
+  }
+
+  // Fetch groups
+  const fetchGroups = async () => {
+    try {
+      setIsLoadingGroups(true)
+      const token = localStorage.getItem('teamMemberToken')
+      if (!token) return
+      
+      const response = await axios.get(`${Base_url}groups`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      
+      if (response.data && response.data.results) {
+        setGroups(response.data.results)
+      }
+    } catch (error) {
+      console.error('Error fetching groups:', error)
+    } finally {
+      setIsLoadingGroups(false)
+    }
+  }
+
+  // Fetch timelines
+  const fetchTimelines = async (page: number = 1, searchQueryParam?: string, forceClearFilters: boolean = false, itemsPerPage?: number) => {
+    try {
+      setIsLoadingTimelines(true)
+      const token = localStorage.getItem('teamMemberToken')
+      if (!token) return
+      
+      // Get activity name if activity filter is selected
+      const selectedActivityData = selectedActivity && !forceClearFilters
+        ? activities.find(a => a.id === selectedActivity)
+        : null
+      const activityName = selectedActivityData?.name
+      
+      // Get group name if group filter is selected
+      const selectedGroupData = selectedGroup && !forceClearFilters
+        ? groups.find(g => g.id === selectedGroup)
+        : null
+      const groupName = selectedGroupData?.name
+      
+      // Use provided itemsPerPage or fall back to state value
+      const limit = itemsPerPage ?? timelineItemsPerPage
+      
+      // Build query parameters with proper pagination
+      const searchValue = forceClearFilters 
+        ? (searchQueryParam !== undefined ? searchQueryParam : "")
+        : (searchQueryParam !== undefined ? searchQueryParam : timelineSearchQuery)
+      
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        sortBy: activityName ? "activityName:asc" : "title:asc",
+        ...(searchValue && { search: searchValue })
+      })
+
+      // Add activity filter using activityName parameter
+      if (activityName && !forceClearFilters) {
+        queryParams.append('activityName', activityName)
+      }
+
+      // Add group filter using group parameter
+      if (groupName && !forceClearFilters) {
+        queryParams.append('group', groupName)
+      }
+
+      const response = await axios.get(`${Base_url}timelines?${queryParams}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+
+      if (response.data) {
+        setTimelines(response.data.results || [])
+        setTimelineTotalResults(response.data.totalResults || 0)
+        setTimelineTotalPages(response.data.totalPages || 1)
+        setTimelineCurrentPage(page)
+      }
+    } catch (err) {
+      console.error('Error fetching timelines:', err)
+      toast.error('Failed to fetch timelines')
+    } finally {
+      setIsLoadingTimelines(false)
+    }
+  }
+
+  // Refetch timelines when filters change
+  useEffect(() => {
+    if (showTimelineModal) {
+      setTimelineCurrentPage(1)
+      fetchTimelines(1, timelineSearchQuery)
+    }
+  }, [selectedActivity, selectedGroup, showTimelineModal])
 
   const fetchTasks = async () => {
     // Don't fetch if still loading or no team member data
@@ -500,8 +663,86 @@ const TeamMemberDashboard = () => {
       priority: 'medium',
       branch: teamMemberData?.branch?.id || '',
       remarks: '',
-      status: 'pending'
+      status: 'pending',
+      timeline: []
     })
+    setSelectedTimelines([])
+    setTimelineSearchQuery("")
+    setSelectedActivity("")
+    setSelectedGroup("")
+    setTimelineCurrentPage(1)
+  }
+
+  // Timeline selection handlers
+  const handleTimelineSelect = (timeline: typeof timelines[0]) => {
+    setSelectedTimelines(prev => {
+      const isSelected = prev.some(t => t.id === timeline.id)
+      if (isSelected) {
+        return prev.filter(t => t.id !== timeline.id)
+      } else {
+        return [...prev, timeline]
+      }
+    })
+  }
+
+  const handleTimelineModalSubmit = () => {
+    setAssignTaskForm(prev => ({
+      ...prev,
+      timeline: selectedTimelines.map(timeline => timeline.id)
+    }))
+    setShowTimelineModal(false)
+  }
+
+  const handleTimelineSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value
+    setTimelineSearchQuery(query)
+    if (showTimelineModal) {
+      debouncedTimelineSearch(query)
+    }
+  }
+
+  const handleTimelineSearchClick = () => {
+    if (showTimelineModal) {
+      setTimelineCurrentPage(1)
+      fetchTimelines(1, timelineSearchQuery)
+    }
+  }
+
+  const handleTimelinePageChange = (newPage: number) => {
+    setTimelineCurrentPage(newPage)
+    fetchTimelines(newPage, timelineSearchQuery)
+  }
+
+  // Debounced search function for timelines
+  const debouncedTimelineSearch = useCallback(
+    (() => {
+      let timeoutId: NodeJS.Timeout
+      return (searchQuery: string) => {
+        clearTimeout(timeoutId)
+        timeoutId = setTimeout(() => {
+          setTimelineCurrentPage(1)
+          fetchTimelines(1, searchQuery)
+        }, 500)
+      }
+    })(),
+    []
+  )
+
+  // Filter change handlers
+  const handleActivityFilterChange = (activityId: string) => {
+    setSelectedActivity(activityId)
+  }
+
+  const handleGroupFilterChange = (groupId: string) => {
+    setSelectedGroup(groupId)
+  }
+
+  const clearTimelineFilters = () => {
+    setSelectedActivity("")
+    setSelectedGroup("")
+    setTimelineSearchQuery("")
+    setTimelineCurrentPage(1)
+    fetchTimelines(1, "", true)
   }
 
   const handleAssignTask = async () => {
@@ -557,7 +798,7 @@ const TeamMemberDashboard = () => {
         branch: assignTaskForm.branch,
         remarks: assignTaskForm.remarks || '',
         status: assignTaskForm.status,
-        timeline: [],
+        timeline: assignTaskForm.timeline || [],
         metadata: {},
         attachments: []
       }
@@ -1416,6 +1657,57 @@ const TeamMemberDashboard = () => {
                   </select>
                 </div>
 
+                {/* Related Timelines */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Related Timelines
+                  </label>
+                  <div className="flex items-center space-x-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowTimelineModal(true)
+                        setTimelineSearchQuery("")
+                        setTimelineCurrentPage(1)
+                        setSelectedActivity("")
+                        setSelectedGroup("")
+                        setTimelineItemsPerPage(10)
+                        fetchTimelines(1, "", true)
+                      }}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                    >
+                      Select Timelines ({selectedTimelines.length} selected)
+                    </button>
+                    {selectedTimelines.length > 0 && (
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        {selectedTimelines.length} timeline{selectedTimelines.length !== 1 ? 's' : ''} selected
+                      </span>
+                    )}
+                  </div>
+                  {selectedTimelines.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {selectedTimelines.map(timeline => (
+                        <span key={timeline.id} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200">
+                          {timeline.title || `${timeline.activity?.name || 'Unknown Activity'} - ${timeline.client?.name || 'Unknown Client'}`}
+                          <button
+                            type="button"
+                            className="ml-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                            onClick={() => {
+                              setSelectedTimelines(prev => prev.filter(t => t.id !== timeline.id))
+                              setAssignTaskForm(prev => ({
+                                ...prev,
+                                timeline: prev.timeline.filter(id => id !== timeline.id)
+                              }))
+                            }}
+                          >
+                            <i className="ri-close-line"></i>
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 {/* Remarks */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -1460,6 +1752,294 @@ const TeamMemberDashboard = () => {
                   className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
                 >
                   {assigningTask ? 'Assigning...' : 'Assign Task'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Timeline Selection Modal */}
+      {showTimelineModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg w-11/12 max-w-6xl max-h-[90vh] flex flex-col">
+            <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Select Timelines</h2>
+              <button
+                onClick={() => setShowTimelineModal(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                <i className="ri-close-line text-2xl"></i>
+              </button>
+            </div>
+
+            <div className="p-4 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+              {/* Activity and Group Filters */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                {/* Activity Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Filter by Activity
+                  </label>
+                  <select
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={selectedActivity}
+                    onChange={(e) => handleActivityFilterChange(e.target.value)}
+                  >
+                    <option value="">All Activities</option>
+                    {activities.map((activity) => (
+                      <option key={activity.id} value={activity.id}>
+                        {activity.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Group Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Filter by Group
+                  </label>
+                  <select
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={selectedGroup}
+                    onChange={(e) => handleGroupFilterChange(e.target.value)}
+                  >
+                    <option value="">All Groups</option>
+                    {groups.map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.name} ({group.numberOfClients} clients)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Clear Filters Button */}
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={clearTimelineFilters}
+                    className="w-full px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm"
+                    disabled={!selectedActivity && !selectedGroup && !timelineSearchQuery}
+                  >
+                    <i className="ri-refresh-line mr-2"></i>
+                    Clear Filters
+                  </button>
+                </div>
+              </div>
+
+              {/* Search Bar */}
+              <div className="flex items-center space-x-4">
+                <div className="relative flex-1">
+                  <div className="flex items-center">
+                    <i className="ri-search-line text-gray-400 text-xl mr-3"></i>
+                    <input
+                      type="text"
+                      placeholder="Search timelines by title, activity, or client..."
+                      className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      value={timelineSearchQuery}
+                      onChange={handleTimelineSearchChange}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleTimelineSearchClick()
+                        }
+                      }}
+                    />
+                  </div>
+                  <button 
+                    className="absolute end-0 top-0 px-6 h-full bg-blue-600 text-white hover:bg-blue-700 rounded-r-md"
+                    onClick={handleTimelineSearchClick}
+                  >
+                    <i className="ri-search-line text-xl"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-auto p-4">
+              {/* Active Filters Summary */}
+              {(selectedActivity || selectedGroup) && (
+                <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Active Filters:</span>
+                      {selectedActivity && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200">
+                          Activity: {activities.find(a => a.id === selectedActivity)?.name}
+                        </span>
+                      )}
+                      {selectedGroup && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200">
+                          Group: {groups.find(g => g.id === selectedGroup)?.name}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={clearTimelineFilters}
+                      className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm"
+                    >
+                      <i className="ri-close-line mr-1"></i>
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {isLoadingTimelines ? (
+                <div className="flex items-center justify-center h-32">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead className="bg-gray-50 dark:bg-gray-700">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          Select
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          Activity
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          Client
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          Priority
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                      {timelines.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-8 text-center">
+                            <div className="flex flex-col items-center justify-center">
+                              <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-4">
+                                <i className="ri-search-line text-2xl text-gray-400"></i>
+                              </div>
+                              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                                No timelines found
+                              </h3>
+                              <p className="text-gray-500 dark:text-gray-400 text-center mb-4">
+                                {selectedActivity || selectedGroup 
+                                  ? "Try adjusting your filters or search criteria."
+                                  : "No timelines available at the moment."
+                                }
+                              </p>
+                              {(selectedActivity || selectedGroup) && (
+                                <button
+                                  onClick={clearTimelineFilters}
+                                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                                >
+                                  <i className="ri-refresh-line mr-2"></i>
+                                  Clear Filters
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        timelines.map((timeline) => (
+                          <tr key={timeline.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <input
+                                type="checkbox"
+                                className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                checked={selectedTimelines.some(t => t.id === timeline.id)}
+                                onChange={() => handleTimelineSelect(timeline)}
+                              />
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900 dark:text-white">{timeline.activity?.name || 'Unknown Activity'}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900 dark:text-white">{timeline.client?.name || 'Unknown Client'}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                timeline.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200' :
+                                timeline.status === 'ongoing' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200' :
+                                timeline.status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200' :
+                                'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-200'
+                              }`}>
+                                {timeline.status || 'N/A'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                timeline.priority === 'high' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200' :
+                                timeline.priority === 'medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200' :
+                                'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200'
+                              }`}>
+                                {timeline.priority || 'N/A'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t dark:border-gray-700 flex justify-between items-center">
+              <div className="flex items-center space-x-2">
+                <div className="flex items-center mr-4">
+                  <label className="mr-2 text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">Rows per page:</label>
+                  <select
+                    className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={timelineItemsPerPage}
+                    onChange={(e) => {
+                      const newItemsPerPage = Number(e.target.value)
+                      setTimelineItemsPerPage(newItemsPerPage)
+                      setTimelineCurrentPage(1)
+                      fetchTimelines(1, timelineSearchQuery, false, newItemsPerPage)
+                    }}
+                  >
+                    <option value={10}>10</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                    <option value={500}>500</option>
+                    <option value={1000}>1000</option>
+                  </select>
+                </div>
+                <button
+                  onClick={() => handleTimelinePageChange(Math.max(timelineCurrentPage - 1, 1))}
+                  disabled={timelineCurrentPage === 1 || timelines.length === 0}
+                  className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  {timelineTotalResults > 0 ? (
+                    `Showing ${(timelineCurrentPage - 1) * timelineItemsPerPage + 1} to ${Math.min(timelineCurrentPage * timelineItemsPerPage, timelineTotalResults)} of ${timelineTotalResults} entries`
+                  ) : (
+                    "No results"
+                  )}
+                </span>
+                <button
+                  onClick={() => handleTimelinePageChange(Math.min(timelineCurrentPage + 1, timelineTotalPages))}
+                  disabled={timelineCurrentPage === timelineTotalPages || timelineTotalPages === 0 || timelines.length === 0}
+                  className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setShowTimelineModal(false)}
+                  className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleTimelineModalSubmit}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                >
+                  Select ({selectedTimelines.length})
                 </button>
               </div>
             </div>

@@ -49,20 +49,8 @@ export default function ClientLogin() {
   const handleGenerateOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email.trim()) {
-      setError("Email is required");
-      return;
-    }
-
     if (!pan.trim()) {
       setError("PAN is required");
-      return;
-    }
-
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setError("Please enter a valid email address");
       return;
     }
 
@@ -79,11 +67,13 @@ export default function ClientLogin() {
 
     try {
       const response = await axios.post(`${Base_url}client-auth/generate-otp`, {
-        email: email.trim(),
         pan: pan.trim().toUpperCase()
       });
 
       if (response.data && response.data.success) {
+        // Extract email from response
+        const clientEmail = response.data.data?.email || email;
+        setEmail(clientEmail);
         setSuccess("OTP sent successfully! Please check your email.");
         setStep('otp');
       }
@@ -158,11 +148,13 @@ export default function ClientLogin() {
 
     try {
       const response = await axios.post(`${Base_url}client-auth/generate-otp`, {
-        email: email.trim(),
         pan: pan.trim().toUpperCase()
       });
 
       if (response.data && response.data.success) {
+        // Extract email from response
+        const clientEmail = response.data.data?.email || email;
+        setEmail(clientEmail);
         setSuccess("OTP resent successfully! Please check your email.");
         // Clear previous OTP
         setOtpDigits(['', '', '', '', '', '']);
@@ -202,24 +194,11 @@ export default function ClientLogin() {
                       </div>
                     )}
                     <p className="mb-4 text-[#8c9097] dark:text-white/50 opacity-[0.7] font-normal text-center">
-                      Enter your email and PAN to receive a one-time password
+                      Enter your PAN number to receive a one-time password
                     </p>
                     
                     <form onSubmit={handleGenerateOtp}>
                       <div className="grid grid-cols-12 gap-y-4">
-                        <div className="xl:col-span-12 col-span-12">
-                          <label htmlFor="client-email" className="form-label text-default">Email Address</label>
-                                                     <input 
-                             type="email" 
-                             name="email" 
-                             className="form-control w-full !rounded-md h-9 sm:h-10 md:h-12 text-sm sm:text-base" 
-                             id="client-email" 
-                             value={email}
-                             onChange={(e) => setEmail(e.target.value)}
-                             placeholder="Enter your email address"
-                             required
-                           />
-                        </div>
                         <div className="xl:col-span-12 col-span-12">
                           <label htmlFor="client-pan" className="form-label text-default">PAN Number</label>
                                                      <input 
@@ -317,6 +296,7 @@ export default function ClientLogin() {
                           setOtpDigits(['', '', '', '', '', '']);
                           setOtp("");
                           setPan("");
+                          setEmail("");
                         }}
                         className="text-gray-500 hover:text-gray-700 text-sm"
                       >

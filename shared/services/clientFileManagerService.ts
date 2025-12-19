@@ -80,15 +80,33 @@ class ClientFileManagerService {
   }
 
   // Get folder contents
-  async getFolderContents(folderId: string, page: number = 1): Promise<ClientContentsResponse> {
+  // NOTE: This should use a client-specific endpoint, not the admin file-manager endpoint
+  // Backend should implement: GET /client-file-manager/folders/:folderId/contents
+  // Or support: GET /client-file-manager/clients/:clientId/contents?folderId=:folderId
+  async getFolderContents(folderId: string, clientId?: string, page: number = 1): Promise<ClientContentsResponse> {
     try {
-      const response = await axios.get(`${Base_url}file-manager/folders/${folderId}/contents`, {
-        headers: this.getAuthHeaders(),
-        params: { page, limit: 100 }
-      });
-      return response.data;
+      // Try client-specific endpoint first
+      let response;
+      try {
+        response = await axios.get(`${Base_url}client-file-manager/folders/${folderId}/contents`, {
+          headers: this.getAuthHeaders(),
+          params: { page, limit: 100 }
+        });
+        return response.data;
+      } catch (clientError: any) {
+        // Fallback: Use client contents endpoint with folderId parameter
+        if (clientId) {
+          response = await axios.get(`${Base_url}client-file-manager/clients/${clientId}/contents`, {
+            headers: this.getAuthHeaders(),
+            params: { page, limit: 100, folderId }
+          });
+          return response.data;
+        }
+        // If no clientId provided and client endpoint fails, throw the original error
+        throw clientError;
+      }
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to load folder contents');
+      throw new Error(error.response?.data?.message || 'Failed to load folder contents. Backend needs client-specific folder endpoint.');
     }
   }
 

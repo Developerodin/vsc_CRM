@@ -103,6 +103,10 @@ const AddClientPage = () => {
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
   const fileUploadRef = useRef<HTMLInputElement>(null);
   
+  // Folder navigation state (similar to file manager)
+  const [currentFolder, setCurrentFolder] = useState<any | null>(null);
+  const [folderHistory, setFolderHistory] = useState<(string | null)[]>([]);
+  
   // Document context menu state
   const [documentContextMenu, setDocumentContextMenu] = useState<{
     visible: boolean;
@@ -567,10 +571,17 @@ const AddClientPage = () => {
     setUploadFiles(prev => prev.filter(f => f.name !== name));
   };
 
-  const fetchClientDocuments = async (clientId: string) => {
+  const fetchClientDocuments = async (clientId: string, folderId?: string | null) => {
     try {
       setIsLoadingDocuments(true);
-      const response = await fetch(`${Base_url}file-manager/clients/${clientId}/contents`, {
+      let url = `${Base_url}file-manager/clients/${clientId}/contents`;
+      
+      // If folderId is provided, navigate into that folder
+      if (folderId) {
+        url = `${Base_url}file-manager/folders/${folderId}/contents`;
+      }
+      
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -581,11 +592,73 @@ const AddClientPage = () => {
       }
 
       const data = await response.json();
-      setClientDocuments(data.results || []);
+      
+      // Handle nested contents structure (same as file manager)
+      let results = [];
+      if (data.contents && data.contents.results) {
+        // Structure: { contents: { results: [...] } }
+        results = data.contents.results;
+      } else if (data.results) {
+        // Structure: { results: [...] }
+        results = data.results;
+      }
+      
+      // Set current folder info if available
+      if (data.clientFolder) {
+        setCurrentFolder(data.clientFolder);
+      } else if (data.folder) {
+        setCurrentFolder(data.folder);
+      } else if (folderId === null || folderId === undefined) {
+        // Explicitly navigating to root - no folder in response
+        setCurrentFolder(null);
+      }
+      
+      setClientDocuments(results);
     } catch (error) {
       toast.error('Failed to fetch client documents');
     } finally {
       setIsLoadingDocuments(false);
+    }
+  };
+  
+  // Handle folder navigation (similar to file manager)
+  const handleFolderClick = (item: any) => {
+    if (!savedClientId) return;
+    
+    if (item.type === 'folder' && item.folder) {
+      // Add current folder to history before navigating
+      // If we have a currentFolder and it's different from target, add its ID to history
+      // If currentFolder is null (we're at root), add null to history so we can go back to root
+      if (currentFolder && currentFolder.id !== item.id) {
+        setFolderHistory(prev => [...prev, currentFolder.id]);
+      } else if (!currentFolder) {
+        // We're at root, add null to history to track that we came from root
+        setFolderHistory(prev => [...prev, null]);
+      }
+      // Navigate into the folder
+      fetchClientDocuments(savedClientId, item.id);
+    }
+  };
+  
+  // Handle back navigation to parent folder (exact copy from file manager)
+  const handleBackToParent = () => {
+    if (!savedClientId) return;
+    
+    if (folderHistory.length > 0) {
+      const previousFolderId = folderHistory[folderHistory.length - 1];
+      setFolderHistory(prev => prev.slice(0, -1)); // Remove last item from history
+      // If previousFolderId is null, go to root, otherwise go to that folder
+      fetchClientDocuments(savedClientId, previousFolderId || null);
+    }
+  };
+  
+  // Handle item click (files vs folders)
+  const handleItemClick = (item: any) => {
+    if (item.type === 'folder') {
+      handleFolderClick(item);
+    } else if (item.type === 'file' && item.file) {
+      // Handle file click - download or view
+      handleDownloadDocument(item);
     }
   };
 
@@ -728,9 +801,9 @@ const AddClientPage = () => {
       try {
         // You can implement delete functionality here if needed
         toast.success('Document deleted successfully');
-        // Refresh documents list
+        // Refresh documents list (maintain current folder location)
         if (savedClientId) {
-          fetchClientDocuments(savedClientId);
+          fetchClientDocuments(savedClientId, currentFolder?.id || null);
         }
       } catch (error) {
         toast.error('Failed to delete document');
@@ -969,9 +1042,9 @@ const AddClientPage = () => {
       setUploadFiles([]);
       setUploadProgress({});
       
-      // Refresh documents list
+      // Refresh documents list (maintain current folder location)
       if (savedClientId) {
-        fetchClientDocuments(savedClientId);
+        fetchClientDocuments(savedClientId, currentFolder?.id || null);
       }
     } catch (error) {
       toast.error('Failed to upload files');
@@ -1750,6 +1823,39 @@ const AddClientPage = () => {
                             </div>
                           </div>
                         </div>
+                        
+                        {/* Folder Navigation Header - Only show when in a folder */}
+                        {currentFolder && (
+                          <div className="border-b border-defaultborder dark:border-defaultborder/10 px-5 py-3 bg-light/60 rounded-t-lg mb-4">
+                            <div className="flex items-center justify-between gap-4">
+                              {/* Left section: Back button and folder info */}
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
+                                {/* Back Button - Only show when we have history */}
+                                {folderHistory.length > 0 && (
+                                  <button
+                                    type="button"
+                                    className="ti-btn ti-btn-light ti-btn-sm flex items-center gap-1 px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-gray-200 transition flex-shrink-0 mr-3"
+                                    onClick={handleBackToParent}
+                                    title="Back to parent folder"
+                                  >
+                                    <i className="ri-arrow-left-line text-base"></i>
+                                    <span className="hidden sm:inline">Back</span>
+                                  </button>
+                                )}
+                                <div className="flex flex-col min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h2 className="text-lg font-semibold text-defaulttextcolor m-0 truncate">{currentFolder.name}</h2>
+                                    {currentFolder.description && (
+                                      <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded whitespace-nowrap">
+                                        {currentFolder.description}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
 
                         {isLoadingDocuments ? (
                       <div className="flex items-center justify-center py-16">
@@ -1759,60 +1865,94 @@ const AddClientPage = () => {
                     ) : clientDocuments.length > 0 ? (
                       <div className="space-y-4">
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
-                          {clientDocuments.map((doc, index) => (
-                            <div
-                              key={index}
-                              className="group relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-all duration-200 cursor-pointer"
-                            >
-                              {/* Selection Checkbox */}
-                              <input
-                                type="checkbox"
-                                className="absolute top-2 left-2 z-10 opacity-100 transition-opacity duration-200"
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  // Handle selection if needed
-                                }}
-                              />
-
-                              {/* Icon */}
-                              <div className="flex items-center justify-center w-16 h-16 mb-3">
-                                <div className={`w-full h-full rounded-lg flex items-center justify-center ${getFileColor(doc.file?.mimeType || '', doc.file?.fileName || doc.fileName || '')}`}>
-                                  <i className={`text-2xl ${getFileIcon(doc.file?.mimeType || '', doc.file?.fileName || doc.fileName || '')}`}></i>
-                                </div>
-                              </div>
-
-                              {/* Content */}
-                              <div className="text-center">
-                                <div className="font-medium text-sm truncate">
-                                  {doc.file?.fileName || doc.fileName || 'Unknown File'}
-                                </div>
-                                <div className="text-xs text-gray-500 mt-1">
-                                  {doc.file?.fileSize ? `${(doc.file.fileSize / 1024).toFixed(1)} KB` : 'Unknown size'}
-                                </div>
-                              </div>
-
-                              {/* Three-dot menu */}
-                              <button
-                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDocumentContextMenu(e, doc);
-                                }}
-                                title="More options"
+                          {clientDocuments.filter(item => {
+                            // Filter out invalid items
+                            if (!item || typeof item !== 'object') return false;
+                            if (item.type === 'file' && (!item.file || item.file === null)) return false;
+                            if (item.type === 'folder' && (!item.folder || item.folder === null)) return false;
+                            return true;
+                          }).map((item, index) => {
+                            const isFolder = item.type === 'folder';
+                            const itemId = item.id || item._id || index;
+                            
+                            return (
+                              <div
+                                key={itemId}
+                                className="group relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-all duration-200 cursor-pointer"
+                                onClick={() => handleItemClick(item)}
                               >
-                                <i className="ri-more-2-fill text-gray-500 hover:text-primary"></i>
-                              </button>
-                            </div>
-                          ))}
+                                {/* Selection Checkbox */}
+                                <input
+                                  type="checkbox"
+                                  className="absolute top-2 left-2 z-10 opacity-100 transition-opacity duration-200"
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    // Handle selection if needed
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+
+                                {/* Icon */}
+                                <div className="flex items-center justify-center w-16 h-16 mb-3">
+                                  <div className={`w-full h-full rounded-lg flex items-center justify-center ${
+                                    isFolder 
+                                      ? 'bg-blue-100 dark:bg-blue-900/30' 
+                                      : getFileColor(item.file?.mimeType || '', item.file?.fileName || item.fileName || '')
+                                  }`}>
+                                    <i className={`text-2xl ${
+                                      isFolder 
+                                        ? 'ri-folder-2-line text-blue-600 dark:text-blue-400'
+                                        : getFileIcon(item.file?.mimeType || '', item.file?.fileName || item.fileName || '')
+                                    }`}></i>
+                                  </div>
+                                </div>
+
+                                {/* Content */}
+                                <div className="text-center">
+                                  <div className="font-medium text-sm truncate">
+                                    {isFolder 
+                                      ? (item.folder?.name || 'Unknown Folder')
+                                      : (item.file?.fileName || item.fileName || 'Unknown File')
+                                    }
+                                  </div>
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    {isFolder 
+                                      ? 'Folder'
+                                      : item.file?.fileSize ? `${(item.file.fileSize / 1024).toFixed(1)} KB` : 'Unknown size'
+                                    }
+                                  </div>
+                                </div>
+
+                                {/* Three-dot menu - only show for files */}
+                                {!isFolder && (
+                                  <button
+                                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDocumentContextMenu(e, item);
+                                    }}
+                                    title="More options"
+                                  >
+                                    <i className="ri-more-2-fill text-gray-500 hover:text-primary"></i>
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     ) : (
                       <div className="text-center py-16 text-gray-500">
                         <i className="ri-folder-open-line text-4xl mb-4 opacity-50"></i>
-                            <p className="text-lg font-medium">No documents uploaded yet</p>
-                            <p className="text-sm">Click "Upload Documents" to add files for this client</p>
+                        <p className="text-lg font-medium">No items found in this folder</p>
+                        <p className="text-sm">
+                          {currentFolder 
+                            ? 'This folder is empty. Go back or upload files here.'
+                            : 'Click "Upload Documents" to add files for this client'
+                          }
+                        </p>
                       </div>
-                        )}
+                    )}
                       </>
                     )}
                   </div>

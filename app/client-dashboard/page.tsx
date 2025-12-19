@@ -72,6 +72,8 @@ const ClientDashboard = () => {
   const [clientData, setClientData] = useState<ClientData | null>(null)
   const [folderContents, setFolderContents] = useState<FileManagerItem[]>([])
   const [clientFolder, setClientFolder] = useState<any>(null)
+  const [currentFolder, setCurrentFolder] = useState<FolderItem | null>(null) // Track current folder being viewed
+  const [folderHistory, setFolderHistory] = useState<string[]>([]) // Track folder navigation history
   const [clientEmail, setClientEmail] = useState<string>('') // New state for client email from API
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -111,6 +113,17 @@ const ClientDashboard = () => {
     }
   }, [router])
 
+  // Get auth headers helper
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('clientToken')
+    return {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'X-Client-ID': clientData?.id || ''
+    }
+  }
+
   // Define loadClientContents function before using it in useEffect
   const loadClientContents = useCallback(async () => {
     if (!clientData) return
@@ -140,12 +153,7 @@ const ClientDashboard = () => {
       
       // Log the full request details for debugging
       const requestConfig = {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-Client-ID': clientData.id
-        }
+        headers: getAuthHeaders()
       }
       console.log('Request config:', requestConfig)
       console.log('Request URL:', `${Base_url}client-file-manager/clients/${clientData.id}/contents`)
@@ -164,6 +172,8 @@ const ClientDashboard = () => {
       const responseData: FileManagerResponse = response.data
       setFolderContents(responseData.results || [])
       setClientFolder(responseData.clientFolder)
+      setCurrentFolder(null) // Reset current folder when loading root
+      setFolderHistory([]) // Reset history when loading root
       
       // Update client data with the latest information from API (including email)
       if (responseData.client) {
@@ -197,6 +207,160 @@ const ClientDashboard = () => {
       setLoading(false)
     }
   }, [clientData])
+
+  // Load folder contents (for subfolders)
+  // NOTE: This function tries multiple endpoints:
+  // 1. /client-file-manager/folders/{folderId}/contents (preferred - needs backend implementation)
+  // 2. /client-file-manager/clients/{clientId}/contents?folderId={folderId} (fallback - if backend supports folderId param)
+  // The backend should implement one of these endpoints to allow clients to access subfolders
+  const loadFolderContents = useCallback(async (folderId: string) => {
+    if (!clientData) return
+    
+    setLoading(true)
+    setError('')
+    
+    try {
+      const requestConfig = {
+        headers: getAuthHeaders()
+      }
+      
+      // Use client-specific endpoint for folder contents
+      // Try client-file-manager endpoint first (client-specific)
+      let response
+      try {
+        response = await axios.get(`${Base_url}client-file-manager/folders/${folderId}/contents`, {
+          ...requestConfig,
+          params: { page: 1, limit: 100 }
+        })
+        console.log('Folder contents loaded from client-file-manager:', response.data)
+      } catch (clientError: any) {
+        // If client-specific endpoint doesn't exist, fall back to using clientId in the path
+        console.warn('Client-specific folder endpoint not available, trying alternative:', clientError.response?.status)
+        
+        // Alternative: Use client contents endpoint with folderId parameter
+        try {
+          response = await axios.get(`${Base_url}client-file-manager/clients/${clientData.id}/contents`, {
+            ...requestConfig,
+            params: { 
+              page: 1, 
+              limit: 100,
+              folderId: folderId // Pass folderId as query parameter
+            }
+          })
+          console.log('Folder contents loaded from client contents with folderId param:', response.data)
+        } catch (altError: any) {
+          console.error('All client endpoints failed:', altError)
+          throw altError
+        }
+      }
+      
+      // The response structure should match the client contents response
+      const responseData = response.data
+      
+      // Handle response structure (same as root folder response)
+      if (responseData.results) {
+        setFolderContents(responseData.results || [])
+        
+        // Set current folder if available in response
+        if (responseData.clientFolder) {
+          setCurrentFolder({
+            _id: responseData.clientFolder.id,
+            name: responseData.clientFolder.name,
+            path: responseData.clientFolder.path,
+            description: responseData.clientFolder.description || '',
+            createdAt: responseData.clientFolder.createdAt,
+            updatedAt: responseData.clientFolder.updatedAt
+          })
+        } else if (responseData.folder) {
+          // Handle if folder info is in different format
+          setCurrentFolder({
+            _id: responseData.folder.id || responseData.folder._id,
+            name: responseData.folder.name,
+            path: responseData.folder.path || '',
+            description: responseData.folder.description || '',
+            createdAt: responseData.folder.createdAt,
+            updatedAt: responseData.folder.updatedAt
+          })
+        }
+      } else if (responseData.contents && responseData.contents.results) {
+        // Handle nested contents structure
+        setFolderContents(responseData.contents.results || [])
+        if (responseData.folder) {
+          setCurrentFolder({
+            _id: responseData.folder.id || responseData.folder._id,
+            name: responseData.folder.name,
+            path: responseData.folder.path || '',
+            description: responseData.folder.description || '',
+            createdAt: responseData.folder.createdAt,
+            updatedAt: responseData.folder.updatedAt
+          })
+        }
+      } else if (Array.isArray(responseData)) {
+        // Handle direct array response
+        setFolderContents(responseData)
+      } else {
+        // Fallback
+        setFolderContents(responseData || [])
+      }
+    } catch (error: any) {
+      console.error('Error loading folder contents:', error)
+      console.error('Error response:', error.response?.data)
+      
+      if (error.response?.status === 401) {
+        localStorage.removeItem('clientToken')
+        localStorage.removeItem('clientData')
+        router.push('/client-login')
+        setError('Session expired. Please login again.')
+      } else {
+        setError(error.response?.data?.message || 'Failed to load folder contents. The backend may need a client-specific folder endpoint.')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [clientData, router])
+
+  // Handle folder click - navigate into folder
+  const handleFolderClick = (folder: FolderItem) => {
+    // Add current folder to history if we're in a subfolder
+    if (currentFolder) {
+      setFolderHistory(prev => [...prev, currentFolder._id])
+    } else if (clientFolder) {
+      // If we're at root, add root folder to history
+      setFolderHistory(prev => [...prev, clientFolder.id])
+    }
+    
+    // Load the clicked folder's contents
+    loadFolderContents(folder._id)
+  }
+
+  // Handle back navigation
+  const handleBackToParent = () => {
+    if (folderHistory.length > 0) {
+      const previousFolderId = folderHistory[folderHistory.length - 1]
+      setFolderHistory(prev => prev.slice(0, -1))
+      
+      // If we're going back to root
+      if (previousFolderId === clientFolder?.id) {
+        loadClientContents()
+      } else {
+        // Load the previous folder
+        loadFolderContents(previousFolderId)
+      }
+    } else {
+      // If no history, go back to root
+      loadClientContents()
+    }
+  }
+
+  // Handle item click (both files and folders)
+  const handleItemClick = (item: FileManagerItem) => {
+    if (item.type === 'folder' && item.folder) {
+      handleFolderClick(item.folder)
+    } else if (item.type === 'file' && item.file) {
+      // Files are handled by their action buttons, but we could add download on click here if needed
+      // handleDownloadFile(item.file)
+    }
+  }
 
   // Separate useEffect to load contents after clientData is set
   useEffect(() => {
@@ -532,11 +696,30 @@ const ClientDashboard = () => {
          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
            <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
-               <div>
-                 <h2 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white">Your Files</h2>
-                 <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
-                   {clientFolder ? `Location: ${clientFolder.path}` : 'Manage your files and folders'}
-                 </p>
+               <div className="flex items-center gap-3 min-w-0 flex-1">
+                 {/* Back Button */}
+                 {(currentFolder || folderHistory.length > 0) && (
+                   <button
+                     onClick={handleBackToParent}
+                     className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors flex-shrink-0 flex items-center gap-1"
+                     title="Back to parent folder"
+                   >
+                     <i className="ri-arrow-left-line"></i>
+                     <span className="hidden sm:inline">Back</span>
+                   </button>
+                 )}
+                 <div className="min-w-0">
+                   <h2 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white truncate">
+                     {currentFolder ? currentFolder.name : 'Your Files'}
+                   </h2>
+                   <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1 truncate">
+                     {currentFolder 
+                       ? currentFolder.path || currentFolder.description || 'Folder'
+                       : clientFolder 
+                         ? `Location: ${clientFolder.path}` 
+                         : 'Manage your files and folders'}
+                   </p>
+                 </div>
                </div>
                {clientFolder && (
                  <div className="flex items-center gap-2 sm:gap-4">
@@ -722,7 +905,12 @@ const ClientDashboard = () => {
                {filteredContent.map((item) => (
                  <div
                    key={item._id}
-                   className="flex items-center gap-2 sm:gap-4 p-3 sm:p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                   className={`flex items-center gap-2 sm:gap-4 p-3 sm:p-4 transition-colors ${
+                     item.type === 'folder' 
+                       ? 'hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer' 
+                       : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                   }`}
+                   onClick={() => item.type === 'folder' && handleItemClick(item)}
                  >
                    {/* Icon */}
                    <div className="flex-shrink-0">
@@ -739,6 +927,11 @@ const ClientDashboard = () => {
                    <div className="flex-1 min-w-0">
                      <div className="font-medium text-gray-900 dark:text-white truncate text-sm sm:text-base">
                        {item.type === 'file' ? item.file?.fileName : item.folder?.name}
+                       {item.type === 'folder' && (
+                         <span className="ml-2 text-xs text-gray-400">
+                           <i className="ri-arrow-right-s-line"></i>
+                         </span>
+                       )}
                      </div>
                      <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                        {item.type === 'folder' 
@@ -750,7 +943,7 @@ const ClientDashboard = () => {
 
                    {/* Actions */}
                    {item.type === 'file' && item.file && (
-                     <div className="flex items-center gap-1 sm:gap-2">
+                     <div className="flex items-center gap-1 sm:gap-2" onClick={(e) => e.stopPropagation()}>
                        {/* {canViewInBrowser(item.file.mimeType) && (
                          <button
                            onClick={() => handleViewFile(item.file!)}
