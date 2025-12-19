@@ -166,6 +166,13 @@ const TasksPage = () => {
   const handleQuickEditSubmit = async () => {
     if (!quickEditTask) return;
 
+    // Get task ID with fallback (same pattern as TaskManagement)
+    const taskId = quickEditTask.id || (quickEditTask as any)._id;
+    if (!taskId) {
+      toast.error('Task ID is missing. Cannot update task.');
+      return;
+    }
+
     // For delayed tasks, only allow status change to completed
     if (quickEditTask.status === 'delayed' && quickEditStatus !== 'completed') {
       toast.error('Delayed tasks can only be marked as completed', {
@@ -191,7 +198,7 @@ const TasksPage = () => {
         updateData.remarks = quickEditRemarks;
       }
 
-      const response = await fetch(`${Base_url}tasks/${quickEditTask.id}`, {
+      const response = await fetch(`${Base_url}tasks/${taskId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -208,11 +215,12 @@ const TasksPage = () => {
       
       // Update the task in the local state
       setTasks(prevTasks => 
-        prevTasks.map(task => 
-          task.id === quickEditTask.id 
+        prevTasks.map(task => {
+          const currentTaskId = task.id || (task as any)._id;
+          return currentTaskId === taskId
             ? { ...task, status: quickEditStatus as Task['status'], remarks: quickEditTask.status === 'delayed' ? task.remarks : quickEditRemarks }
-            : task
-        )
+            : task;
+        })
       );
 
       closeQuickEditModal();
@@ -278,7 +286,12 @@ const TasksPage = () => {
       });
 
       const data: ApiResponse = response.data;
-      setTasks(data.results);
+      // Transform _id to id for consistency (same as TaskManagement)
+      const transformedTasks = data.results.map((task: any) => ({
+        ...task,
+        id: task._id || task.id
+      }));
+      setTasks(transformedTasks);
       setTotalPages(data.totalPages);
       setTotalResults(data.totalResults);
     } catch (err) {
@@ -330,11 +343,12 @@ const TasksPage = () => {
 
       // Update the task in local state
       setTasks(prevTasks => 
-        prevTasks.map(task => 
-          task.id === taskId 
+        prevTasks.map(task => {
+          const currentTaskId = task.id || (task as any)._id;
+          return currentTaskId === taskId
             ? { ...task, status: newStatus as Task['status'], remarks: remarks || task.remarks }
-            : task
-        )
+            : task;
+        })
       );
 
       toast.success(`Task status updated to ${newStatus}`);
@@ -353,7 +367,7 @@ const TasksPage = () => {
   // Selection handlers
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
-      setSelectedTasks(tasks.map(task => task.id));
+      setSelectedTasks(tasks.map(task => task.id || (task as any)._id).filter(Boolean) as string[]);
     } else {
       setSelectedTasks([]);
     }
@@ -876,12 +890,15 @@ const TasksPage = () => {
               </tr>
             ) : (
               tasks.map((task, index) => (
-                <tr key={task.id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                <tr key={task.id || (task as any)._id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
                   <td className="border border-gray-300">
                     <input
                       type="checkbox"
-                      checked={selectedTasks.includes(task.id)}
-                      onChange={() => handleSelectTask(task.id)}
+                      checked={selectedTasks.includes(task.id || (task as any)._id)}
+                      onChange={() => {
+                        const taskId = task.id || (task as any)._id;
+                        if (taskId) handleSelectTask(taskId);
+                      }}
                       className="form-checkbox"
                     />
                   </td>
@@ -967,8 +984,13 @@ const TasksPage = () => {
                          type="button"
                          className="ti-btn ti-btn-sm ti-btn-secondary"
                          onClick={() => {
-                           console.log('Task ID=========================================>:', task.id);
-                           router.push(`/tasks/edit/${task.id}`);
+                           const taskId = task.id || (task as any)._id;
+                           if (!taskId) {
+                             toast.error('Task ID is missing. Cannot navigate to edit page.');
+                             return;
+                           }
+                           console.log('Task ID=========================================>:', taskId);
+                           router.push(`/tasks/edit/${taskId}`);
                          }}
                          title="Edit Task"
                        >
@@ -1267,6 +1289,13 @@ const TaskDetailsModal = ({
   };
 
   const handleStatusUpdate = async () => {
+    // Get task ID with fallback (same pattern as TaskManagement)
+    const taskId = task.id || (task as any)._id;
+    if (!taskId) {
+      toast.error('Task ID is missing. Cannot update task.');
+      return;
+    }
+
     // For delayed tasks, only allow status change to completed
     if (task.status === 'delayed' && selectedStatus !== 'completed') {
       toast.error('Delayed tasks can only be marked as completed', {
@@ -1282,7 +1311,7 @@ const TaskDetailsModal = ({
     }
     
     if (selectedStatus !== task.status || (task.status !== 'delayed' && remarks !== (task.remarks || ''))) {
-      await onUpdateStatus(task.id, selectedStatus, task.status === 'delayed' ? undefined : remarks);
+      await onUpdateStatus(taskId, selectedStatus, task.status === 'delayed' ? undefined : remarks);
     }
   };
 
