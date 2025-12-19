@@ -218,7 +218,6 @@ const Dashboard = () => {
       const data = await DashboardService.getDashboardData(branchId);
       setDashboardData(data);
     } catch (err) {
-      console.error('Error fetching dashboard data:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch dashboard data');
       toast.error('Failed to load dashboard data');
     } finally {
@@ -235,7 +234,6 @@ const Dashboard = () => {
       const data = await DashboardService.getTimelineCountsByBranch(branchId);
       setTimelineCounts(data);
     } catch (err) {
-      console.error('Error fetching timeline counts:', err);
       toast.error('Failed to load timeline data');
       setTimelineCounts(null);
     } finally {
@@ -255,7 +253,6 @@ const Dashboard = () => {
         months: data.months || []
       });
     } catch (err) {
-      console.error('Error fetching monthly task data:', err);
       toast.error('Failed to load monthly task data');
       setMonthlyTaskData({ assigned: [], months: [] });
     } finally {
@@ -272,7 +269,6 @@ const Dashboard = () => {
       const data = await DashboardService.getTopClients(branchId);
       setTopClients(data);
     } catch (err) {
-      console.error('Error fetching top clients:', err);
       toast.error('Failed to load top clients data');
       setTopClients([]);
     } finally {
@@ -289,7 +285,6 @@ const Dashboard = () => {
       const data = await DashboardService.getTopActivities(branchId);
       setTopActivities(data);
     } catch (err) {
-      console.error('Error fetching top activities:', err);
       toast.error('Failed to load top activities data');
       setTopActivities([]);
     } finally {
@@ -307,7 +302,6 @@ const Dashboard = () => {
       const data = await DashboardService.getTimelineStatusByFrequency(filters);
       setFrequencyStatusData(data);
     } catch (err) {
-      console.error('Error fetching frequency data:', err);
       toast.error('Failed to load frequency data');
       setFrequencyStatusData([]);
     } finally {
@@ -325,7 +319,6 @@ const Dashboard = () => {
       const data = await DashboardService.getTimelineFrequencyAnalytics(filters);
       setFrequencyAnalyticsData(data);
     } catch (err) {
-      console.error('Error fetching analytics data:', err);
       toast.error('Failed to load analytics data');
       setFrequencyAnalyticsData([]);
     } finally {
@@ -343,7 +336,6 @@ const Dashboard = () => {
       const data = await DashboardService.getTimelineStatusTrends(filters);
       setStatusTrendsData(data);
     } catch (err) {
-      console.error('Error fetching trends data:', err);
       toast.error('Failed to load trends data');
       setStatusTrendsData([]);
     } finally {
@@ -361,7 +353,6 @@ const Dashboard = () => {
       const data = await DashboardService.getTimelineCompletionRates(filters);
       setCompletionRatesData(data);
     } catch (err) {
-      console.error('Error fetching completion rates:', err);
       toast.error('Failed to load completion rates');
       setCompletionRatesData(null);
     } finally {
@@ -379,7 +370,6 @@ const Dashboard = () => {
       const data = await DashboardService.getFrequencyStatusStats(filters);
       setFrequencyStatusStats(data);
     } catch (err) {
-      console.error('Error fetching frequency status stats:', err);
       toast.error('Failed to load frequency status stats');
       setFrequencyStatusStats(null);
     } finally {
@@ -398,7 +388,6 @@ const Dashboard = () => {
       const data = await DashboardService.getTaskTrends(filters);
       setTaskTrendsData(data);
     } catch (err) {
-      console.error('Error fetching task trends:', err);
       toast.error('Failed to load task trends');
       setTaskTrendsData(null);
     } finally {
@@ -417,7 +406,6 @@ const Dashboard = () => {
       const data = await DashboardService.getTaskAnalytics(filters);
       setTaskStatusAnalytics(data);
     } catch (err) {
-      console.error('Error fetching task status analytics:', err);
       toast.error('Failed to load task status analytics');
       setTaskStatusAnalytics(null);
     } finally {
@@ -436,7 +424,6 @@ const Dashboard = () => {
       const data = await DashboardService.getTaskAnalytics(filters);
       setTaskPriorityAnalytics(data);
     } catch (err) {
-      console.error('Error fetching task priority analytics:', err);
       toast.error('Failed to load task priority analytics');
       setTaskPriorityAnalytics(null);
     } finally {
@@ -461,7 +448,6 @@ const Dashboard = () => {
       const data = await DashboardService.getTaskTrends(filters);
       setTaskTrendsData(data);
     } catch (err) {
-      console.error('Error refreshing task trends:', err);
       toast.error('Failed to refresh task trends');
     } finally {
       setIsLoadingTaskTrends(false);
@@ -485,7 +471,6 @@ const Dashboard = () => {
       const data = await DashboardService.getTimelineStatusByPeriod(filters);
       setTimelinePeriodData(data.periods || []);
     } catch (err) {
-      console.error('Error fetching period data:', err);
       toast.error('Failed to load period data');
       setTimelinePeriodData([]);
     } finally {

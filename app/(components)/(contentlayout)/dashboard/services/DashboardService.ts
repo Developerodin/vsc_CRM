@@ -172,7 +172,6 @@ class DashboardService {
       });
       return response.data.results || [];
     } catch (error) {
-      console.error('Error fetching timeline status by frequency:', error);
       throw error;
     }
   }
@@ -192,7 +191,6 @@ class DashboardService {
       });
       return response.data;
     } catch (error) {
-      console.error('Error fetching timeline status by period:', error);
       throw error;
     }
   }
@@ -206,7 +204,6 @@ class DashboardService {
       });
       return response.data.analytics || [];
     } catch (error) {
-      console.error('Error fetching timeline frequency analytics:', error);
       throw error;
     }
   }
@@ -220,7 +217,6 @@ class DashboardService {
       });
       return response.data.trends || [];
     } catch (error) {
-      console.error('Error fetching timeline status trends:', error);
       throw error;
     }
   }
@@ -234,7 +230,6 @@ class DashboardService {
       });
       return response.data.overallStats;
     } catch (error) {
-      console.error('Error fetching timeline completion rates:', error);
       throw error;
     }
   }
@@ -248,7 +243,6 @@ class DashboardService {
       });
       return response.data;
     } catch (error) {
-      console.error('Error fetching frequency status stats:', error);
       throw error;
     }
   }
@@ -281,7 +275,6 @@ class DashboardService {
         totalOngoingTasks: tasksResponse.data.total || 0
       };
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
       throw error;
     }
   }
@@ -295,7 +288,6 @@ class DashboardService {
       });
       return response.data;
     } catch (error) {
-      console.error('Error fetching timeline counts:', error);
       throw error;
     }
   }
@@ -309,7 +301,6 @@ class DashboardService {
       });
       return response.data;
     } catch (error) {
-      console.error('Error fetching assigned task counts:', error);
       throw error;
     }
   }
@@ -323,7 +314,6 @@ class DashboardService {
       });
       return response.data || [];
     } catch (error) {
-      console.error('Error fetching top clients:', error);
       throw error;
     }
   }
@@ -337,7 +327,6 @@ class DashboardService {
       });
       return response.data || [];
     } catch (error) {
-      console.error('Error fetching top activities:', error);
       throw error;
     }
   }
@@ -351,7 +340,6 @@ class DashboardService {
       });
       return response.data;
     } catch (error) {
-      console.error('Error fetching task trends:', error);
       throw error;
     }
   }
@@ -365,7 +353,6 @@ class DashboardService {
       });
       return response.data;
     } catch (error) {
-      console.error('Error fetching task analytics:', error);
       throw error;
     }
   }

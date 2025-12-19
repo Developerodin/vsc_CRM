@@ -87,7 +87,6 @@ const AddGroupPage = () => {
       setTotalPages(Math.max(1, Math.ceil(totalResults / limit)));
       setCurrentPage(page);
     } catch (err) {
-      console.error('Error fetching clients:', err);
       toast.error('Failed to fetch clients');
     } finally {
       setIsLoadingClients(false);
@@ -212,7 +211,6 @@ const AddGroupPage = () => {
       toast.success('Group created successfully');
       router.push('/groups');
     } catch (err) {
-      console.error('Error creating group:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to create group');
     } finally {
       setIsLoading(false);

@@ -221,7 +221,6 @@ const TasksPage = () => {
       // Refresh task statistics
       await fetchTaskStats();
     } catch (error) {
-      console.error('Error updating task:', error);
       toast.error('Failed to update task');
     } finally {
       setIsUpdatingQuickEdit(false);
@@ -272,28 +271,17 @@ const TasksPage = () => {
         ...(sortBy && { sortBy })
       });
 
-      console.log('Fetching tasks with URL:', `${Base_url}tasks?${queryParams}`);
-      console.log('Original Filters:', filters);
-      console.log('Processed Filters:', processedFilters);
-      console.log('Clean Filters:', cleanFilters);
-
       const response = await axios.get(`${Base_url}tasks?${queryParams}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
 
-      console.log('API Response:', response.data);
-
       const data: ApiResponse = response.data;
       setTasks(data.results);
       setTotalPages(data.totalPages);
       setTotalResults(data.totalResults);
-      
-      console.log('Tasks set:', data.results);
-      console.log('Total results:', data.totalResults);
     } catch (err) {
-      console.error('Error fetching tasks:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch tasks');
       toast.error('Failed to fetch tasks');
     } finally {
@@ -357,7 +345,6 @@ const TasksPage = () => {
       await fetchTaskStats();
     } catch (err) {
       toast.error('Failed to update task status');
-      console.error('Error updating task status:', err);
     } finally {
       setIsUpdatingTask(false);
     }
@@ -1247,15 +1234,13 @@ const TaskDetailsModal = ({
             }
           });
           
-          if (response.ok) {
-            return await response.json();
-          } else {
-            console.error(`Failed to fetch timeline ${timelineRef.id}:`, response.status);
-            return null;
-          }
-        } catch (error) {
-          console.error(`Error fetching timeline ${timelineRef.id}:`, error);
-          return null;
+              if (response.ok) {
+                return await response.json();
+              } else {
+                return null;
+              }
+            } catch (error) {
+              return null;
         }
       });
 
@@ -1264,7 +1249,6 @@ const TaskDetailsModal = ({
        setTimelineDetails(validTimelines);
        setTimelineCurrentPage(1); // Reset to first page when new data is loaded
     } catch (error) {
-      console.error('Error fetching timeline details:', error);
     } finally {
       setIsLoadingTimelines(false);
     }

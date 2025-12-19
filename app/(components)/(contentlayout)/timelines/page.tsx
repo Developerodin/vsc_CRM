@@ -211,8 +211,6 @@ const TimelinesPage = () => {
         ...(sortBy && { sortBy })
       });
 
-      console.log('Fetching timelines with query params:', queryParams.toString());
-
       const response = await fetch(`${Base_url}timelines?${queryParams}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -224,7 +222,6 @@ const TimelinesPage = () => {
       }
 
       const data: ApiResponse = await response.json();
-      console.log('Timelines API response:', data);
       setTimelines(data.results);
       setTotalPages(data.totalPages);
       setTotalResults(data.totalResults);
@@ -256,7 +253,6 @@ const TimelinesPage = () => {
       const data = await response.json();
       setActivities(data.results);
     } catch (err) {
-      console.error('Error fetching activities:', err);
     }
   };
 
@@ -286,7 +282,6 @@ const TimelinesPage = () => {
       const data = await response.json();
       setAvailablePeriods(data.periods || []);
     } catch (err) {
-      console.error('Error fetching frequency periods:', err);
       toast.error('Failed to fetch frequency periods');
       setAvailablePeriods([]);
     } finally {
@@ -373,8 +368,6 @@ const TimelinesPage = () => {
         ...(exportFilters.period && { period: exportFilters.period })
       });
 
-      console.log('Export API call:', `${Base_url}timelines?${queryParams}`);
-
       const response = await fetch(`${Base_url}timelines?${queryParams}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -394,9 +387,6 @@ const TimelinesPage = () => {
           allFieldNames.add(field.fileName);
         });
       });
-
-      console.log('Dynamic field names found:', Array.from(allFieldNames));
-      console.log('Sample timeline data:', apiData.results[0]);
 
       exportData = apiData.results.map((timeline: Timeline) => {
         const baseData = {
@@ -418,8 +408,6 @@ const TimelinesPage = () => {
 
         return { ...baseData, ...fieldData };
       });
-
-      console.log('Final export data structure:', exportData[0]);
 
       const ws = XLSX.utils.json_to_sheet(exportData);
       
@@ -450,7 +438,6 @@ const TimelinesPage = () => {
       setShowExportModal(false);
       setExportFilters({ activity: '', subActivity: '', frequency: '', period: '' });
     } catch (error) {
-      console.error("Error exporting timelines:", error);
       toast.error("Failed to export timelines");
     }
   };
@@ -492,7 +479,6 @@ const TimelinesPage = () => {
           // Validate the date
           const dateObj = new Date(isoDate);
           if (isNaN(dateObj.getTime())) {
-            console.warn(`Invalid date: ${dateValue}`);
             return undefined;
           }
           
@@ -506,10 +492,8 @@ const TimelinesPage = () => {
         }
       }
       
-      console.warn(`Could not parse date: ${dateValue}`);
       return undefined;
     } catch (error) {
-      console.error(`Error parsing date ${dateValue}:`, error);
       return undefined;
     }
   };
@@ -534,10 +518,6 @@ const TimelinesPage = () => {
             toast.error('No data found in the file');
             return;
           }
-
-          console.log('Imported Excel data:', jsonData);
-          console.log('Sample row structure:', jsonData[0]);
-          console.log('Sample row keys:', Object.keys(jsonData[0]));
 
           // Transform data for bulk import fields API
           const timelineUpdates = jsonData.map(row => {
@@ -585,15 +565,8 @@ const TimelinesPage = () => {
               }
             }
 
-            console.log(`Processing row for Timeline ID: ${timelineId}`);
-            console.log(`Extracted fields:`, fields);
-            console.log(`Status:`, updateData.status);
-            console.log(`CompletedAt:`, updateData.completedAt);
-            
             return updateData;
           });
-
-          console.log('Transformed data for API:', timelineUpdates);
 
           // Call the bulk import fields API
           const response = await fetch(`${Base_url}timelines/bulk-import-fields`, {
@@ -613,7 +586,6 @@ const TimelinesPage = () => {
           
           if (result.errors && result.errors.length > 0) {
             toast.error(`Import completed with ${result.errors.length} errors`);
-            console.log('Import errors:', result.errors);
           } else {
             toast.success(`Import completed successfully! ${timelineUpdates.length} timelines updated`);
           }
@@ -622,7 +594,6 @@ const TimelinesPage = () => {
           fetchTimelines();
           
         } catch (err) {
-          console.error('Error processing file:', err);
           toast.error(err instanceof Error ? err.message : 'Failed to process file');
         } finally {
           setIsProcessingImport(false);
@@ -632,7 +603,6 @@ const TimelinesPage = () => {
 
       reader.readAsArrayBuffer(file);
     } catch (err) {
-      console.error('Error reading file:', err);
       toast.error('Failed to read file');
       setIsProcessingImport(false);
       setImportProgress(null);

@@ -105,10 +105,8 @@ const GroupOverviewPage = () => {
         }
       });
       
-      console.log('Group analytics API response:', response.data);
       setGroupData(response.data);
     } catch (err) {
-      console.error('Error fetching group overview:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch group analytics');
     } finally {
       setLoading(false);

@@ -158,11 +158,6 @@ const TaskManagement = () => {
         ...(sortBy && { sortBy })
       });
 
-      console.log('Fetching tasks with URL:', `${Base_url}tasks?${queryParams}`);
-      console.log('Original Filters:', filters);
-      console.log('Processed Filters:', processedFilters);
-      console.log('Clean Filters:', cleanFilters);
-
       const response = await fetch(`${Base_url}tasks?${queryParams}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -312,7 +307,6 @@ const TaskManagement = () => {
       XLSX.writeFile(wb, fileName);
       toast.success(successMessage);
     } catch (error) {
-      console.error("Error exporting tasks:", error);
       toast.error("Failed to export tasks");
     }
   };
@@ -364,21 +358,18 @@ const TaskManagement = () => {
           
           if (result.errors && result.errors.length > 0) {
             toast.error(`Import completed with ${result.errors.length} errors`);
-            console.log('Import errors:', result.errors);
           } else {
             toast.success(`Import completed: ${result.created} added, ${result.updated} updated`);
           }
 
           fetchTasks();
         } catch (err) {
-          console.error('Error processing file:', err);
           toast.error('Failed to process file');
         }
       };
 
       reader.readAsArrayBuffer(file);
     } catch (err) {
-      console.error('Error reading file:', err);
       toast.error('Failed to read file');
     }
   };

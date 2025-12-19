@@ -259,7 +259,6 @@ const EditTaskPage = () => {
                 };
               }
             } catch (error) {
-              console.error(`Error fetching timeline ${timelineRef.id}:`, error);
               // Return basic timeline object as fallback - try to fetch activity and client names
               try {
                 const [activityResponse, clientResponse] = await Promise.allSettled([
@@ -309,7 +308,6 @@ const EditTaskPage = () => {
           const fullTimelines = await Promise.all(timelinePromises);
           setSelectedTimelines(fullTimelines.filter(Boolean)); // Filter out any null/undefined results
         } catch (error) {
-          console.error('Error fetching timeline details:', error);
           // Final fallback: create basic timeline objects from the data we have
           const basicTimelines = taskData.timeline.map(t => ({
             id: t.id,
@@ -359,7 +357,6 @@ const EditTaskPage = () => {
       });
     } catch (error) {
       toast.error('Failed to fetch task');
-      console.error('Error fetching task:', error);
     } finally {
       setIsLoading(false);
     }
@@ -377,7 +374,6 @@ const EditTaskPage = () => {
         setTeamMembers(data.results || []);
       }
     } catch (error) {
-      console.error('Error fetching team members:', error);
     }
   };
 
@@ -408,7 +404,6 @@ const EditTaskPage = () => {
       setTeamMemberTotalPages(Math.max(1, Math.ceil(totalResults / limit)));
       setTeamMemberCurrentPage(page);
     } catch (err) {
-      console.error('Error fetching team members:', err);
       toast.error('Failed to fetch team members');
     } finally {
       setIsLoadingTeamMembers(false);
@@ -427,7 +422,6 @@ const EditTaskPage = () => {
         setBranches(data.results || []);
       }
     } catch (error) {
-      console.error('Error fetching branches:', error);
     }
   };
 
@@ -444,7 +438,6 @@ const EditTaskPage = () => {
         setActivities(data.results || []);
       }
     } catch (error) {
-      console.error('Error fetching activities:', error);
       toast.error('Failed to fetch activities');
     } finally {
       setIsLoadingActivities(false);
@@ -464,7 +457,6 @@ const EditTaskPage = () => {
         setGroups(data.results || []);
       }
     } catch (error) {
-      console.error('Error fetching groups:', error);
       toast.error('Failed to fetch groups');
     } finally {
       setIsLoadingGroups(false);
@@ -524,7 +516,6 @@ const EditTaskPage = () => {
       setTimelineTotalPages(data.totalPages || 1);
       setTimelineCurrentPage(page);
     } catch (err) {
-      console.error('Error fetching timelines:', err);
       toast.error('Failed to fetch timelines');
     } finally {
       setIsLoadingTimelines(false);
@@ -716,7 +707,6 @@ const EditTaskPage = () => {
           setUploadProgress(prev => ({ ...prev, [file.name]: 50 }));
 
           const uploadResult = await response.json();
-          console.log('Upload response from /common/upload:', uploadResult);
           
           // Extract file data from the response
           const fileData = uploadResult.data || uploadResult;
@@ -732,7 +722,6 @@ const EditTaskPage = () => {
 
           return attachmentData;
         } catch (error) {
-          console.error(`Error uploading ${file.name}:`, error);
           toast.error(`Failed to upload ${file.name}`);
           return null;
         }
@@ -762,7 +751,6 @@ const EditTaskPage = () => {
       setUploadProgress({});
       toast.success(`Successfully uploaded ${successfulUploads.length} file(s)`);
     } catch (error) {
-      console.error('Error during upload:', error);
       toast.error('Failed to upload files');
     } finally {
       setIsUploading(false);
@@ -842,11 +830,6 @@ const EditTaskPage = () => {
         delete cleanFormData.metadata;
         delete cleanFormData.attachments;
       }
-
-      // Debug log to verify clean data
-      console.log('Original formData attachments:', formData.attachments);
-      console.log('Clean attachments:', cleanAttachments);
-      console.log('Clean form data being sent:', cleanFormData);
 
       const response = await fetch(`${Base_url}tasks/${taskId}`, {
         method: 'PATCH',

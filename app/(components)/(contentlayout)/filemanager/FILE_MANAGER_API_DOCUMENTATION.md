@@ -815,7 +815,6 @@ const FileUpload = () => {
         }
       }
     } catch (error) {
-      console.error('Upload failed:', error);
     } finally {
       setUploading(false);
     }
@@ -868,7 +867,6 @@ const FolderManager = () => {
       const result = await response.json();
       setFolders(result.results);
     } catch (error) {
-      console.error('Failed to fetch folders:', error);
     } finally {
       setLoading(false);
     }
@@ -896,7 +894,6 @@ const FolderManager = () => {
         fetchRootFolders(); // Refresh the list
       }
     } catch (error) {
-      console.error('Failed to create folder:', error);
     }
   };
 
@@ -915,7 +912,6 @@ const FolderManager = () => {
         fetchRootFolders(); // Refresh the list
       }
     } catch (error) {
-      console.error('Failed to delete folder:', error);
     }
   };
 

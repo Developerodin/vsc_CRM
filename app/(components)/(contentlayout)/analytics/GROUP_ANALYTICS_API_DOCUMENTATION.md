@@ -358,7 +358,6 @@ const response = await fetch('http://localhost:4000 /groups/analytics', {
   }
 });
 const data = await response.json();
-console.log(data);
 
 // Get specific group analytics
 const groupId = '675a1b2c3d4e5f6g7h8i9j0k';
@@ -370,6 +369,5 @@ const groupResponse = await fetch(`http://localhost:4000 /groups/${groupId}/anal
   }
 });
 const groupData = await groupResponse.json();
-console.log(groupData);
 ```
 

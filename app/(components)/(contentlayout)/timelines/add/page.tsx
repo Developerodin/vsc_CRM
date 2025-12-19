@@ -127,7 +127,6 @@ const AddTimelinePage = () => {
       const data = await response.json();
       setActivities(data.results);
     } catch (error) {
-      console.error('Error fetching activities:', error);
       toast.error('Failed to fetch activities');
     }
   };
@@ -148,7 +147,6 @@ const AddTimelinePage = () => {
       const data = await response.json();
       setGroups(data.results);
     } catch (error) {
-      console.error('Error fetching groups:', error);
       toast.error('Failed to fetch groups');
     }
   };
@@ -164,7 +162,6 @@ const AddTimelinePage = () => {
           fetchGroups()
         ]);
       } catch (error) {
-        console.error('Error loading data:', error);
       }
     };
 
@@ -278,7 +275,6 @@ const AddTimelinePage = () => {
       setClientTotalResults(clientsData.totalResults || 0);
       setClientTotalPages(clientsData.totalPages || 1);
     } catch (err) {
-      console.error('Error fetching clients:', err);
       toast.error('Failed to fetch clients');
       setAvailableClients([]);
       setClientTotalResults(0);
@@ -596,10 +592,6 @@ const AddTimelinePage = () => {
       // Remove empty fields from request body
       const cleanedFormData = removeEmptyFields(requestBody);
 
-      console.log('Request body before cleaning:', requestBody);
-      console.log('Cleaned Form Data being sent to API:', cleanedFormData);
-      console.log('Request body (stringified):', JSON.stringify(cleanedFormData));
-
       const response = await fetch(`${Base_url}timelines`, {
         method: 'POST',
         headers: {
@@ -609,18 +601,12 @@ const AddTimelinePage = () => {
         body: JSON.stringify(cleanedFormData)
       });
 
-      console.log('API Response status:', response.status);
-      console.log('API Response ok:', response.ok);
-
       if (!response.ok) {
         const errorData = await response.text();
-        console.log('API Error response:', errorData);
         try {
           const errorJson = JSON.parse(errorData);
-          console.log('API Error JSON:', errorJson);
           throw new Error(errorJson.message || 'Failed to create timeline');
         } catch (parseError) {
-          console.log('Failed to parse error response as JSON');
           throw new Error(`Failed to create timeline: ${response.status} - ${errorData}`);
         }
       }
@@ -628,7 +614,6 @@ const AddTimelinePage = () => {
       toast.success(`Timeline(s) created successfully for ${formData.clientId.length} client(s)`);
       router.push('/timelines');
     } catch (err) {
-      console.error('Error creating timeline:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to create timeline');
     } finally {
       setIsLoading(false);

@@ -249,7 +249,6 @@ const FileUpload = () => {
         setUploadedFile(result.data);
       }
     } catch (error) {
-      console.error('Upload failed:', error);
     } finally {
       setUploading(false);
     }
@@ -270,7 +269,6 @@ const FileUpload = () => {
         setUploadedFile(null);
       }
     } catch (error) {
-      console.error('Delete failed:', error);
     }
   };
 

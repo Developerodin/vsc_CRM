@@ -68,7 +68,6 @@ const AnalyticsTeamMembersPage = () => {
       setTotalResults(data.data.totalResults);
       setTotalPages(data.data.totalPages);
     } catch (err) {
-      console.error('Error fetching team members:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch team members');
       toast.error('Failed to fetch team members');
     } finally {
@@ -192,7 +191,6 @@ const AnalyticsTeamMembersPage = () => {
       XLSX.writeFile(wb, fileName);
       toast.success("Analytics team members data exported successfully");
     } catch (error) {
-      console.error("Error exporting analytics team members:", error);
       toast.error("Failed to export analytics team members");
     }
   };

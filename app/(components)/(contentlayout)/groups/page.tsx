@@ -161,7 +161,6 @@ const GroupsPage = () => {
         setTotalClients(allClientIds.size);
       }
     } catch (error) {
-      console.error('Error fetching total clients:', error);
       // Calculate from current groups if API fails
       const allClientIds = new Set<string>();
       groups.forEach(group => {
@@ -191,8 +190,6 @@ const GroupsPage = () => {
         ...(filters.name && { name: filters.name }),
       });
 
-      console.log('Fetching task statistics with query params:', queryParams.toString());
-
       const response = await fetch(`${Base_url}groups/task-statistics?${queryParams}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -204,7 +201,6 @@ const GroupsPage = () => {
       }
 
       const data: TaskStatisticsResponse = await response.json();
-      console.log('Task statistics API response:', data);
       
       // Create a map of groupId to taskStatistics
       const statsMap = new Map<string, any>();
@@ -212,10 +208,8 @@ const GroupsPage = () => {
         statsMap.set(item.groupId, item.taskStatistics);
       });
 
-      console.log('Task statistics map created:', statsMap);
       return statsMap;
     } catch (error) {
-      console.error('Error fetching task statistics:', error);
       toast.error('Failed to fetch task statistics');
       // Return empty map on error
       return new Map();
@@ -233,8 +227,6 @@ const GroupsPage = () => {
         sortBy,
         ...(filters.name && { name: filters.name }),
       });
-
-      console.log('Fetching groups with query params:', queryParams.toString());
 
       const response = await fetch(`${Base_url}groups?${queryParams}`, {
         headers: {
@@ -308,7 +300,6 @@ const GroupsPage = () => {
         setTotalPages(data.totalPages);
       }
     } catch (err) {
-      console.error('Error fetching groups:', err);
       setError('Failed to fetch groups');
     } finally {
       setIsLoading(false);
@@ -421,7 +412,6 @@ const GroupsPage = () => {
       toast.success('Group deleted successfully');
       fetchGroups();
     } catch (err) {
-      console.error('Error deleting group:', err);
       toast.error('Failed to delete group');
     }
   };
@@ -446,7 +436,6 @@ const GroupsPage = () => {
       setSelectedGroups([]);
       fetchGroups();
     } catch (err) {
-      console.error('Error deleting groups:', err);
       toast.error('Failed to delete groups');
     }
   };
@@ -541,7 +530,6 @@ const GroupsPage = () => {
       XLSX.writeFile(wb, fileName);
       toast.success(successMessage);
     } catch (error) {
-      console.error("Error exporting groups:", error);
       toast.error("Failed to export groups");
     }
   };
@@ -644,14 +632,12 @@ const GroupsPage = () => {
 
         if (result.errors && result.errors.length > 0) {
           toast.error(`Import completed with ${result.errors.length} errors`);
-          console.log('Import errors:', result.errors);
         } else {
           toast.success(`Import completed: ${result.created} added, ${result.updated} updated`);
         }
 
         fetchGroups(); // Refresh the groups list
       } catch (err) {
-        console.error('Error processing file:', err);
         toast.error('Failed to process file');
       } finally {
         setImportProgress(null);
@@ -660,7 +646,6 @@ const GroupsPage = () => {
 
     reader.readAsArrayBuffer(file);
   } catch (err) {
-    console.error('Error reading file:', err);
     toast.error('Failed to read file');
   }
 };
@@ -673,8 +658,6 @@ const GroupsPage = () => {
         limit: "10",
         ...(clientSearchQuery && { search: clientSearchQuery })
       });
-
-      console.log('Fetching clients with query params:', queryParams.toString());
 
       // First get the group details to get the clients
       const groupResponse = await fetch(`${Base_url}groups/${groupId}`, {
@@ -722,7 +705,6 @@ const GroupsPage = () => {
         setClientTotalPages(clientsData.totalPages || 1);
       }
     } catch (err) {
-      console.error('Error fetching clients:', err);
       toast.error('Failed to fetch clients');
       setAvailableClients([]);
       setClientTotalResults(0);
@@ -768,7 +750,6 @@ const GroupsPage = () => {
       fetchAvailableClients(selectedGroup.id);
       fetchGroups(); // Refresh groups list to update client count
     } catch (err) {
-      console.error('Error adding client to group:', err);
       toast.error('Failed to add client to group');
     }
   };
@@ -792,7 +773,6 @@ const GroupsPage = () => {
       fetchAvailableClients(selectedGroup.id);
       fetchGroups(); // Refresh groups list to update client count
     } catch (err) {
-      console.error('Error removing client from group:', err);
       toast.error('Failed to remove client from group');
     }
   };
@@ -894,8 +874,6 @@ const GroupsPage = () => {
 
   // Handle advanced filter changes
   const handleAdvancedFilterChange = (key: keyof AdvancedFilters, value: string | TaskStatus) => {
-    console.log(`Advanced filter changed: ${key} = ${value}`);
-    
     // Update the filter
     updateFilter(key, value);
     setCurrentPage(1); // Reset to first page when filters change
@@ -908,7 +886,6 @@ const GroupsPage = () => {
 
   // Handle task status filter changes - Commented out
   // const handleTaskStatusFilterChange = (status: keyof TaskStatus, value: boolean) => {
-  //   console.log(`Task status filter changed: ${status} = ${value}`);
   //   updateTaskStatusFilter(status, value);
   //   setCurrentPage(1); // Reset to first page when filters change
   //   

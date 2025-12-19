@@ -270,17 +270,11 @@ const TeamMemberOverviewPage = () => {
         }
       });
       
-      console.log('Team member overview API response:', response.data);
-      
       const result: TeamMemberOverviewResponse = response.data;
-      console.log('Parsed result:', result);
-      console.log('Team member data:', result.data?.teamMember);
-      console.log('Skills data:', result.data?.teamMember?.skills);
       
       setOverviewData(result.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch team member overview');
-      console.error('Error fetching team member overview:', err);
     } finally {
       setLoading(false);
     }
@@ -369,16 +363,8 @@ const TeamMemberOverviewPage = () => {
 
   const { teamMember, performance, currentMonth, tasks, clients } = overviewData;
   
-  // Debug logging
-  console.log('Rendering with teamMember:', teamMember);
-  console.log('Skills type:', typeof teamMember.skills);
-  console.log('Skills value:', teamMember.skills);
-  console.log('Tasks data:', tasks);
-  console.log('Clients data:', clients);
-  
   // Safety check for data
   if (!tasks || !clients) {
-    console.error('Missing tasks or clients data');
     return (
       <div className="main-content">
         <Seo title="Team Member Overview" />

@@ -162,7 +162,6 @@ const AddTaskPage = () => {
         setTeamMembers(data.results || []);
       }
     } catch (error) {
-      console.error('Error fetching team members:', error);
     }
   };
 
@@ -176,8 +175,6 @@ const AddTaskPage = () => {
         ...((searchQueryParam || teamMemberSearchQuery) && { search: searchQueryParam || teamMemberSearchQuery })
       });
 
-      console.log('Fetching team members with query params:', queryParams.toString());
-
       const response = await fetch(`${Base_url}team-members?${queryParams}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -189,7 +186,6 @@ const AddTaskPage = () => {
       }
 
       const data = await response.json();
-      console.log('Team members API response:', data);
       
       setAllTeamMembers(data.results || []);
       const totalResults = data.totalResults || 0;
@@ -197,7 +193,6 @@ const AddTaskPage = () => {
       setTeamMemberTotalPages(Math.max(1, Math.ceil(totalResults / limit)));
       setTeamMemberCurrentPage(page);
     } catch (err) {
-      console.error('Error fetching team members:', err);
       toast.error('Failed to fetch team members');
     } finally {
       setIsLoadingTeamMembers(false);
@@ -216,7 +211,6 @@ const AddTaskPage = () => {
         setBranches(data.results || []);
       }
     } catch (error) {
-      console.error('Error fetching branches:', error);
     }
   };
 
@@ -233,7 +227,6 @@ const AddTaskPage = () => {
         setActivities(data.results || []);
       }
     } catch (error) {
-      console.error('Error fetching activities:', error);
     } finally {
       setIsLoadingActivities(false);
     }
@@ -249,11 +242,9 @@ const AddTaskPage = () => {
       });
       if (response.ok) {
         const data = await response.json();
-        console.log('Groups data loaded:', data.results);
         setGroups(data.results || []);
       }
     } catch (error) {
-      console.error('Error fetching groups:', error);
     } finally {
       setIsLoadingGroups(false);
     }
@@ -321,7 +312,6 @@ const AddTaskPage = () => {
       setTimelineTotalPages(data.totalPages || 1);
       setTimelineCurrentPage(page);
     } catch (err) {
-      console.error('Error fetching timelines:', err);
       toast.error('Failed to fetch timelines');
     } finally {
       setIsLoadingTimelines(false);
@@ -503,7 +493,6 @@ const AddTaskPage = () => {
 
   const handleTeamMemberSearchClick = () => {
     if (showTeamMemberModal) {
-      console.log('Team member search clicked:', teamMemberSearchQuery);
       setTeamMemberCurrentPage(1);
       fetchTeamMembersModal(1, teamMemberSearchQuery);
     }
@@ -521,7 +510,6 @@ const AddTaskPage = () => {
       return (searchQuery: string) => {
         clearTimeout(timeoutId);
         timeoutId = setTimeout(() => {
-          console.log('Debounced team member search triggered:', searchQuery);
           setTeamMemberCurrentPage(1);
           fetchTeamMembersModal(1, searchQuery);
         }, 500);
@@ -578,7 +566,6 @@ const AddTaskPage = () => {
           setUploadProgress(prev => ({ ...prev, [file.name]: 50 }));
 
           const uploadResult = await response.json();
-          console.log('Upload response from /common/upload:', uploadResult);
           
           // Extract file data from the response
           const fileData = uploadResult.data || uploadResult;
@@ -593,7 +580,6 @@ const AddTaskPage = () => {
 
           return attachmentData;
         } catch (error) {
-          console.error(`Error uploading ${file.name}:`, error);
           toast.error(`Failed to upload ${file.name}`);
           return null;
         }
@@ -616,7 +602,6 @@ const AddTaskPage = () => {
       setUploadProgress({});
       toast.success(`Successfully uploaded ${successfulUploads.length} file(s)`);
     } catch (error) {
-      console.error('Error during upload:', error);
       toast.error('Failed to upload files');
     } finally {
       setIsUploading(false);

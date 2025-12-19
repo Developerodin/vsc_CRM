@@ -343,7 +343,6 @@ const AnalyticsPage = () => {
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && showClientsModal) {
-        console.log('Closing modal with escape key');
         setShowClientsModal(false);
         setSelectedMemberForClients(null);
       }
@@ -370,7 +369,6 @@ const AnalyticsPage = () => {
       setDashboardData(result.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
-      console.error('Error fetching dashboard data:', err);
     } finally {
       setLoading(false);
     }
@@ -387,7 +385,6 @@ const AnalyticsPage = () => {
       const result: CompletionTrendsResponse = response.data;
       setCompletionTrends(result.data);
     } catch (err) {
-      console.error('Error fetching completion trends:', err);
     } finally {
       setTrendsLoading(false);
     }
@@ -414,7 +411,6 @@ const AnalyticsPage = () => {
       const result: TopByCompletionResponse = response.data;
       setTopByCompletion(result.data);
     } catch (err) {
-      console.error('Error fetching top by completion:', err);
     } finally {
       setTopCompletionLoading(false);
     }
@@ -437,7 +433,6 @@ const AnalyticsPage = () => {
       const result: TopByBranchResponse = response.data;
       setTopByBranch(result.data);
     } catch (err) {
-      console.error('Error fetching top by branch:', err);
     } finally {
       setTopBranchLoading(false);
     }
@@ -452,8 +447,6 @@ const AnalyticsPage = () => {
         }
       });
       
-      console.log('Global team members API response:', response.data);
-      
       // The API returns data in response.data.results, not response.data.data
       const apiData = response.data;
       const transformedData = {
@@ -463,10 +456,8 @@ const AnalyticsPage = () => {
         limit: apiData.data?.limit || 5
       };
       
-      console.log('Transformed data:', transformedData);
       setGlobalTeamMembers(transformedData);
     } catch (err) {
-      console.error('Error fetching global team members:', err);
     } finally {
       setGlobalTeamLoading(false);
     }
@@ -481,10 +472,8 @@ const AnalyticsPage = () => {
         }
       });
       
-      console.log('Clients API response:', response.data);
       setClients(response.data.data?.results || []);
     } catch (err) {
-      console.error('Error fetching clients:', err);
     } finally {
       setClientsLoading(false);
     }
@@ -499,10 +488,8 @@ const AnalyticsPage = () => {
         }
       });
       
-      console.log('Groups API response:', response.data);
       setGroups(response.data.groups || []);
     } catch (err) {
-      console.error('Error fetching groups:', err);
     } finally {
       setGroupsLoading(false);
     }
@@ -1421,8 +1408,6 @@ const AnalyticsPage = () => {
                     <td className="px-4 py-3 whitespace-nowrap">
                       <button
                         onClick={() => {
-                          console.log('Opening clients modal for member:', member.name);
-                          console.log('Member clients data:', member.clients);
                           setSelectedMemberForClients(member);
                           setShowClientsModal(true);
                         }}
@@ -1718,7 +1703,6 @@ const AnalyticsPage = () => {
          <div 
            className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-[9999]"
            onClick={() => {
-             console.log('Closing modal by clicking outside');
              setShowClientsModal(false);
              setSelectedMemberForClients(null);
            }}
@@ -1734,7 +1718,6 @@ const AnalyticsPage = () => {
                  </h3>
                  <button
                    onClick={() => {
-                     console.log('Closing clients modal from close button');
                      setShowClientsModal(false);
                      setSelectedMemberForClients(null);
                    }}
@@ -1782,7 +1765,6 @@ const AnalyticsPage = () => {
                <div className="mt-4 flex justify-end">
                  <button
                    onClick={() => {
-                     console.log('Closing clients modal from close button');
                      setShowClientsModal(false);
                      setSelectedMemberForClients(null);
                    }}

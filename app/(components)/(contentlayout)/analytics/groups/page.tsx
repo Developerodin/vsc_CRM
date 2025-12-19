@@ -103,7 +103,6 @@ const AnalyticsGroupsPage = () => {
         setSummary(data.summary || null);
       }
     } catch (err) {
-      console.error('Error fetching groups:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch groups');
       toast.error('Failed to fetch groups');
     } finally {
@@ -122,7 +121,6 @@ const AnalyticsGroupsPage = () => {
         setBranches(response.data.data);
       }
     } catch (err) {
-      console.error('Error fetching branches:', err);
     }
   };
 
@@ -202,7 +200,6 @@ const AnalyticsGroupsPage = () => {
       XLSX.writeFile(wb, fileName);
       toast.success("Analytics groups data exported successfully");
     } catch (error) {
-      console.error("Error exporting analytics groups:", error);
       toast.error("Failed to export analytics groups");
     }
   };

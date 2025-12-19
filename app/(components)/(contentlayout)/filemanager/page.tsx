@@ -136,8 +136,6 @@ const Filemanager = () => {
                 ]
             };
 
-            console.log('Sending email with data:', requestBody);
-
             const response = await fetch(`${Base_url}common-email/send-with-attachments`, {
                 method: 'POST',
                 headers: {
@@ -146,20 +144,14 @@ const Filemanager = () => {
                 body: JSON.stringify(requestBody)
             });
 
-            console.log('Response status:', response.status);
-            console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error('API Error Response:', errorText);
                 throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
             }
 
             const result = await response.json();
-            console.log('Email sent successfully:', result);
             return result;
         } catch (error) {
-            console.error('Failed to send email:', error);
             throw error;
         }
     };
@@ -399,11 +391,6 @@ const Filemanager = () => {
         // Ensure folderContents is always an array
         let files = Array.isArray(folderContents) ? folderContents : [];
         
-        // Debug: Log the structure of items
-        if (files.length > 0) {
-            console.log('File contents structure:=>>', files[0]);
-        }
-        
         // Filter out invalid items (files with null file data, folders with null folder data)
         // This handles cases where the API returns items with null data, which can happen
         // when files are deleted but not properly cleaned up from the database
@@ -477,7 +464,6 @@ const Filemanager = () => {
             }
             closeRenameModal();
         } catch (error) {
-            console.error('Failed to rename item:', error);
         }
     };
 
@@ -492,7 +478,6 @@ const Filemanager = () => {
             setNewFolderName('');
             setNewFolderDescription('');
         } catch (error) {
-            console.error('Failed to create folder:', error);
         }
     };
 
@@ -534,7 +519,6 @@ const Filemanager = () => {
             setShowUploadModal(false);
             setUploadFiles([]);
         } catch (error) {
-            console.error('Failed to upload files:', error);
         }
     };
 
@@ -547,7 +531,6 @@ const Filemanager = () => {
                 await deleteMultipleItems(selectedIds);
                 setSelectedIds([]);
             } catch (error) {
-                console.error('Failed to delete items:', error);
             }
         }
     };
@@ -562,7 +545,6 @@ const Filemanager = () => {
                     await deleteFolder(item.id);
                 }
             } catch (error) {
-                console.error('Failed to delete item:', error);
             }
         }
     };
@@ -654,7 +636,6 @@ const Filemanager = () => {
                 totalResults: results.totalResults
             }));
         } catch (error) {
-            console.error('Failed to search clients:', error);
             setSearchModal(prev => ({ 
                 ...prev, 
                 loading: false, 
@@ -698,7 +679,6 @@ const Filemanager = () => {
     // Enhanced download function for single file
     const handleDownloadFile = (fileItem: FileItem) => {
         if (!fileItem.file?.fileUrl || !fileItem.file?.fileName) {
-            console.error('File URL or name is missing');
             return;
         }
 
@@ -724,10 +704,7 @@ const Filemanager = () => {
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            
-            console.log(`Downloading: ${fileItem.file.fileName} from ${link.href}`);
         } catch (error) {
-            console.error('Failed to download file:', error);
         }
     };
 
@@ -1107,7 +1084,6 @@ const Filemanager = () => {
                                                             prev.includes(item.id) ? prev.filter(i => i !== item.id) : [...prev, item.id]
                                                         );
                                                     }}
-                                                    onClick={() => console.log('Checkbox for', item.id, 'selectedIds:', selectedIds)}
                                                 />
 
                                                 {/* Icon */}
@@ -1559,7 +1535,6 @@ const Filemanager = () => {
                                                 })
                                                 .catch(error => {
                                                     showToast('error', `Failed to send email: ${error.message}`);
-                                                    console.error('Email sending failed:', error);
                                                     setEmailModal(prev => ({ ...prev, loading: false }));
                                                 });
                                         }}

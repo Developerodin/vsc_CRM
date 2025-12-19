@@ -79,7 +79,6 @@ const EditGroupPage = ({ params }: { params: { id: string } }) => {
         });
         setSelectedClients(data.clients);
       } catch (err) {
-        console.error('Error fetching group:', err);
         toast.error('Failed to fetch group details');
         router.push('/groups');
       } finally {
@@ -117,7 +116,6 @@ const EditGroupPage = ({ params }: { params: { id: string } }) => {
       setTotalPages(Math.max(1, Math.ceil(totalResults / limit)));
       setCurrentPage(page);
     } catch (err) {
-      console.error('Error fetching clients:', err);
       toast.error('Failed to fetch clients');
     } finally {
       setIsLoadingClients(false);
@@ -197,7 +195,6 @@ const EditGroupPage = ({ params }: { params: { id: string } }) => {
       toast.success('Group updated successfully');
       router.push('/groups');
     } catch (err) {
-      console.error('Error updating group:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to update group');
     } finally {
       setIsSaving(false);

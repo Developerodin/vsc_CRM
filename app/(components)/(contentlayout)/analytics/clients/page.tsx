@@ -179,7 +179,6 @@ const AnalyticsClientsPage = () => {
       setTotalResults(data.data.totalResults);
       setTotalPages(data.data.totalPages);
     } catch (err) {
-      console.error('Error fetching clients:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch clients');
       toast.error('Failed to fetch clients');
     } finally {
@@ -352,7 +351,6 @@ const AnalyticsClientsPage = () => {
       XLSX.writeFile(wb, fileName);
       toast.success("Analytics clients data exported successfully");
     } catch (error) {
-      console.error("Error exporting analytics clients:", error);
       toast.error("Failed to export analytics clients");
     }
   };

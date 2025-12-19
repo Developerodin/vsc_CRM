@@ -95,7 +95,6 @@ const ClientOverviewPage = () => {
       queryParams.append('limit', pagination.limit.toString());
       
       const url = `${Base_url}analytics/clients/${clientId}/overview?${queryParams.toString()}`;
-      console.log('API URL:', url);
       
       const response = await axios.get(url, {
         headers: {
@@ -103,7 +102,6 @@ const ClientOverviewPage = () => {
         }
       });
       
-      console.log('Client overview API response:', response.data);
       setClientData(response.data.data);
       
       // Update filtered tasks and pagination from API response
@@ -117,7 +115,6 @@ const ClientOverviewPage = () => {
         });
       }
     } catch (err) {
-      console.error('Error fetching client overview:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch client overview');
     } finally {
       setLoading(false);
@@ -157,7 +154,6 @@ const ClientOverviewPage = () => {
       queryParams.append('limit', pagination.limit.toString());
       
       const url = `${Base_url}analytics/clients/${clientId}/overview?${queryParams.toString()}`;
-      console.log('Applying filters:', url);
       
       const response = await axios.get(url, {
         headers: {
@@ -176,7 +172,6 @@ const ClientOverviewPage = () => {
         });
       }
     } catch (err) {
-      console.error('Error applying filters:', err);
       // Don't show error for filter updates to prevent page refresh
     } finally {
       setIsApplyingFilters(false);

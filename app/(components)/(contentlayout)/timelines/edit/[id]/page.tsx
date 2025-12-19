@@ -201,7 +201,6 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
       const data = await response.json();
       setActivities(data.results);
     } catch (error) {
-      console.error('Error fetching activities:', error);
       toast.error('Failed to fetch activities');
     }
   };
@@ -222,7 +221,6 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
       const data = await response.json();
       setGroups(data.results);
     } catch (error) {
-      console.error('Error fetching groups:', error);
       toast.error('Failed to fetch groups');
     }
   };
@@ -254,9 +252,6 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
 
         const timelineData: Timeline = await response.json();
 
-        console.log('Timeline Data:', timelineData);
-        console.log('Branch from API:', timelineData.branch);
-
         setFormData({
           activityId: timelineData.activity?.id || '',
           groupId: '',
@@ -285,13 +280,7 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
           endDate: formatDateForInput(timelineData.endDate),
           completedAt: formatDateForInput(timelineData.completedAt)
         });
-
-        console.log('Form Data after setting:', {
-          activityId: timelineData.activity.id,
-          branch: timelineData.branch || '',
-        });
       } catch (error) {
-        console.error('Error fetching timeline data:', error);
         toast.error('Failed to load timeline data');
         router.push('/timelines');
       } finally {
@@ -303,12 +292,6 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
       fetchTimelineData();
     }
   }, [params.id, router]);
-
-  // Debug useEffect to monitor formData changes
-  useEffect(() => {
-    console.log('FormData changed:', formData);
-    console.log('Current branch value:', formData.branch);
-  }, [formData]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -414,7 +397,6 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
       setClientTotalResults(clientsData.totalResults || 0);
       setClientTotalPages(clientsData.totalPages || 1);
     } catch (err) {
-      console.error('Error fetching clients:', err);
       toast.error('Failed to fetch clients');
       setAvailableClients([]);
       setClientTotalResults(0);
@@ -624,7 +606,6 @@ const EditTimelinePage = ({ params }: { params: { id: string } }) => {
       toast.success('Timeline updated successfully');
       router.push('/timelines');
     } catch (err) {
-      console.error('Error updating timeline:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to update timeline');
     } finally {
       setIsLoading(false);
