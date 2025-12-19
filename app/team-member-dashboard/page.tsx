@@ -1796,8 +1796,8 @@ const TeamMemberDashboard = () => {
             </div>
 
             <div className="p-4 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-              {/* Activity and Group Filters */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              {/* Activity Filter */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 {/* Activity Filter */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -1817,32 +1817,13 @@ const TeamMemberDashboard = () => {
                   </select>
                 </div>
 
-                {/* Group Filter */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Filter by Group
-                  </label>
-                  <select
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    value={selectedGroup}
-                    onChange={(e) => handleGroupFilterChange(e.target.value)}
-                  >
-                    <option value="">All Groups</option>
-                    {groups.map((group) => (
-                      <option key={group.id} value={group.id}>
-                        {group.name} ({group.numberOfClients} clients)
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
                 {/* Clear Filters Button */}
                 <div className="flex items-end">
                   <button
                     type="button"
                     onClick={clearTimelineFilters}
                     className="w-full px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm"
-                    disabled={!selectedActivity && !selectedGroup && !timelineSearchQuery}
+                    disabled={!selectedActivity && !timelineSearchQuery}
                   >
                     <i className="ri-refresh-line mr-2"></i>
                     Clear Filters
@@ -1880,7 +1861,7 @@ const TeamMemberDashboard = () => {
 
             <div className="flex-1 overflow-auto p-4">
               {/* Active Filters Summary */}
-              {(selectedActivity || selectedGroup) && (
+              {selectedActivity && (
                 <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
@@ -1888,11 +1869,6 @@ const TeamMemberDashboard = () => {
                       {selectedActivity && (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200">
                           Activity: {activities.find(a => a.id === selectedActivity)?.name}
-                        </span>
-                      )}
-                      {selectedGroup && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200">
-                          Group: {groups.find(g => g.id === selectedGroup)?.name}
                         </span>
                       )}
                     </div>
@@ -1945,12 +1921,12 @@ const TeamMemberDashboard = () => {
                                 No timelines found
                               </h3>
                               <p className="text-gray-500 dark:text-gray-400 text-center mb-4">
-                                {selectedActivity || selectedGroup 
+                                {selectedActivity 
                                   ? "Try adjusting your filters or search criteria."
                                   : "No timelines available at the moment."
                                 }
                               </p>
-                              {(selectedActivity || selectedGroup) && (
+                              {selectedActivity && (
                                 <button
                                   onClick={clearTimelineFilters}
                                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
