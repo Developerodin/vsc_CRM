@@ -122,10 +122,13 @@ const TeamMemberDashboard = () => {
   // Task filters and pagination
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(10)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalResults, setTotalResults] = useState(0)
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [priorityFilter, setPriorityFilter] = useState<string>('all')
   const [startDateFilter, setStartDateFilter] = useState<string>('')
   const [endDateFilter, setEndDateFilter] = useState<string>('')
+  const [teamMemberFilter, setTeamMemberFilter] = useState<string>('all')
   const [viewAccessibleTasks, setViewAccessibleTasks] = useState(false)
   
   // Task update modal
@@ -231,7 +234,13 @@ const TeamMemberDashboard = () => {
       
       // Extract accessible team members from the profile
       if (teamMember.accessibleTeamMembers && Array.isArray(teamMember.accessibleTeamMembers)) {
-        const accessibleMembers = teamMember.accessibleTeamMembers.map((tm: any) => ({
+        const accessibleMembers: Array<{
+          _id?: string
+          id?: string
+          name: string
+          email: string
+          phone?: string
+        }> = teamMember.accessibleTeamMembers.map((tm: any) => ({
           _id: tm._id || tm.id,
           id: tm.id || tm._id,
           name: tm.name || '',
@@ -241,7 +250,7 @@ const TeamMemberDashboard = () => {
         setAccessibleTeamMembers(accessibleMembers)
         
         // If any members are missing name/email (just IDs), fetch full profile
-        const needsFetch = accessibleMembers.some(m => !m.name || !m.email)
+        const needsFetch = accessibleMembers.some((m: { _id?: string; id?: string; name: string; email: string; phone?: string }) => !m.name || !m.email)
         if (needsFetch && token) {
           fetchAccessibleTeamMembersFromProfile(token)
         }
@@ -454,6 +463,11 @@ const TeamMemberDashboard = () => {
       if (startDateFilter) params.append('startDate', startDateFilter)
       if (endDateFilter) params.append('endDate', endDateFilter)
       
+      // Add team member filter for accessible team members tasks
+      if (viewAccessibleTasks && accessibleTeamMembers.length > 0 && teamMemberFilter !== 'all') {
+        params.append('teamMember', teamMemberFilter)
+      }
+      
       // Use accessible team members endpoint if enabled and there are accessible team members
       const apiUrl = (viewAccessibleTasks && accessibleTeamMembers.length > 0)
         ? `${Base_url}team-member-auth/tasks/accessible-team-members?${params}`
@@ -481,15 +495,25 @@ const TeamMemberDashboard = () => {
       
       if (response.data.success) {
         // Handle both response formats
-        const taskData = response.data.data || response.data
         let tasksList: Task[] = []
         
-        if (taskData.tasks) {
-          // Own tasks format
-          tasksList = taskData.tasks
-        } else if (taskData.results) {
-          // Accessible team members tasks format
-          tasksList = taskData.results
+        // Check if response.data.data is an array (accessible-team-members format)
+        if (Array.isArray(response.data.data)) {
+          tasksList = response.data.data
+        } else {
+          // Handle nested data structure
+          const taskData = response.data.data || response.data
+          
+          if (taskData.tasks) {
+            // Own tasks format
+            tasksList = taskData.tasks
+          } else if (taskData.results) {
+            // Accessible team members tasks format
+            tasksList = taskData.results
+          } else if (Array.isArray(taskData)) {
+            // If taskData itself is an array
+            tasksList = taskData
+          }
         }
         
         // Normalize task IDs and ensure timeline is handled correctly
@@ -501,6 +525,44 @@ const TeamMemberDashboard = () => {
         }))
         
         setTasks(normalizedTasks)
+        
+        // Extract pagination data - check multiple possible locations
+        // Priority: response.data root level > response.data.pagination > taskData.pagination > taskData root
+        if (response.data.totalPages !== undefined || response.data.totalResults !== undefined) {
+          // Pagination at root level of response.data (for accessible-team-members endpoint)
+          setTotalPages(response.data.totalPages || 1)
+          setTotalResults(response.data.totalResults || 0)
+          setCurrentPage(response.data.page || currentPage)
+        } else if (response.data.pagination) {
+          // Pagination nested in response.data
+          setTotalPages(response.data.pagination.totalPages || 1)
+          setTotalResults(response.data.pagination.totalResults || response.data.pagination.totalTasks || 0)
+          setCurrentPage(response.data.pagination.page || currentPage)
+        } else {
+          // Check in taskData if it exists and is an object
+          const taskData = response.data.data || response.data
+          if (taskData && typeof taskData === 'object' && !Array.isArray(taskData)) {
+            if (taskData.pagination) {
+              // Pagination nested in data object
+              setTotalPages(taskData.pagination.totalPages || 1)
+              setTotalResults(taskData.pagination.totalResults || taskData.pagination.totalTasks || 0)
+              setCurrentPage(taskData.pagination.page || currentPage)
+            } else if (taskData.totalPages !== undefined || taskData.totalResults !== undefined) {
+              // Pagination at root level of taskData
+              setTotalPages(taskData.totalPages || 1)
+              setTotalResults(taskData.totalResults || 0)
+              setCurrentPage(taskData.page || currentPage)
+            } else {
+              // Fallback: if no pagination data, assume single page
+              setTotalPages(1)
+              setTotalResults(normalizedTasks.length)
+            }
+          } else {
+            // Fallback: if no pagination data, assume single page
+            setTotalPages(1)
+            setTotalResults(normalizedTasks.length)
+          }
+        }
       }
     } catch (error: any) {
       console.error('Error fetching tasks:', error)
@@ -523,6 +585,17 @@ const TeamMemberDashboard = () => {
     } finally {
       setTasksLoading(false)
     }
+  }
+
+  const handleRefreshTasks = () => {
+    // Reset all filters
+    setStatusFilter('all')
+    setPriorityFilter('all')
+    setStartDateFilter('')
+    setEndDateFilter('')
+    setTeamMemberFilter('all')
+    setCurrentPage(1)
+    // fetchTasks will be called automatically by useEffect when filters change
   }
 
   const handleLogout = async () => {
@@ -847,15 +920,30 @@ const TeamMemberDashboard = () => {
   useEffect(() => {
     if (accessibleTeamMembers.length === 0) {
       setViewAccessibleTasks(false)
+      setTeamMemberFilter('all')
     }
   }, [accessibleTeamMembers.length])
 
-  // Refresh tasks when filters change
+  // Reset team member filter when switching to "My Tasks" view
+  useEffect(() => {
+    if (!viewAccessibleTasks) {
+      setTeamMemberFilter('all')
+    }
+  }, [viewAccessibleTasks])
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    if (teamMemberData && !loading) {
+      setCurrentPage(1)
+    }
+  }, [statusFilter, priorityFilter, startDateFilter, endDateFilter, teamMemberFilter, viewAccessibleTasks])
+
+  // Refresh tasks when filters or pagination change
   useEffect(() => {
     if (teamMemberData && !loading) {
       fetchTasks()
     }
-  }, [currentPage, itemsPerPage, statusFilter, priorityFilter, startDateFilter, endDateFilter, viewAccessibleTasks, teamMemberData, loading])
+  }, [currentPage, itemsPerPage, statusFilter, priorityFilter, startDateFilter, endDateFilter, teamMemberFilter, viewAccessibleTasks, teamMemberData, loading])
 
   if (loading || !teamMemberData) {
     return (
@@ -929,7 +1017,7 @@ const TeamMemberDashboard = () => {
                   {accessibleTeamMembers.length > 0 && viewAccessibleTasks ? 'Accessible Team Members\' Tasks' : 'My Tasks'}
                 </h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  {tasks.length > 0 ? `${tasks.length} task(s) found` : 'No tasks available'}
+                  {totalResults > 0 ? `${totalResults} task(s) found` : tasks.length > 0 ? `${tasks.length} task(s) found` : 'No tasks available'}
                 </p>
               </div>
               <div className="flex gap-2">
@@ -956,7 +1044,7 @@ const TeamMemberDashboard = () => {
                   </>
                 )}
                 <button
-                  onClick={fetchTasks}
+                  onClick={handleRefreshTasks}
                   disabled={tasksLoading}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 text-sm"
                 >
@@ -977,7 +1065,7 @@ const TeamMemberDashboard = () => {
             </div>
             
             {/* Filters */}
-            <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className={`mb-6 grid grid-cols-1 sm:grid-cols-2 ${viewAccessibleTasks && accessibleTeamMembers.length > 0 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-4`}>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
                 <select
@@ -1030,6 +1118,25 @@ const TeamMemberDashboard = () => {
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
+
+              {/* Team Member Filter - Only show when viewing accessible tasks */}
+              {viewAccessibleTasks && accessibleTeamMembers.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Team Member</label>
+                  <select
+                    value={teamMemberFilter}
+                    onChange={(e) => setTeamMemberFilter(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="all">All Team Members</option>
+                    {accessibleTeamMembers.map((member) => (
+                      <option key={member._id || member.id} value={member._id || member.id}>
+                        {member.name} ({member.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             {/* Delayed Tasks Warning */}
@@ -1190,6 +1297,54 @@ const TeamMemberDashboard = () => {
                 </div>
               )}
             </div>
+
+            {/* Pagination Controls */}
+            {tasks.length > 0 && (
+              <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center space-x-2">
+                  <div className="flex items-center">
+                    <label className="mr-2 text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">Rows per page:</label>
+                    <select
+                      className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      value={itemsPerPage}
+                      onChange={(e) => {
+                        const newItemsPerPage = Number(e.target.value)
+                        setItemsPerPage(newItemsPerPage)
+                        setCurrentPage(1)
+                      }}
+                    >
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setCurrentPage(Math.max(currentPage - 1, 1))}
+                    disabled={currentPage === 1 || tasksLoading}
+                    className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    {totalResults > 0 ? (
+                      `Showing ${(currentPage - 1) * itemsPerPage + 1} to ${Math.min(currentPage * itemsPerPage, totalResults)} of ${totalResults} entries`
+                    ) : (
+                      "No results"
+                    )}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(Math.min(currentPage + 1, totalPages))}
+                    disabled={currentPage === totalPages || totalPages === 0 || tasksLoading}
+                    className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
