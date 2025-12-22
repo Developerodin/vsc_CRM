@@ -78,16 +78,19 @@ export const useGroupFilters = () => {
 
   // Apply advanced filters to groups
   const applyAdvancedFilters = useCallback((groupsData: GroupWithTasks[]) => {
-    if (!hasActiveAdvancedFilters()) return groupsData;
+    // Note: clientName filter is now handled by the API, so we skip it here
+    const hasOtherFilters = !!(
+      advancedFilters.minTasks ||
+      advancedFilters.maxTasks ||
+      advancedFilters.minClients ||
+      advancedFilters.maxClients ||
+      Object.values(advancedFilters.taskStatus).some(Boolean)
+    );
+    
+    if (!hasOtherFilters) return groupsData;
 
     return groupsData.filter(group => {
-      // Filter by client name (search within group's clients)
-      if (advancedFilters.clientName) {
-        const hasMatchingClient = group.clients.some(client =>
-          client.name.toLowerCase().includes(advancedFilters.clientName.toLowerCase())
-        );
-        if (!hasMatchingClient) return false;
-      }
+      // Client name filtering is handled by the API, so skip it here
 
       // Filter by task count range - Commented out
       // if (advancedFilters.minTasks && group.taskStats.total < parseInt(advancedFilters.minTasks)) {

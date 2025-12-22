@@ -662,6 +662,13 @@ const TaskManagement = () => {
                 });
                 setCurrentPage(1);
               }}
+              onClick={(e) => {
+                const input = e.target as HTMLInputElement;
+                input.focus();
+                if (typeof input.showPicker === 'function') {
+                  input.showPicker();
+                }
+              }}
               max={filters.endDate || undefined}
               title="Start Date From"
               style={!filters.startDate ? { color: 'transparent' } : {}}
@@ -669,13 +676,6 @@ const TaskManagement = () => {
             {!filters.startDate && (
               <div 
                 className="absolute inset-0 flex items-center px-3 text-gray-500 bg-white cursor-pointer pointer-events-none"
-                onClick={(e) => {
-                  const input = e.currentTarget.previousElementSibling as HTMLInputElement;
-                  if (input) {
-                    input.focus();
-                    input.showPicker();
-                  }
-                }}
               >
                 <span className="text-xs sm:text-sm">Start Date</span>
               </div>
@@ -702,6 +702,15 @@ const TaskManagement = () => {
                 });
                 setCurrentPage(1);
               }}
+              onClick={(e) => {
+                if (filters.startDate) {
+                  const input = e.target as HTMLInputElement;
+                  input.focus();
+                  if (typeof input.showPicker === 'function') {
+                    input.showPicker();
+                  }
+                }
+              }}
               min={filters.startDate || undefined}
               disabled={!filters.startDate}
               title="End Date Until"
@@ -710,15 +719,6 @@ const TaskManagement = () => {
             {!filters.endDate && (
               <div 
                 className={`absolute inset-0 flex items-center px-3 text-gray-500 bg-white ${!filters.startDate ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'} pointer-events-none`}
-                onClick={(e) => {
-                  if (filters.startDate) {
-                    const input = e.currentTarget.previousElementSibling as HTMLInputElement;
-                    if (input) {
-                      input.focus();
-                      input.showPicker();
-                    }
-                  }
-                }}
               >
                 <span className="text-xs sm:text-sm">End Date {!filters.startDate && '(Select start date first)'}</span>
               </div>

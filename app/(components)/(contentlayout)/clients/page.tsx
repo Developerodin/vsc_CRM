@@ -190,6 +190,10 @@ const ClientsPage = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
+  const [businessTypes, setBusinessTypes] = useState<Array<{id: string, name: string}>>([]);
+  const [entityTypes, setEntityTypes] = useState<Array<{id: string, name: string}>>([]);
+  const [businessTypeLoading, setBusinessTypeLoading] = useState(false);
+  const [entityTypeLoading, setEntityTypeLoading] = useState(false);
 
   // Function to fetch activities (same as add page)
   const fetchActivities = async (): Promise<Activity[]> => {
@@ -252,6 +256,82 @@ const ClientsPage = () => {
       return found._id;
     } else {
       return null;
+    }
+  };
+
+  // Function to fetch business types
+  const fetchBusinessTypes = async (page = 1, search = "") => {
+    setBusinessTypeLoading(true);
+    try {
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: '1000', // Get all business types
+        ...(search && { name: search }),
+        sortBy: 'name:asc'
+      });
+
+      const url = `${Base_url}business-master?${queryParams}`;
+
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch business types: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data && data.results && Array.isArray(data.results)) {
+        setBusinessTypes(data.results);
+      } else {
+        setBusinessTypes([]);
+      }
+    } catch (err) {
+      toast.error(`Failed to fetch business types: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setBusinessTypes([]);
+    } finally {
+      setBusinessTypeLoading(false);
+    }
+  };
+
+  // Function to fetch entity types
+  const fetchEntityTypes = async (page = 1, search = "") => {
+    setEntityTypeLoading(true);
+    try {
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: '1000', // Get all entity types
+        ...(search && { name: search }),
+        sortBy: 'name:asc'
+      });
+
+      const url = `${Base_url}entity-master?${queryParams}`;
+
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch entity types: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data && data.results && Array.isArray(data.results)) {
+        setEntityTypes(data.results);
+      } else {
+        setEntityTypes([]);
+      }
+    } catch (err) {
+      toast.error(`Failed to fetch entity types: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setEntityTypes([]);
+    } finally {
+      setEntityTypeLoading(false);
     }
   };
 
@@ -405,6 +485,9 @@ const ClientsPage = () => {
 
   useEffect(() => {
     loadInitialData();
+    // Fetch business types and entity types on mount
+    fetchBusinessTypes();
+    fetchEntityTypes();
   }, []); // Only run once on component mount
 
   useEffect(() => {
@@ -1707,30 +1790,18 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                           setFilters(prev => ({ ...prev, businessType: e.target.value }));
                           setCurrentPage(1);
                         }}
+                        disabled={businessTypeLoading}
                       >
                         <option value="">All Business Types</option>
-                        <option value="Aviation">Aviation</option>
-                        <option value="Banking">Banking</option>
-                        <option value="Chemicals, Petrochemicals">Chemicals, Petrochemicals</option>
-                        <option value="Coal">Coal</option>
-                        <option value="Construction">Construction</option>
-                        <option value="Consultancy Services">Consultancy Services</option>
-                        <option value="Co-operatives">Co-operatives</option>
-                        <option value="Education">Education</option>
-                        <option value="Information Technology">Information Technology</option>
-                        <option value="Insurance">Insurance</option>
-                        <option value="Manufacturing">Manufacturing</option>
-                        <option value="Mining">Mining</option>
-                        <option value="Non Banking Financial Companies">Non Banking Financial Companies</option>
-                        <option value="Non Government Organisation">Non Government Organisation</option>
-                        <option value="Oil & Gas">Oil & Gas</option>
-                        <option value="Power">Power</option>
-                        <option value="Shipping">Shipping</option>
-                        <option value="Steel">Steel</option>
-                        <option value="Tele-Communication">Tele-Communication</option>
-                        <option value="Tourism">Tourism</option>
-                        <option value="Trading">Trading</option>
-                        <option value="Transport other than Shipping & Aviation">Transport other than Shipping & Aviation</option>
+                        {businessTypeLoading ? (
+                          <option value="" disabled>Loading...</option>
+                        ) : (
+                          businessTypes.map((businessType) => (
+                            <option key={businessType.id} value={businessType.name}>
+                              {businessType.name}
+                            </option>
+                          ))
+                        )}
                       </select>
                     </div>
 
@@ -1746,18 +1817,18 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                           setFilters(prev => ({ ...prev, entityType: e.target.value }));
                           setCurrentPage(1);
                         }}
+                        disabled={entityTypeLoading}
                       >
                         <option value="">All Entity Types</option>
-                        <option value="Proprietorship">Proprietorship</option>
-                        <option value="Partnership">Partnership</option>
-                        <option value="Private Limited">Private Limited</option>
-                        <option value="Public Limited">Public Limited</option>
-                        <option value="LLP">LLP</option>
-                        <option value="Sole Proprietorship">Sole Proprietorship</option>
-                        <option value="HUF">HUF</option>
-                        <option value="Trust">Trust</option>
-                        <option value="Society">Society</option>
-                        <option value="Other">Other</option>
+                        {entityTypeLoading ? (
+                          <option value="" disabled>Loading...</option>
+                        ) : (
+                          entityTypes.map((entityType) => (
+                            <option key={entityType.id} value={entityType.name}>
+                              {entityType.name}
+                            </option>
+                          ))
+                        )}
                       </select>
                     </div>
 

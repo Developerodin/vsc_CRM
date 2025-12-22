@@ -732,19 +732,19 @@ const TasksPage = () => {
                 setFilters(prev => ({ ...prev, startDate: e.target.value }));
                 setCurrentPage(1);
               }}
+              onClick={(e) => {
+                const input = e.target as HTMLInputElement;
+                input.focus();
+                if (typeof input.showPicker === 'function') {
+                  input.showPicker();
+                }
+              }}
               title="Start Date From"
               style={!filters.startDate ? { color: 'transparent' } : {}}
             />
             {!filters.startDate && (
               <div 
                 className="absolute inset-0 flex items-center px-3 text-gray-500 bg-white cursor-pointer pointer-events-none"
-                onClick={(e) => {
-                  const input = e.currentTarget.previousElementSibling as HTMLInputElement;
-                  if (input) {
-                    input.focus();
-                    input.showPicker();
-                  }
-                }}
               >
                 <span className="text-xs sm:text-sm">Start Date</span>
               </div>
@@ -763,19 +763,19 @@ const TasksPage = () => {
                 setFilters(prev => ({ ...prev, endDate: e.target.value }));
                 setCurrentPage(1);
               }}
+              onClick={(e) => {
+                const input = e.target as HTMLInputElement;
+                input.focus();
+                if (typeof input.showPicker === 'function') {
+                  input.showPicker();
+                }
+              }}
               title="End Date Until"
               style={!filters.endDate ? { color: 'transparent' } : {}}
             />
             {!filters.endDate && (
               <div 
                 className="absolute inset-0 flex items-center px-3 text-gray-500 bg-white cursor-pointer pointer-events-none"
-                onClick={(e) => {
-                  const input = e.currentTarget.previousElementSibling as HTMLInputElement;
-                  if (input) {
-                    input.focus();
-                    input.showPicker();
-                  }
-                }}
               >
                 <span className="text-xs sm:text-sm">End Date</span>
               </div>

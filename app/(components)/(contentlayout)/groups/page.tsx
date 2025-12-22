@@ -188,6 +188,7 @@ const GroupsPage = () => {
         limit: '1000', // Get all groups' task stats
         // Pass the same filters as groups
         ...(filters.name && { name: filters.name }),
+        ...(advancedFilters.clientName && { client: advancedFilters.clientName }),
       });
 
       const response = await fetch(`${Base_url}groups/task-statistics?${queryParams}`, {
@@ -226,6 +227,7 @@ const GroupsPage = () => {
         limit: limit.toString(),
         sortBy,
         ...(filters.name && { name: filters.name }),
+        ...(advancedFilters.clientName && { client: advancedFilters.clientName }),
       });
 
       const response = await fetch(`${Base_url}groups?${queryParams}`, {
@@ -235,14 +237,28 @@ const GroupsPage = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch groups');
+        const errorText = await response.text();
+        console.error('Groups API error:', response.status, errorText);
+        throw new Error(`Failed to fetch groups: ${response.status} ${response.statusText}`);
       }
 
       const data: ApiResponse = await response.json();
       
-      // Fetch task statistics for all groups
-      const newTaskStatsMap = await fetchGroupTaskStats();
-      setTaskStatsMap(newTaskStatsMap);
+      // Validate response structure
+      if (!data || !Array.isArray(data.results)) {
+        console.error('Invalid API response structure:', data);
+        throw new Error('Invalid response format from API');
+      }
+      
+      // Fetch task statistics for all groups (handle errors gracefully)
+      let newTaskStatsMap = new Map<string, any>();
+      try {
+        newTaskStatsMap = await fetchGroupTaskStats();
+        setTaskStatsMap(newTaskStatsMap);
+      } catch (taskStatsError) {
+        console.error('Failed to fetch task statistics:', taskStatsError);
+        // Continue without task stats - use empty stats
+      }
       
       // Merge groups with their task statistics
       let groupsWithTasks: GroupWithTasks[] = data.results.map(group => {
@@ -258,37 +274,27 @@ const GroupsPage = () => {
         return { ...group, taskStats };
       });
       
-      // Check if any advanced filters are active
-      const hasAdvancedFilters = advancedFilters.clientName || 
+      // Check if any advanced filters are active (excluding clientName as it's handled by API)
+      const hasAdvancedFilters = 
         advancedFilters.minClients || 
         advancedFilters.maxClients || 
         advancedFilters.minTasks || 
         advancedFilters.maxTasks ||
         (advancedFilters.taskStatus && Object.values(advancedFilters.taskStatus).some(v => v === true));
       
-      // Apply client name filter after fetching groups
-      if (advancedFilters.clientName) {
-        groupsWithTasks = groupsWithTasks.filter(group => 
-          group.clients && group.clients.some(client => {
-            // Handle both cases: string ID or object with properties
-            if (typeof client === 'string') {
-              return false; // Skip string IDs as they don't have name/email
-            }
-            if (client && typeof client === 'object') {
-              const clientName = client.name?.toLowerCase() || '';
-              const clientEmail = client.email?.toLowerCase() || '';
-              const searchTerm = advancedFilters.clientName.toLowerCase();
-              return clientName.includes(searchTerm) || clientEmail.includes(searchTerm);
-            }
-            return false;
-          })
-        );
+      // Apply other advanced filters (Task Count, Client Count, Task Status)
+      // Note: clientName filter is handled by the API, so no client-side filtering needed
+      let filteredGroups: GroupWithTasks[] = [];
+      try {
+        filteredGroups = applyAdvancedFilters(groupsWithTasks);
+      } catch (filterError) {
+        console.error('Failed to apply advanced filters:', filterError);
+        // If filter application fails, use unfiltered groups
+        filteredGroups = groupsWithTasks;
       }
       
-      // Apply other advanced filters (Task Count, Client Count, Task Status)
-      const filteredGroups = applyAdvancedFilters(groupsWithTasks);
-      
       setGroups(filteredGroups);
+      setError(null); // Clear any previous errors
       
       // Only use filtered results for pagination if advanced filters are active
       // Otherwise, use the API's pagination data
@@ -300,7 +306,10 @@ const GroupsPage = () => {
         setTotalPages(data.totalPages);
       }
     } catch (err) {
-      setError('Failed to fetch groups');
+      console.error('Error fetching groups:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch groups';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -311,8 +320,20 @@ const GroupsPage = () => {
     fetchTotalClients();
   }, [currentPage, itemsPerPage, sortBy, filters.name, advancedFilters.clientName]);
 
-  // Separate useEffect for advanced filters to update task statistics and reapply filters
+  // Separate useEffect for advanced filters (excluding clientName) to update task statistics and reapply filters
   useEffect(() => {
+    // Skip if only clientName filter changed (it's handled by API in fetchGroups)
+    const hasOnlyClientNameFilter = advancedFilters.clientName && 
+      !advancedFilters.minClients && 
+      !advancedFilters.maxClients && 
+      !advancedFilters.minTasks && 
+      !advancedFilters.maxTasks &&
+      (!advancedFilters.taskStatus || !Object.values(advancedFilters.taskStatus).some(v => v === true));
+    
+    if (hasOnlyClientNameFilter) {
+      return; // clientName filter is handled by API, so fetchGroups will handle it
+    }
+
     const updateTaskStats = async () => {
       const newTaskStatsMap = await fetchGroupTaskStats();
       setTaskStatsMap(newTaskStatsMap);
@@ -332,31 +353,11 @@ const GroupsPage = () => {
           return { ...group, taskStats };
         });
         
-        // Apply client name filter first
-        let filteredGroups = updatedGroups;
-        if (advancedFilters.clientName) {
-          filteredGroups = updatedGroups.filter(group => 
-            group.clients && group.clients.some(client => {
-              // Handle both cases: string ID or object with properties
-              if (typeof client === 'string') {
-                return false; // Skip string IDs as they don't have name/email
-              }
-              if (client && typeof client === 'object') {
-                const clientName = client.name?.toLowerCase() || '';
-                const clientEmail = client.email?.toLowerCase() || '';
-                const searchTerm = advancedFilters.clientName.toLowerCase();
-                return clientName.includes(searchTerm) || clientEmail.includes(searchTerm);
-              }
-              return false;
-            })
-          );
-        }
+        // Apply other advanced filters (clientName is handled by API)
+        const finalFiltered = applyAdvancedFilters(updatedGroups);
         
-        // Then apply other advanced filters
-        const finalFiltered = applyAdvancedFilters(filteredGroups);
-        
-        // Update pagination counts when advanced filters are active
-        const hasAdvancedFilters = advancedFilters.clientName || 
+        // Update pagination counts when advanced filters are active (excluding clientName)
+        const hasAdvancedFilters = 
           advancedFilters.minClients || 
           advancedFilters.maxClients || 
           advancedFilters.minTasks || 
@@ -455,8 +456,12 @@ const GroupsPage = () => {
             "Number Of Clients": group.clients ? group.clients.length : 0,
             "Created Date": new Date(group.createdAt).toLocaleDateString(),
             "Sort Order": group.sortOrder,
-            "Client IDs": group.clients?.map(client => client.id).join(',') || '',
-            "Client Names": group.clients?.map(client => client.name).join(',') || '',
+            "Client IDs": group.clients?.map(client => 
+              typeof client === 'string' ? client : client.id
+            ).join(',') || '',
+            "Client Names": group.clients?.map(client => 
+              typeof client === 'string' ? '' : client.name
+            ).filter(name => name).join(',') || '',
             "Total Tasks": group.taskStats.total,
             "Pending": group.taskStats.pending,
             "Completed": group.taskStats.completed,
@@ -494,8 +499,12 @@ const GroupsPage = () => {
           "Number Of Clients": group.clients ? group.clients.length : 0,
           "Created Date": new Date(group.createdAt).toLocaleDateString(),
           "Sort Order": group.sortOrder,
-          "Client IDs": group.clients?.map(client => client.id).join(',') || '',
-          "Client Names": group.clients?.map(client => client.name).join(',') || '',
+          "Client IDs": group.clients?.map(client => 
+            typeof client === 'string' ? client : client.id
+          ).join(',') || '',
+          "Client Names": group.clients?.map(client => 
+            typeof client === 'string' ? '' : client.name
+          ).filter(name => name).join(',') || '',
             "Total Tasks": taskStats.total,
             "Pending": taskStats.pending,
             "Completed": taskStats.completed,
