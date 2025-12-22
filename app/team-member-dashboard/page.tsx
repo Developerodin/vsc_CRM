@@ -1,5 +1,5 @@
 "use client"
-import React, { useEffect, useState, useMemo, useCallback } from 'react'
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import axios from 'axios'
 import { Base_url } from '@/app/api/config/BaseUrl'
@@ -118,6 +118,7 @@ const TeamMemberDashboard = () => {
   const [tasksLoading, setTasksLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const isFetchingRef = useRef(false)
   
   // Task filters and pagination
   const [currentPage, setCurrentPage] = useState(1)
@@ -436,13 +437,20 @@ const TeamMemberDashboard = () => {
     }
   }, [selectedActivity, selectedGroup, showTimelineModal])
 
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     // Don't fetch if still loading or no team member data
     if (loading || !teamMemberData) {
       console.log('Skipping fetchTasks - still loading or no team member data')
       return
     }
     
+    // Prevent concurrent fetches
+    if (isFetchingRef.current) {
+      console.log('Skipping fetchTasks - already fetching')
+      return
+    }
+    
+    isFetchingRef.current = true
     setTasksLoading(true)
     setError('')
     
@@ -472,26 +480,10 @@ const TeamMemberDashboard = () => {
       const apiUrl = (viewAccessibleTasks && accessibleTeamMembers.length > 0)
         ? `${Base_url}team-member-auth/tasks/accessible-team-members?${params}`
         : `${Base_url}team-member-auth/tasks?${params}`
-      console.log('Fetching tasks with URL:', apiUrl)
-      console.log('Token:', token)
-      console.log('Base_url:', Base_url)
-      
-      // First, let's test if the token is valid by calling the profile endpoint
-      try {
-        const profileResponse = await axios.get(`${Base_url}team-member-auth/profile`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        console.log('Profile test successful:', profileResponse.data)
-      } catch (profileError: any) {
-        console.error('Profile test failed:', profileError.response?.data)
-        console.error('Profile error status:', profileError.response?.status)
-      }
       
       const response = await axios.get(apiUrl, {
         headers: { Authorization: `Bearer ${token}` }
       })
-      
-      console.log('Tasks API response:', response.data)
       
       if (response.data.success) {
         // Handle both response formats
@@ -528,16 +520,21 @@ const TeamMemberDashboard = () => {
         
         // Extract pagination data - check multiple possible locations
         // Priority: response.data root level > response.data.pagination > taskData.pagination > taskData root
+        const responsePage = response.data.page || response.data.pagination?.page || (response.data.data && typeof response.data.data === 'object' && !Array.isArray(response.data.data) ? (response.data.data.pagination?.page || response.data.data.page) : undefined) || currentPage
+        
+        // Only update currentPage if it's actually different to prevent infinite loops
+        if (responsePage !== currentPage) {
+          setCurrentPage(responsePage)
+        }
+        
         if (response.data.totalPages !== undefined || response.data.totalResults !== undefined) {
           // Pagination at root level of response.data (for accessible-team-members endpoint)
           setTotalPages(response.data.totalPages || 1)
           setTotalResults(response.data.totalResults || 0)
-          setCurrentPage(response.data.page || currentPage)
         } else if (response.data.pagination) {
           // Pagination nested in response.data
           setTotalPages(response.data.pagination.totalPages || 1)
           setTotalResults(response.data.pagination.totalResults || response.data.pagination.totalTasks || 0)
-          setCurrentPage(response.data.pagination.page || currentPage)
         } else {
           // Check in taskData if it exists and is an object
           const taskData = response.data.data || response.data
@@ -546,12 +543,10 @@ const TeamMemberDashboard = () => {
               // Pagination nested in data object
               setTotalPages(taskData.pagination.totalPages || 1)
               setTotalResults(taskData.pagination.totalResults || taskData.pagination.totalTasks || 0)
-              setCurrentPage(taskData.pagination.page || currentPage)
             } else if (taskData.totalPages !== undefined || taskData.totalResults !== undefined) {
               // Pagination at root level of taskData
               setTotalPages(taskData.totalPages || 1)
               setTotalResults(taskData.totalResults || 0)
-              setCurrentPage(taskData.page || currentPage)
             } else {
               // Fallback: if no pagination data, assume single page
               setTotalPages(1)
@@ -584,10 +579,13 @@ const TeamMemberDashboard = () => {
       }
     } finally {
       setTasksLoading(false)
+      isFetchingRef.current = false
     }
-  }
+  }, [currentPage, itemsPerPage, statusFilter, priorityFilter, startDateFilter, endDateFilter, teamMemberFilter, viewAccessibleTasks, accessibleTeamMembers.length, loading, teamMemberData])
 
   const handleRefreshTasks = () => {
+    // Reset the fetching ref to allow immediate refresh
+    isFetchingRef.current = false
     // Reset all filters
     setStatusFilter('all')
     setPriorityFilter('all')
@@ -595,7 +593,11 @@ const TeamMemberDashboard = () => {
     setEndDateFilter('')
     setTeamMemberFilter('all')
     setCurrentPage(1)
-    // fetchTasks will be called automatically by useEffect when filters change
+    // Call fetchTasks after a brief delay to ensure state updates are processed
+    // This ensures the refresh happens even if useEffect doesn't trigger immediately
+    setTimeout(() => {
+      fetchTasks()
+    }, 100)
   }
 
   const handleLogout = async () => {
@@ -896,8 +898,12 @@ const TeamMemberDashboard = () => {
           position: 'top-right'
         })
         closeAssignTaskModal()
-        // Optionally refresh tasks if viewing accessible team members' tasks
-        // fetchTasks()
+        // Refresh tasks to show the newly assigned task
+        // Reset the fetching ref to allow immediate refresh
+        isFetchingRef.current = false
+        // Refresh tasks - if viewing accessible team members' tasks, show new task
+        // If viewing own tasks, also refresh in case the assigned task is for current user
+        fetchTasks()
       } else {
         toast.error(response.data?.message || 'Failed to assign task', {
           duration: 3000,
@@ -936,14 +942,14 @@ const TeamMemberDashboard = () => {
     if (teamMemberData && !loading) {
       setCurrentPage(1)
     }
-  }, [statusFilter, priorityFilter, startDateFilter, endDateFilter, teamMemberFilter, viewAccessibleTasks])
+  }, [statusFilter, priorityFilter, startDateFilter, endDateFilter, teamMemberFilter, viewAccessibleTasks, teamMemberData, loading])
 
   // Refresh tasks when filters or pagination change
   useEffect(() => {
     if (teamMemberData && !loading) {
       fetchTasks()
     }
-  }, [currentPage, itemsPerPage, statusFilter, priorityFilter, startDateFilter, endDateFilter, teamMemberFilter, viewAccessibleTasks, teamMemberData, loading])
+  }, [fetchTasks, teamMemberData, loading])
 
   if (loading || !teamMemberData) {
     return (
