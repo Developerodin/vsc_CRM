@@ -199,6 +199,7 @@ const TeamMemberDashboard = () => {
     }
   }>>([])
   const [showTimelineModal, setShowTimelineModal] = useState(false)
+  const [showEditTimelineModal, setShowEditTimelineModal] = useState(false)
   const [isLoadingTimelines, setIsLoadingTimelines] = useState(false)
   const [timelineSearchQuery, setTimelineSearchQuery] = useState("")
   const [timelineCurrentPage, setTimelineCurrentPage] = useState(1)
@@ -431,11 +432,11 @@ const TeamMemberDashboard = () => {
 
   // Refetch timelines when filters change
   useEffect(() => {
-    if (showTimelineModal) {
+    if (showTimelineModal || showEditTimelineModal) {
       setTimelineCurrentPage(1)
       fetchTimelines(1, timelineSearchQuery)
     }
-  }, [selectedActivity, selectedGroup, showTimelineModal])
+  }, [selectedActivity, selectedGroup, showTimelineModal, showEditTimelineModal])
 
   const fetchTasks = useCallback(async () => {
     // Don't fetch if still loading or no team member data
@@ -722,6 +723,227 @@ const TeamMemberDashboard = () => {
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString()
+  }
+
+  // Helper function to get team member name from task
+  const getTeamMemberName = (task: Task): string => {
+    if (!task.teamMember) return 'N/A'
+    if (typeof task.teamMember === 'string') {
+      // If it's just an ID, try to find the name from accessibleTeamMembers
+      const member = accessibleTeamMembers.find(m => (m._id || m.id) === task.teamMember)
+      return member?.name || task.teamMember
+    }
+    // If it's an object, return the name
+    return task.teamMember.name || 'N/A'
+  }
+
+  // Edit task modal state
+  const [showEditTaskModal, setShowEditTaskModal] = useState(false)
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
+  const [editTaskForm, setEditTaskForm] = useState({
+    teamMember: '',
+    branch: '',
+    remarks: '',
+    priority: 'medium',
+    status: 'pending',
+    startDate: '',
+    endDate: '',
+    timeline: [] as string[]
+  })
+  const [editSelectedTimelines, setEditSelectedTimelines] = useState<Array<{
+    id: string
+    title?: string
+    activity?: {
+      id: string
+      name: string
+    }
+    client?: {
+      id: string
+      name: string
+    }
+  }>>([])
+
+  const openEditTaskModal = (task: Task) => {
+    setEditingTask(task)
+    // Get team member ID from task (could be string or object)
+    let teamMemberId = ''
+    if (typeof task.teamMember === 'string') {
+      teamMemberId = task.teamMember
+    } else if (task.teamMember && typeof task.teamMember === 'object') {
+      teamMemberId = task.teamMember._id || task.teamMember.id || ''
+    }
+    
+    // Get branch ID
+    const branchId = task.branch?._id || task.branch?.id || ''
+    
+    // Get timeline IDs - handle both string IDs and populated objects
+    let timelineIds: string[] = []
+    let timelineObjects: Array<{
+      id: string
+      title?: string
+      activity?: {
+        id: string
+        name: string
+      }
+      client?: {
+        id: string
+        name: string
+      }
+    }> = []
+    
+    if (task.timeline && Array.isArray(task.timeline)) {
+      task.timeline.forEach((timeline) => {
+        if (typeof timeline === 'string') {
+          timelineIds.push(timeline)
+        } else if (timeline && typeof timeline === 'object') {
+          const timelineId = timeline._id || timeline.id || ''
+          if (timelineId) {
+            timelineIds.push(timelineId)
+            timelineObjects.push({
+              id: timelineId,
+              title: timeline.title,
+              activity: timeline.activity ? {
+                id: timeline.activity._id || timeline.activity.id || '',
+                name: timeline.activity.name || ''
+              } : undefined,
+              client: timeline.client ? {
+                id: timeline.client._id || timeline.client.id || '',
+                name: timeline.client.name || ''
+              } : undefined
+            })
+          }
+        }
+      })
+    }
+    
+    setEditTaskForm({
+      teamMember: teamMemberId,
+      branch: branchId,
+      remarks: task.remarks || '',
+      priority: task.priority || 'medium',
+      status: task.status || 'pending',
+      startDate: task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : '',
+      endDate: task.endDate ? new Date(task.endDate).toISOString().split('T')[0] : '',
+      timeline: timelineIds
+    })
+    setEditSelectedTimelines(timelineObjects)
+    setShowEditTaskModal(true)
+  }
+
+  const closeEditTaskModal = () => {
+    setShowEditTaskModal(false)
+    setEditingTask(null)
+    setEditTaskForm({
+      teamMember: '',
+      branch: '',
+      remarks: '',
+      priority: 'medium',
+      status: 'pending',
+      startDate: '',
+      endDate: '',
+      timeline: []
+    })
+    setEditSelectedTimelines([])
+  }
+
+  const handleEditTask = async () => {
+    if (!editingTask) return
+
+    if (!editTaskForm.teamMember) {
+      toast.error('Please select a team member', {
+        duration: 3000,
+        position: 'top-right'
+      })
+      return
+    }
+
+    if (!editTaskForm.branch) {
+      toast.error('Please select a branch', {
+        duration: 3000,
+        position: 'top-right'
+      })
+      return
+    }
+
+    if (!editTaskForm.startDate || !editTaskForm.endDate) {
+      toast.error('Start date and end date are required', {
+        duration: 3000,
+        position: 'top-right'
+      })
+      return
+    }
+
+    if (new Date(editTaskForm.startDate) > new Date(editTaskForm.endDate)) {
+      toast.error('End date must be after start date', {
+        duration: 3000,
+        position: 'top-right'
+      })
+      return
+    }
+
+    setIsSavingEdit(true)
+    try {
+      const token = localStorage.getItem('teamMemberToken')
+      const taskId = editingTask._id || editingTask.id
+      
+      const updateData = {
+        teamMember: editTaskForm.teamMember,
+        branch: editTaskForm.branch,
+        remarks: editTaskForm.remarks || '',
+        priority: editTaskForm.priority,
+        status: editTaskForm.status,
+        startDate: new Date(editTaskForm.startDate).toISOString(),
+        endDate: new Date(editTaskForm.endDate).toISOString(),
+        timeline: editTaskForm.timeline || []
+      }
+
+      const response = await axios.patch(
+        `${Base_url}team-member-auth/tasks/accessible/${taskId}`,
+        updateData,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      )
+
+      if (response.data.success) {
+        toast.success('Task updated successfully!', {
+          duration: 3000,
+          position: 'top-right'
+        })
+        closeEditTaskModal()
+        fetchTasks()
+      }
+    } catch (error: any) {
+      console.error('Error editing task:', error)
+      const errorMessage = error.response?.data?.message || 'Failed to update task'
+      toast.error(errorMessage, {
+        duration: 4000,
+        position: 'top-right'
+      })
+    } finally {
+      setIsSavingEdit(false)
+    }
+  }
+
+  // Timeline selection handlers for edit modal
+  const handleEditTimelineSelect = (timeline: typeof timelines[0]) => {
+    setEditSelectedTimelines(prev => {
+      const isSelected = prev.some(t => t.id === timeline.id)
+      if (isSelected) {
+        return prev.filter(t => t.id !== timeline.id)
+      } else {
+        return [...prev, timeline]
+      }
+    })
+  }
+
+  const handleEditTimelineModalSubmit = () => {
+    setEditTaskForm(prev => ({
+      ...prev,
+      timeline: editSelectedTimelines.map(timeline => timeline.id)
+    }))
+    setShowEditTimelineModal(false)
   }
 
   const openAssignTaskModal = () => {
@@ -1182,6 +1404,12 @@ const TeamMemberDashboard = () => {
                       <tr key={task._id || task.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                         <td className="px-6 py-4">
                           <div className="text-sm font-medium text-gray-900 dark:text-white">{task.remarks}</div>
+                          {viewAccessibleTasks && (
+                            <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                              <i className="ri-user-line mr-1"></i>
+                              Assigned to: <span className="font-medium">{getTeamMemberName(task)}</span>
+                            </div>
+                          )}
                           <div className="text-sm text-gray-500 dark:text-gray-400">
                             Branch: {task.branch?.name || 'N/A'}
                           </div>
@@ -1268,7 +1496,7 @@ const TeamMemberDashboard = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 flex-wrap">
                             <button
                               onClick={() => openViewDetailsModal(task)}
                               className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
@@ -1277,6 +1505,16 @@ const TeamMemberDashboard = () => {
                               <i className="ri-eye-line mr-1"></i>
                               View
                             </button>
+                            {viewAccessibleTasks && (
+                              <button
+                                onClick={() => openEditTaskModal(task)}
+                                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                                title="Edit task"
+                              >
+                                <i className="ri-edit-2-line mr-1"></i>
+                                Edit
+                              </button>
+                            )}
                             <button
                               onClick={() => openUpdateModal(task)}
                               className={`inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white focus:outline-none focus:ring-2 focus:ring-offset-2 ${
@@ -1375,6 +1613,15 @@ const TeamMemberDashboard = () => {
                 <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Task Details (View Only)</h4>
                 
                 <div className="grid grid-cols-2 gap-4">
+                  {viewAccessibleTasks && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Assigned To</label>
+                      <p className="text-sm text-gray-900 dark:text-white font-medium">
+                        <i className="ri-user-line mr-1"></i>
+                        {getTeamMemberName(selectedTask)}
+                      </p>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Remarks</label>
                     <p className="text-sm text-gray-900 dark:text-white">{selectedTask.remarks || 'N/A'}</p>
@@ -1527,6 +1774,15 @@ const TeamMemberDashboard = () => {
                 <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                   <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Task Information</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {viewAccessibleTasks && (
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Assigned To</label>
+                        <p className="text-sm text-gray-900 dark:text-white font-medium">
+                          <i className="ri-user-line mr-1"></i>
+                          {getTeamMemberName(viewTaskDetails)}
+                        </p>
+                      </div>
+                    )}
                     <div>
                       <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Remarks</label>
                       <p className="text-sm text-gray-900 dark:text-white">{viewTaskDetails.remarks || 'N/A'}</p>
@@ -1720,6 +1976,18 @@ const TeamMemberDashboard = () => {
                 >
                   Close
                 </button>
+                {viewAccessibleTasks && (
+                  <button
+                    onClick={() => {
+                      closeViewDetailsModal()
+                      openEditTaskModal(viewTaskDetails)
+                    }}
+                    className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
+                  >
+                    <i className="ri-edit-2-line mr-1"></i>
+                    Edit Task
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     closeViewDetailsModal()
@@ -1733,6 +2001,226 @@ const TeamMemberDashboard = () => {
                 >
                   <i className={`ri-${viewTaskDetails.status === 'delayed' ? 'check-line' : 'edit-line'} mr-1`}></i>
                   {viewTaskDetails.status === 'delayed' ? 'Mark Complete' : 'Update Status'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Task Modal */}
+      {showEditTaskModal && editingTask && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-10 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white dark:bg-gray-800 max-h-[90vh] overflow-y-auto">
+            <div className="mt-3">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Edit Task</h3>
+                <button
+                  onClick={closeEditTaskModal}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  <i className="ri-close-line text-2xl"></i>
+                </button>
+              </div>
+              
+              {/* Editable Fields */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Team Member <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={editTaskForm.teamMember}
+                    onChange={(e) => setEditTaskForm({...editTaskForm, teamMember: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  >
+                    <option value="">Select a team member</option>
+                    {accessibleTeamMembers.map((member) => (
+                      <option key={member._id || member.id} value={member._id || member.id}>
+                        {member.name} ({member.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Start Date */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Start Date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={editTaskForm.startDate}
+                    onChange={(e) => setEditTaskForm({...editTaskForm, startDate: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+
+                {/* End Date */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    End Date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={editTaskForm.endDate}
+                    onChange={(e) => setEditTaskForm({...editTaskForm, endDate: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    min={editTaskForm.startDate || new Date().toISOString().split('T')[0]}
+                    required
+                  />
+                </div>
+
+                {/* Priority */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Priority <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={editTaskForm.priority}
+                    onChange={(e) => setEditTaskForm({...editTaskForm, priority: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                    <option value="critical">Critical</option>
+                  </select>
+                </div>
+
+                {/* Branch */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Branch <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={editTaskForm.branch}
+                    onChange={(e) => setEditTaskForm({...editTaskForm, branch: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  >
+                    <option value="">Select a branch</option>
+                    {branches.map((branch) => (
+                      <option key={branch._id || branch.id} value={branch._id || branch.id}>
+                        {branch.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Related Timelines */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Related Timelines
+                  </label>
+                  <div className="flex items-center space-x-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowEditTimelineModal(true)
+                        setTimelineSearchQuery("")
+                        setTimelineCurrentPage(1)
+                        setSelectedActivity("")
+                        setSelectedGroup("")
+                        setTimelineItemsPerPage(10)
+                        fetchTimelines(1, "", true)
+                      }}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                    >
+                      Select Timelines ({editSelectedTimelines.length} selected)
+                    </button>
+                    {editSelectedTimelines.length > 0 && (
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        {editSelectedTimelines.length} timeline{editSelectedTimelines.length !== 1 ? 's' : ''} selected
+                      </span>
+                    )}
+                  </div>
+                  {editSelectedTimelines.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {editSelectedTimelines.map(timeline => (
+                        <span key={timeline.id} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200">
+                          {timeline.title || `${timeline.activity?.name || 'Unknown Activity'} - ${timeline.client?.name || 'Unknown Client'}`}
+                          <button
+                            type="button"
+                            className="ml-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                            onClick={() => {
+                              setEditSelectedTimelines(prev => prev.filter(t => t.id !== timeline.id))
+                              setEditTaskForm(prev => ({
+                                ...prev,
+                                timeline: prev.timeline.filter(id => id !== timeline.id)
+                              }))
+                            }}
+                          >
+                            <i className="ri-close-line"></i>
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
+                {/* Remarks */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Remarks
+                  </label>
+                  <textarea
+                    value={editTaskForm.remarks}
+                    onChange={(e) => setEditTaskForm({...editTaskForm, remarks: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    rows={3}
+                    placeholder="Enter task remarks..."
+                  />
+                </div>
+
+                {/* Status */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Status
+                  </label>
+                  <select
+                    value={editTaskForm.status}
+                    onChange={(e) => setEditTaskForm({...editTaskForm, status: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="ongoing">Ongoing</option>
+                    <option value="completed">Completed</option>
+                    <option value="on_hold">On Hold</option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="delayed">Delayed</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={closeEditTaskModal}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500"
+                  disabled={isSavingEdit}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleEditTask}
+                  disabled={isSavingEdit}
+                  className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
+                >
+                  {isSavingEdit ? (
+                    <>
+                      <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <i className="ri-save-line mr-1"></i>
+                      Save Changes
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -1942,14 +2430,17 @@ const TeamMemberDashboard = () => {
         </div>
       )}
 
-      {/* Timeline Selection Modal */}
-      {showTimelineModal && (
+      {/* Timeline Selection Modal - Shared for Assign and Edit */}
+      {(showTimelineModal || showEditTimelineModal) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg w-11/12 max-w-6xl max-h-[90vh] flex flex-col">
             <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Select Timelines</h2>
               <button
-                onClick={() => setShowTimelineModal(false)}
+                onClick={() => {
+                  setShowTimelineModal(false)
+                  setShowEditTimelineModal(false)
+                }}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               >
                 <i className="ri-close-line text-2xl"></i>
@@ -2106,8 +2597,18 @@ const TeamMemberDashboard = () => {
                               <input
                                 type="checkbox"
                                 className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                checked={selectedTimelines.some(t => t.id === timeline.id)}
-                                onChange={() => handleTimelineSelect(timeline)}
+                                checked={
+                                  showEditTimelineModal
+                                    ? editSelectedTimelines.some(t => t.id === timeline.id)
+                                    : selectedTimelines.some(t => t.id === timeline.id)
+                                }
+                                onChange={() => {
+                                  if (showEditTimelineModal) {
+                                    handleEditTimelineSelect(timeline)
+                                  } else {
+                                    handleTimelineSelect(timeline)
+                                  }
+                                }}
                               />
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -2189,16 +2690,29 @@ const TeamMemberDashboard = () => {
               </div>
               <div className="flex items-center space-x-2">
                 <button
-                  onClick={() => setShowTimelineModal(false)}
+                  onClick={() => {
+                    setShowTimelineModal(false)
+                    setShowEditTimelineModal(false)
+                  }}
                   className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={handleTimelineModalSubmit}
+                  onClick={() => {
+                    if (showEditTimelineModal) {
+                      handleEditTimelineModalSubmit()
+                    } else {
+                      handleTimelineModalSubmit()
+                    }
+                  }}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
                 >
-                  Select ({selectedTimelines.length})
+                  Select ({
+                    showEditTimelineModal
+                      ? editSelectedTimelines.length
+                      : selectedTimelines.length
+                  })
                 </button>
               </div>
             </div>
