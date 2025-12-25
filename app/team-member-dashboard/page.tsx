@@ -96,6 +96,12 @@ interface Task {
   updatedAt?: string
   metadata?: any
   assignedBy?: any
+  assignedByTeamMember?: {
+    _id?: string
+    id?: string
+    name: string
+    email: string
+  }
 }
 
 interface TaskResponse {
@@ -735,6 +741,47 @@ const TeamMemberDashboard = () => {
     }
     // If it's an object, return the name
     return task.teamMember.name || 'N/A'
+  }
+
+  // Helper function to get assigned by name from task
+  const getAssignedByName = (task: Task): string => {
+    // Check assignedByTeamMember first
+    if (task.assignedByTeamMember) {
+      return task.assignedByTeamMember.name || task.assignedByTeamMember.email || 'Admin'
+    }
+    
+    // Fallback to assignedBy
+    if (!task.assignedBy) return 'Admin'
+    if (typeof task.assignedBy === 'string') {
+      // If it's just an ID, try to find the name from accessibleTeamMembers
+      const member = accessibleTeamMembers.find(m => (m._id || m.id) === task.assignedBy)
+      return member?.name || task.assignedBy
+    }
+    // If it's an object, return the name
+    if (task.assignedBy && typeof task.assignedBy === 'object') {
+      return task.assignedBy.name || task.assignedBy.email || 'Admin'
+    }
+    return 'Admin'
+  }
+
+  // Helper function to get assigned by email from task
+  const getAssignedByEmail = (task: Task): string | null => {
+    // Check assignedByTeamMember first
+    if (task.assignedByTeamMember) {
+      return task.assignedByTeamMember.email || null
+    }
+    
+    // Fallback to assignedBy
+    if (task.assignedBy && typeof task.assignedBy === 'object') {
+      return task.assignedBy.email || null
+    }
+    return null
+  }
+
+  // Helper function to check if task has assigned by info
+  // Always return true since we show "Admin" as default
+  const hasAssignedBy = (task: Task): boolean => {
+    return true // Always show assigned by, defaulting to "Admin" if no data
   }
 
   // Edit task modal state
@@ -1410,6 +1457,12 @@ const TeamMemberDashboard = () => {
                               Assigned to: <span className="font-medium">{getTeamMemberName(task)}</span>
                             </div>
                           )}
+                          {hasAssignedBy(task) && (
+                            <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                              <i className="ri-user-add-line mr-1"></i>
+                              Assigned by: <span className="font-medium">{getAssignedByName(task)}</span>
+                            </div>
+                          )}
                           <div className="text-sm text-gray-500 dark:text-gray-400">
                             Branch: {task.branch?.name || 'N/A'}
                           </div>
@@ -1622,6 +1675,15 @@ const TeamMemberDashboard = () => {
                       </p>
                     </div>
                   )}
+                  {hasAssignedBy(selectedTask) && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Assigned By</label>
+                      <p className="text-sm text-gray-900 dark:text-white font-medium">
+                        <i className="ri-user-add-line mr-1"></i>
+                        {getAssignedByName(selectedTask)}
+                      </p>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Remarks</label>
                     <p className="text-sm text-gray-900 dark:text-white">{selectedTask.remarks || 'N/A'}</p>
@@ -1780,6 +1842,20 @@ const TeamMemberDashboard = () => {
                         <p className="text-sm text-gray-900 dark:text-white font-medium">
                           <i className="ri-user-line mr-1"></i>
                           {getTeamMemberName(viewTaskDetails)}
+                        </p>
+                      </div>
+                    )}
+                    {hasAssignedBy(viewTaskDetails) && (
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Assigned By</label>
+                        <p className="text-sm text-gray-900 dark:text-white font-medium">
+                          <i className="ri-user-add-line mr-1"></i>
+                          {getAssignedByName(viewTaskDetails)}
+                          {getAssignedByEmail(viewTaskDetails) && (
+                            <span className="text-xs text-gray-500 dark:text-gray-400 block mt-1">
+                              {getAssignedByEmail(viewTaskDetails)}
+                            </span>
+                          )}
                         </p>
                       </div>
                     )}
