@@ -225,6 +225,12 @@ const TeamMemberDashboard = () => {
   const [activities, setActivities] = useState<Array<{
     id: string
     name: string
+    subactivities?: Array<{
+      _id: string
+      id: string
+      name: string
+      frequency?: string
+    }>
   }>>([])
   const [groups, setGroups] = useState<Array<{
     id: string
@@ -232,6 +238,7 @@ const TeamMemberDashboard = () => {
     numberOfClients: number
   }>>([])
   const [selectedActivity, setSelectedActivity] = useState<string>("")
+  const [selectedSubActivity, setSelectedSubActivity] = useState<string>("")
   const [selectedGroup, setSelectedGroup] = useState<string>("")
   const [isLoadingActivities, setIsLoadingActivities] = useState(false)
   const [isLoadingGroups, setIsLoadingGroups] = useState(false)
@@ -349,7 +356,7 @@ const TeamMemberDashboard = () => {
       const token = localStorage.getItem('teamMemberToken')
       if (!token) return
       
-      const response = await axios.get(`${Base_url}activities`, {
+      const response = await axios.get(`${Base_url}activities?limit=1000`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       
@@ -397,6 +404,12 @@ const TeamMemberDashboard = () => {
         : null
       const activityName = selectedActivityData?.name
       
+      // Get subactivity name if subactivity filter is selected
+      const selectedSubActivityData = selectedSubActivity && selectedActivity && !forceClearFilters
+        ? selectedActivityData?.subactivities?.find(sa => (sa._id || sa.id) === selectedSubActivity)
+        : null
+      const subActivityName = selectedSubActivityData?.name
+      
       // Get group name if group filter is selected
       const selectedGroupData = selectedGroup && !forceClearFilters
         ? groups.find(g => g.id === selectedGroup)
@@ -421,6 +434,11 @@ const TeamMemberDashboard = () => {
       // Add activity filter using activityName parameter
       if (activityName && !forceClearFilters) {
         queryParams.append('activityName', activityName)
+      }
+
+      // Add subactivity filter using subactivityName parameter
+      if (subActivityName && !forceClearFilters) {
+        queryParams.append('subactivityName', subActivityName)
       }
 
       // Add group filter using group parameter
@@ -452,7 +470,7 @@ const TeamMemberDashboard = () => {
       setTimelineCurrentPage(1)
       fetchTimelines(1, timelineSearchQuery)
     }
-  }, [selectedActivity, selectedGroup, showTimelineModal, showEditTimelineModal])
+  }, [selectedActivity, selectedSubActivity, selectedGroup, showTimelineModal, showEditTimelineModal])
 
   const fetchTasks = useCallback(async () => {
     // Don't fetch if still loading or no team member data
@@ -1106,6 +1124,11 @@ const TeamMemberDashboard = () => {
   // Filter change handlers
   const handleActivityFilterChange = (activityId: string) => {
     setSelectedActivity(activityId)
+    setSelectedSubActivity("") // Clear subactivity when activity changes
+  }
+
+  const handleSubActivityFilterChange = (subActivityId: string) => {
+    setSelectedSubActivity(subActivityId)
   }
 
   const handleGroupFilterChange = (groupId: string) => {
@@ -1114,6 +1137,7 @@ const TeamMemberDashboard = () => {
 
   const clearTimelineFilters = () => {
     setSelectedActivity("")
+    setSelectedSubActivity("")
     setSelectedGroup("")
     setTimelineSearchQuery("")
     setTimelineCurrentPage(1)
@@ -2226,6 +2250,7 @@ const TeamMemberDashboard = () => {
                         setTimelineSearchQuery("")
                         setTimelineCurrentPage(1)
                         setSelectedActivity("")
+                        setSelectedSubActivity("")
                         setSelectedGroup("")
                         setTimelineItemsPerPage(10)
                         fetchTimelines(1, "", true)
@@ -2442,6 +2467,7 @@ const TeamMemberDashboard = () => {
                         setTimelineSearchQuery("")
                         setTimelineCurrentPage(1)
                         setSelectedActivity("")
+                        setSelectedSubActivity("")
                         setSelectedGroup("")
                         setTimelineItemsPerPage(10)
                         fetchTimelines(1, "", true)
@@ -2549,8 +2575,8 @@ const TeamMemberDashboard = () => {
             </div>
 
             <div className="p-4 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-              {/* Activity Filter */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              {/* Activity, Subactivity Filter */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 {/* Activity Filter */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -2570,13 +2596,36 @@ const TeamMemberDashboard = () => {
                   </select>
                 </div>
 
+                {/* Subactivity Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Filter by Sub Activity
+                  </label>
+                  <select
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={selectedSubActivity}
+                    onChange={(e) => handleSubActivityFilterChange(e.target.value)}
+                    disabled={!selectedActivity}
+                  >
+                    <option value="">All Sub Activities</option>
+                    {selectedActivity && activities.find(a => a.id === selectedActivity)?.subactivities?.map((subActivity) => (
+                      <option key={subActivity._id || subActivity.id} value={subActivity._id || subActivity.id}>
+                        {subActivity.name}
+                      </option>
+                    ))}
+                  </select>
+                  {!selectedActivity && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Select an activity first</p>
+                  )}
+                </div>
+
                 {/* Clear Filters Button */}
                 <div className="flex items-end">
                   <button
                     type="button"
                     onClick={clearTimelineFilters}
                     className="w-full px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm"
-                    disabled={!selectedActivity && !timelineSearchQuery}
+                    disabled={!selectedActivity && !selectedSubActivity && !timelineSearchQuery}
                   >
                     <i className="ri-refresh-line mr-2"></i>
                     Clear Filters
@@ -2614,7 +2663,7 @@ const TeamMemberDashboard = () => {
 
             <div className="flex-1 overflow-auto p-4">
               {/* Active Filters Summary */}
-              {selectedActivity && (
+              {(selectedActivity || selectedSubActivity) && (
                 <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
@@ -2622,6 +2671,11 @@ const TeamMemberDashboard = () => {
                       {selectedActivity && (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200">
                           Activity: {activities.find(a => a.id === selectedActivity)?.name}
+                        </span>
+                      )}
+                      {selectedSubActivity && selectedActivity && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200">
+                          Sub Activity: {activities.find(a => a.id === selectedActivity)?.subactivities?.find(sa => (sa._id || sa.id) === selectedSubActivity)?.name}
                         </span>
                       )}
                     </div>
@@ -2680,12 +2734,12 @@ const TeamMemberDashboard = () => {
                                 No timelines found
                               </h3>
                               <p className="text-gray-500 dark:text-gray-400 text-center mb-4">
-                                {selectedActivity 
+                                {(selectedActivity || selectedSubActivity)
                                   ? "Try adjusting your filters or search criteria."
                                   : "No timelines available at the moment."
                                 }
                               </p>
-                              {selectedActivity && (
+                              {(selectedActivity || selectedSubActivity) && (
                                 <button
                                   onClick={clearTimelineFilters}
                                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
