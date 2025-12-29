@@ -416,12 +416,12 @@ const Header = ({ local_varaiable, ThemeChanger }:any) => {
                 )}
               </div>
 
-              <div className="header-element py-[1rem] md:px-[0.65rem] px-2 header-search">
+              {/* <div className="header-element py-[1rem] md:px-[0.65rem] px-2 header-search">
                 <button aria-label="button" type="button" data-hs-overlay="#search-modal"
                   className="inline-flex flex-shrink-0 justify-center items-center gap-2  rounded-full font-medium focus:ring-offset-0 focus:ring-offset-white transition-all text-xs dark:bg-bgdark dark:hover:bg-black/20 dark:text-[#8c9097] dark:text-white/50 dark:hover:text-white dark:focus:ring-white/10 dark:focus:ring-offset-white/10">
                   <i className="bx bx-search-alt-2 header-link-icon"></i>
                 </button>
-              </div>
+              </div> */}
               {/* <div className="header-element py-[1rem] md:px-[0.65rem] px-2  header-country hs-dropdown ti-dropdown  hidden sm:block [--placement:bottom-left]">
                 <button id="dropdown-flag" type="button"
                   className="hs-dropdown-toggle ti-dropdown-toggle !p-0 flex-shrink-0  !border-0 !rounded-full !shadow-none">

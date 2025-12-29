@@ -63,6 +63,12 @@ interface Activity {
   frequencyConfig?: any;
   createdAt: string;
   updatedAt: string;
+  subactivities?: Array<{
+    _id: string;
+    id: string;
+    name: string;
+    frequency?: string;
+  }>;
 }
 
 interface Client {
@@ -110,6 +116,10 @@ interface Timeline {
     id: string;
     name: string;
   };
+  subactivity?: {
+    id: string;
+    name: string;
+  };
   client: {
     id: string;
     name: string;
@@ -118,6 +128,7 @@ interface Timeline {
   priority: string;
   startDate: string;
   endDate: string;
+  period?: string;
 }
 
 const EditTaskPage = () => {
@@ -156,6 +167,7 @@ const EditTaskPage = () => {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [selectedActivity, setSelectedActivity] = useState<string>("");
+  const [selectedSubActivity, setSelectedSubActivity] = useState<string>("");
   const [selectedGroup, setSelectedGroup] = useState<string>("");
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
@@ -187,7 +199,7 @@ const EditTaskPage = () => {
   // Refetch timelines when filters change
   useEffect(() => {
     if (showTimelineModal) {
-      if (selectedActivity || selectedGroup) {
+      if (selectedActivity || selectedSubActivity || selectedGroup) {
         setTimelineCurrentPage(1);
         fetchTimelines(1, timelineSearchQuery);
       } else {
@@ -195,7 +207,7 @@ const EditTaskPage = () => {
         fetchTimelines(1, "", true);
       }
     }
-  }, [selectedActivity, selectedGroup, showTimelineModal]);
+  }, [selectedActivity, selectedSubActivity, selectedGroup, showTimelineModal]);
 
   const fetchTask = async () => {
     try {
@@ -428,7 +440,7 @@ const EditTaskPage = () => {
   const fetchActivities = async () => {
     try {
       setIsLoadingActivities(true);
-      const response = await fetch(`${Base_url}activities`, {
+      const response = await fetch(`${Base_url}activities?limit=1000`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -473,6 +485,12 @@ const EditTaskPage = () => {
         : null;
       const activityName = selectedActivityData?.name;
       
+      // Get subactivity name if subactivity filter is selected
+      const selectedSubActivityData = selectedSubActivity && selectedActivity && !forceClearFilters
+        ? selectedActivityData?.subactivities?.find(sa => (sa._id || sa.id) === selectedSubActivity)
+        : null;
+      const subActivityName = selectedSubActivityData?.name;
+      
       // Get group name if group filter is selected
       const selectedGroupData = selectedGroup && !forceClearFilters
         ? groups.find(g => g.id === selectedGroup)
@@ -490,6 +508,11 @@ const EditTaskPage = () => {
       // Add activity filter using activityName parameter
       if (activityName && !forceClearFilters) {
         queryParams.append('activityName', activityName);
+      }
+
+      // Add subactivity filter using subactivityName parameter
+      if (subActivityName && !forceClearFilters) {
+        queryParams.append('subactivityName', subActivityName);
       }
 
       // Add group filter using group parameter (backend API now supports it)
@@ -573,6 +596,11 @@ const EditTaskPage = () => {
   // Filter change handlers
   const handleActivityFilterChange = (activityId: string) => {
     setSelectedActivity(activityId);
+    setSelectedSubActivity(""); // Clear subactivity when activity changes
+  };
+
+  const handleSubActivityFilterChange = (subActivityId: string) => {
+    setSelectedSubActivity(subActivityId);
   };
 
   const handleGroupFilterChange = (groupId: string) => {
@@ -581,6 +609,7 @@ const EditTaskPage = () => {
 
   const clearFilters = () => {
     setSelectedActivity("");
+    setSelectedSubActivity("");
     setSelectedGroup("");
     setTimelineSearchQuery("");
     setTimelineCurrentPage(1);
@@ -1051,6 +1080,7 @@ const EditTaskPage = () => {
                         setTimelineSearchQuery("");
                         setTimelineCurrentPage(1);
                         setSelectedActivity("");
+                        setSelectedSubActivity("");
                         setSelectedGroup("");
                         // Fetch all timelines without filters initially
                         fetchTimelines(1, "", true);
@@ -1068,7 +1098,7 @@ const EditTaskPage = () => {
                     <div className="mt-3 flex flex-wrap gap-2">
                       {selectedTimelines.map(timeline => (
                         <span key={timeline.id} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800">
-                          {timeline.title || `${timeline.activity?.name || 'Unknown Activity'} - ${timeline.client?.name || 'Unknown Client'}`}
+                          {timeline.title || `${timeline.activity?.name || 'Unknown Activity'}${timeline.subactivity?.name ? ` - ${timeline.subactivity.name}` : ''} - ${timeline.client?.name || 'Unknown Client'}${timeline.period ? ` (${timeline.period})` : ''}`}
                           <button
                             type="button"
                             className="ml-2 text-blue-600 hover:text-blue-800"
@@ -1283,8 +1313,8 @@ const EditTaskPage = () => {
             </div>
 
             <div className="p-4 border-b bg-gray-50">
-              {/* Activity and Group Filters */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              {/* Activity, Subactivity and Group Filters */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                 {/* Activity Filter */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1302,6 +1332,29 @@ const EditTaskPage = () => {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                {/* Subactivity Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Filter by Sub Activity
+                  </label>
+                  <select
+                    className="form-select w-full"
+                    value={selectedSubActivity}
+                    onChange={(e) => handleSubActivityFilterChange(e.target.value)}
+                    disabled={!selectedActivity}
+                  >
+                    <option value="">All Sub Activities</option>
+                    {selectedActivity && activities.find(a => a.id === selectedActivity)?.subactivities?.map((subActivity) => (
+                      <option key={subActivity._id || subActivity.id} value={subActivity._id || subActivity.id}>
+                        {subActivity.name}
+                      </option>
+                    ))}
+                  </select>
+                  {!selectedActivity && (
+                    <p className="text-xs text-gray-500 mt-1">Select an activity first</p>
+                  )}
                 </div>
 
                 {/* Group Filter */}
@@ -1329,7 +1382,7 @@ const EditTaskPage = () => {
                     type="button"
                     onClick={clearFilters}
                     className="ti-btn ti-btn-secondary w-full"
-                    disabled={!selectedActivity && !selectedGroup && !timelineSearchQuery}
+                    disabled={!selectedActivity && !selectedSubActivity && !selectedGroup && !timelineSearchQuery}
                   >
                     <i className="ri-refresh-line me-2"></i>
                     Clear Filters
@@ -1367,7 +1420,7 @@ const EditTaskPage = () => {
 
             <div className="flex-1 overflow-auto p-4">
               {/* Active Filters Summary */}
-              {(selectedActivity || selectedGroup) && (
+              {(selectedActivity || selectedSubActivity || selectedGroup) && (
                 <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
@@ -1375,6 +1428,11 @@ const EditTaskPage = () => {
                       {selectedActivity && (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
                           Activity: {activities.find(a => a.id === selectedActivity)?.name}
+                        </span>
+                      )}
+                      {selectedSubActivity && selectedActivity && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                          Sub Activity: {activities.find(a => a.id === selectedActivity)?.subactivities?.find(sa => (sa._id || sa.id) === selectedSubActivity)?.name}
                         </span>
                       )}
                       {selectedGroup && (
@@ -1411,7 +1469,13 @@ const EditTaskPage = () => {
                           Activity
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Sub Activity
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Client
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Period
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Status
@@ -1424,7 +1488,7 @@ const EditTaskPage = () => {
                     <tbody className="bg-white divide-y divide-gray-200">
                       {timelines.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="px-6 py-8 text-center">
+                          <td colSpan={7} className="px-6 py-8 text-center">
                             <div className="flex flex-col items-center justify-center">
                               <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
                                 <i className="ri-search-line text-2xl text-gray-400"></i>
@@ -1465,7 +1529,13 @@ const EditTaskPage = () => {
                               <div className="text-sm text-gray-900">{timeline.activity?.name || 'Unknown Activity'}</div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">{timeline.subactivity?.name || '-'}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-900">{timeline.client?.name || 'Unknown Client'}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">{timeline.period || '-'}</div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${

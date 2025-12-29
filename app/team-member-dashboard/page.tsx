@@ -185,12 +185,17 @@ const TeamMemberDashboard = () => {
       id: string
       name: string
     }
+    subactivity?: {
+      id: string
+      name: string
+    }
     client?: {
       id: string
       name: string
     }
     status?: string
     priority?: string
+    period?: string
   }>>([])
   const [selectedTimelines, setSelectedTimelines] = useState<Array<{
     id: string
@@ -199,10 +204,15 @@ const TeamMemberDashboard = () => {
       id: string
       name: string
     }
+    subactivity?: {
+      id: string
+      name: string
+    }
     client?: {
       id: string
       name: string
     }
+    period?: string
   }>>([])
   const [showTimelineModal, setShowTimelineModal] = useState(false)
   const [showEditTimelineModal, setShowEditTimelineModal] = useState(false)
@@ -805,10 +815,15 @@ const TeamMemberDashboard = () => {
       id: string
       name: string
     }
+    subactivity?: {
+      id: string
+      name: string
+    }
     client?: {
       id: string
       name: string
     }
+    period?: string
   }>>([])
 
   const openEditTaskModal = (task: Task) => {
@@ -833,10 +848,15 @@ const TeamMemberDashboard = () => {
         id: string
         name: string
       }
+      subactivity?: {
+        id: string
+        name: string
+      }
       client?: {
         id: string
         name: string
       }
+      period?: string
     }> = []
     
     if (task.timeline && Array.isArray(task.timeline)) {
@@ -854,10 +874,15 @@ const TeamMemberDashboard = () => {
                 id: timeline.activity._id || timeline.activity.id || '',
                 name: timeline.activity.name || ''
               } : undefined,
+              subactivity: timeline.subactivity ? {
+                id: timeline.subactivity._id || timeline.subactivity.id || '',
+                name: timeline.subactivity.name || ''
+              } : undefined,
               client: timeline.client ? {
                 id: timeline.client._id || timeline.client.id || '',
                 name: timeline.client.name || ''
-              } : undefined
+              } : undefined,
+              period: timeline.period || undefined
             })
           }
         }
@@ -2219,7 +2244,7 @@ const TeamMemberDashboard = () => {
                     <div className="mt-3 flex flex-wrap gap-2">
                       {editSelectedTimelines.map(timeline => (
                         <span key={timeline.id} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200">
-                          {timeline.title || `${timeline.activity?.name || 'Unknown Activity'} - ${timeline.client?.name || 'Unknown Client'}`}
+                          {timeline.title || `${timeline.activity?.name || 'Unknown Activity'}${timeline.subactivity?.name ? ` - ${timeline.subactivity.name}` : ''} - ${timeline.client?.name || 'Unknown Client'}${timeline.period ? ` (${timeline.period})` : ''}`}
                           <button
                             type="button"
                             className="ml-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
@@ -2435,7 +2460,7 @@ const TeamMemberDashboard = () => {
                     <div className="mt-3 flex flex-wrap gap-2">
                       {selectedTimelines.map(timeline => (
                         <span key={timeline.id} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200">
-                          {timeline.title || `${timeline.activity?.name || 'Unknown Activity'} - ${timeline.client?.name || 'Unknown Client'}`}
+                          {timeline.title || `${timeline.activity?.name || 'Unknown Activity'}${timeline.subactivity?.name ? ` - ${timeline.subactivity.name}` : ''} - ${timeline.client?.name || 'Unknown Client'}${timeline.period ? ` (${timeline.period})` : ''}`}
                           <button
                             type="button"
                             className="ml-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
@@ -2627,7 +2652,13 @@ const TeamMemberDashboard = () => {
                           Activity
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          Sub Activity
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                           Client
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          Period
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                           Status
@@ -2640,7 +2671,7 @@ const TeamMemberDashboard = () => {
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                       {timelines.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="px-6 py-8 text-center">
+                          <td colSpan={7} className="px-6 py-8 text-center">
                             <div className="flex flex-col items-center justify-center">
                               <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-4">
                                 <i className="ri-search-line text-2xl text-gray-400"></i>
@@ -2691,7 +2722,13 @@ const TeamMemberDashboard = () => {
                               <div className="text-sm text-gray-900 dark:text-white">{timeline.activity?.name || 'Unknown Activity'}</div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900 dark:text-white">{timeline.subactivity?.name || '-'}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-900 dark:text-white">{timeline.client?.name || 'Unknown Client'}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900 dark:text-white">{timeline.period || '-'}</div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${

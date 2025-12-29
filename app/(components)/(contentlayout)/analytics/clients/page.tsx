@@ -82,6 +82,12 @@ interface Client {
   };
   timelines: {
     total: number;
+    byStatus?: {
+      pending?: number;
+      completed?: number;
+      delayed?: number;
+      ongoing?: number;
+    };
     summary: Array<{
       id: string;
       client: string;
@@ -130,10 +136,41 @@ const AnalyticsClientsPage = () => {
     tanNumber: "",
     cinNumber: "",
     udyamNumber: "",
-    iecCode: ""
+    iecCode: "",
+    activity: "",
+    subactivity: ""
   });
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [activities, setActivities] = useState<any[]>([]);
+  const [isLoadingActivities, setIsLoadingActivities] = useState(false);
+  const [expandedActivities, setExpandedActivities] = useState<Record<string, boolean>>({});
+
+  const fetchActivities = async () => {
+    try {
+      setIsLoadingActivities(true);
+      const response = await fetch(`${Base_url}activities?limit=1000`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch activities');
+      }
+
+      const data = await response.json();
+      setActivities(data.results || []);
+    } catch (err) {
+      toast.error('Failed to fetch activities');
+    } finally {
+      setIsLoadingActivities(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchActivities();
+  }, []);
 
   const fetchClients = async (page = 1, limit = itemsPerPage) => {
     try {
@@ -156,6 +193,8 @@ const AnalyticsClientsPage = () => {
         ...(filters.pan && { pan: filters.pan }),
         ...(filters.businessType && { businessType: filters.businessType }),
         ...(filters.entityType && { entityType: filters.entityType }),
+        ...(filters.activity && { activity: filters.activity }),
+        ...(filters.subactivity && { subactivity: filters.subactivity }),
         ...(filters.gstNumber && { gstNumber: filters.gstNumber }),
         ...(filters.tanNumber && { tanNumber: filters.tanNumber }),
         ...(filters.cinNumber && { cinNumber: filters.cinNumber }),
@@ -263,6 +302,48 @@ const AnalyticsClientsPage = () => {
           {tasks.status.delayed > 0 && (
             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-danger text-black">
               {tasks.status.delayed} Delayed
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Function to render timeline status badges
+  const renderTimelineStatus = (timelines: Client['timelines']) => {
+    if (!timelines || timelines.total === 0) {
+      return (
+        <div className="text-center text-gray-400 text-xs">
+          <i className="ri-calendar-line mr-1"></i>
+          No timelines
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-1">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-gray-600">Total: {timelines.total}</span>
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {timelines.byStatus?.pending > 0 && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-warning text-black">
+              {timelines.byStatus.pending} Pending
+            </span>
+          )}
+          {timelines.byStatus?.ongoing > 0 && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary text-black">
+              {timelines.byStatus.ongoing} Ongoing
+            </span>
+          )}
+          {timelines.byStatus?.completed > 0 && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success text-black">
+              {timelines.byStatus.completed} Completed
+            </span>
+          )}
+          {timelines.byStatus?.delayed > 0 && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-danger text-black">
+              {timelines.byStatus.delayed} Delayed
             </span>
           )}
         </div>
@@ -512,6 +593,8 @@ const AnalyticsClientsPage = () => {
                         pan: "",
                         businessType: "",
                         entityType: "",
+                        activity: "",
+                        subactivity: "",
                         gstNumber: "",
                         tanNumber: "",
                         cinNumber: "",
@@ -594,6 +677,56 @@ const AnalyticsClientsPage = () => {
                         <option value="Trust">Trust</option>
                         <option value="Society">Society</option>
                         <option value="Other">Other</option>
+                      </select>
+                    </div>
+
+                    {/* Activity Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Activity
+                      </label>
+                      <select
+                        className="form-select w-full"
+                        value={filters.activity}
+                        onChange={(e) => {
+                          setFilters(prev => ({ 
+                            ...prev, 
+                            activity: e.target.value,
+                            subactivity: "" // Reset subactivity when activity changes
+                          }));
+                          setCurrentPage(1);
+                        }}
+                        disabled={isLoadingActivities}
+                      >
+                        <option value="">All Activities</option>
+                        {activities.map((activity) => (
+                          <option key={activity.id || activity._id} value={activity.id || activity._id}>
+                            {activity.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Subactivity Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Subactivity
+                      </label>
+                      <select
+                        className="form-select w-full"
+                        value={filters.subactivity}
+                        onChange={(e) => {
+                          setFilters(prev => ({ ...prev, subactivity: e.target.value }));
+                          setCurrentPage(1);
+                        }}
+                        disabled={!filters.activity}
+                      >
+                        <option value="">All Subactivities</option>
+                        {filters.activity && activities.find(a => (a.id || a._id) === filters.activity)?.subactivities?.map((subactivity: any) => (
+                          <option key={subactivity._id || subactivity.id} value={subactivity._id || subactivity.id}>
+                            {subactivity.name}
+                          </option>
+                        ))}
                       </select>
                     </div>
 
@@ -726,6 +859,8 @@ const AnalyticsClientsPage = () => {
                           ...prev,
                           businessType: "",
                           entityType: "",
+                          activity: "",
+                          subactivity: "",
                           gstNumber: "",
                           tanNumber: "",
                           cinNumber: "",
@@ -788,6 +923,8 @@ const AnalyticsClientsPage = () => {
                           ...prev,
                           businessType: "",
                           entityType: "",
+                          activity: "",
+                          subactivity: "",
                           gstNumber: "",
                           tanNumber: "",
                           cinNumber: "",
@@ -836,6 +973,28 @@ const AnalyticsClientsPage = () => {
                         <button
                           className="ml-1 text-blue-600 hover:text-blue-800"
                           onClick={() => setFilters(prev => ({ ...prev, entityType: "" }))}
+                        >
+                          <i className="ri-close-line"></i>
+                        </button>
+                      </span>
+                    )}
+                    {filters.activity && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        Activity: {activities.find(a => (a.id || a._id) === filters.activity)?.name || filters.activity}
+                        <button
+                          className="ml-1 text-blue-600 hover:text-blue-800"
+                          onClick={() => setFilters(prev => ({ ...prev, activity: "", subactivity: "" }))}
+                        >
+                          <i className="ri-close-line"></i>
+                        </button>
+                      </span>
+                    )}
+                    {filters.subactivity && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        Subactivity: {activities.find(a => (a.id || a._id) === filters.activity)?.subactivities?.find((sa: any) => (sa._id || sa.id) === filters.subactivity)?.name || filters.subactivity}
+                        <button
+                          className="ml-1 text-blue-600 hover:text-blue-800"
+                          onClick={() => setFilters(prev => ({ ...prev, subactivity: "" }))}
                         >
                           <i className="ri-close-line"></i>
                         </button>
@@ -937,11 +1096,9 @@ const AnalyticsClientsPage = () => {
                                          <thead>
                        <tr className="border-b border-gray-200">
                          <th className="px-4 py-3">Client</th>
-                         <th className="px-4 py-3">City</th>
-                         <th className="px-4 py-3">PAN</th>
                          <th className="px-4 py-3">Activities</th>
-                         <th className="px-4 py-3">Team Members</th>
-                         <th className="px-4 py-3">Task Status</th>
+                         <th className="px-4 py-3">Tasks & Team</th>
+                         <th className="px-4 py-3">Timeline Status</th>
                        </tr>
                      </thead>
                     <tbody>
@@ -990,95 +1147,127 @@ const AnalyticsClientsPage = () => {
                                     <i className="ri-search-line ml-1 text-xs"></i>
                                   )}
                                 </div>
+                                <div className={`text-xs text-gray-400 mt-1 ${
+                                  debouncedSearchQuery && client.district?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) 
+                                    ? 'bg-yellow-100 text-yellow-800 px-1 rounded' 
+                                    : ''
+                                }`}>
+                                  <i className="ri-map-pin-line mr-1"></i>
+                                  {client.district}
+                                  {debouncedSearchQuery && client.district?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) && (
+                                    <i className="ri-search-line ml-1 text-xs"></i>
+                                  )}
+                                </div>
+                                <div className={`text-xs text-gray-400 mt-1 ${
+                                  debouncedSearchQuery && client.pan?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) 
+                                    ? 'bg-yellow-100 text-yellow-800 px-1 rounded' 
+                                    : ''
+                                }`}>
+                                  <i className="ri-file-text-line mr-1"></i>
+                                  PAN: {client.pan}
+                                  {debouncedSearchQuery && client.pan?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) && (
+                                    <i className="ri-search-line ml-1 text-xs"></i>
+                                  )}
+                                </div>
                               </div>
-                            </td>
-                            <td className={`${
-                              debouncedSearchQuery && client.district?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) 
-                                ? 'bg-yellow-100 text-yellow-800 px-1 rounded' 
-                                : ''
-                            }`}>
-                              {client.district}
-                              {debouncedSearchQuery && client.district?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) && (
-                                <i className="ri-search-line ml-1 text-xs"></i>
-                              )}
-                            </td>
-                            <td className={`${
-                              debouncedSearchQuery && client.pan?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) 
-                                ? 'bg-yellow-100 text-yellow-800 px-1 rounded' 
-                                : ''
-                            }`}>
-                              {client.pan}
-                              {debouncedSearchQuery && client.pan?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) && (
-                                <i className="ri-search-line ml-1 text-xs"></i>
-                              )}
                             </td>
                             <td>
                               <div className="text-sm text-gray-900">
-                                {client.activities?.summary?.map((activity: any, index: number) => {
-                                  const isActivityMatch = debouncedSearchQuery && 
-                                    activity.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
-                                  
-                                  return (
-                                    <span key={activity.id || index}>
-                                      <span className={`${isActivityMatch ? 'bg-yellow-100 text-yellow-800 px-1 rounded' : ''}`}>
-                                        {activity.name}
-                                        {isActivityMatch && (
-                                          <i className="ri-search-line ml-1 text-xs"></i>
-                                        )}
+                                {client.activities?.summary && client.activities.summary.length > 0 ? (
+                                  <>
+                                    {(expandedActivities[client._id] 
+                                      ? client.activities.summary 
+                                      : client.activities.summary.slice(0, 2)
+                                    ).map((activity: any, index: number) => {
+                                      const isActivityMatch = debouncedSearchQuery && 
+                                        activity.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
+                                      
+                                      return (
+                                        <span key={activity.id || index}>
+                                          <span className={`${isActivityMatch ? 'bg-yellow-100 text-yellow-800 px-1 rounded' : ''}`}>
+                                            {activity.name}
+                                            {isActivityMatch && (
+                                              <i className="ri-search-line ml-1 text-xs"></i>
+                                            )}
+                                          </span>
+                                          {index < (expandedActivities[client._id] ? client.activities.summary.length : Math.min(2, client.activities.summary.length)) - 1 ? ', ' : ''}
+                                        </span>
+                                      );
+                                    })}
+                                    {client.activities.summary.length > 2 && (
+                                      <button
+                                        onClick={() => setExpandedActivities(prev => ({
+                                          ...prev,
+                                          [client._id]: !prev[client._id]
+                                        }))}
+                                        className="text-blue-600 hover:text-blue-800 text-xs ml-1 underline"
+                                      >
+                                        {expandedActivities[client._id] ? '...less' : '...more'}
+                                      </button>
+                                    )}
+                                  </>
+                                ) : (
+                                  'No activities'
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="space-y-2">
+                                {/* Task Status */}
+                                <div>
+                                  <div className="text-xs text-gray-600 mb-1">Tasks:</div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {client.tasks?.status?.pending > 0 && (
+                                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-warning text-black">
+                                        {client.tasks.status.pending} P
                                       </span>
-                                      {index < client.activities.summary.length - 1 ? ', ' : ''}
-                                    </span>
-                                  );
-                                }) || 'No activities'}
+                                    )}
+                                    {client.tasks?.status?.ongoing > 0 && (
+                                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary text-black">
+                                        {client.tasks.status.ongoing} O
+                                      </span>
+                                    )}
+                                    {client.tasks?.status?.completed > 0 && (
+                                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success text-black">
+                                        {client.tasks.status.completed} C
+                                      </span>
+                                    )}
+                                    {client.tasks?.status?.on_hold > 0 && (
+                                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                        {client.tasks.status.on_hold} H
+                                      </span>
+                                    )}
+                                    {client.tasks?.status?.delayed > 0 && (
+                                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-danger text-black">
+                                        {client.tasks.status.delayed} D
+                                      </span>
+                                    )}
+                                    {(!client.tasks || client.tasks.total === 0) && (
+                                      <span className="text-gray-400 text-xs">No tasks</span>
+                                    )}
+                                  </div>
+                                </div>
+                                {/* Team Members */}
+                                <div>
+                                  <div className="text-xs text-gray-600 mb-1">Team:</div>
+                                  <div className="text-sm text-gray-900">
+                                    {client.teamMembers?.members && client.teamMembers.members.length > 0 ? (
+                                      client.teamMembers.members.map((member: any) => member.name).join(', ')
+                                    ) : (
+                                      <span className="text-gray-400 text-xs">No team members</span>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
                             </td>
-                            <td>
-                              <div className="text-sm text-gray-900">
-                                {client.teamMembers?.members?.map((member: any) => member.name).join(', ') || 'No team members'}
-                              </div>
-                            </td>
-                                                         <td className="px-4 py-3">
-                               <div className="text-sm text-gray-900">
-                                 {client.tasks?.status?.pending > 0 && (
-                                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-warning text-black mr-1">
-                                     {client.tasks.status.pending} Pending
-                                   </span>
-                                 )}
-                                 {client.tasks?.status?.ongoing > 0 && (
-                                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary text-black mr-1">
-                                     {client.tasks.status.ongoing} Ongoing
-                                   </span>
-                                 )}
-                                 {client.tasks?.status?.completed > 0 && (
-                                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success text-black mr-1">
-                                     {client.tasks.status.completed} Completed
-                                   </span>
-                                 )}
-                                 {client.tasks?.status?.on_hold > 0 && (
-                                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 mr-1">
-                                     {client.tasks.status.on_hold} On Hold
-                                   </span>
-                                 )}
-                                 {client.tasks?.status?.delayed > 0 && (
-                                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-danger text-black mr-1">
-                                     {client.tasks?.status.delayed} Delayed
-                                   </span>
-                                 )}
-                                 {client.tasks?.status?.cancelled > 0 && (
-                                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 mr-1">
-                                     {client.tasks.status.cancelled} Cancelled
-                                   </span>
-                                 )}
-                                 {(!client.tasks || client.tasks.total === 0) && (
-                                   <span className="text-gray-400 text-xs">No tasks</span>
-                                 )}
-                               </div>
+                             <td className="px-4 py-3">
+                               {renderTimelineStatus(client.timelines)}
                              </td>
                           </tr>
                         ))
                       ) : (
-                                                 <tr>
-                           <td colSpan={6} className="text-center py-8">
+                        <tr>
+                          <td colSpan={4} className="text-center py-8">
                             <div className="flex flex-col items-center justify-center">
                               <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
                                 <i className="ri-folder-line text-4xl text-primary"></i>

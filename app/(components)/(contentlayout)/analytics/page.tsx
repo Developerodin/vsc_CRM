@@ -1573,6 +1573,35 @@ const AnalyticsPage = () => {
          )}
        </div>
 
+       {/* Timelines Table */}
+       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
+         <div className="flex items-center justify-between mb-6">
+           <h2 className="text-xl font-semibold text-gray-900">Timelines Overview</h2>
+           <button
+             onClick={() => router.push('/analytics/timelines')}
+             className="ti-btn ti-btn-primary"
+           >
+             Explore All Timelines
+           </button>
+         </div>
+         <div className="text-center py-8">
+           <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
+             <i className="ri-calendar-line text-4xl text-primary"></i>
+           </div>
+           <h3 className="text-xl font-medium mb-2">Timeline Analytics</h3>
+           <p className="text-gray-500 text-center mb-6">
+             View comprehensive timeline analytics with filtering and search capabilities.
+           </p>
+           <button
+             onClick={() => router.push('/analytics/timelines')}
+             className="ti-btn ti-btn-primary"
+           >
+             <i className="ri-calendar-line mr-2"></i>
+             View Timelines
+           </button>
+         </div>
+       </div>
+
        {/* Clients Table */}
        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
          <div className="flex items-center justify-between mb-6">
