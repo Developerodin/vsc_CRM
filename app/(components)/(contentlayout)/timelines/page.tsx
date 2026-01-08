@@ -6,6 +6,7 @@ import { toast, Toaster } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { Base_url } from '@/app/api/config/BaseUrl';
 import TaskManagement from './components/TaskManagement';
+import ComplianceRegister from './components/ComplianceRegister';
 
 interface Timeline {
   _id: string;
@@ -94,7 +95,7 @@ interface ExcelRow {
 }
 
 const TimelinesPage = () => {
-  const [activeTab, setActiveTab] = useState<'timelines' | 'tasks'>('tasks');
+  const [activeTab, setActiveTab] = useState<'timelines' | 'tasks' | 'register'>('tasks');
   const [selectedTimelines, setSelectedTimelines] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [timelines, setTimelines] = useState<Timeline[]>([]);
@@ -354,91 +355,108 @@ const TimelinesPage = () => {
     setShowExportModal(true);
   };
 
-  const performExport = async () => {
+  const performExport = async (exportType: 'timelines' | 'register' = 'timelines') => {
     try {
       let exportData;
-      let successMessage;
+      let fileName;
 
-      // Build query parameters based on export filters
-      const queryParams = new URLSearchParams({
-        limit: '1000',
-        ...(exportFilters.activity && { activity: exportFilters.activity }),
-        ...(exportFilters.subActivity && { subactivity: exportFilters.subActivity }),
-        ...(exportFilters.frequency && { frequency: exportFilters.frequency }),
-        ...(exportFilters.period && { period: exportFilters.period })
-      });
+      if (exportType === 'register') {
+        // Export compliance register
+        const queryParams = new URLSearchParams({
+          limit: '1000',
+          ...(exportFilters.period && { period: exportFilters.period })
+        });
 
-      const response = await fetch(`${Base_url}timelines?${queryParams}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        const response = await fetch(`${Base_url}compliance-register?${queryParams}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch compliance register for export');
         }
-      });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch timelines for export');
+        const apiData = await response.json();
+        const registerData = apiData.results || apiData || [];
+
+        exportData = registerData.map((entry: any) => ({
+          "Client Name": entry.clientName || "",
+          "Task Type": entry.taskType || "",
+          "Period": entry.period || "",
+          "Financial Year": entry.financialYear || "",
+          "Status": entry.status || "",
+          "Due Date": entry.dueDate || "",
+          "Filed Date": entry.filedDate || "",
+          "Approved Date": entry.approvedDate || "",
+          "Remarks": entry.remarks || ""
+        }));
+
+        fileName = `compliance_register_${new Date().toISOString().split("T")[0]}.xlsx`;
+      } else {
+        // Export timelines (existing logic)
+        const queryParams = new URLSearchParams({
+          limit: '1000',
+          ...(exportFilters.activity && { activity: exportFilters.activity }),
+          ...(exportFilters.subActivity && { subactivity: exportFilters.subActivity }),
+          ...(exportFilters.frequency && { frequency: exportFilters.frequency }),
+          ...(exportFilters.period && { period: exportFilters.period })
+        });
+
+        const response = await fetch(`${Base_url}timelines?${queryParams}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch timelines for export');
+        }
+
+        const apiData: ApiResponse = await response.json();
+        
+        // Get unique field names from all timelines for dynamic columns
+        const allFieldNames = new Set<string>();
+        apiData.results.forEach((timeline: Timeline) => {
+          timeline.fields?.forEach(field => {
+            allFieldNames.add(field.fileName);
+          });
+        });
+
+        exportData = apiData.results.map((timeline: Timeline) => {
+          const baseData = {
+            "Timeline ID": timeline.id,
+            "Name of Clients": timeline.client?.name || "",
+            "Subactivity": timeline.subactivity?.name || "",
+            "Frequency": timeline.subactivity?.frequency || timeline.frequency || "",
+            "Period": timeline.period || "",
+            "Status": timeline.status || "",
+            "Completed At": timeline.completedAt ? new Date(timeline.completedAt).toLocaleDateString('en-GB').replace(/\//g, '-') : ""
+          };
+
+          // Add dynamic field columns
+          const fieldData: any = {};
+          allFieldNames.forEach(fieldName => {
+            const field = timeline.fields?.find(f => f.fileName === fieldName);
+            fieldData[fieldName] = field?.fieldValue || "";
+          });
+
+          return { ...baseData, ...fieldData };
+        });
+
+        fileName = `timelines_${new Date().toISOString().split("T")[0]}.xlsx`;
       }
 
-      const apiData: ApiResponse = await response.json();
-      
-      // Get unique field names from all timelines for dynamic columns
-      const allFieldNames = new Set<string>();
-      apiData.results.forEach((timeline: Timeline) => {
-        timeline.fields?.forEach(field => {
-          allFieldNames.add(field.fileName);
-        });
-      });
-
-      exportData = apiData.results.map((timeline: Timeline) => {
-        const baseData = {
-          "Timeline ID": timeline.id,
-          "Name of Clients": timeline.client?.name || "",
-          "Subactivity": timeline.subactivity?.name || "",
-          "Frequency": timeline.subactivity?.frequency || timeline.frequency || "",
-          "Period": timeline.period || "",
-          "Status": timeline.status || "",
-          "Completed At": timeline.completedAt ? new Date(timeline.completedAt).toLocaleDateString('en-GB').replace(/\//g, '-') : ""
-        };
-
-        // Add dynamic field columns
-        const fieldData: any = {};
-        allFieldNames.forEach(fieldName => {
-          const field = timeline.fields?.find(f => f.fileName === fieldName);
-          fieldData[fieldName] = field?.fieldValue || "";
-        });
-
-        return { ...baseData, ...fieldData };
-      });
-
       const ws = XLSX.utils.json_to_sheet(exportData);
-      
-      // Calculate column widths dynamically
-      const columnWidths = [
-        { wch: 20 }, // Timeline ID
-        { wch: 30 }, // Name of Clients
-        { wch: 25 }, // Subactivity
-        { wch: 20 }, // Frequency
-        { wch: 20 }, // Period
-        { wch: 15 }, // Status
-        { wch: 20 }  // Completed At
-      ];
-
-      // Add widths for dynamic field columns
-      allFieldNames.forEach(fieldName => {
-        columnWidths.push({ wch: Math.max(20, fieldName.length + 2) });
-      });
-
-      ws["!cols"] = columnWidths;
-
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Timelines");
-      const fileName = `timelines_${new Date().toISOString().split("T")[0]}.xlsx`;
+      XLSX.utils.book_append_sheet(wb, ws, exportType === 'register' ? "Compliance Register" : "Timelines");
       XLSX.writeFile(wb, fileName);
       
-      toast.success("Timelines exported successfully");
+      toast.success(`${exportType === 'register' ? 'Compliance register' : 'Timelines'} exported successfully`);
       setShowExportModal(false);
       setExportFilters({ activity: '', subActivity: '', frequency: '', period: '' });
     } catch (error) {
-      toast.error("Failed to export timelines");
+      toast.error(`Failed to export ${exportType === 'register' ? 'compliance register' : 'timelines'}`);
     }
   };
 
@@ -742,12 +760,29 @@ const TimelinesPage = () => {
                 <i className="ri-time-line me-2"></i>
                 Timelines
               </button>
+              <button
+                onClick={() => setActiveTab('register')}
+                className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'register'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <i className="ri-file-list-3-line me-2"></i>
+                Register
+              </button>
             </div>
           </div>
 
           {/* Content Box */}
           {activeTab === 'tasks' ? (
             <TaskManagement />
+          ) : activeTab === 'register' ? (
+            <ComplianceRegister onExport={async (filters) => {
+              // Open export modal with filters for register export
+              setExportFilters(filters);
+              setShowExportModal(true);
+            }} />
           ) : (
             <div className="box">
               <div className="box-body">
@@ -1215,7 +1250,9 @@ const TimelinesPage = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Export Timelines</h3>
+              <h3 className="text-lg font-semibold">
+                {activeTab === 'register' ? 'Export Compliance Register' : 'Export Timelines'}
+              </h3>
               <button
                 onClick={() => {
                   setShowExportModal(false);
@@ -1229,133 +1266,154 @@ const TimelinesPage = () => {
             </div>
 
             <div className="space-y-4">
-              {/* Activity Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Activity
-                </label>
-                <select
-                  className="form-select w-full"
-                  value={exportFilters.activity}
-                  onChange={(e) => {
-                    setExportFilters(prev => ({
-                      ...prev,
-                      activity: e.target.value,
-                      subActivity: '', // Reset sub-activity when activity changes
-                      frequency: '', // Reset frequency when activity changes
-                      period: '' // Reset period when activity changes
-                    }));
-                    setAvailablePeriods([]); // Clear periods when activity changes
-                  }}
-                >
-                  <option value="">All Activities</option>
-                  {activities.map((activity) => (
-                    <option key={activity.id} value={activity.id}>
-                      {activity.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Sub-Activity Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Sub-Activity
-                </label>
-                <select
-                  className="form-select w-full"
-                  value={exportFilters.subActivity}
-                  onChange={(e) => {
-                    const selectedSubActivityId = e.target.value;
-                    const selectedActivity = activities.find(a => a.id === exportFilters.activity);
-                    const selectedSubActivity = selectedActivity?.subactivities?.find(sa => sa._id === selectedSubActivityId);
-                    
-                    setExportFilters(prev => ({ 
-                      ...prev, 
-                      subActivity: selectedSubActivityId,
-                      frequency: selectedSubActivity?.frequency || ''
-                    }));
-                    
-                    // Fetch periods for the selected frequency
-                    if (selectedSubActivity?.frequency) {
-                      fetchFrequencyPeriods(selectedSubActivity.frequency);
-                    } else {
-                      setAvailablePeriods([]);
-                    }
-                  }}
-                  disabled={!exportFilters.activity}
-                >
-                  <option value="">All Sub-Activities</option>
-                  {exportFilters.activity && activities.find(a => a.id === exportFilters.activity)?.subactivities?.map((subActivity) => (
-                    <option key={subActivity._id} value={subActivity._id}>
-                      {subActivity.name} ({subActivity.frequency || 'No frequency'})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Frequency Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Frequency
-                </label>
-                <select
-                  className="form-select w-full"
-                  value={exportFilters.frequency}
-                  onChange={(e) => {
-                    setExportFilters(prev => ({ ...prev, frequency: e.target.value }));
-                    fetchFrequencyPeriods(e.target.value);
-                  }}
-                  disabled={!!exportFilters.subActivity} // Disabled when sub-activity is selected
-                >
-                  <option value="">All Frequencies</option>
-                  <option value="OneTime">One Time</option>
-                  <option value="Hourly">Hourly</option>
-                  <option value="Daily">Daily</option>
-                  <option value="Weekly">Weekly</option>
-                  <option value="Monthly">Monthly</option>
-                  <option value="Quarterly">Quarterly</option>
-                  <option value="Yearly">Yearly</option>
-                </select>
-                {exportFilters.subActivity && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Frequency auto-selected from sub-activity
+              {activeTab === 'register' ? (
+                // Simplified export for Register
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Period (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    className="form-control w-full"
+                    value={exportFilters.period}
+                    onChange={(e) => setExportFilters(prev => ({ ...prev, period: e.target.value }))}
+                    placeholder="Filter by period (e.g., Q1-2024, April-2024)"
+                  />
+                  <p className="text-xs text-gray-500 mt-2">
+                    Leave empty to export all compliance register entries
                   </p>
-                )}
-              </div>
+                </div>
+              ) : (
+                <>
+                  {/* Activity Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Activity
+                    </label>
+                    <select
+                      className="form-select w-full"
+                      value={exportFilters.activity}
+                      onChange={(e) => {
+                        setExportFilters(prev => ({
+                          ...prev,
+                          activity: e.target.value,
+                          subActivity: '', // Reset sub-activity when activity changes
+                          frequency: '', // Reset frequency when activity changes
+                          period: '' // Reset period when activity changes
+                        }));
+                        setAvailablePeriods([]); // Clear periods when activity changes
+                      }}
+                    >
+                      <option value="">All Activities</option>
+                      {activities.map((activity) => (
+                        <option key={activity.id} value={activity.id}>
+                          {activity.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-              {/* Period Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Period
-                </label>
-                <select
-                  className="form-select w-full"
-                  value={exportFilters.period}
-                  onChange={(e) => setExportFilters(prev => ({ ...prev, period: e.target.value }))}
-                  disabled={!exportFilters.frequency}
-                >
-                  <option value="">All Periods</option>
-                  {isLoadingPeriods ? (
-                    <option value="" disabled>Loading periods...</option>
-                  ) : availablePeriods.length > 0 ? (
-                    availablePeriods.map((period) => (
-                      <option key={period.period} value={period.period}>
-                        {period.displayName}
-                      </option>
-                    ))
-                  ) : exportFilters.frequency ? (
-                    <option value="" disabled>No periods available for this frequency</option>
-                  ) : (
-                    <option value="" disabled>Select frequency first</option>
-                  )}
-                </select>
-                {exportFilters.frequency && !isLoadingPeriods && availablePeriods.length === 0 && (
-                  <p className="text-xs text-red-500 mt-1">
-                    No periods found for {exportFilters.frequency} frequency
-                  </p>
-                )}
-              </div>
+                  {/* Sub-Activity Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Sub-Activity
+                    </label>
+                    <select
+                      className="form-select w-full"
+                      value={exportFilters.subActivity}
+                      onChange={(e) => {
+                        const selectedSubActivityId = e.target.value;
+                        const selectedActivity = activities.find(a => a.id === exportFilters.activity);
+                        const selectedSubActivity = selectedActivity?.subactivities?.find(sa => sa._id === selectedSubActivityId);
+                        
+                        setExportFilters(prev => ({ 
+                          ...prev, 
+                          subActivity: selectedSubActivityId,
+                          frequency: selectedSubActivity?.frequency || ''
+                        }));
+                        
+                        // Fetch periods for the selected frequency
+                        if (selectedSubActivity?.frequency) {
+                          fetchFrequencyPeriods(selectedSubActivity.frequency);
+                        } else {
+                          setAvailablePeriods([]);
+                        }
+                      }}
+                      disabled={!exportFilters.activity}
+                    >
+                      <option value="">All Sub-Activities</option>
+                      {exportFilters.activity && activities.find(a => a.id === exportFilters.activity)?.subactivities?.map((subActivity) => (
+                        <option key={subActivity._id} value={subActivity._id}>
+                          {subActivity.name} ({subActivity.frequency || 'No frequency'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Frequency Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Frequency
+                    </label>
+                    <select
+                      className="form-select w-full"
+                      value={exportFilters.frequency}
+                      onChange={(e) => {
+                        setExportFilters(prev => ({ ...prev, frequency: e.target.value }));
+                        fetchFrequencyPeriods(e.target.value);
+                      }}
+                      disabled={!!exportFilters.subActivity} // Disabled when sub-activity is selected
+                    >
+                      <option value="">All Frequencies</option>
+                      <option value="OneTime">One Time</option>
+                      <option value="Hourly">Hourly</option>
+                      <option value="Daily">Daily</option>
+                      <option value="Weekly">Weekly</option>
+                      <option value="Monthly">Monthly</option>
+                      <option value="Quarterly">Quarterly</option>
+                      <option value="Yearly">Yearly</option>
+                    </select>
+                    {exportFilters.subActivity && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Frequency auto-selected from sub-activity
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Period Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Period
+                    </label>
+                    <select
+                      className="form-select w-full"
+                      value={exportFilters.period}
+                      onChange={(e) => setExportFilters(prev => ({ ...prev, period: e.target.value }))}
+                      disabled={!exportFilters.frequency}
+                    >
+                      <option value="">All Periods</option>
+                      {isLoadingPeriods ? (
+                        <option value="" disabled>Loading periods...</option>
+                      ) : availablePeriods.length > 0 ? (
+                        availablePeriods.map((period) => (
+                          <option key={period.period} value={period.period}>
+                            {period.displayName}
+                          </option>
+                        ))
+                      ) : exportFilters.frequency ? (
+                        <option value="" disabled>No periods available for this frequency</option>
+                      ) : (
+                        <option value="" disabled>Select frequency first</option>
+                      )}
+                    </select>
+                    {exportFilters.frequency && !isLoadingPeriods && availablePeriods.length === 0 && (
+                      <p className="text-xs text-red-500 mt-1">
+                        No periods found for {exportFilters.frequency} frequency
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="flex justify-end space-x-3 mt-6">
@@ -1370,7 +1428,14 @@ const TimelinesPage = () => {
                 Cancel
               </button>
               <button
-                onClick={performExport}
+                onClick={() => {
+                  if (activeTab === 'register') {
+                    // For register, show simplified export modal or direct export
+                    performExport('register');
+                  } else {
+                    setShowExportModal(true);
+                  }
+                }}
                 className="ti-btn ti-btn-primary"
               >
                 <i className="ri-download-2-line me-2"></i>
