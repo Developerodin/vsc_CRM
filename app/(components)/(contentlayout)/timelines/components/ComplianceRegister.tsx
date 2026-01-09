@@ -52,7 +52,8 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
     activity: "",
     subActivity: "",
     frequency: "",
-    period: ""
+    period: "",
+    status: ""
   });
   const [activities, setActivities] = useState<Array<{
     id: string;
@@ -190,7 +191,8 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
         ...(filters.activity && { activity: filters.activity }),
         ...(filters.subActivity && { subactivity: filters.subActivity }),
         ...(filters.frequency && { frequency: filters.frequency }),
-        ...(filters.period && { period: filters.period })
+        ...(filters.period && { period: filters.period }),
+        ...(filters.status && { status: filters.status })
       });
 
       const response = await fetch(`${Base_url}timelines?${queryParams}`, {
@@ -603,7 +605,7 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
         {showFilters && (
         <div className="bg-gray-50 p-4 rounded-lg mb-4">
           <h3 className="text-sm font-semibold mb-3 text-gray-700">Filter Options</h3>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
             {/* Activity Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -617,7 +619,8 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
                     activity: e.target.value,
                     subActivity: '',
                     frequency: '',
-                    period: ''
+                    period: '',
+                    status: filters.status
                   });
                   setAvailablePeriods([]);
                 }}
@@ -723,6 +726,24 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
                 ) : (
                   <option value="" disabled>Select frequency first</option>
                 )}
+              </select>
+            </div>
+
+            {/* Status Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Status
+              </label>
+              <select
+                className="form-select w-full"
+                value={filters.status}
+                onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+              >
+                <option value="">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="completed">Completed</option>
+                <option value="delayed">Delayed</option>
+                <option value="ongoing">Ongoing</option>
               </select>
             </div>
 
