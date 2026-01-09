@@ -45,7 +45,7 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
   const [registerData, setRegisterData] = useState<ComplianceRegisterEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [editingCell, setEditingCell] = useState<{ row: number; col: string } | null>(null);
+  const [editingCell, setEditingCell] = useState<{ row: number; col: string; entryId?: string } | null>(null);
   const [editValue, setEditValue] = useState<string>("");
   const [selectedCell, setSelectedCell] = useState<{ row: number; col: string } | null>(null);
   const [filters, setFilters] = useState({
@@ -77,6 +77,7 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
   const [clients, setClients] = useState<Array<{ id: string; name: string }>>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [entriesToShow, setEntriesToShow] = useState<number | 'all'>(100);
   const inputRef = useRef<HTMLInputElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
@@ -238,9 +239,13 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
     fetchActivities();
   }, []);
 
-  // Save cell value
-  const saveCell = async (rowIndex: number, colKey: string, value: string) => {
-    const entry = registerData[rowIndex];
+  // Save cell value - accepts entry ID or actual index
+  const saveCell = async (entryIdOrIndex: string | number, colKey: string, value: string) => {
+    // Find entry by ID or index
+    const entry = typeof entryIdOrIndex === 'string' 
+      ? registerData.find(e => e.timelineId === entryIdOrIndex || e._id === entryIdOrIndex || e.id === entryIdOrIndex)
+      : registerData[entryIdOrIndex];
+    
     if (!entry || !entry.timelineId) return;
 
     const normalizedValue = colKey === 'referenceNumber' ? value.trim() : value;
@@ -254,8 +259,17 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
       updatedEntry.status = 'completed';
     }
 
+    // Update the entry in registerData by finding its index
+    const entryIndex = registerData.findIndex(
+      e => (e.timelineId === entry.timelineId) || 
+           (e._id && e._id === entry._id) || 
+           (e.id && e.id === entry.id)
+    );
+    
+    if (entryIndex === -1) return;
+    
     const updatedData = [...registerData];
-    updatedData[rowIndex] = updatedEntry;
+    updatedData[entryIndex] = updatedEntry;
     setRegisterData(updatedData);
 
     setIsSaving(true);
@@ -301,23 +315,22 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save');
-      // Revert on error
-      setRegisterData(registerData);
+      // Revert on error - reload from API would be better, but for now just don't update
     } finally {
       setIsSaving(false);
     }
   };
 
 
-  // Handle cell click
-  const handleCellClick = (rowIndex: number, colKey: string) => {
-    const entry = registerData[rowIndex];
+  // Handle cell click - accepts entry and colKey
+  const handleCellClick = (entry: ComplianceRegisterEntry, entryIndex: number, colKey: string) => {
     if (!entry) return;
 
     const value = entry[colKey] || "";
-    setEditingCell({ row: rowIndex, col: colKey });
+    const entryId = entry.timelineId || entry._id || entry.id || entryIndex.toString();
+    setEditingCell({ row: entryIndex, col: colKey, entryId });
     setEditValue(String(value));
-    setSelectedCell({ row: rowIndex, col: colKey });
+    setSelectedCell({ row: entryIndex, col: colKey });
   };
 
   // Handle cell edit
@@ -327,8 +340,8 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
 
   // Handle cell save
   const handleCellSave = () => {
-    if (editingCell) {
-      saveCell(editingCell.row, editingCell.col, editValue);
+    if (editingCell && editingCell.entryId) {
+      saveCell(editingCell.entryId, editingCell.col, editValue);
       setEditingCell(null);
       setEditValue("");
     }
@@ -347,7 +360,10 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
         if (editingCell) {
           handleCellSave();
         } else {
-          handleCellClick(row, col);
+          const entry = registerData[row];
+          if (entry) {
+            handleCellClick(entry, row, col);
+          }
         }
         break;
       case 'Tab':
@@ -411,8 +427,8 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
         if (!editingCell) {
           e.preventDefault();
           const entry = registerData[row];
-          if (entry) {
-            saveCell(row, col, "");
+          if (entry && entry.timelineId) {
+            saveCell(entry.timelineId, col, "");
           }
         }
         break;
@@ -461,6 +477,14 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
     XLSX.writeFile(wb, fileName);
     toast.success("Compliance register exported successfully");
   };
+
+  // Calculate displayed data based on entries to show
+  const displayedData = useMemo(() => {
+    if (entriesToShow === 'all') {
+      return registerData;
+    }
+    return registerData.slice(0, entriesToShow);
+  }, [registerData, entriesToShow]);
 
   // Focus input when editing
   useEffect(() => {
@@ -544,7 +568,7 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
     return (
       <div
         className={`h-full px-2 py-1 flex items-center ${isSelected ? 'bg-blue-100' : ''} ${column.editable ? 'cursor-cell' : ''}`}
-        onClick={() => column.editable && handleCellClick(rowIndex, colKey)}
+        onClick={() => column.editable && handleCellClick(entry, rowIndex, colKey)}
       >
         {value || (column.editable ? <span className="text-gray-400">Click to edit</span> : <span className="text-gray-400">-</span>)}
       </div>
@@ -729,6 +753,33 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
         </div>
         )}
 
+        {/* Entries Selection */}
+        {registerData.length > 0 && (
+          <div className="mb-3 flex justify-end">
+            <div className="flex items-center gap-3">
+              <label className="text-sm text-gray-700">Show:</label>
+              <select
+                className="form-select"
+                style={{ width: '120px' }}
+                value={entriesToShow}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setEntriesToShow(value === 'all' ? 'all' : Number(value));
+                }}
+              >
+                <option value={10}>10</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={1000}>1000</option>
+                <option value="all">Show All</option>
+              </select>
+              <span className="text-sm text-gray-600 whitespace-nowrap">
+                Showing {displayedData.length} of {registerData.length} entries
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Excel-like Grid */}
         {isLoading ? (
           <div className="flex justify-center py-8">
@@ -766,7 +817,7 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
                     </td>
                   </tr>
                 ) : (
-                  registerData.map((entry, rowIndex) => (
+                  displayedData.map((entry, rowIndex) => (
                     <tr key={entry.id || entry._id || rowIndex} className="hover:bg-gray-50">
                       {columns.map(col => (
                         <td
@@ -784,6 +835,7 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
             </table>
           </div>
         )}
+
       </div>
     </div>
   );
