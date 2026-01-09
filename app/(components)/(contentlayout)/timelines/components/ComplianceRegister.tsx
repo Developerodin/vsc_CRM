@@ -76,6 +76,7 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
   const [isLoadingPeriods, setIsLoadingPeriods] = useState(false);
   const [clients, setClients] = useState<Array<{ id: string; name: string }>>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
@@ -83,8 +84,7 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
   const columns = useMemo(() => [
     { key: 'clientName', label: 'Client Name', width: 200, editable: false, type: 'text' },
     { key: 'subActivity', label: 'Sub-Activity', width: 200, editable: false, type: 'text' },
-    { key: 'frequency', label: 'Frequency', width: 150, editable: false, type: 'text' },
-    { key: 'period', label: 'Period', width: 150, editable: false, type: 'text' },
+    { key: 'frequency', label: 'Frequency / Period', width: 180, editable: false, type: 'text' },
     { key: 'status', label: 'Status', width: 130, editable: false, type: 'text' },
     { key: 'referenceNumber', label: 'Reference Number', width: 180, editable: true, type: 'text' },
     { key: 'completedAt', label: 'Completed At', width: 150, editable: true, type: 'date' },
@@ -521,6 +521,26 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
       }
     }
 
+    // Special rendering for frequency column to show period below
+    if (colKey === 'frequency') {
+      const frequency = entry.frequency || '';
+      const period = entry.period || '';
+      return (
+        <div
+          className={`h-full px-2 py-1 flex flex-col justify-center ${isSelected ? 'bg-blue-100' : ''}`}
+        >
+          {frequency ? (
+            <>
+              <div className="font-medium">{frequency}</div>
+              {period && <div className="text-xs text-gray-600 mt-0.5">{period}</div>}
+            </>
+          ) : (
+            <span className="text-gray-400">-</span>
+          )}
+        </div>
+      );
+    }
+
     return (
       <div
         className={`h-full px-2 py-1 flex items-center ${isSelected ? 'bg-blue-100' : ''} ${column.editable ? 'cursor-cell' : ''}`}
@@ -539,6 +559,13 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
           <h2 className="text-xl font-semibold">Compliance Register</h2>
           <div className="flex gap-2">
             <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="ti-btn ti-btn-primary"
+            >
+              <i className={`ri-filter-${showFilters ? 'fill' : 'line'} me-2`}></i>
+              Filters
+            </button>
+            <button
               onClick={handleExport}
               className="ti-btn ti-btn-success"
             >
@@ -549,6 +576,7 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
         </div>
 
         {/* Filters */}
+        {showFilters && (
         <div className="bg-gray-50 p-4 rounded-lg mb-4">
           <h3 className="text-sm font-semibold mb-3 text-gray-700">Filter Options</h3>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
@@ -699,6 +727,7 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
             </div>
           </div>
         </div>
+        )}
 
         {/* Excel-like Grid */}
         {isLoading ? (
