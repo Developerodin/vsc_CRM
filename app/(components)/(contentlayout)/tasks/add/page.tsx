@@ -85,6 +85,11 @@ interface Timeline {
   startDate: string;
   endDate: string;
   period?: string;
+  metadata?: {
+    gstState?: string;
+    gstNumber?: string;
+    [key: string]: any;
+  };
 }
 
 const AddTaskPage = () => {
@@ -154,11 +159,16 @@ const AddTaskPage = () => {
     fetchGroups();
   }, []);
 
-  // Refetch timelines when filters change
+  // Refetch timelines when filters change - only if activity is selected
   useEffect(() => {
-    if (showTimelineModal) {
+    if (showTimelineModal && selectedActivity) {
       setTimelineCurrentPage(1);
       fetchTimelines(1, timelineSearchQuery);
+    } else if (showTimelineModal && !selectedActivity) {
+      // Clear timelines when no activity is selected
+      setTimelines([]);
+      setTimelineTotalResults(0);
+      setTimelineTotalPages(1);
     }
   }, [selectedActivity, selectedSubActivity, selectedGroup, showTimelineModal]);
 
@@ -443,6 +453,11 @@ const AddTaskPage = () => {
   const handleActivityFilterChange = (activityId: string) => {
     setSelectedActivity(activityId);
     setSelectedSubActivity(""); // Clear subactivity when activity changes
+    // Fetch timelines when activity is selected
+    if (activityId && showTimelineModal) {
+      setTimelineCurrentPage(1);
+      fetchTimelines(1, timelineSearchQuery);
+    }
   };
 
   const handleSubActivityFilterChange = (subActivityId: string) => {
@@ -461,8 +476,10 @@ const AddTaskPage = () => {
     setTimelineSearchQuery("");
     setTimelineCurrentPage(1);
     setAllFilteredTimelines([]); // Clear stored filtered timelines
-    // Fetch timelines without any filters - forceClearFilters ensures state is ignored
-    fetchTimelines(1, "", true);
+    // Clear timelines when filters are cleared
+    setTimelines([]);
+    setTimelineTotalResults(0);
+    setTimelineTotalPages(1);
   };
 
   // Get paginated timelines for display
@@ -932,8 +949,10 @@ const AddTaskPage = () => {
                         setSelectedSubActivity("");
                         setSelectedGroup("");
                         setTimelineItemsPerPage(10);
-                        // Fetch timelines with default pagination
-                        fetchTimelines(1, "", true);
+                        // Don't fetch timelines - wait for activity selection
+                        setTimelines([]);
+                        setTimelineTotalResults(0);
+                        setTimelineTotalPages(1);
                       }}
                     >
                       Select Timelines ({selectedTimelines.length} selected)
@@ -1140,19 +1159,46 @@ const AddTaskPage = () => {
             </div>
 
             <div className="p-4 border-b bg-gray-50">
+              {/* Search Bar - First */}
+              <div className="flex items-center space-x-4 mb-4">
+                <div className="relative flex-1">
+                  <div className="flex items-center">
+                    <i className="ri-search-line text-gray-400 text-xl mr-3"></i>
+                    <input
+                      type="text"
+                      placeholder="Search timelines by title, activity, or client..."
+                      className="form-control py-4 pr-20 text-lg border-2 border-gray-300 focus:border-primary focus:ring-2 focus:ring-primary/20 bg-white"
+                      value={timelineSearchQuery}
+                      onChange={handleTimelineSearchChange}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleTimelineSearchClick();
+                        }
+                      }}
+                    />
+                  </div>
+                  <button 
+                    className="absolute end-0 top-0 px-6 h-full bg-primary text-white hover:bg-primary-dark rounded-r-md"
+                    onClick={handleTimelineSearchClick}
+                  >
+                    <i className="ri-search-line text-xl"></i>
+                  </button>
+                </div>
+              </div>
+
               {/* Activity, Subactivity and Group Filters */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {/* Activity Filter */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Filter by Activity
+                    Filter by Activity <span className="text-red-500">*</span>
                   </label>
                   <select
                     className="form-select w-full"
                     value={selectedActivity}
                     onChange={(e) => handleActivityFilterChange(e.target.value)}
                   >
-                    <option value="">All Activities</option>
+                    <option value="">Select Activity</option>
                     {activities.map((activity) => (
                       <option key={activity.id} value={activity.id}>
                         {activity.name}
@@ -1216,48 +1262,19 @@ const AddTaskPage = () => {
                   </button>
                 </div>
               </div>
-
-              {/* Search Bar */}
-              <div className="flex items-center space-x-4">
-                <div className="relative flex-1">
-                  <div className="flex items-center">
-                    <i className="ri-search-line text-gray-400 text-xl mr-3"></i>
-                    <input
-                      type="text"
-                      placeholder="Search timelines by title, activity, or client..."
-                      className="form-control py-4 pr-20 text-lg border-2 border-gray-300 focus:border-primary focus:ring-2 focus:ring-primary/20 bg-white"
-                      value={timelineSearchQuery}
-                      onChange={handleTimelineSearchChange}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          handleTimelineSearchClick();
-                        }
-                      }}
-                    />
-                  </div>
-                  <button 
-                    className="absolute end-0 top-0 px-6 h-full bg-primary text-white hover:bg-primary-dark rounded-r-md"
-                    onClick={handleTimelineSearchClick}
-                  >
-                    <i className="ri-search-line text-xl"></i>
-                  </button>
-                </div>
-              </div>
             </div>
 
             <div className="flex-1 overflow-auto p-4">
               {/* Active Filters Summary */}
-              {(selectedActivity || selectedSubActivity || selectedGroup) && (
+              {selectedActivity && (selectedSubActivity || selectedGroup) && (
                 <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                       <span className="text-sm font-medium text-blue-800">Active Filters:</span>
-                      {selectedActivity && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                          Activity: {activities.find(a => a.id === selectedActivity)?.name}
-                        </span>
-                      )}
-                      {selectedSubActivity && selectedActivity && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                        Activity: {activities.find(a => a.id === selectedActivity)?.name}
+                      </span>
+                      {selectedSubActivity && (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
                           Sub Activity: {activities.find(a => a.id === selectedActivity)?.subactivities?.find(sa => (sa._id || sa.id) === selectedSubActivity)?.name}
                         </span>
@@ -1279,7 +1296,21 @@ const AddTaskPage = () => {
                 </div>
               )}
 
-              {isLoadingTimelines ? (
+              {!selectedActivity ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="flex flex-col items-center justify-center">
+                    <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center mb-4">
+                      <i className="ri-filter-line text-3xl text-blue-600"></i>
+                    </div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      Please Select an Activity
+                    </h3>
+                    <p className="text-gray-500 text-center max-w-md">
+                      To view timelines, please select an activity from the filter above. You can then optionally filter by subactivity and group.
+                    </p>
+                  </div>
+                </div>
+              ) : isLoadingTimelines ? (
                 <div className="flex items-center justify-center h-32">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
@@ -1324,12 +1355,12 @@ const AddTaskPage = () => {
                                 No timelines found
                               </h3>
                               <p className="text-gray-500 text-center mb-4">
-                                {selectedActivity || selectedGroup 
+                                {selectedSubActivity || selectedGroup 
                                   ? "Try adjusting your filters or search criteria."
-                                  : "No timelines available at the moment."
+                                  : "No timelines found for the selected activity. Try selecting a different activity or adjusting your search."
                                 }
                               </p>
-                              {(selectedActivity || selectedGroup) && (
+                              {(selectedSubActivity || selectedGroup) && (
                                 <button
                                   onClick={clearFilters}
                                   className="ti-btn ti-btn-primary"
@@ -1360,7 +1391,14 @@ const AddTaskPage = () => {
                               <div className="text-sm text-gray-900">{timeline.subactivity?.name || '-'}</div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">{timeline.client?.name || 'Unknown Client'}</div>
+                              <div className="space-y-1">
+                                <div className="text-sm text-gray-900">{timeline.client?.name || 'Unknown Client'}</div>
+                                {timeline.metadata?.gstState && (
+                                  <div className="text-xs text-gray-600">
+                                    <span className="font-medium">GST State:</span> {timeline.metadata.gstState}
+                                  </div>
+                                )}
+                              </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-900">{timeline.period || '-'}</div>
@@ -1394,48 +1432,52 @@ const AddTaskPage = () => {
             </div>
 
             <div className="p-4 border-t flex justify-between items-center">
-              <div className="flex items-center space-x-2">
-                <div className="flex items-center mr-4">
-                  <label className="mr-2 text-sm text-gray-600 whitespace-nowrap">Rows per page:</label>
-                  <select
-                    className="form-select w-auto text-sm"
-                    value={timelineItemsPerPage}
-                    onChange={(e) => {
-                      const newItemsPerPage = Number(e.target.value);
-                      setTimelineItemsPerPage(newItemsPerPage);
-                      setTimelineCurrentPage(1);
-                      fetchTimelines(1, timelineSearchQuery, false, newItemsPerPage);
-                    }}
+              {selectedActivity ? (
+                <div className="flex items-center space-x-2">
+                  <div className="flex items-center mr-4">
+                    <label className="mr-2 text-sm text-gray-600 whitespace-nowrap">Rows per page:</label>
+                    <select
+                      className="form-select w-auto text-sm"
+                      value={timelineItemsPerPage}
+                      onChange={(e) => {
+                        const newItemsPerPage = Number(e.target.value);
+                        setTimelineItemsPerPage(newItemsPerPage);
+                        setTimelineCurrentPage(1);
+                        fetchTimelines(1, timelineSearchQuery, false, newItemsPerPage);
+                      }}
+                    >
+                      <option value={10}>10</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                      <option value={500}>500</option>
+                      <option value={1000}>1000</option>
+                    </select>
+                  </div>
+                  <button
+                    onClick={() => handleTimelinePageChange(Math.max(timelineCurrentPage - 1, 1))}
+                    disabled={timelineCurrentPage === 1 || timelines.length === 0}
+                    className="ti-btn ti-btn-secondary"
                   >
-                    <option value={10}>10</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                    <option value={500}>500</option>
-                    <option value={1000}>1000</option>
-                  </select>
+                    Previous
+                  </button>
+                  <span className="text-sm text-gray-500">
+                    {timelineTotalResults > 0 ? (
+                      `Showing ${(timelineCurrentPage - 1) * timelineItemsPerPage + 1} to ${Math.min(timelineCurrentPage * timelineItemsPerPage, timelineTotalResults)} of ${timelineTotalResults} entries`
+                    ) : (
+                      "No results"
+                    )}
+                  </span>
+                  <button
+                    onClick={() => handleTimelinePageChange(Math.min(timelineCurrentPage + 1, timelineTotalPages))}
+                    disabled={timelineCurrentPage === timelineTotalPages || timelineTotalPages === 0 || timelines.length === 0}
+                    className="ti-btn ti-btn-secondary"
+                  >
+                    Next
+                  </button>
                 </div>
-                <button
-                  onClick={() => handleTimelinePageChange(Math.max(timelineCurrentPage - 1, 1))}
-                  disabled={timelineCurrentPage === 1 || timelines.length === 0}
-                  className="ti-btn ti-btn-secondary"
-                >
-                  Previous
-                </button>
-                <span className="text-sm text-gray-500">
-                  {timelineTotalResults > 0 ? (
-                    `Showing ${(timelineCurrentPage - 1) * timelineItemsPerPage + 1} to ${Math.min(timelineCurrentPage * timelineItemsPerPage, timelineTotalResults)} of ${timelineTotalResults} entries`
-                  ) : (
-                    "No results"
-                  )}
-                </span>
-                <button
-                  onClick={() => handleTimelinePageChange(Math.min(timelineCurrentPage + 1, timelineTotalPages))}
-                  disabled={timelineCurrentPage === timelineTotalPages || timelineTotalPages === 0 || timelines.length === 0}
-                  className="ti-btn ti-btn-secondary"
-                >
-                  Next
-                </button>
-              </div>
+              ) : (
+                <div></div>
+              )}
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => setShowTimelineModal(false)}
@@ -1446,6 +1488,7 @@ const AddTaskPage = () => {
                 <button
                   onClick={handleTimelineModalSubmit}
                   className="ti-btn ti-btn-primary"
+                  disabled={!selectedActivity}
                 >
                   Select ({selectedTimelines.length})
                 </button>

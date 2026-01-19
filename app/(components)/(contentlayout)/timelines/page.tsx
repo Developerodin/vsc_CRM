@@ -71,6 +71,11 @@ interface Timeline {
     fieldType: string;
     fieldValue: any;
   }>;
+  metadata?: {
+    gstState?: string;
+    gstNumber?: string;
+    [key: string]: any;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -1098,7 +1103,16 @@ const TimelinesPage = () => {
                           </td>
                           <td className="border border-gray-300">{timeline.activity?.name || "-"}</td>
                           <td className="border border-gray-300">{timeline.subactivity?.name || "-"}</td>
-                          <td className="border border-gray-300">{timeline.client?.name || "-"}</td>
+                          <td className="border border-gray-300">
+                            <div className="space-y-1">
+                              <div className="font-medium text-gray-900">{timeline.client?.name || "-"}</div>
+                              {timeline.metadata?.gstState && (
+                                <div className="text-xs text-gray-600">
+                                  <span className="font-medium">GST State:</span> {timeline.metadata.gstState}
+                                </div>
+                              )}
+                            </div>
+                          </td>
                           <td className="border border-gray-300">
                             <div className="space-y-1 text-sm">
                               <div className="flex items-start">
