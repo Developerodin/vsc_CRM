@@ -136,6 +136,8 @@ const AddClientPage = () => {
     udyamNumber: '',
     iecCode: '',
     entityType: '',
+    category: '',
+    turnover: '',
   });
 
   const [gstNumbers, setGstNumbers] = useState<GstNumber[]>([
@@ -374,27 +376,27 @@ const AddClientPage = () => {
       return false;
     }
 
-    return true;
-  };
-
-  const validateActivityMapping = () => {
-    // Check if at least one activity mapping exists
-    if (activityMappings.length === 0) {
-      toast.error('Please add at least one activity mapping');
+    // Category validation
+    if (!formData.category) {
+      toast.error('Please select a category');
       return false;
     }
 
-    // Check if all activity mappings have both activity and sub-activity selected
-    for (let i = 0; i < activityMappings.length; i++) {
-      const mapping = activityMappings[i];
-      if (!mapping.activity) {
-        toast.error(`Please select an activity for mapping ${i + 1}`);
-        return false;
-      }
-      if (!mapping.subactivity) {
-        toast.error(`Please select a sub-activity for mapping ${i + 1}`);
-        return false;
-      }
+    return true;
+  };
+
+  // Activity validation removed - activities are auto-added based on PAN, GST, etc.
+  const validateActivityMapping = () => {
+    // Check if "Auditing" activity is selected
+    const hasAuditingActivity = activityMappings.some(mapping => {
+      const activity = activities.find(a => a.id === mapping.activity);
+      return activity && activity.name.toLowerCase().includes('auditing');
+    });
+
+    // If Auditing activity is selected, turnover must be filled
+    if (hasAuditingActivity && !formData.turnover) {
+      toast.error('Please fill in the Annual Turnover field as you have selected Auditing activity');
+      return false;
     }
 
     return true;
@@ -411,7 +413,11 @@ const AddClientPage = () => {
     
     if (activeTab === 'activity') {
       if (!validateForm()) return;
-      if (!validateActivityMapping()) return;
+      if (!validateActivityMapping()) {
+        // Switch to general tab if turnover is required
+        setActiveTab('general');
+        return;
+      }
       
       // Check if client already exists to prevent duplicate creation
       if (savedClientId) {
@@ -1380,6 +1386,38 @@ const AddClientPage = () => {
                           </option>
                         ))}
                       </select>
+                    </div>
+
+                    {/* Category */}
+                    <div className="form-group">
+                      <label htmlFor="category" className="form-label">Category <span className="text-red-500">*</span></label>
+                      <select
+                        id="category"
+                        name="category"
+                        className="form-control"
+                        value={formData.category}
+                        onChange={handleInputChange}
+                        required
+                      >
+                        <option value="">Select a category</option>
+                        <option value="A">A</option>
+                        <option value="B">B</option>
+                        <option value="C">C</option>
+                      </select>
+                    </div>
+
+                    {/* Turnover */}
+                    <div className="form-group">
+                      <label htmlFor="turnover" className="form-label">Annual Turnover</label>
+                      <input
+                        type="text"
+                        id="turnover"
+                        name="turnover"
+                        className="form-control"
+                        placeholder="Enter annual turnover"
+                        value={formData.turnover}
+                        onChange={handleInputChange}
+                      />
                     </div>
 
                     {/* Address Information */}

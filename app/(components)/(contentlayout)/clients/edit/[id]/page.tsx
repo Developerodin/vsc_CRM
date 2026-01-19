@@ -30,6 +30,7 @@ interface Client {
   udyamNumber: string;
   iecCode: string;
   entityType: string;
+  category: string;
   activities: ActivityMapping[];
   groups?: string[]; // Array of group IDs
   createdAt: string;
@@ -185,6 +186,8 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     udyamNumber: '',
     iecCode: '',
     entityType: '',
+    category: '',
+    turnover: '',
   });
 
   const [gstNumbers, setGstNumbers] = useState<GstNumber[]>([
@@ -1011,6 +1014,8 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
           udyamNumber: data.udyamNumber || '',
           iecCode: data.iecCode || '',
           entityType: data.entityType || '',
+          category: data.category || '',
+          turnover: (data as any).turnover || '',
         });
 
         // Set activity mappings if they exist
@@ -1235,22 +1240,14 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
       return false;
     }
 
-    // Activity mapping validation
-    for (let i = 0; i < activityMappings.length; i++) {
-      const mapping = activityMappings[i];
-      if (!mapping.activity) {
-        toast.error(`Please select an activity for mapping ${i + 1}`);
-        return false;
-      }
-      if (!mapping.subactivity) {
-        toast.error(`Please select a sub-activity for mapping ${i + 1}`);
-        return false;
-      }
-      if (!mapping.status) {
-        toast.error(`Please select a status for mapping ${i + 1}`);
-        return false;
-      }
+    // Category validation
+    if (!formData.category) {
+      toast.error('Please select a category');
+      return false;
     }
+
+    // Activity mapping validation removed - activities are auto-added based on PAN, GST, etc.
+    // Auditing activity turnover validation is handled in handleSubmit
 
     return true;
   };
@@ -1265,7 +1262,19 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     }
     
     if (activeTab === 'activity') {
-    if (!validateForm()) return;
+      // Check if Auditing activity requires turnover before general validation
+      const hasAuditingActivity = activityMappings.some(mapping => {
+        const activity = activities.find(a => a.id === mapping.activity);
+        return activity && activity.name.toLowerCase().includes('auditing');
+      });
+      
+      if (hasAuditingActivity && !formData.turnover) {
+        toast.error('Please fill in the Annual Turnover field as you have selected Auditing activity');
+        setActiveTab('general');
+        return;
+      }
+      
+      if (!validateForm()) return;
       setActiveTab('group');
       return;
     }
@@ -1603,6 +1612,38 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                           </option>
                         ))}
                       </select>
+                    </div>
+
+                    {/* Category */}
+                    <div className="form-group">
+                      <label htmlFor="category" className="form-label">Category <span className="text-red-500">*</span></label>
+                      <select
+                        id="category"
+                        name="category"
+                        className="form-control"
+                        value={formData.category}
+                        onChange={handleInputChange}
+                        required
+                      >
+                        <option value="">Select a category</option>
+                        <option value="A">A</option>
+                        <option value="B">B</option>
+                        <option value="C">C</option>
+                      </select>
+                    </div>
+
+                    {/* Turnover */}
+                    <div className="form-group">
+                      <label htmlFor="turnover" className="form-label">Annual Turnover</label>
+                      <input
+                        type="text"
+                        id="turnover"
+                        name="turnover"
+                        className="form-control"
+                        placeholder="Enter annual turnover"
+                        value={formData.turnover}
+                        onChange={handleInputChange}
+                      />
                     </div>
 
                     {/* Address Information */}

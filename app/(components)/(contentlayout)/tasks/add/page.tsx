@@ -128,6 +128,12 @@ const AddTaskPage = () => {
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   
+  // Client autosuggestion states
+  const [clientSuggestions, setClientSuggestions] = useState<Client[]>([]);
+  const [showClientSuggestions, setShowClientSuggestions] = useState(false);
+  const [isLoadingClientSuggestions, setIsLoadingClientSuggestions] = useState(false);
+  const [selectedClientFilter, setSelectedClientFilter] = useState<Client | null>(null);
+  
   // Form validation errors
   const [formErrors, setFormErrors] = useState<{
     teamMember?: string;
@@ -158,6 +164,24 @@ const AddTaskPage = () => {
     fetchActivities();
     fetchGroups();
   }, []);
+
+  // Close client suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.client-search-container')) {
+        setShowClientSuggestions(false);
+      }
+    };
+
+    if (showClientSuggestions) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showClientSuggestions]);
 
   // Refetch timelines when filters change - only if activity is selected
   useEffect(() => {
@@ -269,6 +293,39 @@ const AddTaskPage = () => {
     } catch (error) {
     } finally {
       setIsLoadingGroups(false);
+    }
+  };
+
+  const fetchClientSuggestions = async (searchQuery: string) => {
+    if (!searchQuery || searchQuery.trim().length < 1) {
+      setClientSuggestions([]);
+      setShowClientSuggestions(false);
+      return;
+    }
+
+    try {
+      setIsLoadingClientSuggestions(true);
+      const queryParams = new URLSearchParams({
+        search: searchQuery.trim(),
+        limit: "10",
+        sortBy: "name:asc"
+      });
+
+      const response = await fetch(`${Base_url}clients?${queryParams}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setClientSuggestions(data.results || []);
+        setShowClientSuggestions(true);
+      }
+    } catch (error) {
+      setClientSuggestions([]);
+    } finally {
+      setIsLoadingClientSuggestions(false);
     }
   };
 
@@ -423,8 +480,15 @@ const AddTaskPage = () => {
   const handleTimelineSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     setTimelineSearchQuery(query);
+    
+    // Clear selected client filter if user modifies search
+    if (selectedClientFilter) {
+      setSelectedClientFilter(null);
+    }
+    
     if (showTimelineModal) {
       debouncedTimelineSearch(query);
+      debouncedClientSuggestions(query);
     }
   };
 
@@ -476,10 +540,26 @@ const AddTaskPage = () => {
     setTimelineSearchQuery("");
     setTimelineCurrentPage(1);
     setAllFilteredTimelines([]); // Clear stored filtered timelines
+    setSelectedClientFilter(null);
+    setClientSuggestions([]);
+    setShowClientSuggestions(false);
     // Clear timelines when filters are cleared
     setTimelines([]);
     setTimelineTotalResults(0);
     setTimelineTotalPages(1);
+  };
+
+  const handleClientSelect = (client: Client) => {
+    setSelectedClientFilter(client);
+    setTimelineSearchQuery(client.name);
+    setShowClientSuggestions(false);
+    setClientSuggestions([]);
+    
+    // Trigger timeline search with client name
+    if (showTimelineModal && selectedActivity) {
+      setTimelineCurrentPage(1);
+      fetchTimelines(1, client.name);
+    }
   };
 
   // Get paginated timelines for display
@@ -504,6 +584,20 @@ const AddTaskPage = () => {
           setTimelineCurrentPage(1);
           fetchTimelines(1, searchQuery);
         }, 500);
+      };
+    })(),
+    []
+  );
+
+  // Debounced search function for client suggestions
+  const debouncedClientSuggestions = React.useCallback(
+    (() => {
+      let timeoutId: NodeJS.Timeout;
+      return (searchQuery: string) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          fetchClientSuggestions(searchQuery);
+        }, 300);
       };
     })(),
     []
@@ -948,6 +1042,9 @@ const AddTaskPage = () => {
                         setSelectedActivity("");
                         setSelectedSubActivity("");
                         setSelectedGroup("");
+                        setSelectedClientFilter(null);
+                        setClientSuggestions([]);
+                        setShowClientSuggestions(false);
                         setTimelineItemsPerPage(10);
                         // Don't fetch timelines - wait for activity selection
                         setTimelines([]);
@@ -1159,20 +1256,29 @@ const AddTaskPage = () => {
             </div>
 
             <div className="p-4 border-b bg-gray-50">
-              {/* Search Bar - First */}
+              {/* Search Bar with Client Autosuggestion - First */}
               <div className="flex items-center space-x-4 mb-4">
-                <div className="relative flex-1">
+                <div className="relative flex-1 client-search-container">
                   <div className="flex items-center">
                     <i className="ri-search-line text-gray-400 text-xl mr-3"></i>
                     <input
                       type="text"
-                      placeholder="Search timelines by title, activity, or client..."
+                      placeholder="Search timelines by title, activity, or client name..."
                       className="form-control py-4 pr-20 text-lg border-2 border-gray-300 focus:border-primary focus:ring-2 focus:ring-primary/20 bg-white"
                       value={timelineSearchQuery}
                       onChange={handleTimelineSearchChange}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           handleTimelineSearchClick();
+                          setShowClientSuggestions(false);
+                        }
+                        if (e.key === 'Escape') {
+                          setShowClientSuggestions(false);
+                        }
+                      }}
+                      onFocus={() => {
+                        if (clientSuggestions.length > 0) {
+                          setShowClientSuggestions(true);
                         }
                       }}
                     />
@@ -1183,8 +1289,82 @@ const AddTaskPage = () => {
                   >
                     <i className="ri-search-line text-xl"></i>
                   </button>
+                  
+                  {/* Client Suggestions Dropdown */}
+                  {showClientSuggestions && (clientSuggestions.length > 0 || isLoadingClientSuggestions) && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border-2 border-primary rounded-lg shadow-lg max-h-80 overflow-y-auto">
+                      {isLoadingClientSuggestions ? (
+                        <div className="p-4 text-center">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
+                          <p className="text-sm text-gray-500 mt-2">Loading clients...</p>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="px-4 py-2 bg-gray-50 border-b">
+                            <p className="text-xs font-semibold text-gray-600 uppercase">Select Client</p>
+                          </div>
+                          {clientSuggestions.map((client) => (
+                            <div
+                              key={client.id}
+                              className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b last:border-b-0 transition-colors"
+                              onClick={() => handleClientSelect(client)}
+                            >
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="font-medium text-gray-900">{client.name}</div>
+                                  <div className="text-sm text-gray-600 mt-1">
+                                    {client.city && client.state && (
+                                      <span className="inline-flex items-center mr-3">
+                                        <i className="ri-map-pin-line mr-1"></i>
+                                        {client.city}, {client.state}
+                                      </span>
+                                    )}
+                                    {client.phone && (
+                                      <span className="inline-flex items-center">
+                                        <i className="ri-phone-line mr-1"></i>
+                                        {client.phone}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <i className="ri-arrow-right-line text-gray-400 text-lg"></i>
+                              </div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
+              
+              {/* Selected Client Filter Badge */}
+              {selectedClientFilter && (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <i className="ri-user-line text-blue-600"></i>
+                      <span className="text-sm font-medium text-blue-800">
+                        Filtering by Client: <span className="font-semibold">{selectedClientFilter.name}</span>
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedClientFilter(null);
+                        setTimelineSearchQuery("");
+                        if (selectedActivity) {
+                          setTimelineCurrentPage(1);
+                          fetchTimelines(1, "");
+                        }
+                      }}
+                      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                    >
+                      <i className="ri-close-line mr-1"></i>
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Activity, Subactivity and Group Filters */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1255,7 +1435,7 @@ const AddTaskPage = () => {
                     type="button"
                     onClick={clearFilters}
                     className="ti-btn ti-btn-secondary w-full"
-                    disabled={!selectedActivity && !selectedSubActivity && !selectedGroup && !timelineSearchQuery}
+                    disabled={!selectedActivity && !selectedSubActivity && !selectedGroup && !timelineSearchQuery && !selectedClientFilter}
                   >
                     <i className="ri-refresh-line me-2"></i>
                     Clear Filters
@@ -1266,10 +1446,10 @@ const AddTaskPage = () => {
 
             <div className="flex-1 overflow-auto p-4">
               {/* Active Filters Summary */}
-              {selectedActivity && (selectedSubActivity || selectedGroup) && (
+              {selectedActivity && (selectedSubActivity || selectedGroup || selectedClientFilter) && (
                 <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-4 flex-wrap">
                       <span className="text-sm font-medium text-blue-800">Active Filters:</span>
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
                         Activity: {activities.find(a => a.id === selectedActivity)?.name}
@@ -1282,6 +1462,11 @@ const AddTaskPage = () => {
                       {selectedGroup && (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
                           Group: {groups.find(g => g.id === selectedGroup)?.name}
+                        </span>
+                      )}
+                      {selectedClientFilter && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
+                          Client: {selectedClientFilter.name}
                         </span>
                       )}
                     </div>

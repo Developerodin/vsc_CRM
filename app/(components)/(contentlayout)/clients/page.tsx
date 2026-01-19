@@ -30,6 +30,8 @@ interface Client {
   udyamNumber: string;
   iecCode: string;
   entityType: string;
+  category: string;
+  turnover?: string;
   activities?: ActivityMapping[];
   createdAt: string;
   updatedAt: string;
@@ -104,6 +106,8 @@ interface ExcelRow {
   "Client State"?: string;
   "Client Country"?: string;
   "Branch"?: string;
+  "Category"?: string;
+  "Turnover"?: string;
 
   "PAN"?: string;
   "Date of Birth"?: string;
@@ -174,6 +178,7 @@ const ClientsPage = () => {
     status: "",
     pan: "",
     branch: "",
+    category: "",
     businessType: "",
     entityType: "",
     gstNumber: "",
@@ -353,6 +358,7 @@ const ClientsPage = () => {
         ...(filters.district && { district: filters.district }),
         ...(filters.pan && { pan: filters.pan }),
         ...(filters.branch && { branch: filters.branch }),
+        ...(filters.category && { category: filters.category }),
         ...(filters.businessType && { businessType: filters.businessType }),
         ...(filters.entityType && { entityType: filters.entityType }),
         ...(filters.gstNumber && { gstNumber: filters.gstNumber }),
@@ -421,6 +427,7 @@ const ClientsPage = () => {
         ...(filters.status && { status: filters.status }),
         ...(filters.pan && { pan: filters.pan }),
         ...(filters.branch && { branch: filters.branch }),
+        ...(filters.category && { category: filters.category }),
         ...(filters.businessType && { businessType: filters.businessType }),
         ...(filters.entityType && { entityType: filters.entityType }),
         ...(filters.gstNumber && { gstNumber: filters.gstNumber }),
@@ -692,6 +699,8 @@ const ClientsPage = () => {
         "Client State": "Maharashtra",
         "Client Country": "India",
         "Branch": "685140f7a5039eb69705aed6", // Valid ObjectId format
+        "Category": "A", // Category: A, B, or C
+        "Turnover": "10000000", // Annual turnover
         "Status": "active",
         "PAN": "ABCDE1234F", // Valid PAN format: 5 letters + 4 digits + 1 letter
         "Date of Birth": "1990-01-01",
@@ -748,6 +757,8 @@ const ClientsPage = () => {
       { wch: 20 }, // State
       { wch: 20 }, // Country
       { wch: 30 }, // Branch ID
+      { wch: 15 }, // Category
+      { wch: 20 }, // Turnover
       { wch: 20 }, // Status
 
       { wch: 15 }, // PAN
@@ -856,6 +867,8 @@ const ClientsPage = () => {
               "Client State": client.state,
               "Client Country": client.country,
               "Branch": client.branch,
+              "Category": client.category,
+              "Turnover": client.turnover || "",
               "Status": client.status,
 
               "PAN": client.pan,
@@ -933,6 +946,8 @@ const ClientsPage = () => {
             "Client State": client.state,
             "Client Country": client.country,
             "Branch": client.branch,
+            "Category": client.category,
+            "Turnover": (client as any).turnover || "",
             "Status": client.status,
             
             "PAN": client.pan,
@@ -966,6 +981,8 @@ const ClientsPage = () => {
         { wch: 20 }, // State
         { wch: 20 }, // Country
         { wch: 30 }, // Branch ID
+        { wch: 15 }, // Category
+        { wch: 20 }, // Turnover
         { wch: 20 }, // Status
 
         { wch: 15 }, // PAN
@@ -1230,6 +1247,8 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
               pan: row["PAN"]?.toString().trim() || "",
               dob: convertDateFormat(row["Date of Birth"]?.toString() || ""),
               branch: row["Branch"]?.toString().trim() || "",
+              category: row["Category"]?.toString().trim() || "",
+              turnover: row["Turnover"]?.toString().trim() || "",
               sortOrder: parseInt(row["Sort Order"]?.toString() || "1"),
               businessType: row["Business Type"]?.toString().trim() || "",
               entityType: row["Entity Type"]?.toString().trim() || "",
@@ -1249,6 +1268,9 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
             }
             if (clientData.branch && !/^[0-9a-fA-F]{24}$/.test(clientData.branch)) {
               validationIssues.push(`Invalid Branch ID format: ${clientData.branch}`);
+            }
+            if (clientData.category && !['A', 'B', 'C'].includes(clientData.category)) {
+              validationIssues.push(`Invalid Category: ${clientData.category}. Must be A, B, or C`);
             }
             if (clientData.dob && !clientData.dob.match(/^\d{4}-\d{2}-\d{2}$/)) {
               validationIssues.push(`Invalid Date of Birth format: ${row["Date of Birth"]} -> ${clientData.dob}`);
@@ -1754,6 +1776,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         status: "",
                         pan: "",
                         branch: "",
+                        category: "",
                         businessType: "",
                         entityType: "",
                         gstNumber: "",
@@ -1778,6 +1801,26 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
               {showAdvancedFilters && (
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {/* Category Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Category
+                      </label>
+                      <select
+                        className="form-select w-full"
+                        value={filters.category}
+                        onChange={(e) => {
+                          setFilters(prev => ({ ...prev, category: e.target.value }));
+                          setCurrentPage(1);
+                        }}
+                      >
+                        <option value="">All Categories</option>
+                        <option value="A">A</option>
+                        <option value="B">B</option>
+                        <option value="C">C</option>
+                      </select>
+                    </div>
+
                     {/* Business Type Filter */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1978,6 +2021,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                       onClick={() => {
                         setFilters(prev => ({
                           ...prev,
+                          category: "",
                           businessType: "",
                           entityType: "",
                           gstNumber: "",
@@ -2023,6 +2067,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         setDebouncedSearchQuery("");
                         setFilters(prev => ({
                           ...prev,
+                          category: "",
                           businessType: "",
                           entityType: "",
                           gstNumber: "",
@@ -2053,6 +2098,17 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                           onClick={() => {
                             setSearchQuery("");
                           }}
+                        >
+                          <i className="ri-close-line"></i>
+                        </button>
+                      </span>
+                    )}
+                    {filters.category && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                        Category: {filters.category}
+                        <button
+                          className="ml-1 text-purple-600 hover:text-purple-800"
+                          onClick={() => setFilters(prev => ({ ...prev, category: "" }))}
                         >
                           <i className="ri-close-line"></i>
                         </button>
@@ -2252,6 +2308,20 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                                     <i className="ri-phone-line mr-1 text-gray-400"></i>
                                     {client.phone}
                                   </div>
+                                  {client.category && (
+                                    <div className="text-sm text-gray-500 flex items-center mt-1">
+                                      <i className="ri-bookmark-line mr-1 text-gray-400"></i>
+                                      <span className="mr-1">Category:</span>
+                                      <span className={`px-2 py-0.5 text-xs rounded-full ${
+                                        client.category === 'A' ? 'bg-purple-100 text-purple-800' :
+                                        client.category === 'B' ? 'bg-indigo-100 text-indigo-800' :
+                                        client.category === 'C' ? 'bg-pink-100 text-pink-800' :
+                                        'bg-gray-100 text-gray-800'
+                                      }`}>
+                                        {client.category}
+                                      </span>
+                                    </div>
+                                  )}
                                   {client.businessType && (
                                     <div className="text-sm text-gray-500 flex items-center mt-1">
                                       <i className="ri-building-line mr-1 text-gray-400"></i>
