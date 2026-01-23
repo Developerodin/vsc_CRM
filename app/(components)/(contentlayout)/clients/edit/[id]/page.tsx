@@ -1284,14 +1284,21 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
       try {
         setIsSubmitting(true);
         
-        // First, update the client with selected groups
+        // First, update the client with all form data including selected groups
+        const clientData = {
+          ...formData,
+          gstNumbers: gstNumbers.filter(gst => gst.state && gst.gstNumber && gst.dateOfRegistration && gst.gstUserId),
+          activities: activityMappings.filter(mapping => mapping.activity && mapping.subactivity),
+          groups: selectedGroups.map(group => group.id) // Include selected groups
+        };
+        
         const clientResponse = await fetch(`${Base_url}clients/${params.id}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           },
-          body: JSON.stringify({ groups: selectedGroups.map(group => group.id) })
+          body: JSON.stringify(clientData)
         });
         
         if (!clientResponse.ok) {

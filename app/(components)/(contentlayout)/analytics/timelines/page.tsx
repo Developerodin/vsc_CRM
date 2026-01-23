@@ -108,7 +108,10 @@ const AnalyticsTimelinesPage = () => {
     activity: "",
     subactivity: "",
     frequency: "",
-    period: ""
+    period: "",
+    clientCategory: "",
+    turnoverStart: "",
+    turnoverEnd: ""
   });
   const [activities, setActivities] = useState<any[]>([]);
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
@@ -175,6 +178,10 @@ const AnalyticsTimelinesPage = () => {
         ...(filters.subactivity && { subactivity: filters.subactivity }),
         ...(filters.frequency && { frequency: filters.frequency }),
         ...(filters.period && { period: filters.period }),
+        ...(filters.clientCategory && { clientCategory: filters.clientCategory }),
+        ...(filters.turnoverStart && filters.turnoverEnd && { 
+          turnover: `${filters.turnoverStart} to ${filters.turnoverEnd}` 
+        }),
       });
 
       const response = await fetch(`${Base_url}analytics/timelines/table?${queryParams}`, {
@@ -429,7 +436,10 @@ const AnalyticsTimelinesPage = () => {
                         activity: "",
                         subactivity: "",
                         frequency: "",
-                        period: ""
+                        period: "",
+                        clientCategory: "",
+                        turnoverStart: "",
+                        turnoverEnd: ""
                       });
                       setSortBy("createdAt:desc");
                       setCurrentPage(1);
@@ -444,7 +454,7 @@ const AnalyticsTimelinesPage = () => {
               {/* Filter Section */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
                 <h3 className="text-sm font-semibold text-gray-900 mb-4">Filters</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {/* Activity Filter */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -602,6 +612,60 @@ const AnalyticsTimelinesPage = () => {
                       <option value="Other">Other</option>
                     </select>
                   </div>
+
+                  {/* Client Category Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Client Category
+                    </label>
+                    <select
+                      className="form-select w-full"
+                      value={filters.clientCategory}
+                      onChange={(e) => {
+                        setFilters(prev => ({ ...prev, clientCategory: e.target.value }));
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <option value="">All Categories</option>
+                      <option value="A">A</option>
+                      <option value="B">B</option>
+                      <option value="C">C</option>
+                    </select>
+                  </div>
+
+                  {/* Turnover Range Filter */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Turnover Range
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        className="form-control w-full"
+                        placeholder="Start"
+                        value={filters.turnoverStart}
+                        onChange={(e) => {
+                          setFilters(prev => ({ ...prev, turnoverStart: e.target.value }));
+                          setCurrentPage(1);
+                        }}
+                        min="0"
+                        step="1000"
+                      />
+                      <span className="text-gray-500 whitespace-nowrap">to</span>
+                      <input
+                        type="number"
+                        className="form-control w-full"
+                        placeholder="End"
+                        value={filters.turnoverEnd}
+                        onChange={(e) => {
+                          setFilters(prev => ({ ...prev, turnoverEnd: e.target.value }));
+                          setCurrentPage(1);
+                        }}
+                        min="0"
+                        step="1000"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -622,7 +686,10 @@ const AnalyticsTimelinesPage = () => {
                           activity: "",
                           subactivity: "",
                           frequency: "",
-                          period: ""
+                          period: "",
+                          clientCategory: "",
+                          turnoverStart: "",
+                          turnoverEnd: ""
                         });
                         setCurrentPage(1);
                       }}
@@ -693,6 +760,28 @@ const AnalyticsTimelinesPage = () => {
                         <button
                           className="ml-1 text-blue-600 hover:text-blue-800"
                           onClick={() => setFilters(prev => ({ ...prev, entityType: "" }))}
+                        >
+                          <i className="ri-close-line"></i>
+                        </button>
+                      </span>
+                    )}
+                    {filters.clientCategory && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        Category: {filters.clientCategory}
+                        <button
+                          className="ml-1 text-blue-600 hover:text-blue-800"
+                          onClick={() => setFilters(prev => ({ ...prev, clientCategory: "" }))}
+                        >
+                          <i className="ri-close-line"></i>
+                        </button>
+                      </span>
+                    )}
+                    {filters.turnoverStart && filters.turnoverEnd && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        Turnover: {filters.turnoverStart} to {filters.turnoverEnd}
+                        <button
+                          className="ml-1 text-blue-600 hover:text-blue-800"
+                          onClick={() => setFilters(prev => ({ ...prev, turnoverStart: "", turnoverEnd: "" }))}
                         >
                           <i className="ri-close-line"></i>
                         </button>

@@ -2386,12 +2386,12 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                                       <i className="ri-bookmark-line mr-1 text-gray-400"></i>
                                       <span className="mr-1">Category:</span>
                                       <span className={`px-2 py-0.5 text-xs rounded-full ${
-                                        client.category === 'A' ? 'bg-purple-100 text-purple-800' :
-                                        client.category === 'B' ? 'bg-indigo-100 text-indigo-800' :
-                                        client.category === 'C' ? 'bg-pink-100 text-pink-800' :
+                                        client.category.trim().toUpperCase() === 'A' ? 'bg-purple-100 text-purple-800' :
+                                        client.category.trim().toUpperCase() === 'B' ? 'bg-indigo-100 text-indigo-800' :
+                                        client.category.trim().toUpperCase() === 'C' ? 'bg-pink-100 text-pink-800' :
                                         'bg-gray-100 text-gray-800'
                                       }`}>
-                                        {client.category}
+                                        {client.category.trim().toUpperCase()}
                                       </span>
                                     </div>
                                   )}

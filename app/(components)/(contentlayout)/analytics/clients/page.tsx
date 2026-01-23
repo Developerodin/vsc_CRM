@@ -138,7 +138,10 @@ const AnalyticsClientsPage = () => {
     udyamNumber: "",
     iecCode: "",
     activity: "",
-    subactivity: ""
+    subactivity: "",
+    clientCategory: "",
+    turnoverStart: "",
+    turnoverEnd: ""
   });
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -200,6 +203,10 @@ const AnalyticsClientsPage = () => {
         ...(filters.cinNumber && { cinNumber: filters.cinNumber }),
         ...(filters.udyamNumber && { udyamNumber: filters.udyamNumber }),
         ...(filters.iecCode && { iecCode: filters.iecCode }),
+        ...(filters.clientCategory && { clientCategory: filters.clientCategory }),
+        ...(filters.turnoverStart && filters.turnoverEnd && { 
+          turnover: `${filters.turnoverStart} to ${filters.turnoverEnd}` 
+        }),
       });
 
       const response = await fetch(`${Base_url}analytics/clients/table?${queryParams}`, {
@@ -583,7 +590,7 @@ const AnalyticsClientsPage = () => {
                     className="ti-btn ti-btn-secondary py-2 w-full sm:w-auto"
                     onClick={() => {
                       setSearchQuery("");
-                      setFilters({
+                        setFilters({
                         name: "",
                         email: "",
                         phone: "",
@@ -599,7 +606,10 @@ const AnalyticsClientsPage = () => {
                         tanNumber: "",
                         cinNumber: "",
                         udyamNumber: "",
-                        iecCode: ""
+                        iecCode: "",
+                        clientCategory: "",
+                        turnoverStart: "",
+                        turnoverEnd: ""
                       });
                       setSortBy("name:asc");
                     }}
@@ -848,6 +858,60 @@ const AnalyticsClientsPage = () => {
                         }}
                       />
                     </div>
+
+                    {/* Client Category Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Client Category
+                      </label>
+                      <select
+                        className="form-select w-full"
+                        value={filters.clientCategory}
+                        onChange={(e) => {
+                          setFilters(prev => ({ ...prev, clientCategory: e.target.value }));
+                          setCurrentPage(1);
+                        }}
+                      >
+                        <option value="">All Categories</option>
+                        <option value="A">A</option>
+                        <option value="B">B</option>
+                        <option value="C">C</option>
+                      </select>
+                    </div>
+
+                    {/* Turnover Range Filter */}
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Turnover Range
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          className="form-control w-full"
+                          placeholder="Start"
+                          value={filters.turnoverStart}
+                          onChange={(e) => {
+                            setFilters(prev => ({ ...prev, turnoverStart: e.target.value }));
+                            setCurrentPage(1);
+                          }}
+                          min="0"
+                          step="1000"
+                        />
+                        <span className="text-gray-500 whitespace-nowrap">to</span>
+                        <input
+                          type="number"
+                          className="form-control w-full"
+                          placeholder="End"
+                          value={filters.turnoverEnd}
+                          onChange={(e) => {
+                            setFilters(prev => ({ ...prev, turnoverEnd: e.target.value }));
+                            setCurrentPage(1);
+                          }}
+                          min="0"
+                          step="1000"
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   {/* Filter Actions */}
@@ -867,7 +931,10 @@ const AnalyticsClientsPage = () => {
                           udyamNumber: "",
                           iecCode: "",
                           state: "",
-                          country: ""
+                          country: "",
+                          clientCategory: "",
+                          turnoverStart: "",
+                          turnoverEnd: ""
                         }));
                         setCurrentPage(1);
                       }}
@@ -931,7 +998,10 @@ const AnalyticsClientsPage = () => {
                           udyamNumber: "",
                           iecCode: "",
                           state: "",
-                          country: ""
+                          country: "",
+                          clientCategory: "",
+                          turnoverStart: "",
+                          turnoverEnd: ""
                         }));
                         setCurrentPage(1);
                       }}
@@ -1072,6 +1142,28 @@ const AnalyticsClientsPage = () => {
                         <button
                           className="ml-1 text-blue-600 hover:text-blue-800"
                           onClick={() => setFilters(prev => ({ ...prev, country: "" }))}
+                        >
+                          <i className="ri-close-line"></i>
+                        </button>
+                      </span>
+                    )}
+                    {filters.clientCategory && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        Category: {filters.clientCategory}
+                        <button
+                          className="ml-1 text-blue-600 hover:text-blue-800"
+                          onClick={() => setFilters(prev => ({ ...prev, clientCategory: "" }))}
+                        >
+                          <i className="ri-close-line"></i>
+                        </button>
+                      </span>
+                    )}
+                    {filters.turnoverStart && filters.turnoverEnd && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        Turnover: {filters.turnoverStart} to {filters.turnoverEnd}
+                        <button
+                          className="ml-1 text-blue-600 hover:text-blue-800"
+                          onClick={() => setFilters(prev => ({ ...prev, turnoverStart: "", turnoverEnd: "" }))}
                         >
                           <i className="ri-close-line"></i>
                         </button>
