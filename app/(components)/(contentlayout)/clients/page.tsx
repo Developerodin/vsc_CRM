@@ -199,6 +199,10 @@ const ClientsPage = () => {
   const [entityTypes, setEntityTypes] = useState<Array<{id: string, name: string}>>([]);
   const [businessTypeLoading, setBusinessTypeLoading] = useState(false);
   const [entityTypeLoading, setEntityTypeLoading] = useState(false);
+  const [showBulkActivityModal, setShowBulkActivityModal] = useState(false);
+  const [selectedActivityId, setSelectedActivityId] = useState("");
+  const [selectedSubactivityId, setSelectedSubactivityId] = useState("");
+  const [isBulkAssigning, setIsBulkAssigning] = useState(false);
 
   // Function to fetch activities (same as add page)
   const fetchActivities = async (): Promise<Activity[]> => {
@@ -492,9 +496,10 @@ const ClientsPage = () => {
 
   useEffect(() => {
     loadInitialData();
-    // Fetch business types and entity types on mount
+    // Fetch business types, entity types, and activities on mount
     fetchBusinessTypes();
     fetchEntityTypes();
+    fetchActivities();
   }, []); // Only run once on component mount
 
   useEffect(() => {
@@ -1487,6 +1492,58 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
   }
 };
 
+  // Function to handle bulk activity assignment
+  const handleBulkActivityAssignment = async () => {
+    if (selectedClients.length === 0) {
+      toast.error('Please select at least one client');
+      return;
+    }
+
+    if (!selectedActivityId) {
+      toast.error('Please select an activity');
+      return;
+    }
+
+    setIsBulkAssigning(true);
+    try {
+      const response = await fetch(`${Base_url}activities/bulk-create-timelines`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          clientIds: selectedClients,
+          activityId: selectedActivityId,
+          subactivityId: selectedSubactivityId || undefined,
+          status: "pending"
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to assign activities');
+      }
+
+      const result = await response.json();
+      toast.success(`Successfully assigned activity to ${selectedClients.length} client(s)`);
+      
+      // Reset states
+      setShowBulkActivityModal(false);
+      setSelectedActivityId("");
+      setSelectedSubactivityId("");
+      setSelectedClients([]);
+      setSelectAll(false);
+      
+      // Refresh the clients list
+      fetchClients();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to assign activities');
+    } finally {
+      setIsBulkAssigning(false);
+    }
+  };
+
   // Condensed pagination helper
   function getPagination(currentPage: number, totalPages: number) {
     const pages = [];
@@ -1671,31 +1728,47 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
             <div className="box-body">
               {/* Search and Sort */}
               <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
-                {/* Rows per page selector */}
-                <div className="flex items-center w-full lg:w-auto">
-                  <label className="mr-2 text-sm text-gray-600 whitespace-nowrap">Rows per page:</label>
-                  <select
-                    className="form-select w-auto text-sm"
-                    value={itemsPerPage}
-                    onChange={(e) => {
-                      setItemsPerPage(Number(e.target.value));
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <option value={10}>10</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                    <option value={500}>500</option>
-                    <option value={1000}>1000</option>
-                  </select>
-                </div>
+                {/* Left Section: Rows per page and Total clients */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full lg:w-auto">
+                  {/* Rows per page selector */}
+                  <div className="flex items-center">
+                    <label className="mr-2 text-sm text-gray-600 whitespace-nowrap">Rows per page:</label>
+                    <select
+                      className="form-select w-auto text-sm"
+                      value={itemsPerPage}
+                      onChange={(e) => {
+                        setItemsPerPage(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <option value={10}>10</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                      <option value={500}>500</option>
+                      <option value={1000}>1000</option>
+                    </select>
+                  </div>
 
-                {/* Total clients count */}
-                <div className="flex items-center">
-                  <span className="text-sm font-medium text-gray-700">
-                    <i className="ri-group-line mr-1 text-primary"></i>
-                    Total Clients: <span className="text-primary font-semibold">{totalResults}</span>
-                  </span>
+                  {/* Total clients count */}
+                  <div className="flex items-center">
+                    <span className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                      <i className="ri-group-line mr-1 text-primary"></i>
+                      Total Clients: <span className="text-primary font-semibold">{totalResults}</span>
+                    </span>
+                  </div>
+
+                  {/* Bulk Activity Button */}
+                  {selectedClients.length > 0 && (
+                    <button
+                      type="button"
+                      className="ti-btn ti-btn-success whitespace-nowrap"
+                      onClick={() => setShowBulkActivityModal(true)}
+                      title="Assign Activity to Selected Clients"
+                    >
+                      <i className="ri-task-line me-1"></i>
+                      Assign Activity ({selectedClients.length})
+                    </button>
+                  )}
                 </div>
 
                 {/* Search and filters */}
@@ -2545,6 +2618,176 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
           </div>
         </div>
       </div>
+
+      {/* Bulk Activity Assignment Modal */}
+      {showBulkActivityModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            {/* Background overlay */}
+            <div 
+              className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
+              onClick={() => {
+                if (!isBulkAssigning) {
+                  setShowBulkActivityModal(false);
+                  setSelectedActivityId("");
+                  setSelectedSubactivityId("");
+                }
+              }}
+            ></div>
+
+            {/* Modal panel */}
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              {/* Modal header */}
+              <div className="bg-primary px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-white">
+                    <i className="ri-task-line mr-2"></i>
+                    Assign Activity to {selectedClients.length} Client(s)
+                  </h3>
+                  <button
+                    onClick={() => {
+                      if (!isBulkAssigning) {
+                        setShowBulkActivityModal(false);
+                        setSelectedActivityId("");
+                        setSelectedSubactivityId("");
+                      }
+                    }}
+                    className="text-white hover:text-gray-200"
+                    disabled={isBulkAssigning}
+                  >
+                    <i className="ri-close-line text-xl"></i>
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal body */}
+              <div className="bg-white px-6 py-4">
+                <div className="space-y-4">
+                  {/* Activity Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Select Activity <span className="text-red-500">*</span>
+                    </label>
+                    {isLoadingActivities ? (
+                      <div className="flex items-center justify-center py-4">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                        <span className="ml-2 text-sm text-gray-600">Loading activities...</span>
+                      </div>
+                    ) : (
+                      <select
+                        className="form-select w-full"
+                        value={selectedActivityId}
+                        onChange={(e) => {
+                          setSelectedActivityId(e.target.value);
+                          setSelectedSubactivityId(""); // Reset subactivity when activity changes
+                        }}
+                        disabled={isBulkAssigning}
+                      >
+                        <option value="">Choose an activity</option>
+                        {activities.map((activity) => (
+                          <option key={activity.id} value={activity.id}>
+                            {activity.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  {/* Subactivity Selection */}
+                  {selectedActivityId && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Select Subactivity (Optional)
+                      </label>
+                      {(() => {
+                        const selectedActivity = activities.find(
+                          (act) => act.id === selectedActivityId
+                        );
+                        const subactivities = selectedActivity?.subactivities || [];
+
+                        if (subactivities.length === 0) {
+                          return (
+                            <div className="text-sm text-gray-500 italic py-2">
+                              No subactivities available for this activity
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <select
+                            className="form-select w-full"
+                            value={selectedSubactivityId}
+                            onChange={(e) => setSelectedSubactivityId(e.target.value)}
+                            disabled={isBulkAssigning}
+                          >
+                            <option value="">Choose a subactivity (optional)</option>
+                            {subactivities.map((subactivity) => (
+                              <option key={subactivity._id} value={subactivity._id}>
+                                {subactivity.name}
+                                {subactivity.frequency && ` (${subactivity.frequency})`}
+                              </option>
+                            ))}
+                          </select>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  {/* Info message */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div className="flex items-start">
+                      <i className="ri-information-line text-blue-600 mr-2 mt-0.5"></i>
+                      <div className="text-sm text-blue-800">
+                        <p className="font-medium mb-1">About this action:</p>
+                        <ul className="list-disc list-inside space-y-1">
+                          <li>This will create timelines for {selectedClients.length} selected client(s)</li>
+                          <li>Initial status will be set to "Pending"</li>
+                          <li>You can manage these timelines later from each client's profile</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal footer */}
+              <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3">
+                <button
+                  type="button"
+                  className="ti-btn ti-btn-secondary"
+                  onClick={() => {
+                    setShowBulkActivityModal(false);
+                    setSelectedActivityId("");
+                    setSelectedSubactivityId("");
+                  }}
+                  disabled={isBulkAssigning}
+                >
+                  <i className="ri-close-line mr-1"></i>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="ti-btn ti-btn-primary"
+                  onClick={handleBulkActivityAssignment}
+                  disabled={isBulkAssigning || !selectedActivityId}
+                >
+                  {isBulkAssigning ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white me-2 inline-block"></div>
+                      Assigning...
+                    </>
+                  ) : (
+                    <>
+                      <i className="ri-check-line mr-1"></i>
+                      Assign Activity
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
