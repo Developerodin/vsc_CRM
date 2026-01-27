@@ -186,7 +186,9 @@ const ClientsPage = () => {
     tanNumber: "",
     cinNumber: "",
     udyamNumber: "",
-    iecCode: ""
+    iecCode: "",
+    activity: "",
+    subactivity: ""
   });
 
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -440,7 +442,9 @@ const ClientsPage = () => {
         ...(filters.tanNumber && { tanNumber: filters.tanNumber }),
         ...(filters.cinNumber && { cinNumber: filters.cinNumber }),
         ...(filters.udyamNumber && { udyamNumber: filters.udyamNumber }),
-        ...(filters.iecCode && { iecCode: filters.iecCode })
+        ...(filters.iecCode && { iecCode: filters.iecCode }),
+        ...(filters.activity && { activity: filters.activity }),
+        ...(filters.subactivity && { subactivity: filters.subactivity })
       });
 
       const response = await fetch(`${Base_url}clients?${queryParams}`, {
@@ -1866,7 +1870,9 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         tanNumber: "",
                         cinNumber: "",
                         udyamNumber: "",
-                        iecCode: ""
+                        iecCode: "",
+                        activity: "",
+                        subactivity: ""
                       });
                       setSortBy("name:asc");
                       setCurrentPage(1);
@@ -1955,6 +1961,62 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                             </option>
                           ))
                         )}
+                      </select>
+                    </div>
+
+                    {/* Activity Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Activity
+                      </label>
+                      <select
+                        className="form-select w-full"
+                        value={filters.activity}
+                        onChange={(e) => {
+                          setFilters(prev => ({
+                            ...prev,
+                            activity: e.target.value,
+                            subactivity: ""
+                          }));
+                          setCurrentPage(1);
+                        }}
+                        disabled={isLoadingActivities}
+                      >
+                        <option value="">All Activities</option>
+                        {isLoadingActivities ? (
+                          <option value="" disabled>Loading...</option>
+                        ) : (
+                          activities.map((act) => (
+                            <option key={act.id} value={act.id}>
+                              {act.name}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+
+                    {/* Subactivity Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Subactivity
+                      </label>
+                      <select
+                        className="form-select w-full"
+                        value={filters.subactivity}
+                        onChange={(e) => {
+                          setFilters(prev => ({ ...prev, subactivity: e.target.value }));
+                          setCurrentPage(1);
+                        }}
+                        disabled={!filters.activity}
+                      >
+                        <option value="">All Subactivities</option>
+                        {filters.activity &&
+                          activities.find((a) => a.id === filters.activity)?.subactivities?.map((sub) => (
+                            <option key={sub._id} value={sub._id}>
+                              {sub.name}
+                              {sub.frequency ? ` (${sub.frequency})` : ""}
+                            </option>
+                          ))}
                       </select>
                     </div>
 
@@ -2114,7 +2176,9 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                           iecCode: "",
                           state: "",
                           country: "",
-                          status: ""
+                          status: "",
+                          activity: "",
+                          subactivity: ""
                         }));
                         setCurrentPage(1);
                         // Load initial data without these filters
@@ -2160,7 +2224,9 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                           iecCode: "",
                           state: "",
                           country: "",
-                          status: ""
+                          status: "",
+                          activity: "",
+                          subactivity: ""
                         }));
                         setCurrentPage(1);
                         // Load initial data without any filters
@@ -2214,6 +2280,28 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         <button
                           className="ml-1 text-blue-600 hover:text-blue-800"
                           onClick={() => setFilters(prev => ({ ...prev, entityType: "" }))}
+                        >
+                          <i className="ri-close-line"></i>
+                        </button>
+                      </span>
+                    )}
+                    {filters.activity && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                        Activity: {activities.find((a) => a.id === filters.activity)?.name ?? filters.activity}
+                        <button
+                          className="ml-1 text-amber-600 hover:text-amber-800"
+                          onClick={() => setFilters(prev => ({ ...prev, activity: "", subactivity: "" }))}
+                        >
+                          <i className="ri-close-line"></i>
+                        </button>
+                      </span>
+                    )}
+                    {filters.subactivity && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                        Subactivity: {activities.find((a) => a.id === filters.activity)?.subactivities?.find((s) => s._id === filters.subactivity)?.name ?? filters.subactivity}
+                        <button
+                          className="ml-1 text-amber-600 hover:text-amber-800"
+                          onClick={() => setFilters(prev => ({ ...prev, subactivity: "" }))}
                         >
                           <i className="ri-close-line"></i>
                         </button>
