@@ -144,7 +144,9 @@ const TeamMemberDashboard = () => {
   const [updatingTask, setUpdatingTask] = useState(false)
   const [updateForm, setUpdateForm] = useState({
     status: '',
-    remarks: ''
+    remarks: '',
+    completedAt: '',
+    referenceNumber: ''
   })
 
   // View details modal
@@ -169,7 +171,9 @@ const TeamMemberDashboard = () => {
     branch: '',
     remarks: '',
     status: 'pending',
-    timeline: [] as string[]
+    timeline: [] as string[],
+    completedAt: '',
+    referenceNumber: ''
   })
   const [branches, setBranches] = useState<Array<{
     _id: string
@@ -656,9 +660,37 @@ const TeamMemberDashboard = () => {
 
   const openUpdateModal = (task: Task) => {
     setSelectedTask(task)
+    
+    // Extract completedAt and referenceNumber from timeline array
+    let completedAt = ''
+    let referenceNumber = ''
+    
+    if (task.timeline && Array.isArray(task.timeline) && task.timeline.length > 0) {
+      const firstTimeline = task.timeline[0]
+      if (typeof firstTimeline === 'object' && firstTimeline !== null) {
+        const timelineItem = firstTimeline as any
+        if (timelineItem.completedAt) {
+          completedAt = new Date(timelineItem.completedAt).toISOString().split('T')[0]
+        }
+        if (timelineItem.referenceNumber) {
+          referenceNumber = timelineItem.referenceNumber
+        }
+      }
+    }
+    
+    // Fallback to task-level fields if timeline doesn't have them
+    if (!completedAt && (task as any).completedAt) {
+      completedAt = new Date((task as any).completedAt).toISOString().split('T')[0]
+    }
+    if (!referenceNumber && (task as any).referenceNumber) {
+      referenceNumber = (task as any).referenceNumber
+    }
+    
     setUpdateForm({
       status: task.status,
-      remarks: task.remarks
+      remarks: task.remarks,
+      completedAt: completedAt,
+      referenceNumber: referenceNumber
     })
     setShowUpdateModal(true)
   }
@@ -678,7 +710,9 @@ const TeamMemberDashboard = () => {
     setSelectedTask(null)
     setUpdateForm({
       status: '',
-      remarks: ''
+      remarks: '',
+      completedAt: '',
+      referenceNumber: ''
     })
   }
 
@@ -702,9 +736,17 @@ const TeamMemberDashboard = () => {
     setUpdatingTask(true)
     try {
       const token = localStorage.getItem('teamMemberToken')
-      // Team members can only update status, not remarks
+      // Team members can update status, completedAt, and referenceNumber
       const updateData: any = {
         status: updateForm.status,
+      }
+      
+      // Add optional fields if provided
+      if (updateForm.completedAt) {
+        updateData.completedAt = new Date(updateForm.completedAt).toISOString()
+      }
+      if (updateForm.referenceNumber) {
+        updateData.referenceNumber = updateForm.referenceNumber.trim()
       }
       
       const taskId = selectedTask._id || selectedTask.id
@@ -824,7 +866,9 @@ const TeamMemberDashboard = () => {
     status: 'pending',
     startDate: '',
     endDate: '',
-    timeline: [] as string[]
+    timeline: [] as string[],
+    completedAt: '',
+    referenceNumber: ''
   })
   const [editSelectedTimelines, setEditSelectedTimelines] = useState<Array<{
     id: string
@@ -915,7 +959,9 @@ const TeamMemberDashboard = () => {
       status: task.status || 'pending',
       startDate: task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : '',
       endDate: task.endDate ? new Date(task.endDate).toISOString().split('T')[0] : '',
-      timeline: timelineIds
+      timeline: timelineIds,
+      completedAt: (task as any).completedAt ? new Date((task as any).completedAt).toISOString().split('T')[0] : '',
+      referenceNumber: (task as any).referenceNumber || ''
     })
     setEditSelectedTimelines(timelineObjects)
     setShowEditTaskModal(true)
@@ -932,7 +978,9 @@ const TeamMemberDashboard = () => {
       status: 'pending',
       startDate: '',
       endDate: '',
-      timeline: []
+      timeline: [],
+      completedAt: '',
+      referenceNumber: ''
     })
     setEditSelectedTimelines([])
   }
@@ -977,7 +1025,7 @@ const TeamMemberDashboard = () => {
       const token = localStorage.getItem('teamMemberToken')
       const taskId = editingTask._id || editingTask.id
       
-      const updateData = {
+      const updateData: any = {
         teamMember: editTaskForm.teamMember,
         branch: editTaskForm.branch,
         remarks: editTaskForm.remarks || '',
@@ -986,6 +1034,14 @@ const TeamMemberDashboard = () => {
         startDate: new Date(editTaskForm.startDate).toISOString(),
         endDate: new Date(editTaskForm.endDate).toISOString(),
         timeline: editTaskForm.timeline || []
+      }
+
+      // Add optional fields if provided
+      if (editTaskForm.completedAt) {
+        updateData.completedAt = new Date(editTaskForm.completedAt).toISOString()
+      }
+      if (editTaskForm.referenceNumber) {
+        updateData.referenceNumber = editTaskForm.referenceNumber.trim()
       }
 
       const response = await axios.patch(
@@ -1057,7 +1113,9 @@ const TeamMemberDashboard = () => {
       branch: teamMemberData?.branch?.id || '',
       remarks: '',
       status: 'pending',
-      timeline: []
+      timeline: [],
+      completedAt: '',
+      referenceNumber: ''
     })
     setSelectedTimelines([])
     setTimelineSearchQuery("")
@@ -1189,7 +1247,7 @@ const TeamMemberDashboard = () => {
         return
       }
 
-      const taskData = {
+      const taskData: any = {
         teamMember: assignTaskForm.teamMember,
         startDate: new Date(assignTaskForm.startDate).toISOString(),
         endDate: new Date(assignTaskForm.endDate).toISOString(),
@@ -1200,6 +1258,14 @@ const TeamMemberDashboard = () => {
         timeline: assignTaskForm.timeline || [],
         metadata: {},
         attachments: []
+      }
+
+      // Add optional fields if provided
+      if (assignTaskForm.completedAt) {
+        taskData.completedAt = new Date(assignTaskForm.completedAt).toISOString()
+      }
+      if (assignTaskForm.referenceNumber) {
+        taskData.referenceNumber = assignTaskForm.referenceNumber.trim()
       }
 
       const response = await axios.post(
@@ -1843,6 +1909,34 @@ const TeamMemberDashboard = () => {
                     </select>
                   )}
                 </div>
+
+                {/* Completed Date */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Completed Date <span className="text-gray-500 text-xs">(Optional)</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={updateForm.completedAt}
+                    onChange={(e) => setUpdateForm({...updateForm, completedAt: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    max={selectedTask?.endDate ? new Date(selectedTask.endDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
+                  />
+                </div>
+
+                {/* Reference Number */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Reference Number <span className="text-gray-500 text-xs">(Optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={updateForm.referenceNumber}
+                    onChange={(e) => setUpdateForm({...updateForm, referenceNumber: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter reference number..."
+                  />
+                </div>
               </div>
               
               <div className="flex justify-end gap-3 mt-6">
@@ -2321,6 +2415,34 @@ const TeamMemberDashboard = () => {
                     <option value="delayed">Delayed</option>
                   </select>
                 </div>
+
+                {/* Completed Date */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Completed Date <span className="text-gray-500 text-xs">(Optional)</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={editTaskForm.completedAt}
+                    onChange={(e) => setEditTaskForm({...editTaskForm, completedAt: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    max={editTaskForm.endDate || new Date().toISOString().split('T')[0]}
+                  />
+                </div>
+
+                {/* Reference Number */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Reference Number <span className="text-gray-500 text-xs">(Optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editTaskForm.referenceNumber}
+                    onChange={(e) => setEditTaskForm({...editTaskForm, referenceNumber: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter reference number..."
+                  />
+                </div>
               </div>
               
               <div className="flex justify-end gap-3 mt-6">
@@ -2534,6 +2656,34 @@ const TeamMemberDashboard = () => {
                     <option value="ongoing">Ongoing</option>
                     <option value="on_hold">On Hold</option>
                   </select>
+                </div>
+
+                {/* Completed Date */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Completed Date <span className="text-gray-500 text-xs">(Optional)</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={assignTaskForm.completedAt}
+                    onChange={(e) => setAssignTaskForm({...assignTaskForm, completedAt: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    max={assignTaskForm.endDate || new Date().toISOString().split('T')[0]}
+                  />
+                </div>
+
+                {/* Reference Number */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Reference Number <span className="text-gray-500 text-xs">(Optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={assignTaskForm.referenceNumber}
+                    onChange={(e) => setAssignTaskForm({...assignTaskForm, referenceNumber: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter reference number..."
+                  />
                 </div>
               </div>
               
