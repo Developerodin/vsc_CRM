@@ -1910,33 +1910,37 @@ const TeamMemberDashboard = () => {
                   )}
                 </div>
 
-                {/* Completed Date */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Completed Date <span className="text-gray-500 text-xs">(Optional)</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={updateForm.completedAt}
-                    onChange={(e) => setUpdateForm({...updateForm, completedAt: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    max={selectedTask?.endDate ? new Date(selectedTask.endDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
-                  />
-                </div>
+                {/* Completed Date - Only show for "My Tasks", hide for "Accessible Team Members' Tasks" */}
+                {!viewAccessibleTasks && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Completed Date <span className="text-gray-500 text-xs">(Optional)</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={updateForm.completedAt}
+                      onChange={(e) => setUpdateForm({...updateForm, completedAt: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      max={selectedTask?.endDate ? new Date(selectedTask.endDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
+                    />
+                  </div>
+                )}
 
-                {/* Reference Number */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Reference Number <span className="text-gray-500 text-xs">(Optional)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={updateForm.referenceNumber}
-                    onChange={(e) => setUpdateForm({...updateForm, referenceNumber: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter reference number..."
-                  />
-                </div>
+                {/* Reference Number - Only show for "My Tasks", hide for "Accessible Team Members' Tasks" */}
+                {!viewAccessibleTasks && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Reference Number <span className="text-gray-500 text-xs">(Optional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={updateForm.referenceNumber}
+                      onChange={(e) => setUpdateForm({...updateForm, referenceNumber: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Enter reference number..."
+                    />
+                  </div>
+                )}
               </div>
               
               <div className="flex justify-end gap-3 mt-6">
