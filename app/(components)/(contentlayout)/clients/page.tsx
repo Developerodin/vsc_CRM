@@ -7,6 +7,7 @@ import * as XLSX from "xlsx";
 import { Base_url } from "@/app/api/config/BaseUrl";
 import { useSelectedBranchId } from "@/shared/contextapi";
 import { useRouter } from "next/navigation";
+import { BulkEmailDrawer } from "./components/bulk-email";
 
 interface Client {
   id: string;
@@ -203,6 +204,7 @@ const ClientsPage = () => {
   const [selectedActivityId, setSelectedActivityId] = useState("");
   const [selectedSubactivityId, setSelectedSubactivityId] = useState("");
   const [isBulkAssigning, setIsBulkAssigning] = useState(false);
+  const [showBulkEmailDrawer, setShowBulkEmailDrawer] = useState(false);
 
   // Function to fetch activities (same as add page)
   const fetchActivities = async (): Promise<Activity[]> => {
@@ -1716,6 +1718,14 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                 >
                   <i className="ri-upload-2-line me-2"></i> Export
                 </button>
+                <button
+                  type="button"
+                  className="ti-btn ti-btn-secondary"
+                  onClick={() => setShowBulkEmailDrawer(true)}
+                  title="Bulk email & templates"
+                >
+                  <i className="ri-mail-send-line me-2"></i> Bulk Email
+                </button>
                 <Link href="/clients/add" className="ti-btn ti-btn-primary">
                   <i className="ri-add-line me-2"></i> Add New Client
                 </Link>
@@ -2618,6 +2628,15 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
           </div>
         </div>
       </div>
+
+      {/* Bulk Email right-side drawer */}
+      <BulkEmailDrawer
+        isOpen={showBulkEmailDrawer}
+        onClose={() => setShowBulkEmailDrawer(false)}
+        selectedClientIds={selectedClients}
+        branchId={selectedBranchId}
+        totalClientsCount={totalResults}
+      />
 
       {/* Bulk Activity Assignment Modal */}
       {showBulkActivityModal && (
