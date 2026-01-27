@@ -141,7 +141,8 @@ const AnalyticsClientsPage = () => {
     subactivity: "",
     clientCategory: "",
     turnoverStart: "",
-    turnoverEnd: ""
+    turnoverEnd: "",
+    turnoverYear: ""
   });
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -207,6 +208,7 @@ const AnalyticsClientsPage = () => {
         ...(filters.turnoverStart && filters.turnoverEnd && { 
           turnover: `${filters.turnoverStart} to ${filters.turnoverEnd}` 
         }),
+        ...(filters.turnoverYear && { turnoverYear: filters.turnoverYear }),
       });
 
       const response = await fetch(`${Base_url}analytics/clients/table?${queryParams}`, {
@@ -609,7 +611,8 @@ const AnalyticsClientsPage = () => {
                         iecCode: "",
                         clientCategory: "",
                         turnoverStart: "",
-                        turnoverEnd: ""
+                        turnoverEnd: "",
+                        turnoverYear: ""
                       });
                       setSortBy("name:asc");
                     }}
@@ -912,6 +915,32 @@ const AnalyticsClientsPage = () => {
                         />
                       </div>
                     </div>
+
+                    {/* Turnover Year - shown when turnover range is used */}
+                    {(filters.turnoverStart || filters.turnoverEnd) && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Turnover Year
+                        </label>
+                        <select
+                          className="form-select w-full min-w-[140px]"
+                          value={filters.turnoverYear}
+                          onChange={(e) => {
+                            setFilters(prev => ({ ...prev, turnoverYear: e.target.value }));
+                            setCurrentPage(1);
+                          }}
+                        >
+                          <option value="">All years</option>
+                          {Array.from({ length: 41 }, (_, i) => {
+                            const y = new Date().getFullYear() - 20 + i;
+                            const fy = `${y}-${y + 1}`;
+                            return (
+                              <option key={fy} value={fy}>{fy}</option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                    )}
                   </div>
 
                   {/* Filter Actions */}
@@ -934,7 +963,8 @@ const AnalyticsClientsPage = () => {
                           country: "",
                           clientCategory: "",
                           turnoverStart: "",
-                          turnoverEnd: ""
+                          turnoverEnd: "",
+                          turnoverYear: ""
                         }));
                         setCurrentPage(1);
                       }}
@@ -1001,7 +1031,8 @@ const AnalyticsClientsPage = () => {
                           country: "",
                           clientCategory: "",
                           turnoverStart: "",
-                          turnoverEnd: ""
+                          turnoverEnd: "",
+                          turnoverYear: ""
                         }));
                         setCurrentPage(1);
                       }}
@@ -1163,7 +1194,18 @@ const AnalyticsClientsPage = () => {
                         Turnover: {filters.turnoverStart} to {filters.turnoverEnd}
                         <button
                           className="ml-1 text-blue-600 hover:text-blue-800"
-                          onClick={() => setFilters(prev => ({ ...prev, turnoverStart: "", turnoverEnd: "" }))}
+                          onClick={() => setFilters(prev => ({ ...prev, turnoverStart: "", turnoverEnd: "", turnoverYear: "" }))}
+                        >
+                          <i className="ri-close-line"></i>
+                        </button>
+                      </span>
+                    )}
+                    {filters.turnoverYear && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                        Turnover Year: {filters.turnoverYear}
+                        <button
+                          className="ml-1 text-amber-600 hover:text-amber-800"
+                          onClick={() => setFilters(prev => ({ ...prev, turnoverYear: "" }))}
                         >
                           <i className="ri-close-line"></i>
                         </button>
