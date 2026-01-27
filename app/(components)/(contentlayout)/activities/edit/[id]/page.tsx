@@ -766,7 +766,7 @@ const EditActivityPage = ({ params }: { params: { id: string } }) => {
                      <div className="form-group">
                        <label className="form-label">Quarterly Months <span className="text-red-500">*</span></label>
                        <div className="grid grid-cols-2 gap-2">
-                         {['January', 'April', 'July', 'October'].map(month => (
+                         {['January', 'April', 'May', 'July', 'October'].map(month => (
                            <label key={month} className="flex items-center space-x-2">
                              <input
                                type="checkbox"

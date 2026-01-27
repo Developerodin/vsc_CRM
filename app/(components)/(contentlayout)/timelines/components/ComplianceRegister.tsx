@@ -20,6 +20,7 @@ interface ComplianceRegisterEntry {
   id?: string;
   clientId: string;
   clientName: string;
+  clientGstState?: string; // Client's GST state (from timeline metadata) – shown in Client Name column
   subActivity: string;
   frequency: string;
   period: string;
@@ -77,7 +78,7 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
   const [isLoadingPeriods, setIsLoadingPeriods] = useState(false);
   const [clients, setClients] = useState<Array<{ id: string; name: string }>>([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
   const [entriesToShow, setEntriesToShow] = useState<number | 'all'>(100);
   const inputRef = useRef<HTMLInputElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -208,12 +209,13 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
       const data = await response.json();
       const timelines = data.results || [];
 
-      // Transform timeline data to ComplianceRegisterEntry format
+      // Transform timeline data to ComplianceRegisterEntry format (include client GST state from metadata)
       const transformedData: ComplianceRegisterEntry[] = timelines.map((timeline: any) => ({
         _id: timeline._id,
         id: timeline.id,
         clientId: timeline.client?._id || timeline.client?.id || '',
         clientName: timeline.client?.name || '',
+        clientGstState: timeline.metadata?.gstState || timeline.client?.state || '',
         subActivity: timeline.subactivity?.name || '',
         frequency: timeline.subactivity?.frequency || timeline.frequency || '',
         period: timeline.period || '',
@@ -447,10 +449,11 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
     toast('Delete timelines through the Timelines section', { icon: 'ℹ️' });
   };
 
-  // Export to Excel
+  // Export to Excel (includes Client GST State for GST/activity context)
   const handleExport = async () => {
     const exportData = registerData.map(entry => ({
       'Client Name': entry.clientName || '',
+      'Client GST State': entry.clientGstState || '',
       'Sub-Activity': entry.subActivity || '',
       'Frequency': entry.frequency || '',
       'Period': entry.period || '',
@@ -464,6 +467,7 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
     // Calculate column widths
     const columnWidths = [
       { wch: 30 }, // Client Name
+      { wch: 18 }, // Client GST State
       { wch: 25 }, // Sub-Activity
       { wch: 15 }, // Frequency
       { wch: 20 }, // Period
@@ -545,6 +549,30 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
           />
         );
       }
+    }
+
+    // Client Name column: show name + client GST state below (aligned with timelines list)
+    if (colKey === 'clientName') {
+      const name = entry.clientName || '';
+      const gstState = entry.clientGstState || '';
+      return (
+        <div
+          className={`h-full px-2 py-1 flex flex-col justify-center ${isSelected ? 'bg-blue-100' : ''}`}
+        >
+          {name ? (
+            <>
+              <div className="font-medium text-gray-900">{name}</div>
+              {gstState && (
+                <div className="text-xs text-gray-600 mt-0.5">
+                  <span className="font-medium">GST State:</span> {gstState}
+                </div>
+              )}
+            </>
+          ) : (
+            <span className="text-gray-400">-</span>
+          )}
+        </div>
+      );
     }
 
     // Special rendering for frequency column to show period below
