@@ -584,8 +584,45 @@ const ClientOverviewPage = () => {
                     <label className="block text-sm font-medium text-gray-700">Branch</label>
                     <p className="mt-1 text-sm text-gray-900">{client.branch?.name || 'N/A'}</p>
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Annual Turnover</label>
+                    <p className="mt-1 text-sm text-gray-900">{(client as any)?.turnover || 'N/A'}</p>
+                  </div>
                 </div>
               </div>
+
+              {/* Turnover History - shown near personal information */}
+              {((client as any)?.turnoverHistory && Array.isArray((client as any).turnoverHistory) && (client as any).turnoverHistory.length > 0) && (
+                <div className="mt-4">
+                  <h3 className="text-base font-semibold text-gray-900 mb-3">Turnover History</h3>
+                  <div className="overflow-x-auto rounded-lg border border-gray-200">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Financial Year
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Turnover
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {(client as any).turnoverHistory.map((entry: { year?: string; turnover?: string }, idx: number) => (
+                          <tr key={idx} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-sm text-gray-900">
+                              {entry.year || '—'}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-900">
+                              {entry.turnover || '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
