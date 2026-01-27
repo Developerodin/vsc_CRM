@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { toast } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { Base_url } from '@/app/api/config/BaseUrl';
+import { normalizeQuarterlyPeriods, formatPeriodDisplay } from "../utils/quarterPeriods";
 
 // Compliance task types
 export type ComplianceTaskType = 
@@ -167,7 +168,10 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
       }
 
       const data = await response.json();
-      setAvailablePeriods(data.periods || []);
+      const raw = data.periods || [];
+      setAvailablePeriods(
+        frequency?.toLowerCase() === 'quarterly' ? normalizeQuarterlyPeriods(raw) : raw
+      );
     } catch (err) {
       toast.error('Failed to fetch frequency periods');
       setAvailablePeriods([]);
@@ -575,10 +579,11 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
       );
     }
 
-    // Special rendering for frequency column to show period below
+    // Special rendering for frequency column – show frequency and period (period normalized for Quarterly)
     if (colKey === 'frequency') {
       const frequency = entry.frequency || '';
-      const period = entry.period || '';
+      const rawPeriod = entry.period || '';
+      const periodDisplay = formatPeriodDisplay(frequency, rawPeriod);
       return (
         <div
           className={`h-full px-2 py-1 flex flex-col justify-center ${isSelected ? 'bg-blue-100' : ''}`}
@@ -586,7 +591,7 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
           {frequency ? (
             <>
               <div className="font-medium">{frequency}</div>
-              {period && <div className="text-xs text-gray-600 mt-0.5">{period}</div>}
+              {periodDisplay && <div className="text-xs text-gray-600 mt-0.5">{periodDisplay}</div>}
             </>
           ) : (
             <span className="text-gray-400">-</span>

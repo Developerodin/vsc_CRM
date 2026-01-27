@@ -7,6 +7,7 @@ import * as XLSX from "xlsx";
 import { Base_url } from '@/app/api/config/BaseUrl';
 import TaskManagement from './components/TaskManagement';
 import ComplianceRegister from './components/ComplianceRegister';
+import { normalizeQuarterlyPeriods } from './utils/quarterPeriods';
 
 interface Timeline {
   _id: string;
@@ -286,7 +287,10 @@ const TimelinesPage = () => {
       }
 
       const data = await response.json();
-      setAvailablePeriods(data.periods || []);
+      const raw = data.periods || [];
+      setAvailablePeriods(
+        frequency?.toLowerCase() === 'quarterly' ? normalizeQuarterlyPeriods(raw) : raw
+      );
     } catch (err) {
       toast.error('Failed to fetch frequency periods');
       setAvailablePeriods([]);
