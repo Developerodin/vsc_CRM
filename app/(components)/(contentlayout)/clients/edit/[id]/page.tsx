@@ -199,6 +199,11 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     }
   ]);
 
+  /** Turnover history: financial year + turnover per year */
+  const [turnoverHistory, setTurnoverHistory] = useState<Array<{ year: string; turnover: string }>>([
+    { year: '', turnover: '' }
+  ]);
+
   // Add these state variables after the existing useState declarations (around line 80)
   const [showBusinessTypeModal, setShowBusinessTypeModal] = useState(false);
   const [showEntityTypeModal, setShowEntityTypeModal] = useState(false);
@@ -1018,6 +1023,17 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
           turnover: (data as any).turnover || '',
         });
 
+        // Set turnover history if it exists
+        const th = (data as any).turnoverHistory;
+        if (Array.isArray(th) && th.length > 0) {
+          setTurnoverHistory(th.map((e: { year?: string; turnover?: string }) => ({
+            year: e.year ?? '',
+            turnover: e.turnover ?? ''
+          })));
+        } else {
+          setTurnoverHistory([{ year: '', turnover: '' }]);
+        }
+
         // Set activity mappings if they exist
         if (data.activities && data.activities.length > 0) {
           setActivityMappings(data.activities);
@@ -1289,9 +1305,10 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
           ...formData,
           gstNumbers: gstNumbers.filter(gst => gst.state && gst.gstNumber && gst.dateOfRegistration && gst.gstUserId),
           activities: activityMappings.filter(mapping => mapping.activity && mapping.subactivity),
-          groups: selectedGroups.map(group => group.id) // Include selected groups
+          groups: selectedGroups.map(group => group.id), // Include selected groups
+          turnoverHistory: turnoverHistory.filter(e => (e.year || '').trim() && (e.turnover || '').trim())
         };
-        
+
         const clientResponse = await fetch(`${Base_url}clients/${params.id}`, {
           method: 'PATCH',
           headers: {
@@ -1364,7 +1381,8 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
           ...formData,
           gstNumbers: gstNumbers.filter(gst => gst.state && gst.gstNumber && gst.dateOfRegistration && gst.gstUserId),
           activities: activityMappings.filter(mapping => mapping.activity && mapping.subactivity),
-          groups: selectedGroups.map(group => group.id) // Include selected groups
+          groups: selectedGroups.map(group => group.id), // Include selected groups
+          turnoverHistory: turnoverHistory.filter(e => (e.year || '').trim() && (e.turnover || '').trim())
         };
 
         const response = await fetch(`${Base_url}clients/${params.id}`, {
@@ -1650,7 +1668,65 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                         placeholder="Enter annual turnover"
                         value={formData.turnover}
                         onChange={handleInputChange}
+                        disabled
                       />
+                    </div>
+
+                    {/* Turnover History */}
+                    <div className="form-group md:col-span-2">
+                      <label className="form-label">Turnover History</label>
+                      <small className="block text-gray-500 mb-2">Select year and enter turnover for that year</small>
+                      {turnoverHistory.map((entry, index) => (
+                        <div key={index} className="flex flex-wrap items-center gap-2 mb-2">
+                          <select
+                            className="form-select flex-1 min-w-[140px]"
+                            value={entry.year}
+                            onChange={(e) => {
+                              const next = [...turnoverHistory];
+                              next[index] = { ...next[index], year: e.target.value };
+                              setTurnoverHistory(next);
+                            }}
+                          >
+                            <option value="">Select year</option>
+                            {Array.from({ length: 41 }, (_, i) => {
+                              const y = new Date().getFullYear() - 20 + i;
+                              const fy = `${y}-${y + 1}`;
+                              return <option key={fy} value={fy}>{fy}</option>;
+                            })}
+                          </select>
+                          <input
+                            type="text"
+                            className="form-control flex-1 min-w-[120px]"
+                            placeholder="Turnover"
+                            value={entry.turnover}
+                            onChange={(e) => {
+                              const next = [...turnoverHistory];
+                              next[index] = { ...next[index], turnover: e.target.value };
+                              setTurnoverHistory(next);
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="ti-btn ti-btn-secondary ti-btn-sm"
+                            onClick={() => {
+                              if (turnoverHistory.length > 1) {
+                                setTurnoverHistory(turnoverHistory.filter((_, i) => i !== index));
+                              }
+                            }}
+                            title="Remove row"
+                            disabled={turnoverHistory.length <= 1}
+                          >
+                            <i className="ri-subtract-line"></i>
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        className="ti-btn ti-btn-outline-secondary ti-btn-sm mt-1"
+                        onClick={() => setTurnoverHistory([...turnoverHistory, { year: '', turnover: '' }])}
+                      >
+                        <i className="ri-add-line"></i>
+                      </button>
                     </div>
 
                     {/* Address Information */}
