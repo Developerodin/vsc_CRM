@@ -55,8 +55,10 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
     subActivity: "",
     frequency: "",
     period: "",
-    status: ""
+    status: "",
+    client: ""
   });
+  const [clientSearchTerm, setClientSearchTerm] = useState("");
   const [activities, setActivities] = useState<Array<{
     id: string;
     name: string;
@@ -197,7 +199,8 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
         ...(filters.subActivity && { subactivity: filters.subActivity }),
         ...(filters.frequency && { frequency: filters.frequency }),
         ...(filters.period && { period: filters.period }),
-        ...(filters.status && { status: filters.status })
+        ...(filters.status && { status: filters.status }),
+        ...(filters.client && { client: filters.client })
       });
 
       const response = await fetch(`${Base_url}timelines?${queryParams}`, {
@@ -638,7 +641,7 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
         {showFilters && (
         <div className="bg-gray-50 p-4 rounded-lg mb-4">
           <h3 className="text-sm font-semibold mb-3 text-gray-700">Filter Options</h3>
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
             {/* Activity Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -778,6 +781,73 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
                 <option value="delayed">Delayed</option>
                 <option value="ongoing">Ongoing</option>
               </select>
+            </div>
+
+            {/* Client Search */}
+            <div className="relative">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Client
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  className="form-input w-full pr-8"
+                  placeholder="Search client..."
+                  value={clientSearchTerm || (filters.client ? clients.find(c => c.id === filters.client)?.name || "" : "")}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setClientSearchTerm(value);
+                    if (!value) {
+                      setFilters({ ...filters, client: "" });
+                    }
+                  }}
+                  onFocus={() => {
+                    if (filters.client) {
+                      setClientSearchTerm("");
+                    }
+                  }}
+                />
+                {(clientSearchTerm || filters.client) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setClientSearchTerm("");
+                      setFilters({ ...filters, client: "" });
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <i className="ri-close-line"></i>
+                  </button>
+                )}
+                {clientSearchTerm && !filters.client && (
+                  <div className="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto">
+                    {clients
+                      .filter(client => 
+                        client.name?.toLowerCase().includes(clientSearchTerm.toLowerCase())
+                      )
+                      .slice(0, 20)
+                      .map(client => (
+                        <div
+                          key={client.id}
+                          className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                          onClick={() => {
+                            setFilters({ ...filters, client: client.id });
+                            setClientSearchTerm("");
+                          }}
+                        >
+                          {client.name}
+                        </div>
+                      ))}
+                    {clients.filter(client => 
+                      client.name?.toLowerCase().includes(clientSearchTerm.toLowerCase())
+                    ).length === 0 && (
+                      <div className="px-3 py-2 text-gray-500 text-sm">
+                        No clients found
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Submit Button */}
