@@ -82,6 +82,8 @@ interface ExcelRow {
   "Group Name": string;
   "Sort Order"?: number;
   "ID"?: string;
+  "Client IDs"?: string;
+  "Client Names"?: string;
   "Total Tasks"?: number;
   "Pending"?: number;
   "Completed"?: number;
@@ -572,23 +574,87 @@ const GroupsPage = () => {
         const allGroupsData = await allGroupsResponse.json();
         const allGroups: Group[] = allGroupsData.results || [];
 
+        // Fetch all clients once so we can resolve IDs from names
+        let allClients: Client[] = [];
+        try {
+          const allClientsResponse = await fetch(`${Base_url}clients?limit=1000`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+          if (allClientsResponse.ok) {
+            const allClientsData = await allClientsResponse.json();
+            allClients = allClientsData.results || [];
+          }
+        } catch (clientErr) {
+          // If this fails we will just fall back to existing group clients
+          console.error("Failed to fetch clients for group import:", clientErr);
+        }
+
+        // Build a map for fast lookup by client name (case-insensitive)
+        const clientNameToId = new Map<string, string>();
+        allClients.forEach((client) => {
+          if (client.name) {
+            clientNameToId.set(client.name.trim().toLowerCase(), client.id);
+          }
+        });
+
+        const unresolvedClientNames: string[] = [];
+
         // Transform data for bulk import
-        const groups = jsonData.map((row, index) => {
-          let existingGroup = null;
+        const groups = jsonData.map((row) => {
+          let existingGroup: Group | null = null;
           if (row["ID"]) {
             existingGroup = allGroups.find(g => g.id === row["ID"]);
           } else {
             // Try to find by name (case-insensitive)
+            const rowGroupName = row["Group Name"]?.toString().trim().toLowerCase() || "";
             existingGroup = allGroups.find(
-              (g) => g.name.trim().toLowerCase() === row["Group Name"].toString().trim().toLowerCase()
+              (g) => g.name.trim().toLowerCase() === rowGroupName
+            );
+          }
+
+          // Resolve client IDs either from "Client IDs" column or from "Client Names"
+          let resolvedClientIds: string[] = [];
+
+          // 1. If Client IDs column is provided, use it directly
+          if (row["Client IDs"] && row["Client IDs"]?.toString().trim() !== "") {
+            resolvedClientIds = row["Client IDs"]
+              ?.toString()
+              .split(",")
+              .map(id => id.trim())
+              .filter(id => id.length > 0) || [];
+          } else if (row["Client Names"] && row["Client Names"]?.toString().trim() !== "") {
+            // 2. Otherwise, try to resolve from Client Names column
+            const names = row["Client Names"]
+              ?.toString()
+              .split(",")
+              .map(name => name.trim())
+              .filter(name => name.length > 0) || [];
+
+            names.forEach((name) => {
+              const key = name.toLowerCase();
+              const clientId = clientNameToId.get(key);
+              if (clientId) {
+                resolvedClientIds.push(clientId);
+              } else {
+                unresolvedClientNames.push(name);
+              }
+            });
+          }
+
+          // 3. If nothing provided in Excel, fall back to existing group clients (if any)
+          if (resolvedClientIds.length === 0 && existingGroup?.clients?.length) {
+            resolvedClientIds = existingGroup.clients.map((client: any) =>
+              typeof client === "string" ? client : client.id
             );
           }
 
           const groupData = {
             name: row["Group Name"].toString().trim(),
             sortOrder: parseInt(row["Sort Order"]?.toString() || "1"),
-            numberOfClients: existingGroup?.clients?.length || 0,
-            clients: existingGroup?.clients?.map((client: Client) => client.id) || [],
+            numberOfClients: resolvedClientIds.length,
+            clients: resolvedClientIds,
             // Use imported task stats if available, otherwise use default values
             taskStats: (() => {
               const total = parseInt(row["Total Tasks"]?.toString() || "0") || 0;
@@ -638,6 +704,17 @@ const GroupsPage = () => {
 
         const result = await response.json();
         setImportProgress(100);
+
+        // If there were any client names we could not match, just inform the user.
+        // These names are skipped only on the frontend and are NOT sent to the backend.
+        if (unresolvedClientNames.length > 0) {
+          const uniqueNames = Array.from(new Set(unresolvedClientNames));
+          toast(
+            `Import completed. Some client names could not be matched and were skipped: ${uniqueNames
+              .slice(0, 5)
+              .join(", ")}${uniqueNames.length > 5 ? "..." : ""}`
+          );
+        }
 
         if (result.errors && result.errors.length > 0) {
           toast.error(`Import completed with ${result.errors.length} errors`);

@@ -1173,8 +1173,8 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
             };
 
             // Parse/normalize dates coming from Excel (including ISO strings like 2017-06-30T18:30:00.000Z)
-            // Backend expects date strings like 17-02-2001 or 17/02/2001.
-            // We send dd-mm-yyyy (e.g. 30-06-2017).
+            // Backend expects date strings in DD.MM.YYYY format (e.g. 30.06.2017).
+            // We always send dd.MM.yyyy for GST-related dates.
             const formatDateForBackend = (value: unknown): string => {
               if (value === null || value === undefined) return "";
 
@@ -1244,7 +1244,8 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
               const dd = String(dt.getDate()).padStart(2, "0");
               const mm = String(dt.getMonth() + 1).padStart(2, "0");
               const yyyy = String(dt.getFullYear());
-              return `${dd}-${mm}-${yyyy}`;
+              // Use dots as separators to match backend expectation: DD.MM.YYYY
+              return `${dd}.${mm}.${yyyy}`;
             };
 
             // Helper function to extract GST numbers from Excel
