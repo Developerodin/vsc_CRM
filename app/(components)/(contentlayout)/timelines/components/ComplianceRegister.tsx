@@ -90,7 +90,7 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
   const columns = useMemo(() => [
     { key: 'clientName', label: 'Client Name', width: 200, editable: false, type: 'text' },
     { key: 'subActivity', label: 'Sub-Activity', width: 200, editable: false, type: 'text' },
-    { key: 'frequency', label: 'Frequency / Period', width: 180, editable: false, type: 'text' },
+    { key: 'frequency', label: 'Period', width: 140, editable: false, type: 'text' },
     { key: 'status', label: 'Status', width: 130, editable: false, type: 'text' },
     { key: 'referenceNumber', label: 'Reference Number', width: 180, editable: true, type: 'text' },
     { key: 'completedAt', label: 'Completed At', width: 150, editable: true, type: 'date' },
@@ -582,19 +582,20 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
       );
     }
 
-    // Special rendering for frequency column – show frequency and period (period normalized for Quarterly)
+    // Period column: Q3 2026 only (no Frequency, no Jan–Mar). Optionally show completed date.
     if (colKey === 'frequency') {
       const frequency = entry.frequency || '';
       const rawPeriod = entry.period || '';
-      const periodDisplay = formatPeriodDisplay(frequency, rawPeriod);
+      const periodDisplay = formatPeriodDisplay(frequency, rawPeriod) || (frequency ? rawPeriod : '');
+      const completedAt = entry.completedAt ? new Date(entry.completedAt).toLocaleDateString() : '';
       return (
         <div
           className={`h-full px-2 py-1 flex flex-col justify-center ${isSelected ? 'bg-blue-100' : ''}`}
         >
-          {frequency ? (
+          {periodDisplay ? (
             <>
-              <div className="font-medium">{frequency}</div>
-              {periodDisplay && <div className="text-xs text-gray-600 mt-0.5">{periodDisplay}</div>}
+              <div className="font-medium">{periodDisplay}</div>
+              {completedAt && <div className="text-xs text-gray-600 mt-0.5">{completedAt}</div>}
             </>
           ) : (
             <span className="text-gray-400">-</span>

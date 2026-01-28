@@ -40,7 +40,7 @@ export function getQuarterRangeLabel(quarter: string): string {
 
 /**
  * Format period for display in the register when frequency is Quarterly.
- * Maps backend period (e.g. "Q1-2024", "July-2024", "2024-07") to "Q1 (Jul–Sep) 2024" etc.
+ * Maps backend period to quarter + year only, e.g. "Q3 2026" (no Jan–Mar range).
  * Returns period unchanged for non-Quarterly.
  */
 export function formatPeriodDisplay(frequency: string, period: string): string {
@@ -50,19 +50,19 @@ export function formatPeriodDisplay(frequency: string, period: string): string {
   if (qMatch) {
     const q = `Q${qMatch[1]}` as 'Q1' | 'Q2' | 'Q3' | 'Q4';
     const year = qMatch[2];
-    return `${q} (${getQuarterRangeLabel(q)}) ${year}`;
+    return `${q} ${year}`;
   }
   const monthMatch = period.match(/(January|February|March|April|May|June|July|August|September|October|November|December)[-\s]*(\d{4})?/i);
   if (monthMatch) {
     const q = getQuarterFromMonth(monthMatch[1]);
     const year = monthMatch[2] || new Date().getFullYear().toString();
-    return `${q} (${getQuarterRangeLabel(q)}) ${year}`;
+    return `${q} ${year}`;
   }
   const isoMatch = period.match(/(\d{4})-(\d{1,2})/);
   if (isoMatch) {
     const monthNum = parseInt(isoMatch[2], 10);
     const q = getQuarterFromMonth(monthNum);
-    return `${q} (${getQuarterRangeLabel(q)}) ${isoMatch[1]}`;
+    return `${q} ${isoMatch[1]}`;
   }
   return period;
 }
@@ -103,8 +103,7 @@ export function normalizeQuarterlyPeriods<T extends FrequencyPeriod>(periods: T[
       const fy = String(p.financialYear);
       year = fy.includes('-') ? fy.split('-')[0] : fy.slice(0, 4);
     }
-    const range = getQuarterRangeLabel(q);
-    const displayName = year ? `Q${q.slice(1)} (${range}) ${year}` : `Q${q.slice(1)} (${range})`;
+    const displayName = year ? `${q} ${year}` : q;
     return { ...p, quarter: q, displayName };
   });
 }
