@@ -1172,14 +1172,94 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
               return '';
             };
 
+            // Parse/normalize dates coming from Excel (including ISO strings like 2017-06-30T18:30:00.000Z)
+            // Backend expects date strings like 17-02-2001 or 17/02/2001.
+            // We send dd-mm-yyyy (e.g. 30-06-2017).
+            const formatDateForBackend = (value: unknown): string => {
+              if (value === null || value === undefined) return "";
+
+              const toDate = (v: unknown): Date | null => {
+                if (v instanceof Date) {
+                  return isNaN(v.getTime()) ? null : v;
+                }
+
+                if (typeof v === "number" && Number.isFinite(v)) {
+                  // Excel may provide dates as serial numbers.
+                  try {
+                    const parsed =
+                      (XLSX as any)?.SSF?.parse_date_code?.(v) ?? null;
+                    if (parsed && parsed.y && parsed.m && parsed.d) {
+                      return new Date(parsed.y, parsed.m - 1, parsed.d);
+                    }
+                  } catch {
+                    // fall through to manual conversion
+                  }
+
+                  // Manual Excel serial -> JS Date (1900 date system)
+                  const excelEpoch = new Date(Date.UTC(1899, 11, 30)); // Excel day 0
+                  const ms = Math.round(v * 86400 * 1000);
+                  const dt = new Date(excelEpoch.getTime() + ms);
+                  return isNaN(dt.getTime()) ? null : dt;
+                }
+
+                const s = String(v).trim();
+                if (!s) return null;
+
+                // ISO formats (e.g. 2017-06-30T18:30:00.000Z)
+                if (s.includes("T") || s.endsWith("Z")) {
+                  const dt = new Date(s);
+                  return isNaN(dt.getTime()) ? null : dt;
+                }
+
+                // yyyy-mm-dd
+                if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+                  const dt = new Date(`${s}T00:00:00`);
+                  return isNaN(dt.getTime()) ? null : dt;
+                }
+
+                // dd-mm-yyyy or dd/mm/yyyy or dd.mm.yyyy
+                const m = s.match(/^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})$/);
+                if (m) {
+                  const day = parseInt(m[1], 10);
+                  const month = parseInt(m[2], 10);
+                  const year = parseInt(m[3], 10);
+                  if (
+                    Number.isFinite(day) &&
+                    Number.isFinite(month) &&
+                    Number.isFinite(year)
+                  ) {
+                    const dt = new Date(year, month - 1, day);
+                    return isNaN(dt.getTime()) ? null : dt;
+                  }
+                }
+
+                // Fallback: let JS try
+                const fallback = new Date(s);
+                return isNaN(fallback.getTime()) ? null : fallback;
+              };
+
+              const dt = toDate(value);
+              if (!dt) return "";
+
+              const dd = String(dt.getDate()).padStart(2, "0");
+              const mm = String(dt.getMonth() + 1).padStart(2, "0");
+              const yyyy = String(dt.getFullYear());
+              return `${dd}-${mm}-${yyyy}`;
+            };
+
             // Helper function to extract GST numbers from Excel
             const extractGstNumbers = (row: ExcelRow) => {
               const gstNumbers = [];
               for (let i = 1; i <= 3; i++) {
-                const state = row[`GST State ${i}` as keyof ExcelRow]?.toString().trim();
-                const gstNumber = row[`GST Number ${i}` as keyof ExcelRow]?.toString().trim();
-                const dateOfRegistration = row[`GST Date of Registration ${i}` as keyof ExcelRow]?.toString().trim();
-                const gstUserId = row[`GST User ID ${i}` as keyof ExcelRow]?.toString().trim();
+                const stateRaw = row[`GST State ${i}` as keyof ExcelRow];
+                const gstNumberRaw = row[`GST Number ${i}` as keyof ExcelRow];
+                const dateRaw = row[`GST Date of Registration ${i}` as keyof ExcelRow];
+                const gstUserIdRaw = row[`GST User ID ${i}` as keyof ExcelRow];
+
+                const state = stateRaw ? String(stateRaw).trim() : "";
+                const gstNumber = gstNumberRaw ? String(gstNumberRaw).trim() : "";
+                const dateOfRegistration = formatDateForBackend(dateRaw);
+                const gstUserId = gstUserIdRaw ? String(gstUserIdRaw).trim() : "";
                 
                 // Only add if at least state and gstNumber are provided
                 if (state && gstNumber) {
