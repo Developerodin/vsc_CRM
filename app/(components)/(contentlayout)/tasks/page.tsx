@@ -1257,32 +1257,48 @@ const TaskDetailsModal = ({
 
   const fetchTimelineDetails = async () => {
     if (!task.timeline || task.timeline.length === 0) return;
-    
+
+    // Resolve timeline ID: API may return { id }, { _id }, or raw string
+    const getTimelineId = (item: { id?: string; _id?: string } | string): string | null => {
+      if (typeof item === 'string' && item) return item;
+      const obj = item as { id?: string; _id?: string };
+      const id = obj?.id ?? obj?._id ?? null;
+      return id && String(id).trim() ? id : null;
+    };
+
+    const idsToFetch = task.timeline
+      .map(getTimelineId)
+      .filter((id): id is string => Boolean(id));
+
+    if (idsToFetch.length === 0) {
+      setTimelineDetails([]);
+      return;
+    }
+
     setIsLoadingTimelines(true);
     try {
-      const timelinePromises = task.timeline.map(async (timelineRef) => {
+      const timelinePromises = idsToFetch.map(async (timelineId) => {
         try {
-          const response = await fetch(`${Base_url}timelines/${timelineRef.id}`, {
+          const response = await fetch(`${Base_url}timelines/${timelineId}`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
           });
-          
-              if (response.ok) {
-                return await response.json();
-              } else {
-                return null;
-              }
-            } catch (error) {
-              return null;
+          if (response.ok) {
+            return await response.json();
+          }
+          return null;
+        } catch {
+          return null;
         }
       });
 
-             const results = await Promise.all(timelinePromises);
-       const validTimelines = results.filter(timeline => timeline !== null);
-       setTimelineDetails(validTimelines);
-       setTimelineCurrentPage(1); // Reset to first page when new data is loaded
-    } catch (error) {
+      const results = await Promise.all(timelinePromises);
+      const validTimelines = results.filter((t): t is NonNullable<typeof t> => t !== null);
+      setTimelineDetails(validTimelines);
+      setTimelineCurrentPage(1);
+    } catch {
+      setTimelineDetails([]);
     } finally {
       setIsLoadingTimelines(false);
     }
