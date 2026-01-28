@@ -37,7 +37,11 @@ interface TeamMemberData {
 interface TimelineItem {
   _id?: string
   id?: string
+  title?: string
   status?: string
+  period?: string
+  referenceNumber?: string
+  completedAt?: string | null
   client?: {
     _id?: string
     id?: string
@@ -116,6 +120,13 @@ interface TaskResponse {
   }
 }
 
+type TimelineUpdatePayload = {
+  timelineId: string
+  status?: string
+  referenceNumber?: string
+  completedAt?: string | null // allow null to clear
+}
+
 const TeamMemberDashboard = () => {
   const router = useRouter()
   const [teamMemberData, setTeamMemberData] = useState<TeamMemberData | null>(null)
@@ -137,6 +148,7 @@ const TeamMemberDashboard = () => {
   const [endDateFilter, setEndDateFilter] = useState<string>('')
   const [teamMemberFilter, setTeamMemberFilter] = useState<string>('all')
   const [viewAccessibleTasks, setViewAccessibleTasks] = useState(false)
+  const [sortBy, setSortBy] = useState<string>('createdAt:desc')
   
   // Task update modal
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
@@ -148,6 +160,10 @@ const TeamMemberDashboard = () => {
     completedAt: '',
     referenceNumber: ''
   })
+  const [timelineDetails, setTimelineDetails] = useState<any[]>([])
+  const [isLoadingTimelineDetails, setIsLoadingTimelineDetails] = useState(false)
+  const [timelineUpdatesMap, setTimelineUpdatesMap] = useState<Record<string, TimelineUpdatePayload>>({})
+  const [selectedTimelineIds, setSelectedTimelineIds] = useState<Record<string, boolean>>({})
 
   // View details modal
   const [showViewDetailsModal, setShowViewDetailsModal] = useState(false)
@@ -510,6 +526,9 @@ const TeamMemberDashboard = () => {
       if (startDateFilter) params.append('startDate', startDateFilter)
       if (endDateFilter) params.append('endDate', endDateFilter)
       
+      // Add sortBy parameter
+      if (sortBy) params.append('sortBy', sortBy)
+      
       // Add team member filter for accessible team members tasks
       if (viewAccessibleTasks && accessibleTeamMembers.length > 0 && teamMemberFilter !== 'all') {
         params.append('teamMember', teamMemberFilter)
@@ -620,7 +639,7 @@ const TeamMemberDashboard = () => {
       setTasksLoading(false)
       isFetchingRef.current = false
     }
-  }, [currentPage, itemsPerPage, statusFilter, priorityFilter, startDateFilter, endDateFilter, teamMemberFilter, viewAccessibleTasks, accessibleTeamMembers.length, loading, teamMemberData])
+  }, [currentPage, itemsPerPage, statusFilter, priorityFilter, startDateFilter, endDateFilter, teamMemberFilter, viewAccessibleTasks, accessibleTeamMembers.length, loading, teamMemberData, sortBy])
 
   const handleRefreshTasks = () => {
     // Reset the fetching ref to allow immediate refresh
@@ -631,6 +650,7 @@ const TeamMemberDashboard = () => {
     setStartDateFilter('')
     setEndDateFilter('')
     setTeamMemberFilter('all')
+    setSortBy('createdAt:desc')
     setCurrentPage(1)
     // Call fetchTasks after a brief delay to ensure state updates are processed
     // This ensures the refresh happens even if useEffect doesn't trigger immediately
@@ -661,37 +681,17 @@ const TeamMemberDashboard = () => {
   const openUpdateModal = (task: Task) => {
     setSelectedTask(task)
     
-    // Extract completedAt and referenceNumber from timeline array
-    let completedAt = ''
-    let referenceNumber = ''
-    
-    if (task.timeline && Array.isArray(task.timeline) && task.timeline.length > 0) {
-      const firstTimeline = task.timeline[0]
-      if (typeof firstTimeline === 'object' && firstTimeline !== null) {
-        const timelineItem = firstTimeline as any
-        if (timelineItem.completedAt) {
-          completedAt = new Date(timelineItem.completedAt).toISOString().split('T')[0]
-        }
-        if (timelineItem.referenceNumber) {
-          referenceNumber = timelineItem.referenceNumber
-        }
-      }
-    }
-    
-    // Fallback to task-level fields if timeline doesn't have them
-    if (!completedAt && (task as any).completedAt) {
-      completedAt = new Date((task as any).completedAt).toISOString().split('T')[0]
-    }
-    if (!referenceNumber && (task as any).referenceNumber) {
-      referenceNumber = (task as any).referenceNumber
-    }
-    
     setUpdateForm({
       status: task.status,
       remarks: task.remarks,
-      completedAt: completedAt,
-      referenceNumber: referenceNumber
+      completedAt: '',
+      referenceNumber: ''
     })
+
+    // Reset timeline editor state
+    setTimelineDetails([])
+    setTimelineUpdatesMap({})
+    setSelectedTimelineIds({})
     setShowUpdateModal(true)
   }
 
@@ -714,6 +714,115 @@ const TeamMemberDashboard = () => {
       completedAt: '',
       referenceNumber: ''
     })
+    setTimelineDetails([])
+    setTimelineUpdatesMap({})
+    setSelectedTimelineIds({})
+  }
+
+  const getTimelineId = (timeline: any): string | null => {
+    const id = timeline?.id ?? timeline?._id ?? timeline?.timelineId ?? null
+    return id && String(id).trim() ? String(id) : null
+  }
+
+  const getCompletedAtInputValue = (timeline: any): string => {
+    const raw = timeline?.completedAt
+    if (!raw) return ''
+    try {
+      return new Date(raw).toISOString().split('T')[0]
+    } catch {
+      return ''
+    }
+  }
+
+  const fetchTaskTimelineDetails = async (task: Task) => {
+    const token = localStorage.getItem('teamMemberToken')
+    if (!token) return
+    if (!task.timeline || !Array.isArray(task.timeline) || task.timeline.length === 0) {
+      setTimelineDetails([])
+      return
+    }
+
+    // task.timeline can contain string IDs or populated objects
+    const idsToFetch = task.timeline
+      .map((t) => (typeof t === 'string' ? t : (t?._id || t?.id)))
+      .filter((id): id is string => Boolean(id))
+
+    if (idsToFetch.length === 0) {
+      setTimelineDetails([])
+      return
+    }
+
+    setIsLoadingTimelineDetails(true)
+    try {
+      const results = await Promise.all(
+        idsToFetch.map(async (timelineId) => {
+          try {
+            const res = await axios.get(`${Base_url}timelines/${timelineId}`, {
+              headers: { Authorization: `Bearer ${token}` }
+            })
+            return res.data
+          } catch {
+            return null
+          }
+        })
+      )
+      const valid = results.filter((t): t is NonNullable<typeof t> => t !== null)
+      setTimelineDetails(valid)
+    } finally {
+      setIsLoadingTimelineDetails(false)
+    }
+  }
+
+  // Load timeline details when opening update modal
+  useEffect(() => {
+    if (showUpdateModal && selectedTask) {
+      fetchTaskTimelineDetails(selectedTask)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showUpdateModal, selectedTask?._id, selectedTask?.id])
+
+  const toggleTimelineSelected = (timelineId: string) => {
+    setSelectedTimelineIds(prev => ({ ...prev, [timelineId]: !prev[timelineId] }))
+  }
+
+  const setTimelineField = (timeline: any, field: 'status' | 'referenceNumber' | 'completedAt', value: string) => {
+    const timelineId = getTimelineId(timeline)
+    if (!timelineId) return
+
+    // Editing a row auto-selects it (so payload matches "selected timelines")
+    setSelectedTimelineIds(prev => ({ ...prev, [timelineId]: true }))
+
+    // Update visible data immediately (Excel-like feel)
+    setTimelineDetails(prev =>
+      prev.map(t => {
+        const tid = getTimelineId(t)
+        if (tid !== timelineId) return t
+        if (field === 'completedAt') {
+          return { ...t, completedAt: value ? new Date(value).toISOString() : null }
+        }
+        return { ...t, [field]: value }
+      })
+    )
+
+    // Track edits for payload (do NOT drop empty values; empty/"null" are meaningful to clear)
+    setTimelineUpdatesMap(prev => {
+      const existing = prev[timelineId] || { timelineId }
+      const next: TimelineUpdatePayload = { ...existing, timelineId }
+      if (field === 'completedAt') {
+        next.completedAt = value ? new Date(value).toISOString() : null
+      } else if (field === 'referenceNumber') {
+        next.referenceNumber = value // allow "" to clear
+      } else if (field === 'status') {
+        next.status = value
+      }
+      return { ...prev, [timelineId]: next }
+    })
+  }
+
+  const clearTimelineEdits = () => {
+    setTimelineUpdatesMap({})
+    setSelectedTimelineIds({})
+    // Keep timelineDetails as-is (so user doesn't lose loaded data)
   }
 
   const handleUpdateTask = async () => {
@@ -736,17 +845,30 @@ const TeamMemberDashboard = () => {
     setUpdatingTask(true)
     try {
       const token = localStorage.getItem('teamMemberToken')
-      // Team members can update status, completedAt, and referenceNumber
-      const updateData: any = {
-        status: updateForm.status,
+      // Team members can update task fields + selected timelines using timelineUpdates
+      const updateData: any = {}
+
+      // Task status (optional)
+      if (updateForm.status) {
+        updateData.status = updateForm.status
       }
-      
-      // Add optional fields if provided
-      if (updateForm.completedAt) {
-        updateData.completedAt = new Date(updateForm.completedAt).toISOString()
+
+      // Task remarks (optional)
+      if (updateForm.remarks !== undefined && updateForm.remarks !== selectedTask.remarks) {
+        updateData.remarks = updateForm.remarks || ''
       }
-      if (updateForm.referenceNumber) {
-        updateData.referenceNumber = updateForm.referenceNumber.trim()
+
+      // Timeline updates (only for selected timelines)
+      const selectedIds = Object.entries(selectedTimelineIds)
+        .filter(([, v]) => Boolean(v))
+        .map(([k]) => k)
+
+      const timelineUpdates: TimelineUpdatePayload[] = selectedIds
+        .map((id) => timelineUpdatesMap[id])
+        .filter((u): u is TimelineUpdatePayload => Boolean(u && u.timelineId))
+
+      if (timelineUpdates.length > 0) {
+        updateData.timelineUpdates = timelineUpdates
       }
       
       const taskId = selectedTask._id || selectedTask.id
@@ -1326,7 +1448,7 @@ const TeamMemberDashboard = () => {
     if (teamMemberData && !loading) {
       setCurrentPage(1)
     }
-  }, [statusFilter, priorityFilter, startDateFilter, endDateFilter, teamMemberFilter, viewAccessibleTasks, teamMemberData, loading])
+  }, [statusFilter, priorityFilter, startDateFilter, endDateFilter, teamMemberFilter, viewAccessibleTasks, teamMemberData, loading, sortBy])
 
   // Refresh tasks when filters or pagination change
   useEffect(() => {
@@ -1454,14 +1576,14 @@ const TeamMemberDashboard = () => {
               </div>
             </div>
             
-            {/* Filters */}
-            <div className={`mb-6 grid grid-cols-1 sm:grid-cols-2 ${viewAccessibleTasks && accessibleTeamMembers.length > 0 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-4`}>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
+            {/* Filters - All in one row */}
+            <div className="mb-6 flex flex-wrap items-end gap-3">
+              <div className="flex-shrink-0 min-w-[190px]">
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="all">All Status</option>
                   <option value="pending">Pending</option>
@@ -1473,12 +1595,12 @@ const TeamMemberDashboard = () => {
                 </select>
               </div>
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Priority</label>
+              <div className="flex-shrink-0 min-w-[190px]">
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Priority</label>
                 <select
                   value={priorityFilter}
                   onChange={(e) => setPriorityFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="all">All Priority</option>
                   <option value="low">Low</option>
@@ -1489,34 +1611,34 @@ const TeamMemberDashboard = () => {
                 </select>
               </div>
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Start Date</label>
+              <div className="flex-shrink-0 min-w-[190px]">
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Start Date</label>
                 <input
                   type="date"
                   value={startDateFilter}
                   onChange={(e) => setStartDateFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">End Date</label>
+              <div className="flex-shrink-0 min-w-[190px]">
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">End Date</label>
                 <input
                   type="date"
                   value={endDateFilter}
                   onChange={(e) => setEndDateFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
 
               {/* Team Member Filter - Only show when viewing accessible tasks */}
               {viewAccessibleTasks && accessibleTeamMembers.length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Team Member</label>
+                <div className="flex-shrink-0 min-w-[245px]">
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Team Member</label>
                   <select
                     value={teamMemberFilter}
                     onChange={(e) => setTeamMemberFilter(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="all">All Team Members</option>
                     {accessibleTeamMembers.map((member) => (
@@ -1527,6 +1649,26 @@ const TeamMemberDashboard = () => {
                   </select>
                 </div>
               )}
+
+              {/* Sort Filter */}
+              <div className="flex-shrink-0 min-w-[245px]">
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Sort By</label>
+                <select
+                  value={sortBy}
+                  onChange={(e) => {
+                    setSortBy(e.target.value)
+                    setCurrentPage(1)
+                  }}
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="createdAt:desc">Newest First</option>
+                  <option value="createdAt:asc">Oldest First</option>
+                  <option value="endDate:asc">End Date (Earliest-Latest)</option>
+                  <option value="endDate:desc">End Date (Latest-Earliest)</option>
+                  <option value="priority:desc">Priority (High-Low)</option>
+                  <option value="priority:asc">Priority (Low-High)</option>
+                </select>
+              </div>
             </div>
 
             {/* Delayed Tasks Warning */}
@@ -1764,7 +1906,7 @@ const TeamMemberDashboard = () => {
       {/* Update Task Modal */}
       {showUpdateModal && selectedTask && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-10 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white dark:bg-gray-800 max-h-[90vh] overflow-y-auto">
+          <div className="relative top-10 mx-auto p-5 border w-full max-w-6xl shadow-lg rounded-md bg-white dark:bg-gray-800 max-h-[92vh] overflow-y-auto">
             <div className="mt-3">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white">Update Task Status</h3>
@@ -1828,47 +1970,6 @@ const TeamMemberDashboard = () => {
                     </span>
                   </div>
                 </div>
-
-                {/* Clients & Timeline (Read-Only) */}
-                {selectedTask.timeline && selectedTask.timeline.length > 0 && (
-                  <div className="mt-4">
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Clients & Timeline</label>
-                    <div className="space-y-2 max-h-40 overflow-y-auto">
-                      {selectedTask.timeline.map((timeline, index) => {
-                        const isPopulated = typeof timeline === 'object' && timeline !== null && 'client' in timeline
-                        const timelineId = typeof timeline === 'string' ? timeline : (timeline._id || timeline.id || `timeline-${index}`)
-                        
-                        if (!isPopulated) {
-                          return (
-                            <div key={timelineId} className="p-2 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-600">
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">Timeline ID: {timelineId}</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                Timeline details not loaded. Please contact administrator for more information.
-                              </div>
-                            </div>
-                          )
-                        }
-                        
-                        return (
-                          <div key={timelineId} className="p-2 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-600">
-                            <div className="text-sm font-medium text-gray-900 dark:text-white">{timeline.client?.name || 'N/A'}</div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              {timeline.client?.email && <div>Email: {timeline.client.email}</div>}
-                              {timeline.client?.phone && <div>Phone: {timeline.client.phone}</div>}
-                              {timeline.activity?.name && <div>Activity: {timeline.activity.name}</div>}
-                              {timeline.subactivity?.name && <div>Subactivity: {timeline.subactivity.name}</div>}
-                              {timeline.frequency && <div>Frequency: {timeline.frequency}</div>}
-                              {timeline.status && <div>Status: {timeline.status}</div>}
-                              {timeline.startDate && timeline.endDate && (
-                                <div>Timeline: {formatDate(timeline.startDate)} - {formatDate(timeline.endDate)}</div>
-                              )}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
               </div>
               
               {/* Status Update Section */}
@@ -1905,42 +2006,161 @@ const TeamMemberDashboard = () => {
                       <option value="completed">Completed</option>
                       <option value="on_hold">On Hold</option>
                       <option value="cancelled">Cancelled</option>
-                      <option value="delayed">Delayed</option>
                     </select>
                   )}
                 </div>
 
-                {/* Completed Date - Only show for "My Tasks", hide for "Accessible Team Members' Tasks" */}
-                {!viewAccessibleTasks && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Completed Date <span className="text-gray-500 text-xs">(Optional)</span>
-                    </label>
-                    <input
-                      type="date"
-                      value={updateForm.completedAt}
-                      onChange={(e) => setUpdateForm({...updateForm, completedAt: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      max={selectedTask?.endDate ? new Date(selectedTask.endDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
-                    />
-                  </div>
-                )}
+                {/* Remarks (allow for task-level remarks updates) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Remarks <span className="text-gray-500 text-xs">(Optional)</span>
+                  </label>
+                  <textarea
+                    value={updateForm.remarks}
+                    onChange={(e) => setUpdateForm({ ...updateForm, remarks: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    rows={3}
+                    placeholder="Enter remarks..."
+                  />
+                </div>
 
-                {/* Reference Number - Only show for "My Tasks", hide for "Accessible Team Members' Tasks" */}
-                {!viewAccessibleTasks && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Reference Number <span className="text-gray-500 text-xs">(Optional)</span>
+                {/* Timelines Excel-like editor (for selected timelines) */}
+                <div className="mt-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Related Timelines (Excel)
                     </label>
-                    <input
-                      type="text"
-                      value={updateForm.referenceNumber}
-                      onChange={(e) => setUpdateForm({...updateForm, referenceNumber: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter reference number..."
-                    />
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => fetchTaskTimelineDetails(selectedTask)}
+                        disabled={isLoadingTimelineDetails}
+                        className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        {isLoadingTimelineDetails ? 'Loading...' : 'Refresh'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={clearTimelineEdits}
+                        disabled={updatingTask}
+                        className="px-3 py-1 text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50"
+                      >
+                        Clear edits
+                      </button>
+                    </div>
                   </div>
-                )}
+
+                  {selectedTask.timeline && selectedTask.timeline.length === 0 ? (
+                    <div className="text-sm text-gray-500 dark:text-gray-400 p-3 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
+                      No related timelines available.
+                    </div>
+                  ) : isLoadingTimelineDetails ? (
+                    <div className="flex items-center justify-center py-6">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                    </div>
+                  ) : timelineDetails.length > 0 ? (
+                    <>
+                      <div className="overflow-auto border border-gray-200 dark:border-gray-600 rounded" style={{ maxHeight: '320px' }}>
+                        <table className="min-w-full border-collapse">
+                          <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
+                            <tr>
+                              <th className="border border-gray-200 dark:border-gray-600 px-2 py-1.5 text-left text-xs font-semibold text-gray-600 dark:text-gray-200" style={{ width: 70 }}>
+                                Select
+                              </th>
+                              <th className="border border-gray-200 dark:border-gray-600 px-2 py-1.5 text-left text-xs font-semibold text-gray-600 dark:text-gray-200" style={{ minWidth: 180 }}>
+                                Activity
+                              </th>
+                              <th className="border border-gray-200 dark:border-gray-600 px-2 py-1.5 text-left text-xs font-semibold text-gray-600 dark:text-gray-200" style={{ minWidth: 180 }}>
+                                Client
+                              </th>
+                              <th className="border border-gray-200 dark:border-gray-600 px-2 py-1.5 text-left text-xs font-semibold text-gray-600 dark:text-gray-200" style={{ width: 140 }}>
+                                Status
+                              </th>
+                              <th className="border border-gray-200 dark:border-gray-600 px-2 py-1.5 text-left text-xs font-semibold text-gray-600 dark:text-gray-200" style={{ width: 180 }}>
+                                Reference
+                              </th>
+                              <th className="border border-gray-200 dark:border-gray-600 px-2 py-1.5 text-left text-xs font-semibold text-gray-600 dark:text-gray-200" style={{ width: 150 }}>
+                                Completed
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white dark:bg-gray-800">
+                            {timelineDetails.map((timeline, idx) => {
+                              const tid = getTimelineId(timeline) || `row-${idx}`
+                              const isSelected = Boolean(selectedTimelineIds[tid])
+                              return (
+                                <tr key={tid} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                  <td className="border border-gray-200 dark:border-gray-600 px-2 py-1.5">
+                                    <input
+                                      type="checkbox"
+                                      className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                      checked={isSelected}
+                                      onChange={() => toggleTimelineSelected(tid)}
+                                    />
+                                  </td>
+                                  <td className="border border-gray-200 dark:border-gray-600 px-2 py-1.5 text-xs text-gray-900 dark:text-white">
+                                    <div className="font-medium">
+                                      {timeline.activity?.name || timeline.activity || 'Unknown Activity'}
+                                    </div>
+                                    {timeline.period && (
+                                      <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">Period: {timeline.period}</div>
+                                    )}
+                                  </td>
+                                  <td className="border border-gray-200 dark:border-gray-600 px-2 py-1.5 text-xs text-gray-900 dark:text-white">
+                                    {timeline.client?.name || timeline.client || 'Unknown Client'}
+                                  </td>
+                                  <td className="border border-gray-200 dark:border-gray-600 px-2 py-1.5">
+                                    <select
+                                      className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                      value={timeline.status || ''}
+                                      onChange={(e) => setTimelineField(timeline, 'status', e.target.value)}
+                                      disabled={updatingTask}
+                                    >
+                                      <option value="">Select</option>
+                                      <option value="pending">Pending</option>
+                                      <option value="ongoing">Ongoing</option>
+                                      <option value="completed">Completed</option>
+                                      <option value="on_hold">On Hold</option>
+                                      <option value="cancelled">Cancelled</option>
+                                      <option value="delayed">Delayed</option>
+                                    </select>
+                                  </td>
+                                  <td className="border border-gray-200 dark:border-gray-600 px-2 py-1.5">
+                                    <input
+                                      type="text"
+                                      className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                      value={timeline.referenceNumber || ''}
+                                      onChange={(e) => setTimelineField(timeline, 'referenceNumber', e.target.value)}
+                                      disabled={updatingTask}
+                                      placeholder="REF-123"
+                                    />
+                                  </td>
+                                  <td className="border border-gray-200 dark:border-gray-600 px-2 py-1.5">
+                                    <input
+                                      type="date"
+                                      className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                      value={getCompletedAtInputValue(timeline)}
+                                      onChange={(e) => setTimelineField(timeline, 'completedAt', e.target.value)}
+                                      disabled={updatingTask}
+                                    />
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        - Select timeline rows (or edit a row to auto-select). Only <span className="font-medium">status</span>, <span className="font-medium">referenceNumber</span>, <span className="font-medium">completedAt</span> are sent in <span className="font-medium">timelineUpdates</span>.<br />
+                        - To clear: set Reference empty and clear Completed date (sends <span className="font-mono">""</span> / <span className="font-mono">null</span>).
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-sm text-gray-500 dark:text-gray-400 p-3 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
+                      Timeline details not loaded. Click Refresh.
+                    </div>
+                  )}
+                </div>
               </div>
               
               <div className="flex justify-end gap-3 mt-6">

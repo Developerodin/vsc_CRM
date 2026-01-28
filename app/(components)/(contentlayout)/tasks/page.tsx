@@ -73,6 +73,13 @@ interface TaskStatistics {
   critical: number;
 }
 
+type TimelineUpdatePayload = {
+  timelineId: string;
+  status?: string;
+  referenceNumber?: string;
+  completedAt?: string; // ISO string
+};
+
 
 
 const TasksPage = () => {
@@ -327,12 +334,20 @@ const TasksPage = () => {
   };
 
   // Update task status
-  const updateTaskStatus = async (taskId: string, newStatus: string, remarks?: string) => {
+  const updateTaskStatus = async (
+    taskId: string,
+    newStatus: string,
+    remarks?: string,
+    timelineUpdates?: TimelineUpdatePayload[]
+  ) => {
     setIsUpdatingTask(true);
     try {
       const updateData: any = { status: newStatus };
       if (remarks && remarks.trim() !== '') {
         updateData.remarks = remarks.trim();
+      }
+      if (timelineUpdates && Array.isArray(timelineUpdates) && timelineUpdates.length > 0) {
+        updateData.timelineUpdates = timelineUpdates;
       }
 
       await axios.patch(`${Base_url}tasks/${taskId}`, updateData, {
@@ -1238,15 +1253,14 @@ const TaskDetailsModal = ({
 }: { 
   task: Task; 
   onClose: () => void; 
-  onUpdateStatus: (taskId: string, status: string, remarks?: string) => Promise<void>;
+  onUpdateStatus: (taskId: string, status: string, remarks?: string, timelineUpdates?: TimelineUpdatePayload[]) => Promise<void>;
   isUpdating: boolean;
 }) => {
   const [selectedStatus, setSelectedStatus] = useState(task.status);
   const [remarks, setRemarks] = useState(task.remarks || '');
   const [timelineDetails, setTimelineDetails] = useState<any[]>([]);
   const [isLoadingTimelines, setIsLoadingTimelines] = useState(false);
-  const [timelineCurrentPage, setTimelineCurrentPage] = useState(1);
-  const [timelinesPerPage] = useState(5);
+  const [timelineUpdatesMap, setTimelineUpdatesMap] = useState<Record<string, TimelineUpdatePayload>>({});
 
   // Fetch timeline details when modal opens
   useEffect(() => {
@@ -1255,11 +1269,21 @@ const TaskDetailsModal = ({
     }
   }, [task]);
 
+  // Clear timeline edits when opening a new task
+  useEffect(() => {
+    setTimelineUpdatesMap({});
+  }, [task?.id, (task as any)?._id]);
+
+  const getTimelineId = (timeline: any): string | null => {
+    const id = timeline?.id ?? timeline?._id ?? timeline?.timelineId ?? null;
+    return id && String(id).trim() ? String(id) : null;
+  };
+
   const fetchTimelineDetails = async () => {
     if (!task.timeline || task.timeline.length === 0) return;
 
     // Resolve timeline ID: API may return { id }, { _id }, or raw string
-    const getTimelineId = (item: { id?: string; _id?: string } | string): string | null => {
+    const getTimelineRefId = (item: { id?: string; _id?: string } | string): string | null => {
       if (typeof item === 'string' && item) return item;
       const obj = item as { id?: string; _id?: string };
       const id = obj?.id ?? obj?._id ?? null;
@@ -1267,7 +1291,7 @@ const TaskDetailsModal = ({
     };
 
     const idsToFetch = task.timeline
-      .map(getTimelineId)
+      .map(getTimelineRefId)
       .filter((id): id is string => Boolean(id));
 
     if (idsToFetch.length === 0) {
@@ -1296,12 +1320,51 @@ const TaskDetailsModal = ({
       const results = await Promise.all(timelinePromises);
       const validTimelines = results.filter((t): t is NonNullable<typeof t> => t !== null);
       setTimelineDetails(validTimelines);
-      setTimelineCurrentPage(1);
     } catch {
       setTimelineDetails([]);
     } finally {
       setIsLoadingTimelines(false);
     }
+  };
+
+  const setTimelineField = (timeline: any, field: 'status' | 'referenceNumber' | 'completedAt', value: string) => {
+    const timelineId = getTimelineId(timeline);
+    if (!timelineId) return;
+
+    // Update local visible data immediately (Excel-like feel)
+    setTimelineDetails(prev =>
+      prev.map(t => {
+        const tid = getTimelineId(t);
+        if (tid !== timelineId) return t;
+        if (field === 'completedAt') {
+          // Keep a YYYY-MM-DD view in UI (if user clears it, allow empty)
+          return { ...t, completedAt: value ? new Date(value).toISOString() : null };
+        }
+        return { ...t, [field]: value };
+      })
+    );
+
+    // Track only changed fields for payload (only the 3 allowed)
+    setTimelineUpdatesMap(prev => {
+      const existing = prev[timelineId] || { timelineId };
+      const next: TimelineUpdatePayload = { ...existing, timelineId };
+      if (field === 'completedAt') {
+        next.completedAt = value ? new Date(value).toISOString() : undefined;
+      } else if (field === 'status') {
+        next.status = value || undefined;
+      } else if (field === 'referenceNumber') {
+        next.referenceNumber = value?.trim() ? value.trim() : undefined;
+      }
+
+      // Drop empty update objects (only timelineId left)
+      const hasAny =
+        Boolean(next.status) || Boolean(next.referenceNumber) || Boolean(next.completedAt);
+      if (!hasAny) {
+        const { [timelineId]: _removed, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [timelineId]: next };
+    });
   };
 
   const handleStatusUpdate = async () => {
@@ -1326,9 +1389,22 @@ const TaskDetailsModal = ({
       return;
     }
     
-    if (selectedStatus !== task.status || (task.status !== 'delayed' && remarks !== (task.remarks || ''))) {
-      await onUpdateStatus(taskId, selectedStatus, task.status === 'delayed' ? undefined : remarks);
+    const timelineUpdates = Object.values(timelineUpdatesMap);
+    const taskFieldsChanged =
+      selectedStatus !== task.status ||
+      (task.status !== 'delayed' && remarks !== (task.remarks || ''));
+
+    if (!taskFieldsChanged && timelineUpdates.length === 0) {
+      toast('No changes to update', { icon: 'ℹ️' });
+      return;
     }
+
+    await onUpdateStatus(
+      taskId,
+      selectedStatus,
+      task.status === 'delayed' ? undefined : remarks,
+      timelineUpdates.length > 0 ? timelineUpdates : undefined
+    );
   };
 
   const handleDownloadAttachment = (attachment: { fileName: string; fileUrl: string }) => {
@@ -1341,22 +1417,19 @@ const TaskDetailsModal = ({
     document.body.removeChild(link);
   };
 
-  // Timeline pagination logic
-  const getPaginatedTimelines = () => {
-    const startIndex = (timelineCurrentPage - 1) * timelinesPerPage;
-    const endIndex = startIndex + timelinesPerPage;
-    return timelineDetails.slice(startIndex, endIndex);
-  };
-
-  const totalTimelinePages = Math.ceil(timelineDetails.length / timelinesPerPage);
-
-  const handleTimelinePageChange = (page: number) => {
-    setTimelineCurrentPage(page);
+  const getCompletedAtInputValue = (timeline: any) => {
+    const raw = timeline?.completedAt;
+    if (!raw) return '';
+    try {
+      return new Date(raw).toISOString().split('T')[0];
+    } catch {
+      return '';
+    }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-      <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-lg shadow-lg max-w-6xl w-full max-h-[92vh] flex flex-col">
         <div className="flex items-center justify-between p-6 border-b">
           <div className="flex-1 mr-6">
              <h2 className="text-lg font-semibold text-gray-800">Task Details</h2>
@@ -1420,110 +1493,6 @@ const TaskDetailsModal = ({
                 </div>
               </div>
 
-                <div>
-                 <div className="flex items-center justify-between mb-2">
-                   <h3 className="text-sm font-medium text-gray-700">Related Timelines</h3>
-                   {task.timeline && task.timeline.length > 0 && (
-                     <button
-                       onClick={fetchTimelineDetails}
-                       disabled={isLoadingTimelines}
-                       className="text-xs text-primary hover:text-primary-dark p-1 hover:bg-primary/10 rounded"
-                       title="Refresh timeline details"
-                     >
-                       <i className={`ri-refresh-line ${isLoadingTimelines ? 'animate-spin' : ''}`}></i>
-                     </button>
-                   )}
-                 </div>
-                 {isLoadingTimelines ? (
-                   <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded text-center">
-                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mx-auto mb-2"></div>
-                     Loading timeline details...
-                   </div>
-                 ) : timelineDetails.length > 0 ? (
-                   <>
-                  <div className="space-y-2">
-                       {getPaginatedTimelines().map((timeline, index) => (
-                      <div key={index} className="bg-gray-50 p-2 rounded text-sm">
-                           <div className="font-medium">{timeline.activity?.name || timeline.activity || 'Unknown Activity'}</div>
-                           <div className="text-gray-500">{timeline.client?.name || timeline.client || 'Unknown Client'}</div>
-                           <div className="flex items-center justify-between mt-1">
-                             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusStyling(timeline.status)}`}>
-                               {timeline.status || 'Unknown Status'}
-                        </span>
-                             {timeline.priority && (
-                               <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getPriorityStyling(timeline.priority)}`}>
-                                 {timeline.priority}
-                               </span>
-                             )}
-                           </div>
-                           {timeline.description && (
-                             <div className="text-xs text-gray-600 mt-1">
-                               {timeline.description}
-                             </div>
-                           )}
-                      </div>
-                    ))}
-                  </div>
-                     
-                     {/* Timeline Pagination */}
-                     {totalTimelinePages > 1 && (
-                       <div className="mt-4 flex justify-center">
-                         <nav className="flex items-center space-x-1">
-                           <button
-                             onClick={() => handleTimelinePageChange(timelineCurrentPage - 1)}
-                             disabled={timelineCurrentPage === 1}
-                             className="px-2 py-1 text-xs border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                           >
-                             Previous
-                           </button>
-                           
-                           {Array.from({ length: totalTimelinePages }, (_, i) => i + 1).map((page) => (
-                             <button
-                               key={page}
-                               onClick={() => handleTimelinePageChange(page)}
-                               className={`px-2 py-1 text-xs border rounded ${
-                                 timelineCurrentPage === page
-                                   ? 'bg-primary text-white border-primary'
-                                   : 'border-gray-300 hover:bg-gray-50'
-                               }`}
-                             >
-                               {page}
-                             </button>
-                           ))}
-                           
-                           <button
-                             onClick={() => handleTimelinePageChange(timelineCurrentPage + 1)}
-                             disabled={timelineCurrentPage === totalTimelinePages}
-                             className="px-2 py-1 text-xs border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                           >
-                             Next
-                           </button>
-                         </nav>
-                </div>
-              )}
-                     
-                     <div className="text-xs text-gray-500 text-center mt-2">
-                       Showing {((timelineCurrentPage - 1) * timelinesPerPage) + 1} to {Math.min(timelineCurrentPage * timelinesPerPage, timelineDetails.length)} of {timelineDetails.length} timelines
-                     </div>
-                   </>
-                 ) : task.timeline && task.timeline.length > 0 ? (
-                   <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded text-center">
-                     <i className="ri-error-warning-line text-gray-400 me-2"></i>
-                     Failed to load timeline details
-                     <button
-                       onClick={fetchTimelineDetails}
-                       className="block mx-auto mt-2 text-primary hover:text-primary-dark text-xs underline"
-                     >
-                       Try again
-                     </button>
-                   </div>
-                 ) : (
-                   <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded text-center">
-                     <i className="ri-time-line text-gray-400 me-2"></i>
-                     No related timelines available
-                   </div>
-                 )}
-               </div>
             </div>
 
             {/* Right Column - Status Update */}
@@ -1611,64 +1580,217 @@ const TaskDetailsModal = ({
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Remarks
-                    </label>
-                    <textarea
-                      className="form-control w-full"
-                      rows={3}
-                      placeholder="Add any additional notes or remarks..."
-                      value={remarks}
-                      onChange={(e) => setRemarks(e.target.value)}
-                      disabled={isUpdating}
-                    />
+                  {/* Attachments left of Remarks */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Attachments
+                        </label>
+                      </div>
+                      {task.attachments && task.attachments.length > 0 ? (
+                        <div className="space-y-2">
+                          {task.attachments.map((attachment, index) => (
+                            <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded border border-gray-200">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <i className="ri-file-line text-gray-400"></i>
+                                <span className="text-sm font-medium truncate" title={attachment.fileName}>
+                                  {attachment.fileName}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <button
+                                  onClick={() => handleDownloadAttachment(attachment)}
+                                  className="text-primary hover:text-primary-dark text-sm p-1 hover:bg-primary/10 rounded"
+                                  title="Download Attachment"
+                                  type="button"
+                                >
+                                  <i className="ri-download-line"></i>
+                                </button>
+                                <a
+                                  href={attachment.fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-primary hover:text-primary-dark text-sm p-1 hover:bg-primary/10 rounded"
+                                  title="View Attachment"
+                                >
+                                  <i className="ri-external-link-line"></i>
+                                </a>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded text-center border border-gray-200">
+                          <i className="ri-file-line text-gray-400 me-2"></i>
+                          No attachments available
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Remarks
+                      </label>
+                      <textarea
+                        className="form-control w-full"
+                        rows={5}
+                        placeholder="Add any additional notes or remarks..."
+                        value={remarks}
+                        onChange={(e) => setRemarks(e.target.value)}
+                        disabled={isUpdating}
+                      />
+                    </div>
                   </div>
                 </div>
                  )}
               </div>
-
-                <div>
-                 <h3 className="text-sm font-medium text-gray-700 mb-2">Attachments</h3>
-                 {task.attachments && task.attachments.length > 0 ? (
-                  <div className="space-y-2">
-                    {task.attachments.map((attachment, index) => (
-                      <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                        <div className="flex items-center gap-2">
-                          <i className="ri-file-line text-gray-400"></i>
-                          <span className="text-sm font-medium">{attachment.fileName}</span>
-                        </div>
-                         <div className="flex items-center gap-2">
-                           <button
-                             onClick={() => handleDownloadAttachment(attachment)}
-                             className="text-primary hover:text-primary-dark text-sm p-1 hover:bg-primary/10 rounded"
-                             title="Download Attachment"
-                           >
-                             <i className="ri-download-line"></i>
-                           </button>
-                        <a
-                          href={attachment.fileUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                             className="text-primary hover:text-primary-dark text-sm p-1 hover:bg-primary/10 rounded"
-                             title="View Attachment"
-                        >
-                          <i className="ri-external-link-line"></i>
-                        </a>
-                      </div>
-                      </div>
-                    ))}
-                  </div>
-                 ) : (
-                   <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded text-center">
-                     <i className="ri-file-line text-gray-400 me-2"></i>
-                     No attachments available
-                </div>
-              )}
-               </div>
-
-              
             </div>
+          </div>
+
+          {/* Timelines Editor (Excel-like) - below Attachments/Remarks row */}
+          <div className="mt-6">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-700">Related Timelines</h3>
+              {task.timeline && task.timeline.length > 0 && (
+                <button
+                  onClick={fetchTimelineDetails}
+                  disabled={isLoadingTimelines}
+                  className="text-xs text-primary hover:text-primary-dark p-1 hover:bg-primary/10 rounded"
+                  title="Refresh timeline details"
+                  type="button"
+                >
+                  <i className={`ri-refresh-line ${isLoadingTimelines ? 'animate-spin' : ''}`}></i>
+                </button>
+              )}
+            </div>
+
+            {task.timeline && task.timeline.length === 0 ? (
+              <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded text-center border border-gray-200">
+                <i className="ri-time-line text-gray-400 me-2"></i>
+                No related timelines available
+              </div>
+            ) : isLoadingTimelines ? (
+              <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded text-center border border-gray-200">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mx-auto mb-2"></div>
+                Loading timeline details...
+              </div>
+            ) : timelineDetails.length > 0 ? (
+              <>
+                {Object.keys(timelineUpdatesMap).length > 0 && (
+                  <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-blue-800">
+                        {Object.keys(timelineUpdatesMap).length} timeline(s) edited. Changes will be sent via <span className="font-semibold">timelineUpdates</span>.
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setTimelineUpdatesMap({})}
+                        className="text-blue-600 hover:text-blue-800 text-sm"
+                        disabled={isUpdating}
+                      >
+                        <i className="ri-close-line me-1"></i>
+                        Clear timeline edits
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="overflow-auto border border-gray-300 rounded" style={{ maxHeight: '360px' }}>
+                  <table className="w-full border-collapse">
+                    <thead className="bg-gray-100 sticky top-0 z-10">
+                      <tr>
+                        <th className="border border-gray-300 px-2 py-1.5 text-left font-semibold text-xs" style={{ minWidth: 180 }}>
+                          Activity
+                        </th>
+                        <th className="border border-gray-300 px-2 py-1.5 text-left font-semibold text-xs" style={{ minWidth: 180 }}>
+                          Client
+                        </th>
+                        <th className="border border-gray-300 px-2 py-1.5 text-left font-semibold text-xs" style={{ width: 140 }}>
+                          Status
+                        </th>
+                        <th className="border border-gray-300 px-2 py-1.5 text-left font-semibold text-xs" style={{ width: 180 }}>
+                          Reference Number
+                        </th>
+                        <th className="border border-gray-300 px-2 py-1.5 text-left font-semibold text-xs" style={{ width: 150 }}>
+                          Completed At
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {timelineDetails.map((timeline, idx) => {
+                        const timelineId = getTimelineId(timeline) || `row-${idx}`;
+                        return (
+                          <tr key={timelineId} className="hover:bg-gray-50">
+                            <td className="border border-gray-300 px-2 py-1.5 text-xs">
+                              <div className="font-medium">
+                                {timeline.activity?.name || timeline.activity || 'Unknown Activity'}
+                              </div>
+                              {timeline.period && (
+                                <div className="text-xs text-gray-500 mt-0.5">Period: {timeline.period}</div>
+                              )}
+                            </td>
+                            <td className="border border-gray-300 px-2 py-1.5 text-xs">
+                              {timeline.client?.name || timeline.client || 'Unknown Client'}
+                            </td>
+                            <td className="border border-gray-300 px-2 py-1.5">
+                              <select
+                                className="form-select w-full text-xs py-1"
+                                value={timeline.status || ''}
+                                onChange={(e) => setTimelineField(timeline, 'status', e.target.value)}
+                                disabled={isUpdating}
+                              >
+                                <option value="">Select</option>
+                                <option value="pending">Pending</option>
+                                <option value="ongoing">Ongoing</option>
+                                <option value="completed">Completed</option>
+                                <option value="on_hold">On Hold</option>
+                                <option value="cancelled">Cancelled</option>
+                                <option value="delayed">Delayed</option>
+                              </select>
+                            </td>
+                            <td className="border border-gray-300 px-2 py-1.5">
+                              <input
+                                type="text"
+                                className="form-control w-full text-xs py-1"
+                                value={timeline.referenceNumber || ''}
+                                onChange={(e) => setTimelineField(timeline, 'referenceNumber', e.target.value)}
+                                disabled={isUpdating}
+                                placeholder="REF-123"
+                              />
+                            </td>
+                            <td className="border border-gray-300 px-2 py-1.5">
+                              <input
+                                type="date"
+                                className="form-control w-full text-xs py-1"
+                                value={getCompletedAtInputValue(timeline)}
+                                onChange={(e) => setTimelineField(timeline, 'completedAt', e.target.value)}
+                                disabled={isUpdating}
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="text-xs text-gray-500 mt-2">
+                  Note: only <span className="font-medium">status</span>, <span className="font-medium">referenceNumber</span>, and <span className="font-medium">completedAt</span> will be sent for timeline updates.
+                </div>
+              </>
+            ) : (
+              <div className="text-sm text-gray-500 bg-gray-50 p-3 rounded text-center border border-gray-200">
+                <i className="ri-error-warning-line text-gray-400 me-2"></i>
+                Failed to load timeline details
+                <button
+                  onClick={fetchTimelineDetails}
+                  className="block mx-auto mt-2 text-primary hover:text-primary-dark text-xs underline"
+                  type="button"
+                >
+                  Try again
+                </button>
+              </div>
+            )}
           </div>
         </div>
         
@@ -1683,7 +1805,14 @@ const TaskDetailsModal = ({
           <button
             className="ti-btn ti-btn-primary"
             onClick={handleStatusUpdate}
-            disabled={isUpdating || (task.status === 'delayed' && selectedStatus === 'delayed') || (task.status !== 'delayed' && selectedStatus === task.status && remarks === (task.remarks || ''))}
+            disabled={
+              isUpdating ||
+              (task.status === 'delayed' && selectedStatus === 'delayed' && Object.keys(timelineUpdatesMap).length === 0) ||
+              (task.status !== 'delayed' &&
+                selectedStatus === task.status &&
+                remarks === (task.remarks || '') &&
+                Object.keys(timelineUpdatesMap).length === 0)
+            }
           >
             {isUpdating ? (
               <>
