@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { toast } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { Base_url } from '@/app/api/config/BaseUrl';
-import { normalizeQuarterlyPeriods, formatPeriodDisplay } from "../utils/quarterPeriods";
+import { normalizeQuarterlyPeriods, formatPeriodDisplay, mergeWithExtendedPeriods } from "../utils/quarterPeriods";
 import { getClientIdType, type ClientIdType } from "../utils/timelineClientId";
 
 // Compliance task types
@@ -184,9 +184,8 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
 
       const data = await response.json();
       const raw = data.periods || [];
-      setAvailablePeriods(
-        frequency?.toLowerCase() === 'quarterly' ? normalizeQuarterlyPeriods(raw) : raw
-      );
+      const normalized = frequency?.toLowerCase() === 'quarterly' ? normalizeQuarterlyPeriods(raw) : raw;
+      setAvailablePeriods(mergeWithExtendedPeriods(frequency, normalized));
     } catch (err) {
       toast.error('Failed to fetch frequency periods');
       setAvailablePeriods([]);

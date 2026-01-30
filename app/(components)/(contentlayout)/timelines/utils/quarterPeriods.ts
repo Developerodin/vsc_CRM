@@ -107,3 +107,74 @@ export function normalizeQuarterlyPeriods<T extends FrequencyPeriod>(periods: T[
     return { ...p, quarter: q, displayName };
   });
 }
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/** Generate period options for past 3 and future 3 years (7 years total) for a frequency. */
+export function getExtendedPeriodOptions(frequency: string): Array<{ period: string; displayName: string }> {
+  const currentYear = new Date().getFullYear();
+  const startYear = currentYear - 3;
+  const endYear = currentYear + 3;
+  const result: Array<{ period: string; displayName: string }> = [];
+
+  const freq = (frequency || '').toLowerCase();
+
+  if (freq === 'quarterly') {
+    for (let y = startYear; y <= endYear; y++) {
+      for (let q = 1; q <= 4; q++) {
+        result.push({ period: `Q${q}-${y}`, displayName: `Q${q} ${y}` });
+      }
+    }
+    return result;
+  }
+
+  if (freq === 'yearly') {
+    for (let y = startYear; y <= endYear; y++) {
+      result.push({ period: String(y), displayName: String(y) });
+    }
+    return result;
+  }
+
+  if (freq === 'monthly') {
+    for (let y = startYear; y <= endYear; y++) {
+      for (let m = 1; m <= 12; m++) {
+        const monthName = MONTH_NAMES[m - 1];
+        const period = `${y}-${String(m).padStart(2, '0')}`;
+        result.push({ period, displayName: `${monthName} ${y}` });
+      }
+    }
+    return result;
+  }
+
+  if (freq === 'onetime' || freq === 'one time') {
+    for (let y = startYear; y <= endYear; y++) {
+      result.push({ period: String(y), displayName: String(y) });
+    }
+    return result;
+  }
+
+  return result;
+}
+
+/** Merge API periods with extended past/future 3 years; dedupe by period, sort by period. */
+export function mergeWithExtendedPeriods<T extends { period?: string; displayName?: string }>(
+  frequency: string,
+  apiPeriods: T[]
+): T[] {
+  const extended = getExtendedPeriodOptions(frequency);
+  const byPeriod = new Map<string, T>();
+  apiPeriods.forEach((p) => {
+    const key = (p.period || '').trim();
+    if (key) byPeriod.set(key, p);
+  });
+  extended.forEach((e) => {
+    if (!byPeriod.has(e.period)) {
+      byPeriod.set(e.period, { ...e, period: e.period, displayName: e.displayName } as T);
+    }
+  });
+  return Array.from(byPeriod.values()).sort((a, b) => {
+    const pa = a.period || '';
+    const pb = b.period || '';
+    return pa.localeCompare(pb, undefined, { numeric: true });
+  });
+}
