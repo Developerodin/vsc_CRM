@@ -4,6 +4,7 @@ import { toast } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { Base_url } from '@/app/api/config/BaseUrl';
 import { normalizeQuarterlyPeriods, formatPeriodDisplay } from "../utils/quarterPeriods";
+import { getClientIdType, type ClientIdType } from "../utils/timelineClientId";
 
 // Compliance task types
 export type ComplianceTaskType = 
@@ -21,7 +22,17 @@ interface ComplianceRegisterEntry {
   id?: string;
   clientId: string;
   clientName: string;
-  clientGstState?: string; // Client's GST state (from timeline metadata) – shown in Client Name column
+  clientGstState?: string; // Client's GST state (from timeline metadata)
+  /** Activity name (e.g. GSTR-1, TDS Returns, ITR) – used to pick which client ID to show */
+  activityName?: string;
+  /** GST number for the timeline's gstState (prior state); used when activity is GST */
+  clientGstNumber?: string;
+  /** TAN/TIN number; used when activity is TDS */
+  clientTin?: string;
+  /** PAN number; used when activity is ITR or ROC/Audit */
+  clientPan?: string;
+  /** CIN number; used when activity is ROC, Audit, or other */
+  clientCin?: string;
   subActivity: string;
   frequency: string;
   period: string;
@@ -83,8 +94,10 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
   const [isSaving, setIsSaving] = useState(false);
   const [showFilters, setShowFilters] = useState(true);
   const [entriesToShow, setEntriesToShow] = useState<number | 'all'>(100);
+  const [isImporting, setIsImporting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+  const importFileRef = useRef<HTMLInputElement>(null);
 
   // Column definitions
   const columns = useMemo(() => [
@@ -216,13 +229,27 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
       const data = await response.json();
       const timelines = data.results || [];
 
-      // Transform timeline data to ComplianceRegisterEntry format (include client GST state from metadata)
+      const gstState = (t: any) => t.metadata?.gstState || t.client?.state || '';
+      const gstNumberForState = (t: any) => {
+        const state = gstState(t);
+        const list = t.client?.gstNumbers || [];
+        if (!state || !Array.isArray(list)) return list?.[0]?.gstNumber ?? '';
+        const found = list.find((g: any) => (g.state || '').toLowerCase() === state.toLowerCase());
+        return found?.gstNumber ?? list?.[0]?.gstNumber ?? '';
+      };
+
+      // Transform timeline data to ComplianceRegisterEntry (activity-based client IDs)
       const transformedData: ComplianceRegisterEntry[] = timelines.map((timeline: any) => ({
         _id: timeline._id,
         id: timeline.id,
         clientId: timeline.client?._id || timeline.client?.id || '',
         clientName: timeline.client?.name || '',
-        clientGstState: timeline.metadata?.gstState || timeline.client?.state || '',
+        clientGstState: gstState(timeline),
+        activityName: timeline.activity?.name || '',
+        clientGstNumber: gstNumberForState(timeline),
+        clientTin: timeline.client?.tanNumber || '',
+        clientPan: timeline.client?.pan || '',
+        clientCin: timeline.client?.cinNumber || '',
         subActivity: timeline.subactivity?.name || '',
         frequency: timeline.subactivity?.frequency || timeline.frequency || '',
         period: timeline.period || '',
@@ -456,11 +483,22 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
     toast('Delete timelines through the Timelines section', { icon: 'ℹ️' });
   };
 
-  // Export to Excel (includes Client GST State for GST/activity context)
+  // Export to Excel (includes activity-appropriate client ID: GST / TIN / PAN / PAN&CIN)
+  const getClientIdDisplayValue = (entry: ComplianceRegisterEntry) => {
+    const idType = getClientIdType(entry.activityName, entry.subActivity);
+    if (idType === 'gst') {
+      return entry.clientGstState ? `${entry.clientGstNumber || ''} (${entry.clientGstState})` : (entry.clientGstNumber || '');
+    }
+    if (idType === 'tds') return entry.clientTin || '';
+    if (idType === 'itr') return entry.clientPan || '';
+    return [entry.clientPan, entry.clientCin].filter(Boolean).join(' / ') || '';
+  };
+
   const handleExport = async () => {
     const exportData = registerData.map(entry => ({
+      'Timeline ID': entry.timelineId || '',
       'Client Name': entry.clientName || '',
-      'Client GST State': entry.clientGstState || '',
+      'Client ID (GST/TIN/PAN/CIN)': getClientIdDisplayValue(entry),
       'Sub-Activity': entry.subActivity || '',
       'Frequency': entry.frequency || '',
       'Period': entry.period || '',
@@ -470,11 +508,10 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
     }));
 
     const ws = XLSX.utils.json_to_sheet(exportData);
-    
-    // Calculate column widths
     const columnWidths = [
+      { wch: 28 }, // Timeline ID
       { wch: 30 }, // Client Name
-      { wch: 18 }, // Client GST State
+      { wch: 24 }, // Client ID (GST/TIN/PAN/CIN)
       { wch: 25 }, // Sub-Activity
       { wch: 15 }, // Frequency
       { wch: 20 }, // Period
@@ -489,6 +526,101 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
     const fileName = `compliance_register_${new Date().toISOString().split("T")[0]}.xlsx`;
     XLSX.writeFile(wb, fileName);
     toast.success("Compliance register exported successfully");
+  };
+
+  /** Parse Excel and PATCH timelines with Reference Number and Completed At (match by Timeline ID). */
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const data = ev.target?.result;
+        if (!data || typeof data !== 'object' || !(data instanceof ArrayBuffer)) return;
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json<Record<string, string | number>>(sheet, { defval: '' });
+
+        const timelineIdKey = 'Timeline ID';
+        const refKey = 'Reference Number';
+        const completedKey = 'Completed At';
+        const allKeys = rows.length ? Object.keys(rows[0] || {}) : [];
+        const normalizedKeys = allKeys.reduce((acc, k) => {
+          acc[k.trim()] = k;
+          return acc;
+        }, {} as Record<string, string>);
+        const getVal = (row: Record<string, string | number>, key: string) => {
+          const raw = normalizedKeys[key] || key;
+          const v = row[raw] ?? row[key];
+          return v == null ? '' : String(v).trim();
+        };
+
+        const parseDate = (val: string): string | null => {
+          if (!val) return null;
+          const n = Number(val);
+          if (!Number.isNaN(n) && n > 0) {
+            const excelEpoch = new Date(1899, 11, 30);
+            const d = new Date(excelEpoch.getTime() + n * 86400000);
+            if (!Number.isNaN(d.getTime())) return d.toISOString();
+          }
+          const d = new Date(val);
+          return Number.isNaN(d.getTime()) ? null : d.toISOString();
+        };
+
+        let updated = 0;
+        let failed = 0;
+        setIsImporting(true);
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          const timelineId = getVal(row, timelineIdKey);
+          if (!timelineId) continue;
+
+          const referenceNumber = getVal(row, refKey);
+          const completedAtRaw = getVal(row, completedKey);
+          const completedAtIso = parseDate(completedAtRaw);
+          if (!referenceNumber && !completedAtIso) continue;
+
+          const payload: { referenceNumber?: string | null; completedAt?: string | null; status?: string } = {};
+          payload.referenceNumber = referenceNumber || null;
+          if (completedAtIso) {
+            payload.completedAt = completedAtIso;
+            payload.status = 'completed';
+          }
+
+          try {
+            const response = await fetch(`${Base_url}timelines/${timelineId}`, {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              },
+              body: JSON.stringify(payload)
+            });
+            if (response.ok) updated++;
+            else failed++;
+          } catch {
+            failed++;
+          }
+        }
+        setIsImporting(false);
+        if (updated > 0) {
+          toast.success(`Import complete: ${updated} updated${failed ? `, ${failed} failed` : ''}`);
+          handleSubmit();
+        } else if (failed > 0) {
+          toast.error(`Import failed for ${failed} row(s). Check Timeline ID and try again.`);
+        } else if (rows.length > 0) {
+          toast('No rows had Timeline ID plus Reference Number or Completed At.', { icon: 'ℹ️' });
+        } else {
+          toast.error('Excel file was empty or invalid.');
+        }
+      } catch (err) {
+        setIsImporting(false);
+        toast.error('Failed to parse Excel. Use the exported template.');
+      }
+    };
+    reader.readAsArrayBuffer(file);
   };
 
   // Calculate displayed data based on entries to show
@@ -558,10 +690,25 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
       }
     }
 
-    // Client Name column: show name + client GST state below (aligned with timelines list)
+    // Client Name column: show name + activity-appropriate client ID (GST no / TIN / PAN / PAN & CIN)
     if (colKey === 'clientName') {
       const name = entry.clientName || '';
-      const gstState = entry.clientGstState || '';
+      const idType = getClientIdType(entry.activityName, entry.subActivity);
+      let idLabel = '';
+      let idValue = '';
+      if (idType === 'gst') {
+        idLabel = entry.clientGstState ? `GST (${entry.clientGstState})` : 'GST No.';
+        idValue = entry.clientGstNumber || '';
+      } else if (idType === 'tds') {
+        idLabel = 'TIN';
+        idValue = entry.clientTin || '';
+      } else if (idType === 'itr') {
+        idLabel = 'PAN';
+        idValue = entry.clientPan || '';
+      } else {
+        idLabel = 'PAN / CIN';
+        idValue = [entry.clientPan, entry.clientCin].filter(Boolean).join(' / ') || '';
+      }
       return (
         <div
           className={`h-full px-2 py-1 flex flex-col justify-center ${isSelected ? 'bg-blue-100' : ''}`}
@@ -569,9 +716,9 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
           {name ? (
             <>
               <div className="font-medium text-gray-900">{name}</div>
-              {gstState && (
+              {(idLabel && idValue) && (
                 <div className="text-xs text-gray-600 mt-0.5">
-                  <span className="font-medium">GST State:</span> {gstState}
+                  <span className="font-medium">{idLabel}:</span> {idValue}
                 </div>
               )}
             </>
@@ -628,9 +775,27 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
               <i className={`ri-filter-${showFilters ? 'fill' : 'line'} me-2`}></i>
               Filters
             </button>
+            <input
+              ref={importFileRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={handleImportFile}
+            />
+            <button
+              type="button"
+              onClick={() => importFileRef.current?.click()}
+              disabled={isImporting}
+              className="ti-btn ti-btn-secondary"
+              title="Upload Excel with Timeline ID, Reference Number, Completed At"
+            >
+              {isImporting ? <i className="ri-loader-4-line animate-spin me-2"></i> : <i className="ri-upload-2-line me-2"></i>}
+              Import
+            </button>
             <button
               onClick={handleExport}
               className="ti-btn ti-btn-success"
+              title="Export current register (apply filters and Submit first)"
             >
               <i className="ri-download-2-line me-2"></i>
               Export
@@ -657,7 +822,8 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
                     subActivity: '',
                     frequency: '',
                     period: '',
-                    status: filters.status
+                    status: filters.status,
+                    client: filters.client
                   });
                   setAvailablePeriods([]);
                 }}

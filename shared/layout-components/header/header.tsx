@@ -388,6 +388,18 @@ const Header = ({ local_varaiable, ThemeChanger }:any) => {
             </div>
             <div className="header-content-right">
 
+              {/* Dark mode switch - always visible at top */}
+              <div className="header-element !items-center py-[1rem] md:px-[0.65rem] px-2">
+                <button
+                  type="button"
+                  aria-label={local_varaiable.class === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                  onClick={() => ToggleDark()}
+                  className="header-link inline-flex flex-shrink-0 justify-center items-center rounded-full font-medium transition-all text-defaulttextcolor hover:text-primary dark:text-white/70 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <i className={`header-link-icon w-7 h-7 text-xl flex items-center justify-center ${local_varaiable.class === "dark" ? "bx bx-sun" : "bx bx-moon"}`} />
+                </button>
+              </div>
+
               <div className="header-element py-[1rem] md:px-[0.65rem] px-2">
                 {loading ? (
                   <div className="flex items-center">
@@ -512,18 +524,6 @@ const Header = ({ local_varaiable, ThemeChanger }:any) => {
                     </div>
                   </div>
                 </div>
-              </div>
-              <div className="header-element header-theme-mode hidden !items-center sm:block !py-[1rem] md:!px-[0.65rem] px-2" onClick={() => ToggleDark()}>
-                <button aria-label="anchor"
-                  className="hs-dark-mode-active:hidden flex hs-dark-mode group flex-shrink-0 justify-center items-center gap-2  rounded-full font-medium transition-all text-xs dark:hover:bg-black/20 dark:text-[#8c9097] dark:text-white/50 dark:hover:text-white dark:focus:ring-white/10 dark:focus:ring-offset-white/10"
-                   data-hs-theme-click-value="dark">
-                  <i className="bx bx-moon header-link-icon"></i>
-                </button>
-                <button aria-label="anchor"
-                  className="hs-dark-mode-active:flex hidden hs-dark-mode group flex-shrink-0 justify-center items-center gap-2  rounded-full font-medium text-defaulttextcolor  transition-all text-xs  dark:hover:bg-black/20 dark:text-[#8c9097] dark:text-white/50 dark:hover:text-white dark:focus:ring-white/10 dark:focus:ring-offset-white/10"
-                  data-hs-theme-click-value="light">
-                  <i className="bx bx-sun header-link-icon"></i>
-                </button>
               </div>
               <div className="header-element cart-dropdown hs-dropdown ti-dropdown md:!block !hidden py-[1rem] md:px-[0.65rem] px-2 [--placement:bottom-right] rtl:[--placement:bottom-left]">
                 <button id="dropdown-cart" type="button"

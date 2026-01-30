@@ -8,6 +8,7 @@ import { Base_url } from '@/app/api/config/BaseUrl';
 import TaskManagement from './components/TaskManagement';
 import ComplianceRegister from './components/ComplianceRegister';
 import { normalizeQuarterlyPeriods } from './utils/quarterPeriods';
+import { getClientIdDisplay, getClientIdsForExport } from './utils/timelineClientId';
 
 interface Timeline {
   _id: string;
@@ -54,6 +55,11 @@ interface Timeline {
     name: string;
     phone: string;
     email: string;
+    state?: string;
+    pan?: string;
+    tanNumber?: string;
+    cinNumber?: string;
+    gstNumbers?: Array<{ state?: string; gstNumber?: string }>;
   };
   status: 'pending' | 'completed' | 'ongoing' | 'delayed';
   frequency: 'Hourly' | 'Daily' | 'Weekly' | 'Monthly' | 'Quarterly' | 'Yearly';
@@ -64,6 +70,7 @@ interface Timeline {
   startDate: string;
   endDate: string;
   completedAt?: string;
+  referenceNumber?: string;
   frequencyConfig: any;
   branch: string;
   fields: Array<{
@@ -370,36 +377,42 @@ const TimelinesPage = () => {
       let fileName;
 
       if (exportType === 'register') {
-        // Export compliance register
+        // Export compliance register (same structure as ComplianceRegister: timelines API + Reference Number, Completed At, Timeline ID)
         const queryParams = new URLSearchParams({
           limit: '1000',
+          ...(exportFilters.activity && { activity: exportFilters.activity }),
+          ...(exportFilters.subActivity && { subactivity: exportFilters.subActivity }),
+          ...(exportFilters.frequency && { frequency: exportFilters.frequency }),
           ...(exportFilters.period && { period: exportFilters.period })
         });
 
-        const response = await fetch(`${Base_url}compliance-register?${queryParams}`, {
+        const response = await fetch(`${Base_url}timelines?${queryParams}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
         });
 
         if (!response.ok) {
-          throw new Error('Failed to fetch compliance register for export');
+          throw new Error('Failed to fetch timelines for register export');
         }
 
-        const apiData = await response.json();
-        const registerData = apiData.results || apiData || [];
+        const apiData: ApiResponse = await response.json();
+        const timelinesList = apiData.results || [];
 
-        exportData = registerData.map((entry: any) => ({
-          "Client Name": entry.clientName || "",
-          "Task Type": entry.taskType || "",
-          "Period": entry.period || "",
-          "Financial Year": entry.financialYear || "",
-          "Status": entry.status || "",
-          "Due Date": entry.dueDate || "",
-          "Filed Date": entry.filedDate || "",
-          "Approved Date": entry.approvedDate || "",
-          "Remarks": entry.remarks || ""
-        }));
+        exportData = timelinesList.map((timeline: Timeline) => {
+          const { idValue } = getClientIdDisplay(timeline);
+          return {
+            "Timeline ID": timeline.id || timeline._id || "",
+            "Client Name": timeline.client?.name || "",
+            "Client ID (GST/TIN/PAN/CIN)": idValue,
+            "Sub-Activity": timeline.subactivity?.name || "",
+            "Frequency": timeline.subactivity?.frequency || timeline.frequency || "",
+            "Period": timeline.period || "",
+            "Status": timeline.status || "",
+            "Reference Number": timeline.referenceNumber || "",
+            "Completed At": timeline.completedAt ? new Date(timeline.completedAt).toISOString().split("T")[0] : ""
+          };
+        });
 
         fileName = `compliance_register_${new Date().toISOString().split("T")[0]}.xlsx`;
       } else {
@@ -433,9 +446,15 @@ const TimelinesPage = () => {
         });
 
         exportData = apiData.results.map((timeline: Timeline) => {
+          const ids = getClientIdsForExport(timeline);
           const baseData = {
             "Timeline ID": timeline.id,
             "Name of Clients": timeline.client?.name || "",
+            "GST State": ids.gstState,
+            "GST Number": ids.gstNumber,
+            "TIN": ids.tin,
+            "PAN": ids.pan,
+            "CIN": ids.cin,
             "Subactivity": timeline.subactivity?.name || "",
             "Frequency": timeline.subactivity?.frequency || timeline.frequency || "",
             "Period": timeline.period || "",
@@ -1115,6 +1134,14 @@ const TimelinesPage = () => {
                                   <span className="font-medium">GST State:</span> {timeline.metadata.gstState}
                                 </div>
                               )}
+                              {(() => {
+                                const { idLabel, idValue } = getClientIdDisplay(timeline);
+                                return idLabel && idValue ? (
+                                  <div className="text-xs text-gray-600">
+                                    <span className="font-medium">{idLabel}:</span> {idValue}
+                                  </div>
+                                ) : null;
+                              })()}
                             </div>
                           </td>
                           <td className="border border-gray-300">
@@ -1285,23 +1312,11 @@ const TimelinesPage = () => {
 
             <div className="space-y-4">
               {activeTab === 'register' ? (
-                // Simplified export for Register
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Period (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    className="form-control w-full"
-                    value={exportFilters.period}
-                    onChange={(e) => setExportFilters(prev => ({ ...prev, period: e.target.value }))}
-                    placeholder="Filter by period (e.g., Q1-2024, April-2024)"
-                  />
-                  <p className="text-xs text-gray-500 mt-2">
-                    Leave empty to export all compliance register entries
-                  </p>
-                </div>
-              ) : (
+                <p className="text-sm text-gray-600">
+                  Use the same filters as the register: Activity, Sub-Activity, Frequency, Period. Leave empty to export all.
+                </p>
+              ) : null}
+              {(activeTab === 'register' || activeTab === 'timelines') ? (
                 <>
                   {/* Activity Selection */}
                   <div>
@@ -1431,7 +1446,7 @@ const TimelinesPage = () => {
                     )}
                   </div>
                 </>
-              )}
+              ) : null}
             </div>
 
             <div className="flex justify-end space-x-3 mt-6">
@@ -1448,10 +1463,9 @@ const TimelinesPage = () => {
               <button
                 onClick={() => {
                   if (activeTab === 'register') {
-                    // For register, show simplified export modal or direct export
                     performExport('register');
                   } else {
-                    setShowExportModal(true);
+                    performExport('timelines');
                   }
                 }}
                 className="ti-btn ti-btn-primary"
