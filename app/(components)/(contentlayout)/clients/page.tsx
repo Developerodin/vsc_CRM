@@ -2514,7 +2514,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                           <th className="px-4 py-3">
                             <input
                               type="checkbox"
-                              className="form-checkbox"
+                              className="form-checkbox border-gray-500"
                               checked={selectedClients.length === clients.length}
                               onChange={handleSelectAll}
                             />
@@ -2542,6 +2542,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                                   className="form-check-input"
                                   checked={selectedClients.includes(client.id)}
                                   onChange={() => handleClientSelect(client.id)}
+                                  style={{ borderColor: 'black',borderWidth: '1px' }}
                                 />
                               </td>
                               <td>
