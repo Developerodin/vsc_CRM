@@ -6,6 +6,21 @@ import { Base_url } from '@/app/api/config/BaseUrl';
 import { normalizeQuarterlyPeriods, formatPeriodDisplay, mergeWithExtendedPeriods } from "../utils/quarterPeriods";
 import { getClientIdType, type ClientIdType } from "../utils/timelineClientId";
 
+/** Normalize period to a comparable key (for yearly: "2025" and "2025-2026" → same key). */
+function periodKey(period: string, frequency?: string): string {
+  if (!period?.trim()) return '';
+  if (frequency?.toLowerCase() === 'yearly') {
+    return /^\d{4}$/.test(period.trim()) ? period.trim() : (period.trim().split('-')[0] || period.trim());
+  }
+  return period.trim();
+}
+
+/** True if entry period matches the selected filter period (yearly: 2025 and 2025-2026 match). */
+function periodMatches(entryPeriod: string, selectedPeriod: string, frequency?: string): boolean {
+  if (!selectedPeriod) return true;
+  return periodKey(entryPeriod, frequency) === periodKey(selectedPeriod, frequency);
+}
+
 // Compliance task types
 export type ComplianceTaskType = 
   | 'ITR' 
@@ -276,12 +291,25 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
     fetchActivities();
   }, []);
 
-  // Save cell value - accepts entry ID or actual index
+  // Period-filter first (so selected period shows only that period's entries)
+  const periodFilteredData = useMemo(
+    () =>
+      filters.period
+        ? registerData.filter((e) => periodMatches(e.period || '', filters.period, e.frequency))
+        : registerData,
+    [registerData, filters.period]
+  );
+  const displayedData = useMemo(() => {
+    if (entriesToShow === 'all') return periodFilteredData;
+    return periodFilteredData.slice(0, entriesToShow);
+  }, [periodFilteredData, entriesToShow]);
+
+  // Save cell value - accepts entry ID or row index (row index is into displayed/period-filtered list)
   const saveCell = async (entryIdOrIndex: string | number, colKey: string, value: string) => {
-    // Find entry by ID or index
-    const entry = typeof entryIdOrIndex === 'string' 
+    const dataSource = typeof entryIdOrIndex === 'number' ? periodFilteredData : registerData;
+    const entry = typeof entryIdOrIndex === 'string'
       ? registerData.find(e => e.timelineId === entryIdOrIndex || e._id === entryIdOrIndex || e.id === entryIdOrIndex)
-      : registerData[entryIdOrIndex];
+      : dataSource[entryIdOrIndex];
     
     if (!entry || !entry.timelineId) return;
 
@@ -397,7 +425,7 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
         if (editingCell) {
           handleCellSave();
         } else {
-          const entry = registerData[row];
+          const entry = displayedData[row];
           if (entry) {
             handleCellClick(entry, row, col);
           }
@@ -409,22 +437,19 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
           handleCellSave();
         }
         if (e.shiftKey) {
-          // Move to previous cell
           if (colIndex > 0) {
             setSelectedCell({ row, col: columns[colIndex - 1].key });
           } else if (row > 0) {
             setSelectedCell({ row: row - 1, col: columns[columns.length - 1].key });
           }
         } else {
-          // Move to next cell
           if (colIndex < columns.length - 1) {
             setSelectedCell({ row, col: columns[colIndex + 1].key });
-          } else if (row < registerData.length - 1) {
+          } else if (row < displayedData.length - 1) {
             setSelectedCell({ row: row + 1, col: columns[0].key });
           } else {
-            // Add new row at the end
             addNewRow();
-            setSelectedCell({ row: registerData.length, col: columns[0].key });
+            setSelectedCell({ row: displayedData.length, col: columns[0].key });
           }
         }
         break;
@@ -436,11 +461,11 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
         break;
       case 'ArrowDown':
         e.preventDefault();
-        if (row < registerData.length - 1) {
+        if (row < displayedData.length - 1) {
           setSelectedCell({ row: row + 1, col });
         } else {
           addNewRow();
-          setSelectedCell({ row: registerData.length, col });
+          setSelectedCell({ row: displayedData.length, col });
         }
         break;
       case 'ArrowLeft':
@@ -463,14 +488,14 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
       case 'Backspace':
         if (!editingCell) {
           e.preventDefault();
-          const entry = registerData[row];
+          const entry = displayedData[row];
           if (entry && entry.timelineId) {
             saveCell(entry.timelineId, col, "");
           }
         }
         break;
     }
-  }, [selectedCell, editingCell, editValue, registerData, columns]);
+  }, [selectedCell, editingCell, editValue, registerData, displayedData, columns]);
 
   // Add new row - disabled since we only load from timelines
   const addNewRow = () => {
@@ -494,7 +519,7 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
   };
 
   const handleExport = async () => {
-    const exportData = registerData.map(entry => ({
+    const exportData = periodFilteredData.map(entry => ({
       'Timeline ID': entry.timelineId || '',
       'Client Name': entry.clientName || '',
       'Client ID (GST/TIN/PAN/CIN)': getClientIdDisplayValue(entry),
@@ -621,14 +646,6 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
     };
     reader.readAsArrayBuffer(file);
   };
-
-  // Calculate displayed data based on entries to show
-  const displayedData = useMemo(() => {
-    if (entriesToShow === 'all') {
-      return registerData;
-    }
-    return registerData.slice(0, entriesToShow);
-  }, [registerData, entriesToShow]);
 
   // Focus input when editing
   useEffect(() => {
@@ -1064,7 +1081,7 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
                 <option value="all">Show All</option>
               </select>
               <span className="text-sm text-gray-600 whitespace-nowrap">
-                Showing {displayedData.length} of {registerData.length} entries
+                Showing {displayedData.length} of {periodFilteredData.length} entries
               </span>
             </div>
           </div>
