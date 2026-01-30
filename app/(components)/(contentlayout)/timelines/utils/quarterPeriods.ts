@@ -38,14 +38,23 @@ export function getQuarterRangeLabel(quarter: string): string {
   return QUARTER_RANGES[quarter] ?? quarter;
 }
 
+/** Format single calendar year to FY range for display (e.g. "2024" → "2024-2025"). */
+export function formatYearlyPeriodDisplay(period: string): string {
+  if (!period || !/^\d{4}$/.test(period.trim())) return period;
+  const y = parseInt(period.trim(), 10);
+  return `${y}-${y + 1}`;
+}
+
 /**
- * Format period for display in the register when frequency is Quarterly.
- * Maps backend period to quarter + year only, e.g. "Q3 2026" (no Jan–Mar range).
- * Returns period unchanged for non-Quarterly.
+ * Format period for display in the register when frequency is Quarterly or Yearly.
+ * Quarterly: maps to quarter + year only, e.g. "Q3 2026".
+ * Yearly: maps single year to FY range, e.g. "2024" → "2024-2025".
  */
 export function formatPeriodDisplay(frequency: string, period: string): string {
   if (!period) return period;
-  if (frequency?.toLowerCase() !== 'quarterly') return period;
+  const freq = frequency?.toLowerCase();
+  if (freq === 'yearly') return formatYearlyPeriodDisplay(period);
+  if (freq !== 'quarterly') return period;
   const qMatch = period.match(/Q([1-4])-(\d{4})/i);
   if (qMatch) {
     const q = `Q${qMatch[1]}` as 'Q1' | 'Q2' | 'Q3' | 'Q4';
@@ -130,7 +139,7 @@ export function getExtendedPeriodOptions(frequency: string): Array<{ period: str
 
   if (freq === 'yearly') {
     for (let y = startYear; y <= endYear; y++) {
-      result.push({ period: String(y), displayName: String(y) });
+      result.push({ period: String(y), displayName: `${y}-${y + 1}` });
     }
     return result;
   }
@@ -163,9 +172,16 @@ export function mergeWithExtendedPeriods<T extends { period?: string; displayNam
 ): T[] {
   const extended = getExtendedPeriodOptions(frequency);
   const byPeriod = new Map<string, T>();
+  const freq = (frequency || '').toLowerCase();
+  const isYearly = freq === 'yearly';
+
   apiPeriods.forEach((p) => {
     const key = (p.period || '').trim();
-    if (key) byPeriod.set(key, p);
+    if (!key) return;
+    const displayName = isYearly && /^\d{4}$/.test(key) && !p.displayName?.includes('-')
+      ? formatYearlyPeriodDisplay(key)
+      : (p.displayName ?? key);
+    byPeriod.set(key, { ...p, period: key, displayName } as T);
   });
   extended.forEach((e) => {
     if (!byPeriod.has(e.period)) {
