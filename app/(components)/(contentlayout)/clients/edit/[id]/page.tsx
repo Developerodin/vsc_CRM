@@ -1034,9 +1034,13 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
           setTurnoverHistory([{ year: '', turnover: '' }]);
         }
 
-        // Set activity mappings if they exist
+        // Set activity mappings if they exist (normalize: API may return subactivity as id or populated object)
         if (data.activities && data.activities.length > 0) {
-          setActivityMappings(data.activities);
+          setActivityMappings(data.activities.map((a: any) => ({
+            ...a,
+            activity: typeof a.activity === 'object' ? (a.activity?.id ?? a.activity?._id ?? '') : (a.activity ?? ''),
+            subactivity: typeof a.subactivity === 'object' ? (a.subactivity?.id ?? a.subactivity?._id ?? '') : (a.subactivity ?? '')
+          })));
         }
         
         // Set GST numbers if they exist
