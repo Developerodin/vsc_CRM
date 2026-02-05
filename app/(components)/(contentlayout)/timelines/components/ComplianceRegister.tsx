@@ -3,14 +3,18 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { toast } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { Base_url } from '@/app/api/config/BaseUrl';
-import { normalizeQuarterlyPeriods, formatPeriodDisplay, mergeWithExtendedPeriods } from "../utils/quarterPeriods";
+import { normalizeQuarterlyPeriods, formatPeriodDisplay, mergeWithExtendedPeriods, normalizeMonthlyPeriodKey } from "../utils/quarterPeriods";
 import { getClientIdType, type ClientIdType } from "../utils/timelineClientId";
 
-/** Normalize period to a comparable key (for yearly: "2025" and "2025-2026" → same key). */
+/** Normalize period to a comparable key (yearly: 2025/2025-2026 → same; monthly: February-2026/2026-02 → same). */
 function periodKey(period: string, frequency?: string): string {
   if (!period?.trim()) return '';
-  if (frequency?.toLowerCase() === 'yearly') {
+  const freq = frequency?.toLowerCase();
+  if (freq === 'yearly') {
     return /^\d{4}$/.test(period.trim()) ? period.trim() : (period.trim().split('-')[0] || period.trim());
+  }
+  if (freq === 'monthly') {
+    return normalizeMonthlyPeriodKey(period);
   }
   return period.trim();
 }
@@ -81,6 +85,9 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
     subActivity: "",
     frequency: "",
     period: "",
+    quarter: "",   // Q1–Q4 when frequency is Quarterly
+    year: "",      // e.g. "2025" for Quarterly/Monthly
+    month: "",     // "01"–"12" when frequency is Monthly
     status: "",
     client: ""
   });
@@ -139,6 +146,33 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
     'Completed',
     'Filed',
     'Approved'
+  ];
+
+  /** Activity names allowed in the register filter; others are hidden from the dropdown. */
+  const ALLOWED_ACTIVITY_NAMES = [
+    'Income Tax',
+    'Auditing',
+    'TDS',
+    'GST',
+    'ROC - PVT. LTD.',
+    'ROC - LLP',
+  ];
+  const visibleActivities = useMemo(
+    () => activities.filter((a) => ALLOWED_ACTIVITY_NAMES.includes(a.name?.trim() || '')),
+    [activities]
+  );
+
+  /** Year options for Quarter/Month filters (current ±3). */
+  const filterYears = useMemo(() => {
+    const y = new Date().getFullYear();
+    return Array.from({ length: 7 }, (_, i) => String(y - 3 + i));
+  }, []);
+  const QUARTER_OPTIONS = ['Q1', 'Q2', 'Q3', 'Q4'] as const;
+  const MONTH_OPTIONS = [
+    { value: '01', label: 'January' }, { value: '02', label: 'February' }, { value: '03', label: 'March' },
+    { value: '04', label: 'April' }, { value: '05', label: 'May' }, { value: '06', label: 'June' },
+    { value: '07', label: 'July' }, { value: '08', label: 'August' }, { value: '09', label: 'September' },
+    { value: '10', label: 'October' }, { value: '11', label: 'November' }, { value: '12', label: 'December' },
   ];
 
   // Fetch clients
@@ -220,12 +254,21 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
     setIsLoading(true);
     setError(null);
     try {
+      // Build period from current filters at submit time (quarter+year or month+year or single period)
+      const freq = (filters.frequency || '').toLowerCase();
+      const periodToSend =
+        freq === 'quarterly' && filters.quarter && filters.year
+          ? `Q${filters.quarter.replace(/^Q/i, '')}-${filters.year}`
+          : freq === 'monthly' && filters.month && filters.year
+            ? `${filters.year}-${filters.month}`
+            : (filters.period || '');
+
       const queryParams = new URLSearchParams({
         limit: '1000',
         ...(filters.activity && { activity: filters.activity }),
         ...(filters.subActivity && { subactivity: filters.subActivity }),
         ...(filters.frequency && { frequency: filters.frequency }),
-        ...(filters.period && { period: filters.period }),
+        ...(periodToSend && { period: periodToSend }),
         ...(filters.status && { status: filters.status }),
         ...(filters.client && { client: filters.client })
       });
@@ -291,13 +334,25 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
     fetchActivities();
   }, []);
 
+  /** Effective period for API and table filter: Quarter+Year → Q1-2025, Month+Year → 2025-01, else single period. */
+  const effectivePeriod = useMemo(() => {
+    const freq = (filters.frequency || '').toLowerCase();
+    if (freq === 'quarterly' && filters.quarter && filters.year) {
+      return `Q${filters.quarter.replace(/^Q/i, '')}-${filters.year}`;
+    }
+    if (freq === 'monthly' && filters.month && filters.year) {
+      return `${filters.year}-${filters.month}`;
+    }
+    return filters.period || '';
+  }, [filters.frequency, filters.period, filters.quarter, filters.year, filters.month]);
+
   // Period-filter first (so selected period shows only that period's entries)
   const periodFilteredData = useMemo(
     () =>
-      filters.period
-        ? registerData.filter((e) => periodMatches(e.period || '', filters.period, e.frequency))
+      effectivePeriod
+        ? registerData.filter((e) => periodMatches(e.period || '', effectivePeriod, e.frequency))
         : registerData,
-    [registerData, filters.period]
+    [registerData, effectivePeriod]
   );
   const displayedData = useMemo(() => {
     if (entriesToShow === 'all') return periodFilteredData;
@@ -823,7 +878,7 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
         {showFilters && (
         <div className="bg-gray-50 p-4 rounded-lg mb-4">
           <h3 className="text-sm font-semibold mb-3 text-gray-700">Filter Options</h3>
-          <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
+          <div className={`grid grid-cols-1 gap-3 ${(filters.frequency || '').toLowerCase() === 'quarterly' || (filters.frequency || '').toLowerCase() === 'monthly' ? 'md:grid-cols-8' : 'md:grid-cols-7'}`}>
             {/* Activity Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -838,6 +893,9 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
                     subActivity: '',
                     frequency: '',
                     period: '',
+                    quarter: '',
+                    year: '',
+                    month: '',
                     status: filters.status,
                     client: filters.client
                   });
@@ -845,7 +903,7 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
                 }}
               >
                 <option value="">All Activities</option>
-                {activities.map((activity) => (
+                {visibleActivities.map((activity) => (
                   <option key={activity.id} value={activity.id}>
                     {activity.name}
                   </option>
@@ -869,7 +927,11 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
                   setFilters({
                     ...filters,
                     subActivity: selectedSubActivityId,
-                    frequency: selectedSubActivity?.frequency || ''
+                    frequency: selectedSubActivity?.frequency || '',
+                    period: (selectedSubActivity?.frequency || '').toLowerCase() === 'quarterly' || (selectedSubActivity?.frequency || '').toLowerCase() === 'monthly' ? '' : filters.period,
+                    quarter: (selectedSubActivity?.frequency || '').toLowerCase() === 'quarterly' ? filters.quarter : '',
+                    year: (selectedSubActivity?.frequency || '').toLowerCase() === 'quarterly' || (selectedSubActivity?.frequency || '').toLowerCase() === 'monthly' ? filters.year : '',
+                    month: (selectedSubActivity?.frequency || '').toLowerCase() === 'monthly' ? filters.month : '',
                   });
                   
                   // Fetch periods for the selected frequency
@@ -899,8 +961,16 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
                 className="form-select w-full"
                 value={filters.frequency}
                 onChange={(e) => {
-                  setFilters({ ...filters, frequency: e.target.value });
-                  fetchFrequencyPeriods(e.target.value);
+                  const freq = e.target.value;
+                  setFilters({
+                    ...filters,
+                    frequency: freq,
+                    period: freq && !/quarterly|monthly/i.test(freq) ? filters.period : '',
+                    quarter: /quarterly/i.test(freq) ? filters.quarter : '',
+                    year: /quarterly|monthly/i.test(freq) ? filters.year : '',
+                    month: /monthly/i.test(freq) ? filters.month : '',
+                  });
+                  fetchFrequencyPeriods(freq);
                 }}
                 disabled={!!filters.subActivity}
               >
@@ -920,33 +990,91 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
               )}
             </div>
 
-            {/* Period Selection */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Period
-              </label>
-              <select
-                className="form-select w-full"
-                value={filters.period}
-                onChange={(e) => setFilters({ ...filters, period: e.target.value })}
-                disabled={!filters.frequency}
-              >
-                <option value="">All Periods</option>
-                {isLoadingPeriods ? (
-                  <option value="" disabled>Loading periods...</option>
-                ) : availablePeriods.length > 0 ? (
-                  availablePeriods.map((period) => (
-                    <option key={period.period} value={period.period}>
-                      {period.displayName}
-                    </option>
-                  ))
-                ) : filters.frequency ? (
-                  <option value="" disabled>No periods available for this frequency</option>
-                ) : (
-                  <option value="" disabled>Select frequency first</option>
-                )}
-              </select>
-            </div>
+            {/* Period: single dropdown for Yearly etc.; Quarter + Year for Quarterly; Month + Year for Monthly */}
+            {(filters.frequency || '').toLowerCase() === 'quarterly' ? (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Quarter</label>
+                  <select
+                    className="form-select w-full"
+                    value={filters.quarter}
+                    onChange={(e) => setFilters({ ...filters, quarter: e.target.value })}
+                  >
+                    <option value="">All</option>
+                    {QUARTER_OPTIONS.map((q) => (
+                      <option key={q} value={q}>{q}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+                  <select
+                    className="form-select w-full"
+                    value={filters.year}
+                    onChange={(e) => setFilters({ ...filters, year: e.target.value })}
+                  >
+                    <option value="">All</option>
+                    {filterYears.map((y) => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            ) : (filters.frequency || '').toLowerCase() === 'monthly' ? (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
+                  <select
+                    className="form-select w-full"
+                    value={filters.month}
+                    onChange={(e) => setFilters({ ...filters, month: e.target.value })}
+                  >
+                    <option value="">All</option>
+                    {MONTH_OPTIONS.map((m) => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+                  <select
+                    className="form-select w-full"
+                    value={filters.year}
+                    onChange={(e) => setFilters({ ...filters, year: e.target.value })}
+                  >
+                    <option value="">All</option>
+                    {filterYears.map((y) => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Period</label>
+                <select
+                  className="form-select w-full"
+                  value={filters.period}
+                  onChange={(e) => setFilters({ ...filters, period: e.target.value })}
+                  disabled={!filters.frequency}
+                >
+                  <option value="">All Periods</option>
+                  {isLoadingPeriods ? (
+                    <option value="" disabled>Loading periods...</option>
+                  ) : availablePeriods.length > 0 ? (
+                    availablePeriods.map((period) => (
+                      <option key={period.period} value={period.period}>
+                        {period.displayName?.replace(/^Financial Year\s+/i, '') ?? period.period}
+                      </option>
+                    ))
+                  ) : filters.frequency ? (
+                    <option value="" disabled>No periods available for this frequency</option>
+                  ) : (
+                    <option value="" disabled>Select frequency first</option>
+                  )}
+                </select>
+              </div>
+            )}
 
             {/* Status Selection */}
             <div>

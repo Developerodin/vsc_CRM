@@ -1,451 +1,94 @@
 "use client";
-import React, { useState, useEffect } from "react";
+
+import React, { useState, useEffect, useMemo } from "react";
 import Seo from "@/shared/layout-components/seo/seo";
-import { Base_url } from '@/app/api/config/BaseUrl';
-import axios from 'axios';
-import dynamic from 'next/dynamic';
-import { useParams, useRouter } from 'next/navigation';
+import { Base_url } from "@/app/api/config/BaseUrl";
+import axios from "axios";
+import { useParams } from "next/navigation";
 import Link from "next/link";
+import type { GroupAnalyticsResponse, Client } from "./types";
+import { ClientDetailDrawer } from "./ClientDetailDrawer";
 
-// Dynamically import ApexCharts to avoid SSR issues
-const ReactApexChart = dynamic(() => import("react-apexcharts"), { 
-  ssr: false,
-  loading: () => <div>Loading chart...</div>
-});
-
-interface Group {
-  _id: string;
-  name: string;
-  branch: {
-    _id: string;
-    name: string;
-  };
-  numberOfClients: number;
+/** Build FY options for dropdown (e.g. 2021-2022 .. 2027-2028) */
+function getFYOptions(): string[] {
+  const currentYear = new Date().getFullYear();
+  const options: string[] = [];
+  for (let y = currentYear - 4; y <= currentYear + 2; y++) {
+    options.push(`${y}-${y + 1}`);
+  }
+  return options;
 }
 
-interface Client {
-  _id: string;
-  name: string;
-  email: string;
-  phone: string;
-  branch: string;
-  taskCount: number;
-  timelineCount: number;
-}
-
-interface TaskAnalytics {
-  total: number;
-  statusBreakdown: {
-    pending: number;
-    ongoing: number;
-    completed: number;
-    on_hold: number;
-    cancelled: number;
-    delayed: number;
-  };
-  priorityBreakdown: {
-    low: number;
-    medium: number;
-    high: number;
-    urgent: number;
-    critical: number;
-  };
-}
-
-interface TimelineAnalytics {
-  total: number;
-  statusBreakdown: {
-    pending: number;
-    ongoing: number;
-    completed: number;
-    delayed: number;
-  };
-  frequencyBreakdown: {
-    None: number;
-    OneTime: number;
-    Hourly: number;
-    Daily: number;
-    Weekly: number;
-    Monthly: number;
-    Quarterly: number;
-    Yearly: number;
-  };
-}
-
-interface GroupAnalyticsResponse {
-  group: Group;
-  clients: Client[];
-  taskAnalytics: TaskAnalytics;
-  timelineAnalytics: TimelineAnalytics;
-}
+const FY_OPTIONS = getFYOptions();
 
 const GroupOverviewPage = () => {
   const params = useParams();
-  const router = useRouter();
   const groupId = params.groupId as string;
-  
+
   const [groupData, setGroupData] = useState<GroupAnalyticsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [drawerClient, setDrawerClient] = useState<Client | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  /** Selected fiscal year: "all" (default) or e.g. "2025-2026". */
+  const [selectedFY, setSelectedFY] = useState<string>("all");
 
   useEffect(() => {
-    if (groupId) {
-      fetchGroupOverview();
-    }
+    if (groupId) fetchGroupOverview(undefined);
   }, [groupId]);
 
-  const fetchGroupOverview = async () => {
+  const fetchGroupOverview = async (fy?: string) => {
     try {
       setLoading(true);
       setError(null);
-      
+      const sendFy = fy && fy !== "all" ? fy : undefined;
+      const queryParams = sendFy ? { fy: sendFy } : {};
       const response = await axios.get(`${Base_url}groups/${groupId}/analytics`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        params: queryParams,
       });
-      
-      setGroupData(response.data);
+      const data = response.data as GroupAnalyticsResponse;
+      setGroupData(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch group analytics');
+      setError(err instanceof Error ? err.message : "Failed to fetch group analytics");
     } finally {
       setLoading(false);
     }
   };
 
-  // Task Status Chart
-  const getTaskStatusChartSeries = () => {
-    if (!groupData?.taskAnalytics?.statusBreakdown) return [0, 0, 0, 0, 0, 0];
-    const breakdown = groupData.taskAnalytics.statusBreakdown;
-    const series = [
-      Number(breakdown.pending) || 0,
-      Number(breakdown.ongoing) || 0,
-      Number(breakdown.completed) || 0,
-      Number(breakdown.on_hold) || 0,
-      Number(breakdown.delayed) || 0,
-      Number(breakdown.cancelled) || 0
-    ];
-    return series;
+  const onYearChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    setSelectedFY(val);
+    fetchGroupOverview(val === "all" ? undefined : val);
   };
 
-  const getTaskStatusChartOptions = () => {
-    const series = getTaskStatusChartSeries();
-    const total = series.reduce((a, b) => a + b, 0);
-    const hasData = total > 0;
-    
-    return {
-      chart: {
-        type: 'donut' as const,
-        height: 350,
-        toolbar: { show: false },
-        animations: {
-          enabled: true,
-          animateGradually: {
-            enabled: true,
-            delay: 150
-          },
-          dynamicAnimation: {
-            enabled: true,
-            speed: 350
-          }
-        }
-      },
-      labels: ['Pending', 'Ongoing', 'Completed', 'On Hold', 'Delayed', 'Cancelled'],
-      colors: ['#F59E0B', '#3B82F6', '#10B981', '#F97316', '#EF4444', '#6B7280'],
-      legend: {
-        position: 'bottom' as const,
-        show: true,
-        fontSize: '12px',
-        fontFamily: 'inherit',
-        fontWeight: 500,
-        formatter: function(seriesName: string, opts: any) {
-          const value = opts.w.globals.series[opts.seriesIndex];
-          return seriesName + ': ' + value;
-        }
-      },
-      dataLabels: {
-        enabled: true,
-        formatter: function(val: number, opts: any) {
-          const value = opts.w.globals.series[opts.seriesIndex];
-          if (value === 0) return '';
-          return val.toFixed(1) + '%';
-        },
-        style: {
-          fontSize: '12px',
-          fontWeight: 600
-        }
-      },
-      plotOptions: {
-        pie: {
-          donut: {
-            size: '70%',
-            labels: {
-              show: true,
-              name: {
-                show: true,
-                fontSize: '14px',
-                fontWeight: 600,
-                color: '#374151'
-              },
-              value: {
-                show: true,
-                fontSize: '20px',
-                fontWeight: 700,
-                color: '#111827',
-                formatter: function(val: string) {
-                  return total.toString();
-                }
-              },
-              total: {
-                show: true,
-                label: 'Total Tasks',
-                fontSize: '14px',
-                fontWeight: 600,
-                color: '#6B7280',
-                formatter: function() {
-                  return total.toString();
-                }
-              }
-            }
-          }
-        }
-      },
-      tooltip: {
-        enabled: true,
-        y: {
-          formatter: function(val: number) {
-            return val + ' tasks';
-          }
-        }
-      },
-      responsive: [{
-        breakpoint: 480,
-        options: {
-          chart: {
-            height: 300
-          },
-          legend: {
-            position: 'bottom'
-          }
-        }
-      }]
-    };
-  };
+  const categories = useMemo(() => {
+    if (!groupData?.clients) return [];
+    const set = new Set<string>();
+    groupData.clients.forEach((c) => c.category && set.add(c.category));
+    return Array.from(set).sort();
+  }, [groupData?.clients]);
 
-  // Task Priority Chart
-  const getTaskPriorityChartOptions = () => ({
-    chart: {
-      type: 'bar' as const,
-      height: 350
-    },
-    colors: ['#3B82F6'],
-    plotOptions: {
-      bar: {
-        horizontal: false,
-        columnWidth: '60%',
-        borderRadius: 6
-      }
-    },
-    dataLabels: {
-      enabled: false
-    },
-    xaxis: {
-      categories: ['Low', 'Medium', 'High', 'Urgent', 'Critical']
-    },
-    yaxis: {
-      title: {
-        text: 'Number of Tasks'
-      }
-    }
-  });
+  const filteredClients = useMemo(() => {
+    if (!groupData?.clients) return [];
+    if (categoryFilter === "all") return groupData.clients;
+    return groupData.clients.filter((c) => c.category === categoryFilter);
+  }, [groupData?.clients, categoryFilter]);
 
-  const getTaskPriorityChartSeries = () => {
-    if (!groupData?.taskAnalytics?.priorityBreakdown) return [];
-    const breakdown = groupData.taskAnalytics.priorityBreakdown;
-    return [{
-      name: 'Tasks by Priority',
-      data: [
-        breakdown.low || 0,
-        breakdown.medium || 0,
-        breakdown.high || 0,
-        breakdown.urgent || 0,
-        breakdown.critical || 0
-      ]
-    }];
-  };
-
-  // Timeline Status Chart
-  const getTimelineStatusChartSeries = () => {
-    if (!groupData?.timelineAnalytics?.statusBreakdown) return [0, 0, 0, 0];
-    const breakdown = groupData.timelineAnalytics.statusBreakdown;
-    const series = [
-      Number(breakdown.pending) || 0,
-      Number(breakdown.ongoing) || 0,
-      Number(breakdown.completed) || 0,
-      Number(breakdown.delayed) || 0
-    ];
-    return series;
-  };
-
-  const getTimelineStatusChartOptions = () => {
-    const series = getTimelineStatusChartSeries();
-    const total = series.reduce((a, b) => a + b, 0);
-    const hasData = total > 0;
-    
-    return {
-      chart: {
-        type: 'donut' as const,
-        height: 350,
-        toolbar: { show: false },
-        animations: {
-          enabled: true,
-          animateGradually: {
-            enabled: true,
-            delay: 150
-          },
-          dynamicAnimation: {
-            enabled: true,
-            speed: 350
-          }
-        }
-      },
-      labels: ['Pending', 'Ongoing', 'Completed', 'Delayed'],
-      colors: ['#F59E0B', '#3B82F6', '#10B981', '#EF4444'],
-      legend: {
-        position: 'bottom' as const,
-        show: true,
-        fontSize: '12px',
-        fontFamily: 'inherit',
-        fontWeight: 500,
-        formatter: function(seriesName: string, opts: any) {
-          const value = opts.w.globals.series[opts.seriesIndex];
-          return seriesName + ': ' + value;
-        }
-      },
-      dataLabels: {
-        enabled: true,
-        formatter: function(val: number, opts: any) {
-          const value = opts.w.globals.series[opts.seriesIndex];
-          if (value === 0) return '';
-          return val.toFixed(1) + '%';
-        },
-        style: {
-          fontSize: '12px',
-          fontWeight: 600
-        }
-      },
-      plotOptions: {
-        pie: {
-          donut: {
-            size: '70%',
-            labels: {
-              show: true,
-              name: {
-                show: true,
-                fontSize: '14px',
-                fontWeight: 600,
-                color: '#374151'
-              },
-              value: {
-                show: true,
-                fontSize: '20px',
-                fontWeight: 700,
-                color: '#111827',
-                formatter: function(val: string) {
-                  return total.toString();
-                }
-              },
-              total: {
-                show: true,
-                label: 'Total Timelines',
-                fontSize: '14px',
-                fontWeight: 600,
-                color: '#6B7280',
-                formatter: function() {
-                  return total.toString();
-                }
-              }
-            }
-          }
-        }
-      },
-      tooltip: {
-        enabled: true,
-        y: {
-          formatter: function(val: number) {
-            return val + ' timelines';
-          }
-        }
-      },
-      responsive: [{
-        breakpoint: 480,
-        options: {
-          chart: {
-            height: 300
-          },
-          legend: {
-            position: 'bottom'
-          }
-        }
-      }]
-    };
-  };
-
-  // Timeline Frequency Chart
-  const getTimelineFrequencyChartOptions = () => ({
-    chart: {
-      type: 'bar' as const,
-      height: 350
-    },
-    colors: ['#8B5CF6'],
-    plotOptions: {
-      bar: {
-        horizontal: true,
-        columnWidth: '60%',
-        borderRadius: 6
-      }
-    },
-    dataLabels: {
-      enabled: false
-    },
-    xaxis: {
-      title: {
-        text: 'Number of Timelines'
-      }
-    },
-    yaxis: {
-      categories: ['Yearly', 'Quarterly', 'Monthly', 'Weekly', 'Daily', 'Hourly', 'OneTime', 'None']
-    }
-  });
-
-  const getTimelineFrequencyChartSeries = () => {
-    if (!groupData?.timelineAnalytics?.frequencyBreakdown) return [];
-    const breakdown = groupData.timelineAnalytics.frequencyBreakdown;
-    return [{
-      name: 'Timelines by Frequency',
-      data: [
-        breakdown.Yearly || 0,
-        breakdown.Quarterly || 0,
-        breakdown.Monthly || 0,
-        breakdown.Weekly || 0,
-        breakdown.Daily || 0,
-        breakdown.Hourly || 0,
-        breakdown.OneTime || 0,
-        breakdown.None || 0
-      ]
-    }];
+  const openClientDrawer = (client: Client) => {
+    setDrawerClient(client);
+    setDrawerOpen(true);
   };
 
   if (loading) {
     return (
       <div className="main-content">
         <Seo title="Group Analytics" />
-        <div className="flex items-center justify-center h-64">
+        <div className="flex items-center justify-center min-h-[200px]">
           <div className="text-center">
-            <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
-              <i className="ri-loader-4-line text-2xl text-gray-400 animate-spin"></i>
-            </div>
-            <p className="text-gray-500">Loading group analytics...</p>
+            <i className="ri-loader-4-line text-2xl text-gray-400 animate-spin" />
+            <p className="text-xs text-gray-500 mt-2">Loading group analytics...</p>
           </div>
         </div>
       </div>
@@ -456,16 +99,11 @@ const GroupOverviewPage = () => {
     return (
       <div className="main-content">
         <Seo title="Group Analytics" />
-        <div className="flex items-center justify-center h-64">
+        <div className="flex items-center justify-center min-h-[200px]">
           <div className="text-center">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <i className="ri-error-warning-line text-2xl text-red-400"></i>
-            </div>
-            <p className="text-red-500 mb-4">Error loading group analytics</p>
-            <button 
-              onClick={fetchGroupOverview}
-              className="ti-btn ti-btn-primary"
-            >
+            <i className="ri-error-warning-line text-2xl text-red-400" />
+            <p className="text-sm text-red-500 mt-2">{error}</p>
+            <button type="button" onClick={fetchGroupOverview} className="ti-btn ti-btn-primary ti-btn-sm mt-2">
               Retry
             </button>
           </div>
@@ -478,231 +116,226 @@ const GroupOverviewPage = () => {
     return (
       <div className="main-content">
         <Seo title="Group Analytics" />
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-gray-500">No group data available</p>
-          </div>
+        <div className="flex items-center justify-center min-h-[200px]">
+          <p className="text-sm text-gray-500">No group data available.</p>
         </div>
       </div>
     );
   }
 
+  const task = groupData.taskAnalytics;
+  const timeline = groupData.timelineAnalytics;
+  const turnoverSummary = groupData.groupTurnoverSummary;
+  const activityWise = groupData.activityWiseTimelineAnalytics;
+
   return (
     <div className="main-content">
       <Seo title={`Group Analytics - ${groupData.group.name}`} />
 
-      {/* Page Header */}
-      <div className="box !bg-transparent border-0 shadow-none mb-6">
-        <div className="box-header flex justify-between items-center">
-          <div>
-            <h1 className="box-title text-3xl font-bold text-gray-900">{groupData.group.name}</h1>
-            <p className="text-gray-600 mt-1">Comprehensive analytics and insights</p>
-            <div className="mt-2 flex items-center gap-4 text-sm text-gray-500">
-              <span><i className="ri-building-line mr-1"></i> {groupData.group.branch?.name || 'N/A'}</span>
-              <span><i className="ri-user-line mr-1"></i> {groupData.group.numberOfClients} Clients</span>
+      {/* Compact header: group name + year selector */}
+      <div className="box !bg-transparent border-0 shadow-none mb-4">
+        <div className="box-header flex flex-wrap justify-between items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-lg font-semibold text-gray-900">{groupData.group.name}</h1>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-gray-500">Year:</span>
+              <select
+                value={selectedFY}
+                onChange={onYearChange}
+                className="form-select form-select-sm text-xs w-auto py-1.5 px-2 border border-gray-300 rounded-md"
+                aria-label="Select fiscal year"
+              >
+                <option value="all">All</option>
+                {FY_OPTIONS.map((fy) => (
+                  <option key={fy} value={fy}>{fy}</option>
+                ))}
+              </select>
             </div>
+            <p className="text-xs text-gray-500 mt-0.5 w-full flex-none basis-full">
+              <span className="mr-3"><i className="ri-building-line mr-1" />{groupData.group.branch?.name ?? "N/A"}</span>
+              <span><i className="ri-user-line mr-1" />{groupData.group.numberOfClients} clients</span>
+              <span className="ml-3">{selectedFY === "all" ? "All" : selectedFY}</span>
+            </p>
           </div>
-          <Link href="/analytics/groups" className="ti-btn ti-btn-secondary">
-            <i className="ri-arrow-left-line me-2"></i>
-            Back to Groups
+          <Link href="/analytics/groups" className="ti-btn ti-btn-secondary ti-btn-sm">
+            <i className="ri-arrow-left-line me-1" /> Back
           </Link>
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-blue-100 text-sm font-medium">Total Tasks</p>
-              <p className="text-3xl font-bold">{groupData.taskAnalytics?.total || 0}</p>
-            </div>
-            <i className="ri-task-line text-3xl text-blue-200"></i>
+      {/* Small stat cards — no graphs */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2 mb-4">
+        <div className="box p-3 border border-gray-200 rounded-lg">
+          <p className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">Tasks</p>
+          <p className="text-lg font-bold text-gray-900">{task?.total ?? 0}</p>
+        </div>
+        <div className="box p-3 border border-gray-200 rounded-lg">
+          <p className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">Completed tasks</p>
+          <p className="text-lg font-bold text-success">{task?.statusBreakdown?.completed ?? 0}</p>
+        </div>
+        <div className="box p-3 border border-gray-200 rounded-lg">
+          <p className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">Timelines</p>
+          <p className="text-lg font-bold text-gray-900">{timeline?.total ?? 0}</p>
+        </div>
+        <div className="box p-3 border border-gray-200 rounded-lg">
+          <p className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">Completed timelines</p>
+          <p className="text-lg font-bold text-success">{timeline?.statusBreakdown?.completed ?? 0}</p>
+        </div>
+        <div className="box p-3 border border-gray-200 rounded-lg">
+          <p className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">Clients w/ turnover</p>
+          <p className="text-lg font-bold text-gray-900">{turnoverSummary?.clientsWithTurnover ?? 0}</p>
+        </div>
+        <div className="box p-3 border border-gray-200 rounded-lg">
+          <p className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">Selected year</p>
+          <p className="text-sm font-semibold text-gray-900">{selectedFY === "all" ? "All" : selectedFY || "—"}</p>
+        </div>
+      </div>
+
+      {/* Task status & priority — compact row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+        <div className="box p-3 border border-gray-200 rounded-lg">
+          <h3 className="text-xs font-semibold text-gray-700 mb-2">Task status</h3>
+          <div className="flex flex-wrap gap-1.5">
+            {["pending", "ongoing", "completed", "on_hold", "delayed", "cancelled"].map((key) => (
+              <span key={key} className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-700">
+                {key.replace("_", " ")}: {(task?.statusBreakdown as Record<string, number>)?.[key] ?? 0}
+              </span>
+            ))}
           </div>
         </div>
-
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-green-100 text-sm font-medium">Completed Tasks</p>
-              <p className="text-3xl font-bold">{groupData.taskAnalytics?.statusBreakdown?.completed || 0}</p>
-            </div>
-            <i className="ri-check-double-line text-3xl text-green-200"></i>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-purple-100 text-sm font-medium">Total Timelines</p>
-              <p className="text-3xl font-bold">{groupData.timelineAnalytics?.total || 0}</p>
-            </div>
-            <i className="ri-time-line text-3xl text-purple-200"></i>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg p-6 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-orange-100 text-sm font-medium">Completed Timelines</p>
-              <p className="text-3xl font-bold">{groupData.timelineAnalytics?.statusBreakdown?.completed || 0}</p>
-            </div>
-            <i className="ri-checkbox-circle-line text-3xl text-orange-200"></i>
+        <div className="box p-3 border border-gray-200 rounded-lg">
+          <h3 className="text-xs font-semibold text-gray-700 mb-2">Task priority</h3>
+          <div className="flex flex-wrap gap-1.5">
+            {["low", "medium", "high", "urgent", "critical"].map((key) => (
+              <span key={key} className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-700">
+                {key}: {(task?.priorityBreakdown as Record<string, number>)?.[key] ?? 0}
+              </span>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-       
-
-        {/* Task Priority Chart */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Task Priority Breakdown</h2>
-          {groupData.taskAnalytics && ReactApexChart ? (
-            <ReactApexChart
-              options={getTaskPriorityChartOptions()}
-              series={getTaskPriorityChartSeries()}
-              type="bar"
-              height={350}
-            />
-          ) : (
-            <div className="h-[350px] flex items-center justify-center">
-              <p className="text-gray-500">No priority data available</p>
-            </div>
-          )}
+      {/* Timeline status & frequency — compact */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+        <div className="box p-3 border border-gray-200 rounded-lg">
+          <h3 className="text-xs font-semibold text-gray-700 mb-2">Timeline status</h3>
+          <div className="flex flex-wrap gap-1.5">
+            {["pending", "ongoing", "completed", "delayed"].map((key) => (
+              <span key={key} className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-700">
+                {key}: {(timeline?.statusBreakdown as Record<string, number>)?.[key] ?? 0}
+              </span>
+            ))}
+          </div>
         </div>
-
-    
-
-        {/* Timeline Frequency Chart */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Timeline Frequency Breakdown</h2>
-          {groupData.timelineAnalytics && ReactApexChart ? (
-            <ReactApexChart
-              options={getTimelineFrequencyChartOptions()}
-              series={getTimelineFrequencyChartSeries()}
-              type="bar"
-              height={350}
-            />
-          ) : (
-            <div className="h-[350px] flex items-center justify-center">
-              <p className="text-gray-500">No frequency data available</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Task Status Details */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Task Status Details</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <div className="text-center p-4 bg-warning/10 rounded-lg">
-            <p className="text-2xl font-bold text-warning">{groupData.taskAnalytics?.statusBreakdown?.pending || 0}</p>
-            <p className="text-sm text-gray-600 mt-1">Pending</p>
-          </div>
-          <div className="text-center p-4 bg-primary/10 rounded-lg">
-            <p className="text-2xl font-bold text-primary">{groupData.taskAnalytics?.statusBreakdown?.ongoing || 0}</p>
-            <p className="text-sm text-gray-600 mt-1">Ongoing</p>
-          </div>
-          <div className="text-center p-4 bg-success/10 rounded-lg">
-            <p className="text-2xl font-bold text-success">{groupData.taskAnalytics?.statusBreakdown?.completed || 0}</p>
-            <p className="text-sm text-gray-600 mt-1">Completed</p>
-          </div>
-          <div className="text-center p-4 bg-orange-100 rounded-lg">
-            <p className="text-2xl font-bold text-orange-600">{groupData.taskAnalytics?.statusBreakdown?.on_hold || 0}</p>
-            <p className="text-sm text-gray-600 mt-1">On Hold</p>
-          </div>
-          <div className="text-center p-4 bg-danger/10 rounded-lg">
-            <p className="text-2xl font-bold text-danger">{groupData.taskAnalytics?.statusBreakdown?.delayed || 0}</p>
-            <p className="text-sm text-gray-600 mt-1">Delayed</p>
-          </div>
-          <div className="text-center p-4 bg-gray-100 rounded-lg">
-            <p className="text-2xl font-bold text-gray-600">{groupData.taskAnalytics?.statusBreakdown?.cancelled || 0}</p>
-            <p className="text-sm text-gray-600 mt-1">Cancelled</p>
+        <div className="box p-3 border border-gray-200 rounded-lg">
+          <h3 className="text-xs font-semibold text-gray-700 mb-2">Timeline frequency</h3>
+          <div className="flex flex-wrap gap-1.5">
+            {["Yearly", "Quarterly", "Monthly", "Weekly", "Daily", "Hourly", "OneTime", "None"].map((key) => (
+              <span key={key} className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-700">
+                {key}: {(timeline?.frequencyBreakdown as Record<string, number>)?.[key] ?? 0}
+              </span>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Timeline Status Details */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Timeline Status Details</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="text-center p-4 bg-warning/10 rounded-lg">
-            <p className="text-2xl font-bold text-warning">{groupData.timelineAnalytics?.statusBreakdown?.pending || 0}</p>
-            <p className="text-sm text-gray-600 mt-1">Pending</p>
-          </div>
-          <div className="text-center p-4 bg-primary/10 rounded-lg">
-            <p className="text-2xl font-bold text-primary">{groupData.timelineAnalytics?.statusBreakdown?.ongoing || 0}</p>
-            <p className="text-sm text-gray-600 mt-1">Ongoing</p>
-          </div>
-          <div className="text-center p-4 bg-success/10 rounded-lg">
-            <p className="text-2xl font-bold text-success">{groupData.timelineAnalytics?.statusBreakdown?.completed || 0}</p>
-            <p className="text-sm text-gray-600 mt-1">Completed</p>
-          </div>
-          <div className="text-center p-4 bg-danger/10 rounded-lg">
-            <p className="text-2xl font-bold text-danger">{groupData.timelineAnalytics?.statusBreakdown?.delayed || 0}</p>
-            <p className="text-sm text-gray-600 mt-1">Delayed</p>
+      {/* Activity-wise timeline (current FY) */}
+      {activityWise?.byActivity?.length > 0 && (
+        <div className="box p-3 border border-gray-200 rounded-lg mb-4">
+          <h3 className="text-xs font-semibold text-gray-700 mb-2">Timelines by activity — {selectedFY === "all" ? "All" : selectedFY || activityWise.currentFY}</h3>
+          <div className="flex flex-wrap gap-2">
+            {activityWise.byActivity.map((a) => (
+              <div key={a.activityId} className="text-xs px-3 py-2 rounded-lg bg-gray-50 border border-gray-100">
+                <span className="font-medium text-gray-900">{a.activityName}</span>
+                <span className="text-gray-500 ml-2">Done: {a.completedCurrentFY} · Pending: {a.pendingCurrentFY} · Total: {a.totalCurrentFY}</span>
+              </div>
+            ))}
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Clients Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold text-gray-900">Clients in Group</h2>
-          <span className="text-sm text-gray-600">{groupData.clients?.length || 0} clients</span>
-        </div>
-
-        {groupData.clients && groupData.clients.length > 0 ? (
+      {/* Turnover summary */}
+      {turnoverSummary?.turnoverByClient?.length > 0 && (
+        <div className="box p-3 border border-gray-200 rounded-lg mb-4">
+          <h3 className="text-xs font-semibold text-gray-700 mb-2">Turnover by client</h3>
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Client Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Contact
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Tasks
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Timelines
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-1.5 font-medium text-gray-600">Client</th>
+                  <th className="text-left py-1.5 font-medium text-gray-600">Category</th>
+                  <th className="text-left py-1.5 font-medium text-gray-600">Year</th>
+                  <th className="text-right py-1.5 font-medium text-gray-600">Turnover</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {groupData.clients.map((client) => (
-                  <tr key={client._id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
+              <tbody>
+                {turnoverSummary.turnoverByClient.map((row) => (
+                  <tr key={row.clientId} className="border-b border-gray-100">
+                    <td className="py-1.5 text-gray-900">{row.clientName}</td>
+                    <td className="py-1.5"><span className="px-1.5 py-0.5 rounded bg-gray-100 font-medium">{row.category}</span></td>
+                    <td className="py-1.5 text-gray-600">{row.year ?? "—"}</td>
+                    <td className="py-1.5 text-right font-medium text-gray-900">{row.turnover ? `₹ ${row.turnover}` : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Clients by category + table */}
+      <div className="box p-3 border border-gray-200 rounded-lg mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <h3 className="text-xs font-semibold text-gray-700">Clients in group</h3>
+          {categories.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-gray-500">Category:</span>
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="form-select form-select-sm text-xs w-auto py-1"
+              >
+                <option value="all">All</option>
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+        {filteredClients.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-1.5 font-medium text-gray-600">Name</th>
+                  <th className="text-left py-1.5 font-medium text-gray-600">Contact</th>
+                  <th className="text-left py-1.5 font-medium text-gray-600">Category</th>
+                  <th className="text-left py-1.5 font-medium text-gray-600">Turnover</th>
+                  <th className="text-center py-1.5 font-medium text-gray-600">Tasks</th>
+                  <th className="text-center py-1.5 font-medium text-gray-600">Timelines</th>
+                  <th className="text-right py-1.5 font-medium text-gray-600">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredClients.map((client) => (
+                  <tr key={client._id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-2 font-medium text-gray-900 max-w-[140px] truncate" title={client.name}>{client.name}</td>
+                    <td className="py-2">
+                      <div className="max-w-[120px] truncate text-gray-600" title={client.email}>{client.email || "—"}</div>
+                      <div className="text-[10px] text-gray-500">{client.phone || "—"}</div>
+                    </td>
+                    <td className="py-2"><span className="px-1.5 py-0.5 rounded bg-gray-100 font-medium">{client.category || "—"}</span></td>
+                    <td className="py-2 font-medium">{client.turnover ? `₹ ${client.turnover}` : "—"}</td>
+                    <td className="py-2 text-center">{client.taskCount ?? 0}</td>
+                    <td className="py-2 text-center">{client.timelineCount ?? 0}</td>
+                    <td className="py-2 text-right">
                       <button
-                        onClick={() => router.push(`/analytics/clients/${client._id}/overview`)}
-                        className="text-sm font-medium text-gray-900 hover:text-blue-600 hover:underline cursor-pointer text-left"
+                        type="button"
+                        onClick={() => openClientDrawer(client)}
+                        className="text-primary hover:underline text-[10px] font-medium"
                       >
-                        {client.name}
-                      </button>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{client.email}</div>
-                      <div className="text-sm text-gray-500">{client.phone}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{client.taskCount || 0}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{client.timelineCount || 0}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <button
-                        onClick={() => router.push(`/analytics/clients/${client._id}/overview`)}
-                        className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
-                      >
-                        View Details
+                        Details
                       </button>
                     </td>
                   </tr>
@@ -711,19 +344,17 @@ const GroupOverviewPage = () => {
             </table>
           </div>
         ) : (
-          <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-            <div className="text-center">
-              <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
-                <i className="ri-user-line text-xl text-gray-400"></i>
-              </div>
-              <p className="text-gray-500">No clients in this group</p>
-            </div>
-          </div>
+          <p className="text-xs text-gray-500 py-4 text-center">No clients{categoryFilter !== "all" ? " in this category" : ""}.</p>
         )}
       </div>
+
+      <ClientDetailDrawer
+        isOpen={drawerOpen}
+        onClose={() => { setDrawerOpen(false); setDrawerClient(null); }}
+        client={drawerClient}
+      />
     </div>
   );
 };
 
 export default GroupOverviewPage;
-

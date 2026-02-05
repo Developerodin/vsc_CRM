@@ -38,6 +38,20 @@ export function getQuarterRangeLabel(quarter: string): string {
   return QUARTER_RANGES[quarter] ?? quarter;
 }
 
+/** Normalize monthly period to YYYY-MM for comparison (API may return "February-2026", we send "2026-02"). */
+export function normalizeMonthlyPeriodKey(period: string): string {
+  if (!period?.trim()) return '';
+  const p = period.trim();
+  const iso = p.match(/^(\d{4})-(\d{1,2})$/);
+  if (iso) return `${iso[1]}-${iso[2].padStart(2, '0')}`;
+  const monthYear = p.match(/(January|February|March|April|May|June|July|August|September|October|November|December)[-\s]*(\d{4})/i);
+  if (monthYear) {
+    const monthNum = MONTH_TO_NUM[monthYear[1]];
+    if (monthNum) return `${monthYear[2]}-${String(monthNum).padStart(2, '0')}`;
+  }
+  return p;
+}
+
 /** Format single calendar year to FY range for display (e.g. "2024" → "2024-2025"). */
 export function formatYearlyPeriodDisplay(period: string): string {
   if (!period || !/^\d{4}$/.test(period.trim())) return period;
