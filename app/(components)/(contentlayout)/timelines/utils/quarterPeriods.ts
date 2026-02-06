@@ -179,6 +179,14 @@ export function getExtendedPeriodOptions(frequency: string): Array<{ period: str
   return result;
 }
 
+/** For yearly: normalize to start year so "2025" and "2025-2026" map to same key. */
+function yearlyPeriodKey(period: string): string {
+  const p = (period || '').trim();
+  if (/^\d{4}$/.test(p)) return p;
+  const match = p.match(/^(\d{4})-\d{4}$/);
+  return match ? match[1] : p;
+}
+
 /** Merge API periods with extended past/future 3 years; dedupe by period, sort by period. */
 export function mergeWithExtendedPeriods<T extends { period?: string; displayName?: string }>(
   frequency: string,
@@ -190,16 +198,18 @@ export function mergeWithExtendedPeriods<T extends { period?: string; displayNam
   const isYearly = freq === 'yearly';
 
   apiPeriods.forEach((p) => {
-    const key = (p.period || '').trim();
-    if (!key) return;
-    const displayName = isYearly && /^\d{4}$/.test(key) && !p.displayName?.includes('-')
-      ? formatYearlyPeriodDisplay(key)
-      : (p.displayName ?? key);
-    byPeriod.set(key, { ...p, period: key, displayName } as T);
+    const raw = (p.period || '').trim();
+    if (!raw) return;
+    const key = isYearly ? yearlyPeriodKey(raw) : raw;
+    const displayName = isYearly && /^\d{4}$/.test(raw) && !p.displayName?.includes('-')
+      ? formatYearlyPeriodDisplay(raw)
+      : (p.displayName ?? (isYearly ? formatYearlyPeriodDisplay(yearlyPeriodKey(raw)) : raw));
+    byPeriod.set(key, { ...p, period: raw, displayName } as T);
   });
   extended.forEach((e) => {
-    if (!byPeriod.has(e.period)) {
-      byPeriod.set(e.period, { ...e, period: e.period, displayName: e.displayName } as T);
+    const key = isYearly ? yearlyPeriodKey(e.period) : e.period;
+    if (!byPeriod.has(key)) {
+      byPeriod.set(key, { ...e, period: e.period, displayName: e.displayName } as T);
     }
   });
   return Array.from(byPeriod.values()).sort((a, b) => {

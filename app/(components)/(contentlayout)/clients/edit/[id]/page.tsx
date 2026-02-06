@@ -204,6 +204,31 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     { year: '', turnover: '' }
   ]);
 
+  /** Derive latest turnover from history (most recent year with turnover, or last filled entry). */
+  const getLatestTurnoverFromHistory = (history: Array<{ year: string; turnover: string }>) => {
+    const filled = history.filter(e => (e.turnover ?? '').trim());
+    if (filled.length === 0) return '';
+    // Sort by year descending (e.g. "2024-25" -> 2025, "2023-24" -> 2024)
+    const parseYear = (y: string) => {
+      if (!y) return 0;
+      const parts = y.split('-').map(Number);
+      return parts.length >= 2 ? parts[1] : parts[0] || 0;
+    };
+    const sorted = [...filled].sort((a, b) => parseYear(b.year) - parseYear(a.year));
+    return (sorted[0]?.turnover ?? '').trim();
+  };
+
+  // Sync Annual Turnover from turnover history whenever history changes (latest year's turnover).
+  useEffect(() => {
+    const latest = getLatestTurnoverFromHistory(turnoverHistory);
+    setFormData(prev => {
+      if (prev.turnover === latest) return prev;
+      // When history has no turnover entries, keep existing (e.g. API-loaded) value
+      if (!latest && prev.turnover) return prev;
+      return { ...prev, turnover: latest };
+    });
+  }, [turnoverHistory]);
+
   // Add these state variables after the existing useState declarations (around line 80)
   const [showBusinessTypeModal, setShowBusinessTypeModal] = useState(false);
   const [showEntityTypeModal, setShowEntityTypeModal] = useState(false);
@@ -1669,10 +1694,9 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                         id="turnover"
                         name="turnover"
                         className="form-control"
-                        placeholder="Enter annual turnover"
+                        placeholder="Enter annual turnover (auto-filled from latest turnover history)"
                         value={formData.turnover}
                         onChange={handleInputChange}
-                        disabled
                       />
                     </div>
 
