@@ -107,7 +107,7 @@ const ClientReportPage = () => {
     );
   }
 
-  const { client, financialYear, turnover, turnoverHistory, timelines, statusSummary, pendings } = data;
+  const { client, financialYear, turnover, turnoverHistory, timelines, statusSummary, pendings, auditingPreviousYear, auditingNextYear } = data;
   const fyOptions = getFYOptions();
   const missing: string[] = [];
   if (!client || !client._id) missing.push("client");
@@ -144,11 +144,29 @@ const ClientReportPage = () => {
         });
       }
     }
-    const wsClient = XLSX.utils.json_to_sheet(clientSheet);
-    const wsActivity = XLSX.utils.json_to_sheet(activityRows.length ? activityRows : [{ Activity: "—", Subactivity: "—", Status: "—", "Due Date": "—", Frequency: "—" }]);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, wsClient, "Client");
-    XLSX.utils.book_append_sheet(wb, wsActivity, "By Activity & Subactivity");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(clientSheet), "Client");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(activityRows.length ? activityRows : [{ Activity: "—", Subactivity: "—", Status: "—", "Due Date": "—", Frequency: "—" }]), "By Activity & Subactivity");
+    if (auditingPreviousYear?.timelines?.length) {
+      const prevRows = auditingPreviousYear.timelines.map((t) => ({
+        Activity: t.activity?.name ?? "—",
+        Subactivity: t.subactivity?.name ?? "—",
+        Status: t.status ?? "—",
+        "Due Date": t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—",
+        Frequency: t.frequency ?? "—",
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(prevRows), `Auditing Prev (${auditingPreviousYear.financialYear})`);
+    }
+    if (auditingNextYear?.timelines?.length) {
+      const nextRows = auditingNextYear.timelines.map((t) => ({
+        Activity: t.activity?.name ?? "—",
+        Subactivity: t.subactivity?.name ?? "—",
+        Status: t.status ?? "—",
+        "Due Date": t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—",
+        Frequency: t.frequency ?? "—",
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(nextRows), `Auditing Next (${auditingNextYear.financialYear})`);
+    }
     const safeName = (client?.name ?? "client").replace(/[/\\?*\[\]]/g, "_").slice(0, 30);
     const fileName = `client_report_${safeName}_${financialYear ?? "report"}_${new Date().toISOString().split("T")[0]}.xlsx`;
     XLSX.writeFile(wb, fileName);
@@ -300,7 +318,79 @@ const ClientReportPage = () => {
         </div>
       )}
 
-      {byActivity.length === 0 && (
+      {/* Auditing — Previous year (from API auditingPreviousYear) */}
+      {auditingPreviousYear?.timelines?.length > 0 && (
+        <div className="box p-4 mb-4">
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">Auditing — Previous year</h2>
+          <p className="text-xs text-gray-500 mb-3">Financial year: {auditingPreviousYear.financialYear ?? "—"}</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-1.5 font-medium text-gray-600">Activity</th>
+                  <th className="text-left py-1.5 font-medium text-gray-600">Subactivity</th>
+                  <th className="text-left py-1.5 font-medium text-gray-600">Status</th>
+                  <th className="text-left py-1.5 font-medium text-gray-600">Due date</th>
+                  <th className="text-left py-1.5 font-medium text-gray-600">Frequency</th>
+                </tr>
+              </thead>
+              <tbody>
+                {auditingPreviousYear.timelines.map((t) => (
+                  <tr key={t._id} className="border-b border-gray-100">
+                    <td className="py-1.5 text-gray-900">{t.activity?.name ?? "—"}</td>
+                    <td className="py-1.5 text-gray-900">{t.subactivity?.name ?? "—"}</td>
+                    <td className="py-1.5">
+                      <span className={`px-1.5 py-0.5 rounded ${t.status === "completed" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
+                        {t.status}
+                      </span>
+                    </td>
+                    <td className="py-1.5 text-gray-600">{t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—"}</td>
+                    <td className="py-1.5 text-gray-600">{t.frequency ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Auditing — Next year (from API auditingNextYear) */}
+      {auditingNextYear?.timelines?.length > 0 && (
+        <div className="box p-4 mb-4">
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">Auditing — Next year</h2>
+          <p className="text-xs text-gray-500 mb-3">Financial year: {auditingNextYear.financialYear ?? "—"}</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-1.5 font-medium text-gray-600">Activity</th>
+                  <th className="text-left py-1.5 font-medium text-gray-600">Subactivity</th>
+                  <th className="text-left py-1.5 font-medium text-gray-600">Status</th>
+                  <th className="text-left py-1.5 font-medium text-gray-600">Due date</th>
+                  <th className="text-left py-1.5 font-medium text-gray-600">Frequency</th>
+                </tr>
+              </thead>
+              <tbody>
+                {auditingNextYear.timelines.map((t) => (
+                  <tr key={t._id} className="border-b border-gray-100">
+                    <td className="py-1.5 text-gray-900">{t.activity?.name ?? "—"}</td>
+                    <td className="py-1.5 text-gray-900">{t.subactivity?.name ?? "—"}</td>
+                    <td className="py-1.5">
+                      <span className={`px-1.5 py-0.5 rounded ${t.status === "completed" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
+                        {t.status}
+                      </span>
+                    </td>
+                    <td className="py-1.5 text-gray-600">{t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—"}</td>
+                    <td className="py-1.5 text-gray-600">{t.frequency ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {byActivity.length === 0 && !auditingPreviousYear?.timelines?.length && !auditingNextYear?.timelines?.length && (
         <div className="box p-4 text-center text-sm text-gray-500">No timelines for this year.</div>
       )}
     </div>

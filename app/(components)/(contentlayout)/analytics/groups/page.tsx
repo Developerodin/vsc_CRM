@@ -542,8 +542,9 @@ const AnalyticsGroupsPage = () => {
                             </td>
                             <td className="px-4 py-3 text-right">
                               <button
+                                type="button"
                                 onClick={() => router.push(`/analytics/groups/${group.groupId}/report`)}
-                                className="ti-btn ti-btn-primary ti-btn-sm"
+                                className="ti-btn ti-btn-primary whitespace-nowrap py-1.5 px-2.5 text-sm inline-flex items-center"
                               >
                                 <i className="ri-file-list-3-line me-1"></i> Report
                               </button>

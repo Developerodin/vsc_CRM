@@ -41,6 +41,12 @@ export interface TurnoverHistoryItem {
   turnover: string;
 }
 
+/** Previous-year block (e.g. auditingPreviousYear) */
+export interface PreviousYearBlock {
+  financialYear: string;
+  timelines: ReportTimelineItem[];
+}
+
 /** GET /v1/clients/:clientId/report */
 export interface ClientReportResponse {
   client: ReportClientRef;
@@ -50,6 +56,10 @@ export interface ClientReportResponse {
   timelines: ReportTimelineItem[];
   statusSummary: ReportStatusSummary;
   pendings: ReportTimelineItem[];
+  /** Optional: activity-specific previous year timelines (e.g. Auditing) */
+  auditingPreviousYear?: PreviousYearBlock;
+  /** Optional: activity-specific next year timelines (e.g. Auditing) */
+  auditingNextYear?: PreviousYearBlock;
 }
 
 /** Single client block inside group report */
