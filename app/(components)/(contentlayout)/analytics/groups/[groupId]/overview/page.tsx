@@ -157,9 +157,14 @@ const GroupOverviewPage = () => {
               <span className="ml-3">{selectedFY === "all" ? "All" : selectedFY}</span>
             </p>
           </div>
-          <Link href="/analytics/groups" className="ti-btn ti-btn-secondary ti-btn-sm">
-            <i className="ri-arrow-left-line me-1" /> Back
-          </Link>
+          <div className="flex items-center gap-3 flex-nowrap shrink-0">
+            <Link href={`/analytics/groups/${groupId}/report`} className="ti-btn ti-btn-primary whitespace-nowrap py-2 px-3 text-sm">
+              <i className="ri-file-list-3-line me-1" /> Report
+            </Link>
+            <Link href="/analytics/groups" className="ti-btn ti-btn-secondary whitespace-nowrap py-2 px-3 text-sm">
+              <i className="ri-arrow-left-line me-1" /> Back
+            </Link>
+          </div>
         </div>
       </div>
 

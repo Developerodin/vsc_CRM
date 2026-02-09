@@ -501,6 +501,7 @@ const AnalyticsGroupsPage = () => {
                         <th className="px-4 py-3">Clients</th>
                         <th className="px-4 py-3">Task Status</th>
                         <th className="px-4 py-3">Timeline Status</th>
+                        <th className="px-4 py-3 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -539,11 +540,19 @@ const AnalyticsGroupsPage = () => {
                             <td className="px-4 py-3">
                               {renderTimelineStatus(group.timelineStatus)}
                             </td>
+                            <td className="px-4 py-3 text-right">
+                              <button
+                                onClick={() => router.push(`/analytics/groups/${group.groupId}/report`)}
+                                className="ti-btn ti-btn-primary ti-btn-sm"
+                              >
+                                <i className="ri-file-list-3-line me-1"></i> Report
+                              </button>
+                            </td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={5} className="text-center py-8">
+                          <td colSpan={6} className="text-center py-8">
                             <div className="flex flex-col items-center justify-center">
                               <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
                                 <i className="ri-group-line text-4xl text-primary"></i>

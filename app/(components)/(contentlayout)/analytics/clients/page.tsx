@@ -1233,6 +1233,7 @@ const AnalyticsClientsPage = () => {
                          <th className="px-4 py-3">Activities</th>
                          <th className="px-4 py-3">Tasks & Team</th>
                          <th className="px-4 py-3">Timeline Status</th>
+                         <th className="px-4 py-3 text-right">Actions</th>
                        </tr>
                      </thead>
                     <tbody>
@@ -1397,11 +1398,19 @@ const AnalyticsClientsPage = () => {
                              <td className="px-4 py-3">
                                {renderTimelineStatus(client.timelines)}
                              </td>
+                             <td className="px-4 py-3 text-right">
+                               <Link
+                                 href={`/analytics/clients/${client._id}/report`}
+                                 className="ti-btn ti-btn-primary ti-btn-sm"
+                               >
+                                 <i className="ri-file-list-3-line me-1"></i> Report
+                               </Link>
+                             </td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={4} className="text-center py-8">
+                          <td colSpan={5} className="text-center py-8">
                             <div className="flex flex-col items-center justify-center">
                               <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
                                 <i className="ri-folder-line text-4xl text-primary"></i>

@@ -406,11 +406,18 @@ const ClientOverviewPage = () => {
       </div>
 
       {/* Page Header */}
-      
       <div className="box !bg-transparent border-0 shadow-none mb-6">
-        <div className="box-header">
-          <h1 className="box-title text-3xl font-bold text-gray-900">{client.name}</h1>
-          <p className="text-gray-600 mt-1">Client overview and performance analytics</p>
+        <div className="box-header flex flex-wrap justify-between items-start gap-2">
+          <div>
+            <h1 className="box-title text-3xl font-bold text-gray-900">{client.name}</h1>
+            <p className="text-gray-600 mt-1">Client overview and performance analytics</p>
+          </div>
+          <Link
+            href={`/analytics/clients/${clientId}/report`}
+            className="ti-btn ti-btn-primary shrink-0 whitespace-nowrap"
+          >
+            <i className="ri-file-list-3-line me-2"></i> Report
+          </Link>
         </div>
       </div>
 
