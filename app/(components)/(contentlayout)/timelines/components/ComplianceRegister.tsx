@@ -34,7 +34,7 @@ export type ComplianceTaskType =
   | 'ROC Compliance' 
   | 'Audit & Other Statutory Tasks';
 
-export type RegisterStatus = 'Pending' | 'In Progress' | 'Completed' | 'Filed' | 'Approved';
+export type RegisterStatus = 'Pending' | 'In Progress' | 'Completed' | 'Filed' | 'Approved' | 'Not Applicable';
 
 interface ComplianceRegisterEntry {
   _id?: string;
@@ -117,19 +117,29 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
   const [showFilters, setShowFilters] = useState(true);
   const [entriesToShow, setEntriesToShow] = useState<number | 'all'>(100);
   const [isImporting, setIsImporting] = useState(false);
+  /** When true, table shows the "Mark NA" column with a button in every row */
+  const [showMarkNaColumn, setShowMarkNaColumn] = useState(false);
+  /** Modal: mark single timeline or all displayed as Not Applicable */
+  const [naConfirmModal, setNaConfirmModal] = useState<{ type: 'single'; entry: ComplianceRegisterEntry } | { type: 'all'; count: number } | null>(null);
+  const [isMarkingNa, setIsMarkingNa] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
-  // Column definitions
-  const columns = useMemo(() => [
+  // Column definitions; markNa column shown only when showMarkNaColumn is true
+  const allColumns = useMemo(() => [
     { key: 'clientName', label: 'Client Name', width: 200, editable: false, type: 'text' },
     { key: 'subActivity', label: 'Sub-Activity', width: 200, editable: false, type: 'text' },
     { key: 'frequency', label: 'Period', width: 140, editable: false, type: 'text' },
     { key: 'status', label: 'Status', width: 130, editable: false, type: 'text' },
+    { key: 'markNa', label: 'Mark NA', width: 120, editable: false, type: 'action' },
     { key: 'referenceNumber', label: 'Reference Number', width: 180, editable: true, type: 'text' },
     { key: 'completedAt', label: 'Completed At', width: 150, editable: true, type: 'date' },
   ], []);
+  const columns = useMemo(
+    () => showMarkNaColumn ? allColumns : allColumns.filter(c => c.key !== 'markNa'),
+    [allColumns, showMarkNaColumn]
+  );
 
   const taskTypes: ComplianceTaskType[] = [
     'ITR',
@@ -145,7 +155,8 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
     'In Progress',
     'Completed',
     'Filed',
-    'Approved'
+    'Approved',
+    'Not Applicable'
   ];
 
   /** Activity names allowed in the register filter; others are hidden from the dropdown. */
@@ -467,6 +478,63 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
     }
   };
 
+  /** PATCH timeline status to "not applicable" and update local register data */
+  const markTimelineNotApplicable = useCallback(async (timelineId: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`${Base_url}timelines/${timelineId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ status: 'not applicable' })
+      });
+      if (!response.ok) return false;
+      const idx = registerData.findIndex(
+        e => e.timelineId === timelineId || e._id === timelineId || e.id === timelineId
+      );
+      if (idx !== -1) {
+        const next = [...registerData];
+        next[idx] = { ...next[idx], status: 'not applicable' };
+        setRegisterData(next);
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }, [registerData]);
+
+  const confirmMarkNa = useCallback(async () => {
+    if (!naConfirmModal || isMarkingNa) return;
+    setIsMarkingNa(true);
+    try {
+      if (naConfirmModal.type === 'single') {
+        if (!naConfirmModal.entry.timelineId) {
+          toast.error('No timeline ID for this entry');
+          setNaConfirmModal(null);
+          return;
+        }
+        const ok = await markTimelineNotApplicable(naConfirmModal.entry.timelineId);
+        if (ok) toast.success('Timeline marked as Not Applicable');
+        else toast.error('Failed to update timeline');
+      } else {
+        const entries = displayedData.filter(e => e.timelineId && (e.status || '').toLowerCase() !== 'not applicable');
+        let done = 0;
+        for (const entry of entries) {
+          if (entry.timelineId && (await markTimelineNotApplicable(entry.timelineId))) done++;
+        }
+        if (done > 0) {
+          toast.success(`${done} timeline(s) marked as Not Applicable`);
+          handleSubmit();
+        }
+        if (done < entries.length && entries.length > 0) toast.error(`Failed to update ${entries.length - done} timeline(s)`);
+      }
+      setNaConfirmModal(null);
+    } finally {
+      setIsMarkingNa(false);
+    }
+  }, [naConfirmModal, isMarkingNa, displayedData, markTimelineNotApplicable, handleSubmit]);
+
   // Handle keyboard navigation
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (!selectedCell) return;
@@ -625,6 +693,7 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
         const timelineIdKey = 'Timeline ID';
         const refKey = 'Reference Number';
         const completedKey = 'Completed At';
+        const statusKey = 'Status';
         const allKeys = rows.length ? Object.keys(rows[0] || {}) : [];
         const normalizedKeys = allKeys.reduce((acc, k) => {
           acc[k.trim()] = k;
@@ -659,13 +728,19 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
           const referenceNumber = getVal(row, refKey);
           const completedAtRaw = getVal(row, completedKey);
           const completedAtIso = parseDate(completedAtRaw);
-          if (!referenceNumber && !completedAtIso) continue;
+          const statusVal = (getVal(row, statusKey) || '').toLowerCase();
+
+          const isMarkNa = statusVal === 'not applicable';
+          if (!referenceNumber && !completedAtIso && !isMarkNa) continue;
 
           const payload: { referenceNumber?: string | null; completedAt?: string | null; status?: string } = {};
           payload.referenceNumber = referenceNumber || null;
           if (completedAtIso) {
             payload.completedAt = completedAtIso;
             payload.status = 'completed';
+          }
+          if (isMarkNa) {
+            payload.status = 'not applicable';
           }
 
           try {
@@ -734,7 +809,7 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
                 handleCellSave();
               }
             }}
-            className="w-full h-full border-2 border-primary outline-none px-2"
+            className="w-full h-full border border-gray-200 text-[11px] font-medium px-2 outline-none focus:ring-0 focus:border-purple-300"
             autoFocus
           />
         );
@@ -754,11 +829,32 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
                 handleCellSave();
               }
             }}
-            className="w-full h-full border-2 border-primary outline-none px-2"
+            className="w-full h-full border border-gray-200 text-[11px] font-medium px-2 outline-none focus:ring-0 focus:border-purple-300"
             autoFocus
           />
         );
       }
+    }
+
+    // Mark NA column – spec: 11px bold button, amber warning variant
+    if (colKey === 'markNa') {
+      const isNa = (entry.status || '').toLowerCase() === 'not applicable';
+      return (
+        <div className="h-full min-h-[40px] px-1 flex items-center">
+          <button
+            type="button"
+            disabled={!entry.timelineId || isNa}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (entry.timelineId && !isNa) setNaConfirmModal({ type: 'single', entry });
+            }}
+            className="flex items-center justify-center gap-1 px-3 py-1.5 text-[11px] font-bold rounded bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
+            title={isNa ? 'Already Not Applicable' : 'Mark this timeline as Not Applicable'}
+          >
+            Mark NA
+          </button>
+        </div>
+      );
     }
 
     // Client Name column: show name + activity-appropriate client ID (GST no / TIN / PAN / PAN & CIN)
@@ -782,13 +878,13 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
       }
       return (
         <div
-          className={`h-full px-2 py-1 flex flex-col justify-center ${isSelected ? 'bg-blue-100' : ''}`}
+          className={`h-full px-0 py-0 flex flex-col justify-center text-[12px] ${isSelected ? 'bg-purple-50' : ''}`}
         >
           {name ? (
             <>
-              <div className="font-medium text-gray-900">{name}</div>
+              <div className="font-medium text-[#323251]">{name}</div>
               {(idLabel && idValue) && (
-                <div className="text-xs text-gray-600 mt-0.5">
+                <div className="text-[11px] text-[#495057] mt-0.5">
                   <span className="font-medium">{idLabel}:</span> {idValue}
                 </div>
               )}
@@ -808,12 +904,12 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
       const completedAt = entry.completedAt ? new Date(entry.completedAt).toLocaleDateString() : '';
       return (
         <div
-          className={`h-full px-2 py-1 flex flex-col justify-center ${isSelected ? 'bg-blue-100' : ''}`}
+          className={`h-full px-0 py-0 flex flex-col justify-center text-[12px] ${isSelected ? 'bg-purple-50' : ''}`}
         >
           {periodDisplay ? (
             <>
-              <div className="font-medium">{periodDisplay}</div>
-              {completedAt && <div className="text-xs text-gray-600 mt-0.5">{completedAt}</div>}
+              <div className="font-medium text-[#323251]">{periodDisplay}</div>
+              {completedAt && <div className="text-[11px] text-[#495057] mt-0.5">{completedAt}</div>}
             </>
           ) : (
             <span className="text-gray-400">-</span>
@@ -824,7 +920,7 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
 
     return (
       <div
-        className={`h-full px-2 py-1 flex items-center ${isSelected ? 'bg-blue-100' : ''} ${column.editable ? 'cursor-cell' : ''}`}
+        className={`h-full px-0 py-0 flex items-center text-[12px] font-medium text-[#323251] ${isSelected ? 'bg-purple-50' : ''} ${column.editable ? 'cursor-cell' : ''}`}
         onClick={() => column.editable && handleCellClick(entry, rowIndex, colKey)}
       >
         {value || (column.editable ? <span className="text-gray-400">Click to edit</span> : <span className="text-gray-400">-</span>)}
@@ -833,17 +929,20 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
   };
 
   return (
-    <div className="box" onKeyDown={handleKeyDown} tabIndex={0} ref={gridRef}>
-      <div className="box-body">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">Compliance Register</h2>
-          <div className="flex gap-2">
+    <div className="bg-white shadow-sm border border-gray-100 overflow-hidden rounded" onKeyDown={handleKeyDown} tabIndex={0} ref={gridRef}>
+      <div className="p-[10px]">
+        {/* Header – spec: title 14px bold, accent bar, buttons 11px bold */}
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-2">
+            <span className="w-[3px] h-5 bg-purple-600 rounded-full shrink-0" aria-hidden />
+            <h2 className="text-[0.875rem] font-bold text-gray-800">Compliance Register</h2>
+          </div>
+          <div className="flex items-center gap-1.5">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="ti-btn ti-btn-primary"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm transition-colors"
             >
-              <i className={`ri-filter-${showFilters ? 'fill' : 'line'} me-2`}></i>
+              <i className={`ri-filter-${showFilters ? 'fill' : 'line'} text-xs`} />
               Filters
             </button>
             <input
@@ -857,35 +956,35 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
               type="button"
               onClick={() => importFileRef.current?.click()}
               disabled={isImporting}
-              className="ti-btn ti-btn-secondary"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-white border border-gray-200 text-[#495057] hover:bg-gray-50 shadow-sm transition-colors disabled:opacity-50"
               title="Upload Excel with Timeline ID, Reference Number, Completed At"
             >
-              {isImporting ? <i className="ri-loader-4-line animate-spin me-2"></i> : <i className="ri-upload-2-line me-2"></i>}
+              {isImporting ? <i className="ri-loader-4-line animate-spin text-xs" /> : <i className="ri-upload-2-line text-xs" />}
               Import
             </button>
             <button
               onClick={handleExport}
-              className="ti-btn ti-btn-success"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm transition-colors"
               title="Export current register (apply filters and Submit first)"
             >
-              <i className="ri-download-2-line me-2"></i>
+              <i className="ri-download-2-line text-xs" />
               Export
             </button>
           </div>
         </div>
 
-        {/* Filters */}
+        {/* Filters – spec: labels/inputs 11px, border gray-200 */}
         {showFilters && (
-        <div className="bg-gray-50 p-4 rounded-lg mb-4">
-          <h3 className="text-sm font-semibold mb-3 text-gray-700">Filter Options</h3>
+        <div className="bg-gray-50/50 border border-gray-200 p-[10px] rounded mb-4">
+          <h3 className="text-[11px] font-bold text-[#495057] uppercase tracking-wider mb-3">Filter Options</h3>
           <div className={`grid grid-cols-1 gap-3 ${(filters.frequency || '').toLowerCase() === 'quarterly' || (filters.frequency || '').toLowerCase() === 'monthly' ? 'md:grid-cols-8' : 'md:grid-cols-7'}`}>
             {/* Activity Selection */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-[11px] font-medium text-[#495057] mb-1">
                 Activity
               </label>
               <select
-                className="form-select w-full"
+                className="w-full bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300 transition-all"
                 value={filters.activity}
                 onChange={(e) => {
                   setFilters({
@@ -913,11 +1012,11 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
 
             {/* Sub-Activity Selection */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-[11px] font-medium text-[#495057] mb-1">
                 Sub-Activity
               </label>
               <select
-                className="form-select w-full"
+                className="w-full bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300 transition-all"
                 value={filters.subActivity}
                 onChange={(e) => {
                   const selectedSubActivityId = e.target.value;
@@ -954,11 +1053,11 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
 
             {/* Frequency Selection */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-[11px] font-medium text-[#495057] mb-1">
                 Frequency
               </label>
               <select
-                className="form-select w-full"
+                className="w-full bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300 transition-all"
                 value={filters.frequency}
                 onChange={(e) => {
                   const freq = e.target.value;
@@ -984,7 +1083,7 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
                 <option value="Yearly">Yearly</option>
               </select>
               {filters.subActivity && (
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-[10px] text-gray-500 mt-1">
                   Frequency auto-selected from sub-activity
                 </p>
               )}
@@ -994,9 +1093,9 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
             {(filters.frequency || '').toLowerCase() === 'quarterly' ? (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Quarter</label>
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1">Quarter</label>
                   <select
-                    className="form-select w-full"
+                    className="w-full bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
                     value={filters.quarter}
                     onChange={(e) => setFilters({ ...filters, quarter: e.target.value })}
                   >
@@ -1007,9 +1106,9 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1">Year</label>
                   <select
-                    className="form-select w-full"
+                    className="w-full bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
                     value={filters.year}
                     onChange={(e) => setFilters({ ...filters, year: e.target.value })}
                   >
@@ -1023,9 +1122,9 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
             ) : (filters.frequency || '').toLowerCase() === 'monthly' ? (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1">Month</label>
                   <select
-                    className="form-select w-full"
+                    className="w-full bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
                     value={filters.month}
                     onChange={(e) => setFilters({ ...filters, month: e.target.value })}
                   >
@@ -1036,9 +1135,9 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1">Year</label>
                   <select
-                    className="form-select w-full"
+                    className="w-full bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
                     value={filters.year}
                     onChange={(e) => setFilters({ ...filters, year: e.target.value })}
                   >
@@ -1051,9 +1150,9 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
               </>
             ) : (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Period</label>
+                <label className="block text-[11px] font-medium text-[#495057] mb-1">Period</label>
                 <select
-                  className="form-select w-full"
+                  className="w-full bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
                   value={filters.period}
                   onChange={(e) => setFilters({ ...filters, period: e.target.value })}
                   disabled={!filters.frequency}
@@ -1078,11 +1177,11 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
 
             {/* Status Selection */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-[11px] font-medium text-[#495057] mb-1">
                 Status
               </label>
               <select
-                className="form-select w-full"
+                className="w-full bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
                 value={filters.status}
                 onChange={(e) => setFilters({ ...filters, status: e.target.value })}
               >
@@ -1091,18 +1190,19 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
                 <option value="completed">Completed</option>
                 <option value="delayed">Delayed</option>
                 <option value="ongoing">Ongoing</option>
+                <option value="not applicable">Not Applicable</option>
               </select>
             </div>
 
             {/* Client Search */}
             <div className="relative">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-[11px] font-medium text-[#495057] mb-1">
                 Client
               </label>
               <div className="relative">
                 <input
                   type="text"
-                  className="form-input w-full pr-8"
+                  className="w-full bg-white border border-gray-200 pl-3 pr-8 py-1.5 text-[11px] rounded focus:ring-0 focus:border-purple-300 placeholder:text-gray-400 font-medium transition-all"
                   placeholder="Search client..."
                   value={clientSearchTerm || (filters.client ? clients.find(c => c.id === filters.client)?.name || "" : "")}
                   onChange={(e) => {
@@ -1163,22 +1263,22 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
 
             {/* Submit Button */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1 invisible">
+              <label className="block text-[11px] font-medium text-[#495057] mb-1 invisible">
                 Submit
               </label>
               <button
                 onClick={handleSubmit}
-                className="ti-btn ti-btn-primary w-full"
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm transition-colors disabled:opacity-50"
                 disabled={isLoading}
               >
                 {isLoading ? (
                   <>
-                    <i className="ri-loader-4-line animate-spin me-2"></i>
+                    <i className="ri-loader-4-line animate-spin text-xs" />
                     Loading...
                   </>
                 ) : (
                   <>
-                    <i className="ri-search-line me-2"></i>
+                    <i className="ri-search-line text-xs" />
                     Submit
                   </>
                 )}
@@ -1188,13 +1288,37 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
         </div>
         )}
 
-        {/* Entries Selection */}
-        {registerData.length > 0 && (
-          <div className="mb-3 flex justify-end">
+        {/* Toggle: show Mark NA column | Mark all as NA – spec: buttons 11px bold, amber warning variant */}
+        {(registerData.length > 0 || showFilters) && (
+          <div className="mb-3 flex flex-wrap justify-end items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setShowMarkNaColumn(prev => !prev)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded transition-colors border shadow-sm ${
+                showMarkNaColumn
+                  ? 'bg-amber-200 text-amber-800 border-amber-300 hover:bg-amber-300'
+                  : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+              }`}
+              title={showMarkNaColumn ? 'Hide Mark NA column' : 'Show Mark NA column in every row'}
+            >
+              <i className={`text-xs ${showMarkNaColumn ? 'ri-eye-fill' : 'ri-eye-line'}`} /> Mark NA
+            </button>
+            {showMarkNaColumn && registerData.length > 0 && (
+              <button
+                type="button"
+                disabled={displayedData.length === 0 || displayedData.every(e => (e.status || '').toLowerCase() === 'not applicable')}
+                onClick={() => setNaConfirmModal({ type: 'all', count: displayedData.filter(e => (e.status || '').toLowerCase() !== 'not applicable').length })}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-500 shadow-sm"
+                title="Mark all visible rows as Not Applicable"
+              >
+                <i className="ri-checkbox-blank-line text-xs" /> Mark all as NA
+              </button>
+            )}
+            {registerData.length > 0 && (
             <div className="flex items-center gap-3">
-              <label className="text-sm text-gray-700">Show:</label>
+              <label className="text-[11px] font-medium text-[#495057]">Show:</label>
               <select
-                className="form-select"
+                className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
                 style={{ width: '120px' }}
                 value={entriesToShow}
                 onChange={(e) => {
@@ -1208,29 +1332,33 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
                 <option value={1000}>1000</option>
                 <option value="all">Show All</option>
               </select>
-              <span className="text-sm text-gray-600 whitespace-nowrap">
+              <span className="text-[11px] font-medium text-[#495057] tracking-tight whitespace-nowrap">
                 Showing {displayedData.length} of {periodFilteredData.length} entries
               </span>
             </div>
+            )}
           </div>
         )}
 
         {/* Excel-like Grid */}
         {isLoading ? (
-          <div className="flex justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 opacity-50" />
+            <p className="mt-3 text-[10px] text-gray-400 font-bold tracking-[0.2em] uppercase">Loading Data</p>
           </div>
         ) : error ? (
-          <div className="text-center text-red-500 py-8">{error}</div>
+          <div className="text-center text-red-600 py-20 text-[12px] font-medium">{error}</div>
         ) : (
-          <div className="overflow-auto border border-gray-300" style={{ maxHeight: '600px' }}>
-            <table className="w-full border-collapse">
-              <thead className="bg-gray-100 sticky top-0 z-10">
+          <div className="overflow-x-auto min-h-[300px] border border-gray-200 rounded" style={{ maxHeight: '600px' }}>
+            <table className="w-full border-collapse border border-gray-200">
+              <thead className="bg-gray-100 sticky top-0 z-10 border-b border-gray-200">
                 <tr>
-                  {columns.map(col => (
+                  {columns.map((col, colIndex) => (
                     <th
                       key={col.key}
-                      className="border border-gray-300 px-2 py-2 text-left font-semibold"
+                      className={`text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200 ${
+                        colIndex === 0 ? 'pl-[10px] pr-1.5' : colIndex === columns.length - 1 ? 'pl-1.5 pr-[10px]' : 'px-1.5'
+                      } py-3`}
                       style={{ width: `${col.width}px`, minWidth: `${col.width}px` }}
                     >
                       {col.label}
@@ -1241,24 +1369,24 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
               <tbody>
                 {registerData.length === 0 ? (
                   <tr>
-                    <td colSpan={columns.length} className="text-center py-8 text-gray-500">
-                      {isLoading ? (
-                        <div className="flex justify-center">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    <td colSpan={columns.length} className="text-center py-20">
+                      <div className="flex flex-col items-center">
+                        <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                          <i className="ri-inbox-line text-xl text-gray-200" />
                         </div>
-                      ) : (
-                        "No entries found. Select filters and click Submit to load data."
-                      )}
+                        <p className="text-xs font-bold text-gray-400 mb-1">DATA EMPTY</p>
+                        <p className="text-[11px] text-gray-500">Select filters and click Submit to load data.</p>
+                      </div>
                     </td>
                   </tr>
                 ) : (
                   displayedData.map((entry, rowIndex) => (
-                    <tr key={entry.id || entry._id || rowIndex} className="hover:bg-gray-50">
-                      {columns.map(col => (
+                    <tr key={entry.id || entry._id || rowIndex} className="hover:bg-gray-50/50 transition-colors group">
+                      {columns.map((col, colIndex) => (
                         <td
                           key={col.key}
-                          className="border border-gray-300 p-0"
-                          style={{ width: `${col.width}px`, minWidth: `${col.width}px`, height: '40px' }}
+                          className={`border border-gray-200 p-0 ${colIndex === 0 ? 'pl-[10px] pr-1.5' : colIndex === columns.length - 1 ? 'pl-1.5 pr-[10px]' : 'px-1.5'} py-2.5`}
+                          style={{ width: `${col.width}px`, minWidth: `${col.width}px`, minHeight: '40px' }}
                         >
                           {renderCell(entry, col.key, rowIndex)}
                         </td>
@@ -1271,6 +1399,42 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
           </div>
         )}
 
+        {/* Confirm Mark as Not Applicable modal – spec: overlay 50%, panel rounded-lg, 10px padding, 11px buttons */}
+        {naConfirmModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={() => !isMarkingNa && setNaConfirmModal(null)}>
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="flex justify-between items-center p-[10px] border-b border-gray-200">
+                <h3 className="text-sm font-bold text-gray-800">Mark as Not Applicable</h3>
+              </div>
+              <div className="p-[10px] overflow-auto">
+                <p className="text-[12px] text-[#495057]">
+                  {naConfirmModal.type === 'single'
+                    ? 'Mark this timeline as Not Applicable? This will update the timeline status.'
+                    : `Mark ${naConfirmModal.count} timeline(s) as Not Applicable? This will update all selected timelines.`}
+                </p>
+              </div>
+              <div className="flex justify-end gap-2 p-[10px] border-t border-gray-200">
+                <button
+                  type="button"
+                  disabled={isMarkingNa}
+                  onClick={() => setNaConfirmModal(null)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-white border border-gray-200 text-[#495057] hover:bg-gray-50 shadow-sm transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isMarkingNa}
+                  onClick={confirmMarkNa}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 shadow-sm transition-colors"
+                >
+                  {isMarkingNa ? <i className="ri-loader-4-line animate-spin text-xs" /> : null}
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

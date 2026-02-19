@@ -7,7 +7,7 @@ import * as XLSX from "xlsx";
 import { Base_url } from '@/app/api/config/BaseUrl';
 import TaskManagement from './components/TaskManagement';
 import ComplianceRegister from './components/ComplianceRegister';
-import { normalizeQuarterlyPeriods } from './utils/quarterPeriods';
+import { normalizeQuarterlyPeriods, formatPeriodDisplay } from './utils/quarterPeriods';
 import { getClientIdDisplay, getClientIdsForExport } from './utils/timelineClientId';
 
 interface Timeline {
@@ -700,18 +700,21 @@ const TimelinesPage = () => {
 
       <div className="grid grid-cols-12 gap-6">
         <div className="col-span-12">
-          {/* Page Header */}
-          <div className="box !bg-transparent border-0 shadow-none">
-            <div className="box-header flex justify-between items-center">
-              <h1 className="box-title text-2xl font-semibold">Timelines & Tasks</h1>
-              <div className="box-tools flex items-center space-x-2">
+          {/* Page Header – spec: accent bar, 14px bold title, buttons 11px bold */}
+          <div className="bg-white shadow-sm border border-gray-100 overflow-hidden rounded mb-6">
+            <div className="p-[10px] flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <span className="w-[3px] h-5 bg-purple-600 rounded-full shrink-0" aria-hidden />
+                <h1 className="text-[0.875rem] font-bold text-gray-800">Timelines & Tasks</h1>
+              </div>
+              <div className="flex items-center gap-1.5">
                 {activeTab === 'timelines' && selectedTimelines.length > 0 && (
                   <button
                     type="button"
-                    className="ti-btn ti-btn-danger"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 transition-colors"
                     onClick={handleDeleteSelected}
                   >
-                    <i className="ri-delete-bin-line me-2"></i>
+                    <i className="ri-delete-bin-line text-xs" />
                     Delete Selected ({selectedTimelines.length})
                   </button>
                 )}
@@ -724,37 +727,32 @@ const TimelinesPage = () => {
                       accept=".xlsx,.xls"
                       className="hidden"
                     />
-                                    <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="ti-btn ti-btn-success"
-                  disabled={isProcessingImport}
-                >
-                  <i className={`${isProcessingImport ? 'ri-loader-4-line animate-spin' : 'ri-download-2-line'} me-2`}></i>
-                  {isProcessingImport ? 'Processing...' : 'Import'}
-                </button>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm transition-colors disabled:opacity-50"
+                      disabled={isProcessingImport}
+                    >
+                      <i className={`text-xs ${isProcessingImport ? 'ri-loader-4-line animate-spin' : 'ri-download-2-line'}`} />
+                      {isProcessingImport ? 'Processing...' : 'Import'}
+                    </button>
                     {importProgress !== null && (
-                      <div className="w-40 h-3 bg-gray-200 rounded-full overflow-hidden flex items-center ml-2">
-                        <div
-                          className="bg-primary h-full transition-all duration-200"
-                          style={{ width: `${importProgress}%` }}
-                        ></div>
-                        <span className="ml-2 text-xs text-gray-700">
-                          {importProgress}%
-                        </span>
+                      <div className="w-24 h-2.5 bg-gray-200 rounded-full overflow-hidden flex items-center">
+                        <div className="bg-purple-600 h-full transition-all duration-200" style={{ width: `${importProgress}%` }} />
+                        <span className="ml-1.5 text-[10px] text-gray-600 font-medium">{importProgress}%</span>
                       </div>
                     )}
                     <button
                       type="button"
-                      className="ti-btn ti-btn-primary"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm transition-colors"
                       onClick={handleExport}
                     >
-                      <i className="ri-upload-2-line me-2"></i> Export
+                      <i className="ri-upload-2-line text-xs" /> Export
                     </button>
                     <Link
                       href="/timelines/add"
-                      className="ti-btn ti-btn-primary"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm transition-colors"
                     >
-                      <i className="ri-add-line me-2"></i>
+                      <i className="ri-add-line text-xs" />
                       Add New Timeline
                     </Link>
                   </>
@@ -763,42 +761,27 @@ const TimelinesPage = () => {
             </div>
           </div>
 
-          {/* Tab Navigation */}
-          <div className="box !bg-transparent border-0 shadow-none mb-6">
+          {/* Tab Navigation – spec: 11px, purple active */}
+          <div className="bg-white shadow-sm border border-gray-100 rounded mb-6 overflow-hidden">
             <div className="flex border-b border-gray-200">
-              <button
-                onClick={() => setActiveTab('tasks')}
-                className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'tasks'
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <i className="ri-task-line me-2"></i>
-                Task Management
-              </button>
-              <button
-                onClick={() => setActiveTab('timelines')}
-                className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'timelines'
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <i className="ri-time-line me-2"></i>
-                Timelines
-              </button>
-              <button
-                onClick={() => setActiveTab('register')}
-                className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'register'
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <i className="ri-file-list-3-line me-2"></i>
-                Register
-              </button>
+              {[
+                { id: 'tasks', label: 'Task Management', icon: 'ri-task-line' },
+                { id: 'timelines', label: 'Timelines', icon: 'ri-time-line' },
+                { id: 'register', label: 'Register', icon: 'ri-file-list-3-line' },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                  className={`flex items-center gap-1.5 px-4 py-2.5 text-[11px] font-bold border-b-2 transition-colors ${
+                    activeTab === tab.id
+                      ? 'border-purple-600 text-purple-600'
+                      : 'border-transparent text-[#495057] hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <i className={`${tab.icon} text-xs`} />
+                  {tab.label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -812,97 +795,79 @@ const TimelinesPage = () => {
               setShowExportModal(true);
             }} />
           ) : (
-            <div className="box">
-              <div className="box-body">
-                {/* Status Summary Cards */}
+            <div className="bg-white shadow-sm border border-gray-100 overflow-hidden rounded">
+              <div className="p-[10px]">
+                {/* Status Summary Cards – spec: small text, consistent borders */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                {/* Pending Card */}
-                <div 
-                  className="bg-warning/10 border border-warning/20 rounded-lg p-4 cursor-pointer hover:bg-warning/20 transition-colors"
+                <div
+                  className="bg-amber-50 border border-amber-200 rounded p-4 cursor-pointer hover:bg-amber-100 transition-colors"
                   onClick={() => setFilters({ ...filters, status: 'pending' })}
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="text-sm font-medium text-warning">Pending</span>
-                      <p className="text-2xl font-bold text-warning">
-                        {timelines.filter(t => t?.status === 'pending').length}
-                      </p>
+                      <span className="text-[11px] font-bold text-amber-700">Pending</span>
+                      <p className="text-lg font-bold text-[#323251] mt-0.5">{timelines.filter(t => t?.status === 'pending').length}</p>
                     </div>
-                    <div className="bg-warning/20 p-3 rounded-full">
-                      <i className="ri-time-line text-warning text-xl"></i>
+                    <div className="w-9 h-9 bg-amber-100 rounded-full flex items-center justify-center">
+                      <i className="ri-time-line text-amber-700 text-sm" />
                     </div>
                   </div>
                 </div>
-
-                {/* Ongoing Card */}
-                <div 
-                  className="bg-primary/10 border border-primary/20 rounded-lg p-4 cursor-pointer hover:bg-primary/20 transition-colors"
+                <div
+                  className="bg-purple-50 border border-purple-200 rounded p-4 cursor-pointer hover:bg-purple-100 transition-colors"
                   onClick={() => setFilters({ ...filters, status: 'ongoing' })}
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="text-sm font-medium text-primary">Ongoing</span>
-                      <p className="text-2xl font-bold text-primary">
-                        {timelines.filter(t => t?.status === 'ongoing').length}
-                      </p>
+                      <span className="text-[11px] font-bold text-purple-700">Ongoing</span>
+                      <p className="text-lg font-bold text-[#323251] mt-0.5">{timelines.filter(t => t?.status === 'ongoing').length}</p>
                     </div>
-                    <div className="bg-primary/20 p-3 rounded-full">
-                      <i className="ri-loader-4-line text-primary text-xl"></i>
+                    <div className="w-9 h-9 bg-purple-100 rounded-full flex items-center justify-center">
+                      <i className="ri-loader-4-line text-purple-600 text-sm" />
                     </div>
                   </div>
                 </div>
-
-                {/* Completed Card */}
-                <div 
-                  className="bg-success/10 border border-success/20 rounded-lg p-4 cursor-pointer hover:bg-success/20 transition-colors"
+                <div
+                  className="bg-emerald-50 border border-emerald-200 rounded p-4 cursor-pointer hover:bg-emerald-100 transition-colors"
                   onClick={() => setFilters({ ...filters, status: 'completed' })}
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="text-sm font-medium text-success">Completed</span>
-                      <p className="text-2xl font-bold text-success">
-                        {timelines.filter(t => t?.status === 'completed').length}
-                      </p>
+                      <span className="text-[11px] font-bold text-emerald-700">Completed</span>
+                      <p className="text-lg font-bold text-[#323251] mt-0.5">{timelines.filter(t => t?.status === 'completed').length}</p>
                     </div>
-                    <div className="bg-success/20 p-3 rounded-full">
-                      <i className="ri-check-line text-success text-xl"></i>
+                    <div className="w-9 h-9 bg-emerald-100 rounded-full flex items-center justify-center">
+                      <i className="ri-check-line text-emerald-600 text-sm" />
                     </div>
                   </div>
                 </div>
-
-                {/* Delayed Card */}
-                <div 
-                  className="bg-danger/10 border border-danger/20 rounded-lg p-4 cursor-pointer hover:bg-danger/20 transition-colors"
+                <div
+                  className="bg-red-50 border border-red-100 rounded p-4 cursor-pointer hover:bg-red-100 transition-colors"
                   onClick={() => setFilters({ ...filters, status: 'delayed' })}
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="text-sm font-medium text-danger">Delayed</span>
-                      <p className="text-2xl font-bold text-danger">
-                        {timelines.filter(t => t?.status === 'delayed').length}
-                      </p>
+                      <span className="text-[11px] font-bold text-red-600">Delayed</span>
+                      <p className="text-lg font-bold text-[#323251] mt-0.5">{timelines.filter(t => t?.status === 'delayed').length}</p>
                     </div>
-                    <div className="bg-danger/20 p-3 rounded-full">
-                      <i className="ri-error-warning-line text-danger text-xl"></i>
+                    <div className="w-9 h-9 bg-red-100 rounded-full flex items-center justify-center">
+                      <i className="ri-error-warning-line text-red-600 text-sm" />
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Search and Sort */}
+              {/* Search and Sort – spec: 11px inputs/selects, gray-200 border */}
               <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
-                {/* Rows per page selector */}
-                <div className="flex items-center w-full lg:w-auto">
-                  <label className="mr-2 text-sm text-gray-600 whitespace-nowrap">Rows per page:</label>
+                <div className="flex items-center w-full lg:w-auto gap-2">
+                  <label className="text-[11px] font-medium text-[#495057] whitespace-nowrap">Rows per page:</label>
                   <select
-                    className="form-select w-auto text-sm"
+                    className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
                     value={itemsPerPage}
                     onChange={(e) => {
-                      const newItemsPerPage = Number(e.target.value);
-                      setItemsPerPage(newItemsPerPage);
+                      setItemsPerPage(Number(e.target.value));
                       setCurrentPage(1);
-                      // Fetch data with new itemsPerPage
-                      fetchTimelines(1, newItemsPerPage);
+                      fetchTimelines(1, Number(e.target.value));
                     }}
                   >
                     <option value={10}>10</option>
@@ -912,49 +877,34 @@ const TimelinesPage = () => {
                     <option value={1000}>1000</option>
                   </select>
                 </div>
-
-                {/* Search and filters */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
-                  {/* Search bar for activity name */}
-                  <div className="relative flex-grow sm:max-w-xs">
-                    <input
-                      type="text"
-                      className="form-control py-2 w-full"
-                      placeholder="Search by activity name..."
-                      value={searchInputValue}
-                      onChange={handleSearchChange}
-                    />
-                  </div>
-
-                  {/* Search bar for client name */}
-                  <div className="relative flex-grow sm:max-w-xs">
-                    <input
-                      type="text"
-                      className="form-control py-2 w-full"
-                      placeholder="Search by client name..."
-                      value={clientSearchInputValue}
-                      onChange={handleClientSearchChange}
-                    />
-                  </div>
-
-                  {/* Status filter */}
-                  <div className="relative flex-grow sm:max-w-xs">
-                    <select
-                      className="form-select py-2 w-full"
-                      value={filters.status}
-                      onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                    >
-                      <option value="">All Status</option>
-                      <option value="pending">Pending</option>
-                      <option value="ongoing">Ongoing</option>
-                      <option value="completed">Completed</option>
-                      <option value="delayed">Delayed</option>
-                    </select>
-                  </div>
-
-                  {/* Sort dropdown */}
+                  <input
+                    type="text"
+                    className="bg-white border border-gray-200 pl-3 pr-3 py-1.5 text-[11px] rounded focus:ring-0 focus:border-purple-300 placeholder:text-gray-400 font-medium w-full sm:max-w-[200px]"
+                    placeholder="Search by activity name..."
+                    value={searchInputValue}
+                    onChange={handleSearchChange}
+                  />
+                  <input
+                    type="text"
+                    className="bg-white border border-gray-200 pl-3 pr-3 py-1.5 text-[11px] rounded focus:ring-0 focus:border-purple-300 placeholder:text-gray-400 font-medium w-full sm:max-w-[200px]"
+                    placeholder="Search by client name..."
+                    value={clientSearchInputValue}
+                    onChange={handleClientSearchChange}
+                  />
                   <select
-                    className="form-select py-2 w-full sm:w-auto"
+                    className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300 w-full sm:w-auto min-w-[100px]"
+                    value={filters.status}
+                    onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                  >
+                    <option value="">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="ongoing">Ongoing</option>
+                    <option value="completed">Completed</option>
+                    <option value="delayed">Delayed</option>
+                  </select>
+                  <select
+                    className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300 w-full sm:w-auto"
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
                   >
@@ -965,243 +915,155 @@ const TimelinesPage = () => {
                     <option value="endDate:asc">End Date (Earliest-Latest)</option>
                     <option value="endDate:desc">End Date (Latest-Earliest)</option>
                   </select>
-
-                  {/* Reset button */}
                   <button
-                    className="ti-btn ti-btn-secondary py-2 w-full sm:w-auto"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100 shadow-sm w-full sm:w-auto"
                     onClick={() => {
                       setSearchInputValue("");
                       setClientSearchInputValue("");
-                      setFilters({
-                        activityName: "",
-                        clientName: "",
-                        status: "",
-                        group: ""
-                      });
+                      setFilters({ activityName: "", clientName: "", status: "", group: "" });
                       setSortBy("activityName:asc");
                     }}
                   >
-                    <i className="ri-refresh-line me-2"></i>
-                    Reset
+                    <i className="ri-refresh-line text-xs" /> Reset
                   </button>
                 </div>
               </div>
 
-              {/* Search Results Indicator */}
+              {/* Search Results Indicator – spec: 11px, sky/info */}
               {(filters.activityName || filters.clientName || filters.status) && (
-                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <span className="text-sm font-medium text-blue-800">Active Filters:</span>
-                      
+                <div className="mb-4 p-3 bg-sky-50 border border-sky-100 rounded">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center flex-wrap gap-2">
+                      <span className="text-[11px] font-bold text-sky-700">Active Filters:</span>
                       {filters.activityName && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                          Activity: {filters.activityName}
-                        </span>
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700">Activity: {filters.activityName}</span>
                       )}
-                      
                       {filters.clientName && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                          Client: {filters.clientName}
-                        </span>
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700">Client: {filters.clientName}</span>
                       )}
-                      
                       {filters.status && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                          Status: {filters.status.charAt(0).toUpperCase() + filters.status.slice(1)}
-                        </span>
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700">Status: {filters.status}</span>
                       )}
                     </div>
                     <button
                       onClick={() => {
                         setSearchInputValue("");
                         setClientSearchInputValue("");
-                        setFilters({
-                          activityName: "",
-                          clientName: "",
-                          status: "",
-                          group: ""
-                        });
+                        setFilters({ activityName: "", clientName: "", status: "", group: "" });
                         setCurrentPage(1);
                       }}
-                      className="text-blue-600 hover:text-blue-800 text-sm"
+                      className="text-[11px] font-bold text-sky-600 hover:text-sky-800"
                     >
-                      <i className="ri-close-line me-1"></i>
-                      Clear All Filters
+                      <i className="ri-close-line text-xs" /> Clear All
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* Timelines Table */}
-              <div className="table-responsive">
-                <table className="table table-bordered border-collapse">
+              {/* Timelines Table – spec: gray-50/30 header, 11px uppercase th, 12px td, gray-200 borders */}
+              <div className="overflow-x-auto min-h-[300px] border border-gray-200 rounded">
+                <table className="w-full border-collapse border border-gray-200">
                   <thead>
-                    <tr className="bg-gray-100">
-                      <th className="px-4 py-3 border border-gray-300">
-                        <input
-                          type="checkbox"
-                          className="form-checkbox"
-                          checked={selectedTimelines.length === timelines.length}
-                          onChange={handleSelectAll}
-                        />
+                    <tr className="bg-gray-50/30">
+                      <th className="pl-[10px] pr-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200 w-10">
+                        <input type="checkbox" className="rounded border-gray-200 text-purple-600 focus:ring-0 h-3.5 w-3.5" checked={selectedTimelines.length === timelines.length && timelines.length > 0} onChange={handleSelectAll} />
                       </th>
-                      <th className="px-4 py-3 border border-gray-300">Activity</th>
-                      <th className="px-4 py-3 border border-gray-300">Sub Activity</th>
-                      <th className="px-4 py-3 border border-gray-300">Client Name</th>
-                      <th className="px-4 py-3 border border-gray-300">Status & Dates</th>
-                      <th className="px-4 py-3 border border-gray-300">Actions</th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Activity</th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Sub Activity</th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Client Name</th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Status & Dates</th>
+                      <th className="px-1.5 pr-[10px] py-3 text-right text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {isLoading ? (
                       <tr>
-                        <td colSpan={5} className="text-center py-4 border border-gray-300 bg-white">
-                          <div className="flex justify-center">
-                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                        <td colSpan={6} className="text-center py-20 border border-gray-200">
+                          <div className="flex flex-col items-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 opacity-50" />
+                            <p className="mt-3 text-[10px] text-gray-400 font-bold tracking-[0.2em] uppercase">Loading Data</p>
                           </div>
                         </td>
                       </tr>
                     ) : error ? (
                       <tr>
-                        <td colSpan={5} className="text-center text-red-500 py-4 border border-gray-300 bg-white">
-                          {error}
-                        </td>
+                        <td colSpan={6} className="text-center text-red-600 py-20 text-[12px] font-medium border border-gray-200">{error}</td>
                       </tr>
                     ) : timelines.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="text-center py-8 border border-gray-300 bg-white">
-                          <div className="flex flex-col items-center justify-center">
-                            <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
-                              <i className="ri-time-line text-4xl text-primary"></i>
+                        <td colSpan={6} className="text-center py-20 border border-gray-200">
+                          <div className="flex flex-col items-center">
+                            <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                              <i className="ri-time-line text-xl text-gray-200" />
                             </div>
-                            <h3 className="text-xl font-medium mb-2">
-                              {(filters.activityName || filters.clientName || filters.status) ? 'No Search Results Found' : 'No Timelines Found'}
-                            </h3>
-                            <p className="text-gray-500 text-center mb-6">
-                              {(filters.activityName || filters.clientName || filters.status) 
-                                ? `No timelines found matching your search criteria. Try adjusting your filters.`
-                                : 'Start by adding your first timeline.'
-                              }
-                            </p>
+                            <p className="text-xs font-bold text-gray-400 mb-1">DATA EMPTY</p>
+                            <p className="text-[11px] text-gray-500 mb-4">{(filters.activityName || filters.clientName || filters.status) ? 'No timelines match your filters.' : 'Start by adding your first timeline.'}</p>
                             {(filters.activityName || filters.clientName || filters.status) ? (
-                              <button
-                                onClick={() => {
-                                  setSearchInputValue("");
-                                  setClientSearchInputValue("");
-                                  setFilters({
-                                    activityName: "",
-                                    clientName: "",
-                                    status: "",
-                                    group: ""
-                                  });
-                                  setCurrentPage(1);
-                                }}
-                                className="ti-btn ti-btn-primary"
-                              >
-                                <i className="ri-refresh-line me-2"></i>
-                                Clear All Filters
+                              <button onClick={() => { setSearchInputValue(""); setClientSearchInputValue(""); setFilters({ activityName: "", clientName: "", status: "", group: "" }); setCurrentPage(1); }} className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700">
+                                <i className="ri-refresh-line text-xs" /> Clear Filters
                               </button>
                             ) : (
-                              <Link
-                                href="/timelines/add"
-                                className="ti-btn ti-btn-primary"
-                              >
-                                <i className="ri-add-line me-2"></i> Add First Timeline
+                              <Link href="/timelines/add" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700">
+                                <i className="ri-add-line text-xs" /> Add First Timeline
                               </Link>
                             )}
                           </div>
                         </td>
                       </tr>
                     ) : (
-                      timelines.map((timeline, index) => (
-                        <tr key={timeline.id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                          <td className="border border-gray-300">
-                            <input
-                              type="checkbox"
-                              checked={selectedTimelines.includes(timeline.id)}
-                              onChange={() => handleSelectTimeline(timeline.id)}
-                              className="form-checkbox"
-                            />
+                      timelines.map((timeline) => (
+                        <tr key={timeline.id} className="hover:bg-gray-50/50 transition-colors group">
+                          <td className="pl-[10px] pr-1.5 py-2.5 border border-gray-200">
+                            <input type="checkbox" checked={selectedTimelines.includes(timeline.id)} onChange={() => handleSelectTimeline(timeline.id)} className="rounded border-gray-200 text-purple-600 focus:ring-0 h-3.5 w-3.5" />
                           </td>
-                          <td className="border border-gray-300">{timeline.activity?.name || "-"}</td>
-                          <td className="border border-gray-300">{timeline.subactivity?.name || "-"}</td>
-                          <td className="border border-gray-300">
-                            <div className="space-y-1">
-                              <div className="font-medium text-gray-900">{timeline.client?.name || "-"}</div>
+                          <td className="px-1.5 py-2.5 text-[12px] font-medium text-[#323251] border border-gray-200">{timeline.activity?.name || "-"}</td>
+                          <td className="px-1.5 py-2.5 text-[12px] font-medium text-[#323251] border border-gray-200">{timeline.subactivity?.name || "-"}</td>
+                          <td className="px-1.5 py-2.5 border border-gray-200">
+                            <div className="space-y-0.5 text-[12px]">
+                              <div className="font-medium text-[#323251]">{timeline.client?.name || "-"}</div>
                               {timeline.metadata?.gstState && (
-                                <div className="text-xs text-gray-600">
-                                  <span className="font-medium">GST State:</span> {timeline.metadata.gstState}
-                                </div>
+                                <div className="text-[11px] text-[#495057]">GST State: {timeline.metadata.gstState}</div>
                               )}
                               {(() => {
                                 const { idLabel, idValue } = getClientIdDisplay(timeline);
-                                return idLabel && idValue ? (
-                                  <div className="text-xs text-gray-600">
-                                    <span className="font-medium">{idLabel}:</span> {idValue}
-                                  </div>
-                                ) : null;
+                                return idLabel && idValue ? <div className="text-[11px] text-[#495057]">{idLabel}: {idValue}</div> : null;
                               })()}
                             </div>
                           </td>
-                          <td className="border border-gray-300">
-                            <div className="space-y-1 text-sm">
-                              <div className="flex items-start">
-                                <span className="text-xs font-medium text-gray-600 min-w-[80px]">Status:</span>
-                                <span className="text-xs ml-2">
-                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                    timeline.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                    timeline.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                    timeline.status === 'ongoing' ? 'bg-blue-100 text-blue-800' :
-                                    timeline.status === 'delayed' ? 'bg-red-100 text-red-800' :
-                                    'bg-gray-100 text-gray-800'
-                                  }`}>
-                                    {timeline.status?.charAt(0).toUpperCase() + timeline.status?.slice(1) || "-"}
-                                  </span>
+                          <td className="px-1.5 py-2.5 border border-gray-200">
+                            <div className="space-y-1 text-[12px]">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[11px] text-[#495057]">Status:</span>
+                                <span className={`inline-flex px-1.5 py-0.5 rounded text-[11px] font-medium ${
+                                  timeline.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                                  timeline.status === 'pending' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                                  timeline.status === 'ongoing' ? 'bg-purple-50 text-purple-700 border border-purple-100' :
+                                  timeline.status === 'delayed' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-gray-50 text-gray-600 border border-gray-200'
+                                }`}>
+                                  {timeline.status?.charAt(0).toUpperCase() + timeline.status?.slice(1) || "-"}
                                 </span>
                               </div>
-                              <div className="flex items-start">
-                                <span className="text-xs font-medium text-gray-600 min-w-[80px]">Period:</span>
-                                <span className="text-xs text-gray-900 ml-2">
-                                  {timeline.period || "-"}
-                                </span>
-                              </div>
-                              <div className="flex items-start">
-                                <span className="text-xs font-medium text-gray-600 min-w-[80px]">Due Date:</span>
-                                <span className="text-xs text-gray-900 ml-2">
-                                  {timeline.dueDate ? new Date(timeline.dueDate).toISOString().split('T')[0] : "-"}
-                                </span>
-                              </div>
-                              <div className="flex items-start">
-                                <span className="text-xs font-medium text-gray-600 min-w-[80px]">Created Date:</span>
-                                <div className="text-xs text-gray-900 ml-2">
-                                  {timeline.createdAt ? (
-                                    <>
-                                      <div>{new Date(timeline.createdAt).toISOString().split('T')[0]}</div>
-                                      <div className="text-xs text-gray-500">
-                                        {new Date(timeline.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                                      </div>
-                                    </>
-                                  ) : "-"}
-                                </div>
-                              </div>
+                              {(() => {
+                                const rawPeriod = (timeline as any).period ?? timeline.period ?? "";
+                                if (!rawPeriod) return null;
+                                const freq = timeline.subactivity?.frequency || (timeline as any).frequency || timeline.frequency || "";
+                                const display = formatPeriodDisplay(freq, rawPeriod) || rawPeriod;
+                                if (!display) return null;
+                                return (
+                                  <div className="text-[11px] text-[#495057]">
+                                    <span className="font-medium text-[#323251]">Period:</span> {display}
+                                  </div>
+                                );
+                              })()}
                             </div>
                           </td>
-                          <td className="border border-gray-300">
-                            <div className="flex space-x-2">
-                              <Link
-                                href={`/timelines/edit/${timeline.id}`}
-                                className="ti-btn ti-btn-primary ti-btn-sm"
-                                title="Edit"
-                              >
-                                <i className="ri-edit-line"></i>
+                          <td className="pl-1.5 pr-[10px] py-2.5 border border-gray-200">
+                            <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                              <Link href={`/timelines/edit/${timeline.id}`} className="w-7 h-7 rounded flex items-center justify-center bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100" title="Edit">
+                                <i className="ri-pencil-line text-sm" />
                               </Link>
-                              <button
-                                onClick={() => handleDelete(timeline.id)}
-                                className="ti-btn ti-btn-danger ti-btn-sm"
-                                title="Delete"
-                              >
-                                <i className="ri-delete-bin-line"></i>
+                              <button type="button" onClick={() => handleDelete(timeline.id)} className="w-7 h-7 rounded flex items-center justify-center bg-red-50 text-red-600 border border-red-100 hover:bg-red-100" title="Delete">
+                                <i className="ri-delete-bin-line text-sm" />
                               </button>
                             </div>
                           </td>
@@ -1212,75 +1074,42 @@ const TimelinesPage = () => {
                 </table>
               </div>
 
-              {/* Pagination */}
-              {!isLoading && !error && (
-                <div className="flex justify-between items-center mt-4">
-                  <div className="text-sm text-gray-500">
-                    Showing{" "}
-                    {totalResults === 0
-                      ? 0
-                      : (currentPage - 1) * itemsPerPage + 1}{" "}
-                    to{" "}
-                    {totalResults === 0
-                      ? 0
-                      : Math.min(currentPage * itemsPerPage, totalResults)}{" "}
-                    of {totalResults} entries
+              {/* Pagination – spec: 11px bold, purple active, 10px ellipsis */}
+              {!isLoading && !error && timelines.length > 0 && (
+                <div className="flex flex-wrap justify-between items-center gap-4 p-[10px] pt-4 border-t border-gray-100">
+                  <div className="text-[11px] font-medium text-[#495057] tracking-tight">
+                    Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, totalResults)} of {totalResults} entries
                   </div>
-                  <nav aria-label="Page navigation" className="">
-                    <ul className="flex flex-wrap items-center">
-                      <li
-                        className={`page-item ${
-                          currentPage === 1 ? "disabled" : ""
-                        }`}
-                      >
+                  <nav className="flex flex-wrap items-center gap-1">
+                    <button
+                      className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                      onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </button>
+                    {getPagination(currentPage, totalPages).map((page, idx) =>
+                      page === "..." ? (
+                        <span key={"ellipsis-" + idx} className="px-2 text-[10px] text-gray-300">...</span>
+                      ) : (
                         <button
-                          className="page-link py-2 px-3 ml-0 leading-tight text-gray-500 bg-white rounded-l-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                          onClick={() =>
-                            setCurrentPage((prev) => Math.max(prev - 1, 1))
-                          }
-                          disabled={currentPage === 1}
+                          key={page}
+                          className={`w-7 h-7 flex items-center justify-center text-[11px] font-bold rounded ${
+                            currentPage === page ? "bg-purple-600 text-white shadow-md" : "text-gray-400 hover:bg-gray-50"
+                          }`}
+                          onClick={() => setCurrentPage(Number(page))}
                         >
-                          Previous
+                          {page}
                         </button>
-                      </li>
-                      {getPagination(currentPage, totalPages).map((page, idx) =>
-                        page === "..." ? (
-                          <li key={"ellipsis-" + idx} className="page-item">
-                            <span className="px-3">...</span>
-                          </li>
-                        ) : (
-                          <li key={page} className="page-item">
-                            <button
-                              className={`page-link py-2 px-3 leading-tight border border-gray-300 ${
-                                currentPage === page
-                                  ? "bg-primary text-white hover:bg-primary-dark"
-                                  : "bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                              }`}
-                              onClick={() => setCurrentPage(Number(page))}
-                            >
-                              {page}
-                            </button>
-                          </li>
-                        )
-                      )}
-                      <li
-                        className={`page-item ${
-                          currentPage === totalPages ? "disabled" : ""
-                        }`}
-                      >
-                        <button
-                          className="page-link py-2 px-3 leading-tight text-gray-500 bg-white rounded-r-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                          onClick={() =>
-                            setCurrentPage((prev) =>
-                              Math.min(prev + 1, totalPages)
-                            )
-                          }
-                          disabled={currentPage === totalPages}
-                        >
-                          Next
-                        </button>
-                      </li>
-                    </ul>
+                      )
+                    )}
+                    <button
+                      className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                      onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </button>
                   </nav>
                 </div>
               )}
@@ -1290,41 +1119,28 @@ const TimelinesPage = () => {
         </div>
       </div>
 
-      {/* Export Modal */}
+      {/* Export Modal – spec: 10px padding, 14px title, 11px controls */}
       {showExportModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center p-[10px] border-b border-gray-200">
+              <h3 className="text-sm font-bold text-gray-800">
                 {activeTab === 'register' ? 'Export Compliance Register' : 'Export Timelines'}
               </h3>
-              <button
-                onClick={() => {
-                  setShowExportModal(false);
-                  setExportFilters({ activity: '', subActivity: '', frequency: '', period: '' });
-                  setAvailablePeriods([]);
-                }}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <i className="ri-close-line text-xl"></i>
+              <button type="button" onClick={() => { setShowExportModal(false); setExportFilters({ activity: '', subActivity: '', frequency: '', period: '' }); setAvailablePeriods([]); }} className="text-gray-500 hover:text-gray-700 p-1">
+                <i className="ri-close-line text-lg" />
               </button>
             </div>
-
-            <div className="space-y-4">
-              {activeTab === 'register' ? (
-                <p className="text-sm text-gray-600">
-                  Use the same filters as the register: Activity, Sub-Activity, Frequency, Period. Leave empty to export all.
-                </p>
-              ) : null}
-              {(activeTab === 'register' || activeTab === 'timelines') ? (
+            <div className="p-[10px] overflow-auto space-y-4">
+              {activeTab === 'register' && (
+                <p className="text-[12px] text-[#495057]">Use the same filters as the register. Leave empty to export all.</p>
+              )}
+              {(activeTab === 'register' || activeTab === 'timelines') && (
                 <>
-                  {/* Activity Selection */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Activity
-                    </label>
+                    <label className="block text-[11px] font-medium text-[#495057] mb-1">Activity</label>
                     <select
-                      className="form-select w-full"
+                      className="w-full bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
                       value={exportFilters.activity}
                       onChange={(e) => {
                         setExportFilters(prev => ({
@@ -1346,13 +1162,10 @@ const TimelinesPage = () => {
                     </select>
                   </div>
 
-                  {/* Sub-Activity Selection */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Sub-Activity
-                    </label>
+                    <label className="block text-[11px] font-medium text-[#495057] mb-1">Sub-Activity</label>
                     <select
-                      className="form-select w-full"
+                      className="w-full bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
                       value={exportFilters.subActivity}
                       onChange={(e) => {
                         const selectedSubActivityId = e.target.value;
@@ -1383,13 +1196,10 @@ const TimelinesPage = () => {
                     </select>
                   </div>
 
-                  {/* Frequency Selection */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Frequency
-                    </label>
+                    <label className="block text-[11px] font-medium text-[#495057] mb-1">Frequency</label>
                     <select
-                      className="form-select w-full"
+                      className="w-full bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
                       value={exportFilters.frequency}
                       onChange={(e) => {
                         setExportFilters(prev => ({ ...prev, frequency: e.target.value }));
@@ -1407,19 +1217,13 @@ const TimelinesPage = () => {
                       <option value="Yearly">Yearly</option>
                     </select>
                     {exportFilters.subActivity && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Frequency auto-selected from sub-activity
-                      </p>
+                      <p className="text-[10px] text-gray-500 mt-1">Frequency auto-selected from sub-activity</p>
                     )}
                   </div>
-
-                  {/* Period Selection */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Period
-                    </label>
+                    <label className="block text-[11px] font-medium text-[#495057] mb-1">Period</label>
                     <select
-                      className="form-select w-full"
+                      className="w-full bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
                       value={exportFilters.period}
                       onChange={(e) => setExportFilters(prev => ({ ...prev, period: e.target.value }))}
                       disabled={!exportFilters.frequency}
@@ -1440,38 +1244,26 @@ const TimelinesPage = () => {
                       )}
                     </select>
                     {exportFilters.frequency && !isLoadingPeriods && availablePeriods.length === 0 && (
-                      <p className="text-xs text-red-500 mt-1">
-                        No periods found for {exportFilters.frequency} frequency
-                      </p>
+                      <p className="text-[10px] text-red-500 mt-1">No periods found for this frequency</p>
                     )}
                   </div>
                 </>
-              ) : null}
+              )}
             </div>
-
-            <div className="flex justify-end space-x-3 mt-6">
+            <div className="flex justify-end gap-2 p-[10px] border-t border-gray-200">
               <button
-                onClick={() => {
-                  setShowExportModal(false);
-                  setExportFilters({ activity: '', subActivity: '', frequency: '', period: '' });
-                  setAvailablePeriods([]);
-                }}
-                className="ti-btn ti-btn-secondary"
+                type="button"
+                onClick={() => { setShowExportModal(false); setExportFilters({ activity: '', subActivity: '', frequency: '', period: '' }); setAvailablePeriods([]); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-white border border-gray-200 text-[#495057] hover:bg-gray-50 shadow-sm"
               >
                 Cancel
               </button>
               <button
-                onClick={() => {
-                  if (activeTab === 'register') {
-                    performExport('register');
-                  } else {
-                    performExport('timelines');
-                  }
-                }}
-                className="ti-btn ti-btn-primary"
+                type="button"
+                onClick={() => { activeTab === 'register' ? performExport('register') : performExport('timelines'); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm"
               >
-                <i className="ri-download-2-line me-2"></i>
-                Export
+                <i className="ri-download-2-line text-xs" /> Export
               </button>
             </div>
           </div>
