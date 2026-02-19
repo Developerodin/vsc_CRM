@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import * as XLSX from "xlsx";
 import Seo from "@/shared/layout-components/seo/seo";
 import { Base_url } from "@/app/api/config/BaseUrl";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { toast, Toaster } from "react-hot-toast";
-import type { GroupReportResponse } from "@/app/(components)/(contentlayout)/analytics/report/types";
+import type { GroupReportResponse, ReportTimelineItem } from "@/app/(components)/(contentlayout)/analytics/report/types";
 
 function getFYOptions(): string[] {
   const currentYear = new Date().getFullYear();
@@ -25,6 +25,7 @@ const GroupReportPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [year, setYear] = useState<string>("current");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "completed">("all");
 
   useEffect(() => {
     if (!groupId) return;
@@ -47,6 +48,43 @@ const GroupReportPage = () => {
       })
       .finally(() => setLoading(false));
   }, [groupId, year]);
+
+  const filteredClients = useMemo(() => {
+    if (!data?.clients) return [];
+    const filterList = (list: ReportTimelineItem[] | undefined) =>
+      !list ? [] : statusFilter === "all" ? list : list.filter((t) => (t.status ?? "").toLowerCase() === statusFilter);
+    return data.clients.map((block) => {
+      const timelines = filterList(block.timelines);
+      const pending = timelines.filter((t) => (t.status ?? "").toLowerCase() === "pending").length;
+      const completed = timelines.filter((t) => (t.status ?? "").toLowerCase() === "completed").length;
+      const delayed = timelines.filter((t) => (t.status ?? "").toLowerCase() === "delayed").length;
+      const ongoing = timelines.filter((t) => (t.status ?? "").toLowerCase() === "ongoing").length;
+      const pendings = filterList(block.pendings);
+      return {
+        ...block,
+        timelines,
+        pendings,
+        statusSummary: { pending, completed, delayed, ongoing, total: timelines.length },
+      };
+    });
+  }, [data?.clients, statusFilter]);
+
+  const filteredSummary = useMemo(() => {
+    let totalTimelines = 0;
+    let totalPending = 0;
+    let totalCompleted = 0;
+    for (const block of filteredClients) {
+      totalTimelines += block.statusSummary.total;
+      totalPending += block.statusSummary.pending;
+      totalCompleted += block.statusSummary.completed;
+    }
+    return {
+      totalClients: filteredClients.length,
+      totalTimelines,
+      totalPending,
+      totalCompleted,
+    };
+  }, [filteredClients]);
 
   if (loading && !data) {
     return (
@@ -97,10 +135,11 @@ const GroupReportPage = () => {
       { Field: "Group Name", Value: group.name },
       { Field: "Financial Year", Value: financialYear ?? "—" },
       { Field: "Branch", Value: branchName },
-      { Field: "Total Clients", Value: summary?.totalClients ?? 0 },
-      { Field: "Total Timelines", Value: summary?.totalTimelines ?? 0 },
-      { Field: "Total Pending", Value: summary?.totalPending ?? 0 },
-      { Field: "Total Completed", Value: summary?.totalCompleted ?? 0 },
+      { Field: "Filter", Value: statusFilter === "all" ? "All" : statusFilter },
+      { Field: "Total Clients", Value: filteredSummary.totalClients },
+      { Field: "Total Timelines", Value: filteredSummary.totalTimelines },
+      { Field: "Total Pending", Value: filteredSummary.totalPending },
+      { Field: "Total Completed", Value: filteredSummary.totalCompleted },
     ];
     const activityRows: {
       "Client Name": string;
@@ -113,26 +152,23 @@ const GroupReportPage = () => {
       "Due Date": string;
       Frequency: string;
     }[] = [];
-    if (Array.isArray(clients)) {
-      for (const block of clients) {
-        const clientName = block.client?.name ?? "—";
-        const email = block.client?.email ?? "—";
-        const category = block.client?.category ?? "—";
-        const turnover = block.turnover ?? "—";
-        const timelines = block.timelines ?? [];
-        for (const t of timelines) {
-          activityRows.push({
-            "Client Name": clientName,
-            Email: email,
-            Category: category,
-            Turnover: turnover,
-            Activity: t.activity?.name ?? "—",
-            Subactivity: t.subactivity?.name ?? "—",
-            Status: t.status ?? "—",
-            "Due Date": t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—",
-            Frequency: t.frequency ?? "—",
-          });
-        }
+    for (const block of filteredClients) {
+      const clientName = block.client?.name ?? "—";
+      const email = block.client?.email ?? "—";
+      const category = block.client?.category ?? "—";
+      const turnover = block.turnover ?? "—";
+      for (const t of block.timelines) {
+        activityRows.push({
+          "Client Name": clientName,
+          Email: email,
+          Category: category,
+          Turnover: turnover,
+          Activity: t.activity?.name ?? "—",
+          Subactivity: t.subactivity?.name ?? "—",
+          Status: t.status ?? "—",
+          "Due Date": t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—",
+          Frequency: t.frequency ?? "—",
+        });
       }
     }
     const wsGroup = XLSX.utils.json_to_sheet(groupSheet);
@@ -181,6 +217,16 @@ const GroupReportPage = () => {
                 <option key={fy} value={fy}>{fy}</option>
               ))}
             </select>
+            <label className="text-xs text-gray-500">Status:</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as "all" | "pending" | "completed")}
+              className="form-select form-select-sm text-sm w-auto py-1.5 px-2 border border-gray-300 rounded-md"
+            >
+              <option value="all">All</option>
+              <option value="pending">Pending</option>
+              <option value="completed">Completed</option>
+            </select>
             <button type="button" onClick={handleDownloadReport} className="ti-btn ti-btn-primary whitespace-nowrap py-2 px-3 text-sm">
               <i className="ri-download-line me-1" /> Download report
             </button>
@@ -191,21 +237,21 @@ const GroupReportPage = () => {
         </div>
       </div>
 
-      {/* Summary */}
+      {/* Summary (filtered by status) */}
       <div className="box p-4 mb-4">
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">Summary</h2>
+        <h2 className="text-sm font-semibold text-gray-700 mb-3">Summary {statusFilter !== "all" && `(${statusFilter})`}</h2>
         <div className="flex flex-wrap gap-4 text-sm">
-          <div><span className="text-gray-500">Total clients</span><p className="text-lg font-bold text-gray-900">{summary?.totalClients ?? 0}</p></div>
-          <div><span className="text-gray-500">Total timelines</span><p className="text-lg font-bold text-gray-900">{summary?.totalTimelines ?? 0}</p></div>
-          <div><span className="text-gray-500">Total pending</span><p className="text-lg font-bold text-amber-600">{summary?.totalPending ?? 0}</p></div>
-          <div><span className="text-gray-500">Total completed</span><p className="text-lg font-bold text-green-600">{summary?.totalCompleted ?? 0}</p></div>
+          <div><span className="text-gray-500">Total clients</span><p className="text-lg font-bold text-gray-900">{filteredSummary.totalClients}</p></div>
+          <div><span className="text-gray-500">Total timelines</span><p className="text-lg font-bold text-gray-900">{filteredSummary.totalTimelines}</p></div>
+          <div><span className="text-gray-500">Total pending</span><p className="text-lg font-bold text-amber-600">{filteredSummary.totalPending}</p></div>
+          <div><span className="text-gray-500">Total completed</span><p className="text-lg font-bold text-green-600">{filteredSummary.totalCompleted}</p></div>
         </div>
       </div>
 
-      {/* Per-client blocks */}
-      {clients?.length > 0 ? (
+      {/* Per-client blocks (filtered) */}
+      {filteredClients.length > 0 ? (
         <div className="space-y-6">
-          {clients.map((block) => (
+          {filteredClients.map((block) => (
             <div key={block.client._id} className="box p-4 border border-gray-200 rounded-lg">
               <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
                 <h3 className="text-sm font-semibold text-gray-900">{block.client.name}</h3>
@@ -220,7 +266,7 @@ const GroupReportPage = () => {
                 <div><span className="text-gray-500">Email</span><p className="text-gray-900 truncate">{block.client.email ?? "—"}</p></div>
                 <div><span className="text-gray-500">Category</span><p className="text-gray-900">{block.client.category ?? "—"}</p></div>
                 <div><span className="text-gray-500">Turnover ({block.financialYear})</span><p className="font-medium text-gray-900">{block.turnover ?? "—"}</p></div>
-                <div><span className="text-gray-500">Status</span><p className="text-gray-900">P: {block.statusSummary?.pending ?? 0} · C: {block.statusSummary?.completed ?? 0} · D: {block.statusSummary?.delayed ?? 0}</p></div>
+                <div><span className="text-gray-500">Status</span><p className="text-gray-900">P: {block.statusSummary.pending} · C: {block.statusSummary.completed} · D: {block.statusSummary.delayed}</p></div>
               </div>
               {block.turnoverHistory?.length > 0 && (
                 <div className="mb-3">
@@ -232,7 +278,7 @@ const GroupReportPage = () => {
                   </div>
                 </div>
               )}
-              {block.pendings?.length > 0 && (
+              {block.pendings.length > 0 && (
                 <div>
                   <p className="text-[10px] font-medium text-gray-500 mb-1">Pending / ongoing / delayed ({block.pendings.length})</p>
                   <div className="overflow-x-auto">
@@ -262,7 +308,9 @@ const GroupReportPage = () => {
           ))}
         </div>
       ) : (
-        <div className="box p-4 text-center text-sm text-gray-500">No clients in this group for the selected year.</div>
+        <div className="box p-4 text-center text-sm text-gray-500">
+          No clients in this group for the selected year{statusFilter !== "all" ? ` with status "${statusFilter}"` : ""}.
+        </div>
       )}
     </div>
   );

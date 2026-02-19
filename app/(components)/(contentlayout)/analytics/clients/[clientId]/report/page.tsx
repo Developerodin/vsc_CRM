@@ -42,6 +42,8 @@ const ClientReportPage = () => {
   const [error, setError] = useState<string | null>(null);
   /** "current" = omit year (current FY), or e.g. "2024-2025" */
   const [year, setYear] = useState<string>("current");
+  /** "all" | "pending" | "completed" — filters visible data and download */
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "completed">("all");
 
   useEffect(() => {
     if (!clientId) return;
@@ -65,7 +67,30 @@ const ClientReportPage = () => {
       .finally(() => setLoading(false));
   }, [clientId, year]);
 
-  const byActivity = useMemo(() => groupByActivity(data?.timelines), [data?.timelines]);
+  /** Timelines filtered by status (client-side); used for display and download */
+  const filteredTimelines = useMemo(() => {
+    const list = data?.timelines ?? [];
+    if (statusFilter === "all") return list;
+    return list.filter((t) => (t.status ?? "").toLowerCase() === statusFilter);
+  }, [data?.timelines, statusFilter]);
+
+  const byActivity = useMemo(() => groupByActivity(filteredTimelines), [filteredTimelines]);
+
+  /** Status summary for filtered set (for display and download) */
+  const filteredStatusSummary = useMemo(() => {
+    const list = filteredTimelines;
+    const pending = list.filter((t) => (t.status ?? "").toLowerCase() === "pending").length;
+    const completed = list.filter((t) => (t.status ?? "").toLowerCase() === "completed").length;
+    const delayed = list.filter((t) => (t.status ?? "").toLowerCase() === "delayed").length;
+    const ongoing = list.filter((t) => (t.status ?? "").toLowerCase() === "ongoing").length;
+    return { pending, completed, delayed, ongoing, total: list.length };
+  }, [filteredTimelines]);
+
+  const filterTimelinesByStatus = (list: ReportTimelineItem[] | undefined) =>
+    !list ? [] : statusFilter === "all" ? list : list.filter((t) => (t.status ?? "").toLowerCase() === statusFilter);
+
+  const auditingPrevFiltered = useMemo(() => filterTimelinesByStatus(data?.auditingPreviousYear?.timelines), [data?.auditingPreviousYear?.timelines, statusFilter]);
+  const auditingNextFiltered = useMemo(() => filterTimelinesByStatus(data?.auditingNextYear?.timelines), [data?.auditingNextYear?.timelines, statusFilter]);
 
   if (loading && !data) {
     return (
@@ -126,46 +151,49 @@ const ClientReportPage = () => {
       { Field: "Status", Value: client?.status ?? "—" },
       { Field: "Financial Year", Value: financialYear ?? "—" },
       { Field: "Turnover", Value: turnover ?? "—" },
-      { Field: "Pending", Value: statusSummary?.pending ?? 0 },
-      { Field: "Completed", Value: statusSummary?.completed ?? 0 },
-      { Field: "Delayed", Value: statusSummary?.delayed ?? 0 },
-      { Field: "Ongoing", Value: statusSummary?.ongoing ?? 0 },
-      { Field: "Total Timelines", Value: statusSummary?.total ?? 0 },
+      { Field: "Filter", Value: statusFilter === "all" ? "All" : statusFilter },
+      { Field: "Pending", Value: filteredStatusSummary.pending },
+      { Field: "Completed", Value: filteredStatusSummary.completed },
+      { Field: "Delayed", Value: filteredStatusSummary.delayed },
+      { Field: "Ongoing", Value: filteredStatusSummary.ongoing },
+      { Field: "Total Timelines", Value: filteredStatusSummary.total },
     ];
     const activityRows: { Activity: string; Subactivity: string; Status: string; "Due Date": string; Frequency: string }[] = [];
-    if (Array.isArray(timelines)) {
-      for (const t of timelines) {
-        activityRows.push({
-          Activity: t.activity?.name ?? "—",
-          Subactivity: t.subactivity?.name ?? "—",
-          Status: t.status ?? "—",
-          "Due Date": t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—",
-          Frequency: t.frequency ?? "—",
-        });
-      }
+    for (const t of filteredTimelines) {
+      activityRows.push({
+        Activity: t.activity?.name ?? "—",
+        Subactivity: t.subactivity?.name ?? "—",
+        Status: t.status ?? "—",
+        "Due Date": t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—",
+        Frequency: t.frequency ?? "—",
+      });
     }
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(clientSheet), "Client");
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(activityRows.length ? activityRows : [{ Activity: "—", Subactivity: "—", Status: "—", "Due Date": "—", Frequency: "—" }]), "By Activity & Subactivity");
-    if (auditingPreviousYear?.timelines?.length) {
-      const prevRows = auditingPreviousYear.timelines.map((t) => ({
+    const filterByStatus = (list: ReportTimelineItem[]) =>
+      statusFilter === "all" ? list : list.filter((t) => (t.status ?? "").toLowerCase() === statusFilter);
+    const prevFiltered = filterByStatus(auditingPreviousYear?.timelines ?? []);
+    if (prevFiltered.length > 0) {
+      const prevRows = prevFiltered.map((t) => ({
         Activity: t.activity?.name ?? "—",
         Subactivity: t.subactivity?.name ?? "—",
         Status: t.status ?? "—",
         "Due Date": t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—",
         Frequency: t.frequency ?? "—",
       }));
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(prevRows), `Auditing Prev (${auditingPreviousYear.financialYear})`);
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(prevRows), `Auditing Prev (${auditingPreviousYear!.financialYear})`);
     }
-    if (auditingNextYear?.timelines?.length) {
-      const nextRows = auditingNextYear.timelines.map((t) => ({
+    const nextFiltered = filterByStatus(auditingNextYear?.timelines ?? []);
+    if (nextFiltered.length > 0) {
+      const nextRows = nextFiltered.map((t) => ({
         Activity: t.activity?.name ?? "—",
         Subactivity: t.subactivity?.name ?? "—",
         Status: t.status ?? "—",
         "Due Date": t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—",
         Frequency: t.frequency ?? "—",
       }));
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(nextRows), `Auditing Next (${auditingNextYear.financialYear})`);
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(nextRows), `Auditing Next (${auditingNextYear!.financialYear})`);
     }
     const safeName = (client?.name ?? "client").replace(/[/\\?*\[\]]/g, "_").slice(0, 30);
     const fileName = `client_report_${safeName}_${financialYear ?? "report"}_${new Date().toISOString().split("T")[0]}.xlsx`;
@@ -205,6 +233,16 @@ const ClientReportPage = () => {
               {fyOptions.map((fy) => (
                 <option key={fy} value={fy}>{fy}</option>
               ))}
+            </select>
+            <label className="text-xs text-gray-500">Status:</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as "all" | "pending" | "completed")}
+              className="form-select form-select-sm text-sm w-auto py-1.5 px-2 border border-gray-300 rounded-md"
+            >
+              <option value="all">All</option>
+              <option value="pending">Pending</option>
+              <option value="completed">Completed</option>
             </select>
             <button type="button" onClick={handleDownloadReport} className="ti-btn ti-btn-primary whitespace-nowrap py-2 px-3 text-sm">
               <i className="ri-download-line me-1" /> Download report
@@ -255,15 +293,15 @@ const ClientReportPage = () => {
         )}
       </div>
 
-      {/* Status summary */}
+      {/* Status summary (filtered by selected status) */}
       <div className="box p-4 mb-4">
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">Status summary</h2>
+        <h2 className="text-sm font-semibold text-gray-700 mb-3">Status summary {statusFilter !== "all" && `(${statusFilter})`}</h2>
         <div className="flex flex-wrap gap-2">
-          <span className="px-2 py-1 rounded text-xs bg-amber-100 text-amber-800">Pending: {statusSummary?.pending ?? 0}</span>
-          <span className="px-2 py-1 rounded text-xs bg-green-100 text-green-800">Completed: {statusSummary?.completed ?? 0}</span>
-          <span className="px-2 py-1 rounded text-xs bg-red-100 text-red-800">Delayed: {statusSummary?.delayed ?? 0}</span>
-          <span className="px-2 py-1 rounded text-xs bg-blue-100 text-blue-800">Ongoing: {statusSummary?.ongoing ?? 0}</span>
-          <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-800">Total: {statusSummary?.total ?? 0}</span>
+          <span className="px-2 py-1 rounded text-xs bg-amber-100 text-amber-800">Pending: {filteredStatusSummary.pending}</span>
+          <span className="px-2 py-1 rounded text-xs bg-green-100 text-green-800">Completed: {filteredStatusSummary.completed}</span>
+          <span className="px-2 py-1 rounded text-xs bg-red-100 text-red-800">Delayed: {filteredStatusSummary.delayed}</span>
+          <span className="px-2 py-1 rounded text-xs bg-blue-100 text-blue-800">Ongoing: {filteredStatusSummary.ongoing}</span>
+          <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-800">Total: {filteredStatusSummary.total}</span>
         </div>
       </div>
 
@@ -318,11 +356,11 @@ const ClientReportPage = () => {
         </div>
       )}
 
-      {/* Auditing — Previous year (from API auditingPreviousYear) */}
-      {auditingPreviousYear?.timelines?.length > 0 && (
+      {/* Auditing — Previous year (from API auditingPreviousYear), filtered by status */}
+      {auditingPrevFiltered.length > 0 && (
         <div className="box p-4 mb-4">
           <h2 className="text-sm font-semibold text-gray-700 mb-3">Auditing — Previous year</h2>
-          <p className="text-xs text-gray-500 mb-3">Financial year: {auditingPreviousYear.financialYear ?? "—"}</p>
+          <p className="text-xs text-gray-500 mb-3">Financial year: {auditingPreviousYear!.financialYear ?? "—"}</p>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -335,7 +373,7 @@ const ClientReportPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {auditingPreviousYear.timelines.map((t) => (
+                {auditingPrevFiltered.map((t) => (
                   <tr key={t._id} className="border-b border-gray-100">
                     <td className="py-1.5 text-gray-900">{t.activity?.name ?? "—"}</td>
                     <td className="py-1.5 text-gray-900">{t.subactivity?.name ?? "—"}</td>
@@ -354,11 +392,11 @@ const ClientReportPage = () => {
         </div>
       )}
 
-      {/* Auditing — Next year (from API auditingNextYear) */}
-      {auditingNextYear?.timelines?.length > 0 && (
+      {/* Auditing — Next year (from API auditingNextYear), filtered by status */}
+      {auditingNextFiltered.length > 0 && (
         <div className="box p-4 mb-4">
           <h2 className="text-sm font-semibold text-gray-700 mb-3">Auditing — Next year</h2>
-          <p className="text-xs text-gray-500 mb-3">Financial year: {auditingNextYear.financialYear ?? "—"}</p>
+          <p className="text-xs text-gray-500 mb-3">Financial year: {auditingNextYear!.financialYear ?? "—"}</p>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -371,7 +409,7 @@ const ClientReportPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {auditingNextYear.timelines.map((t) => (
+                {auditingNextFiltered.map((t) => (
                   <tr key={t._id} className="border-b border-gray-100">
                     <td className="py-1.5 text-gray-900">{t.activity?.name ?? "—"}</td>
                     <td className="py-1.5 text-gray-900">{t.subactivity?.name ?? "—"}</td>
@@ -390,8 +428,10 @@ const ClientReportPage = () => {
         </div>
       )}
 
-      {byActivity.length === 0 && !auditingPreviousYear?.timelines?.length && !auditingNextYear?.timelines?.length && (
-        <div className="box p-4 text-center text-sm text-gray-500">No timelines for this year.</div>
+      {byActivity.length === 0 && auditingPrevFiltered.length === 0 && auditingNextFiltered.length === 0 && (
+        <div className="box p-4 text-center text-sm text-gray-500">
+          No timelines for this year{statusFilter !== "all" ? ` with status "${statusFilter}"` : ""}.
+        </div>
       )}
     </div>
   );
