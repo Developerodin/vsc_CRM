@@ -19,6 +19,8 @@ export function getClientIdType(activityName?: string, subActivityName?: string)
 interface TimelineLike {
   activity?: { name?: string };
   subactivity?: { name?: string };
+  /** Top-level state (e.g. task API timeline.state "Rajasthan") */
+  state?: string;
   client?: {
     pan?: string;
     tanNumber?: string;
@@ -26,10 +28,13 @@ interface TimelineLike {
     state?: string;
     gstNumbers?: Array<{ state?: string; gstNumber?: string }>;
   };
-  metadata?: { gstState?: string };
+  /** Task/timeline API often returns GST here (e.g. metadata.gstNumber, metadata.gstState) */
+  metadata?: { gstState?: string; gstNumber?: string };
 }
 
 export function gstNumberForState(t: TimelineLike): string {
+  // Prefer timeline-level metadata (how task API returns GST)
+  if (t.metadata?.gstNumber) return t.metadata.gstNumber;
   const state = t.metadata?.gstState || t.client?.state || '';
   const list = t.client?.gstNumbers || [];
   if (!state || !Array.isArray(list)) return list?.[0]?.gstNumber ?? '';
@@ -46,7 +51,7 @@ export function getClientIdsForExport(timeline: TimelineLike): {
   cin: string;
 } {
   return {
-    gstState: timeline.metadata?.gstState || timeline.client?.state || '',
+    gstState: timeline.metadata?.gstState || timeline.state || timeline.client?.state || '',
     gstNumber: gstNumberForState(timeline),
     tin: timeline.client?.tanNumber || '',
     pan: timeline.client?.pan || '',
@@ -61,7 +66,7 @@ export function getClientIdDisplay(timeline: TimelineLike): { idLabel: string; i
   const idType = getClientIdType(activityName, subActivityName);
 
   if (idType === 'gst') {
-    const gstState = timeline.metadata?.gstState || timeline.client?.state || '';
+    const gstState = timeline.metadata?.gstState || timeline.state || timeline.client?.state || '';
     return {
       idLabel: gstState ? `GST (${gstState})` : 'GST No.',
       idValue: gstNumberForState(timeline),

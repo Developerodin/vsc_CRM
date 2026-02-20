@@ -158,19 +158,20 @@ const ClientReportPage = () => {
       { Field: "Ongoing", Value: filteredStatusSummary.ongoing },
       { Field: "Total Timelines", Value: filteredStatusSummary.total },
     ];
-    const activityRows: { Activity: string; Subactivity: string; Status: string; "Due Date": string; Frequency: string }[] = [];
+    const activityRows: { Activity: string; Subactivity: string; Status: string; "Due Date": string; "Completed AT": string; Frequency: string }[] = [];
     for (const t of filteredTimelines) {
       activityRows.push({
         Activity: t.activity?.name ?? "—",
         Subactivity: t.subactivity?.name ?? "—",
         Status: t.status ?? "—",
         "Due Date": t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—",
+        "Completed AT": t.completedAt ? new Date(t.completedAt).toLocaleDateString() : "—",
         Frequency: t.frequency ?? "—",
       });
     }
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(clientSheet), "Client");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(activityRows.length ? activityRows : [{ Activity: "—", Subactivity: "—", Status: "—", "Due Date": "—", Frequency: "—" }]), "By Activity & Subactivity");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(activityRows.length ? activityRows : [{ Activity: "—", Subactivity: "—", Status: "—", "Due Date": "—", "Completed AT": "—", Frequency: "—" }]), "By Activity & Subactivity");
     const filterByStatus = (list: ReportTimelineItem[]) =>
       statusFilter === "all" ? list : list.filter((t) => (t.status ?? "").toLowerCase() === statusFilter);
     const prevFiltered = filterByStatus(auditingPreviousYear?.timelines ?? []);
@@ -180,6 +181,7 @@ const ClientReportPage = () => {
         Subactivity: t.subactivity?.name ?? "—",
         Status: t.status ?? "—",
         "Due Date": t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—",
+        "Completed AT": t.completedAt ? new Date(t.completedAt).toLocaleDateString() : "—",
         Frequency: t.frequency ?? "—",
       }));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(prevRows), `Auditing Prev (${auditingPreviousYear!.financialYear})`);
@@ -191,6 +193,7 @@ const ClientReportPage = () => {
         Subactivity: t.subactivity?.name ?? "—",
         Status: t.status ?? "—",
         "Due Date": t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—",
+        "Completed AT": t.completedAt ? new Date(t.completedAt).toLocaleDateString() : "—",
         Frequency: t.frequency ?? "—",
       }));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(nextRows), `Auditing Next (${auditingNextYear!.financialYear})`);
@@ -327,6 +330,7 @@ const ClientReportPage = () => {
                         <th className="text-left py-1.5 font-medium text-gray-600">Subactivity</th>
                         <th className="text-left py-1.5 font-medium text-gray-600">Status</th>
                         <th className="text-left py-1.5 font-medium text-gray-600">Due date</th>
+                        <th className="text-left py-1.5 font-medium text-gray-600">Completed AT</th>
                         <th className="text-left py-1.5 font-medium text-gray-600">Frequency</th>
                       </tr>
                     </thead>
@@ -336,6 +340,7 @@ const ClientReportPage = () => {
                           <td className="py-1.5 text-gray-900">{t.subactivity?.name ?? "—"}</td>
                           <td className="py-1.5"><span className="px-1.5 py-0.5 rounded bg-green-100 text-green-800">{t.status}</span></td>
                           <td className="py-1.5 text-gray-600">{t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—"}</td>
+                          <td className="py-1.5 text-gray-600">{t.completedAt ? new Date(t.completedAt).toLocaleDateString() : "—"}</td>
                           <td className="py-1.5 text-gray-600">{t.frequency ?? "—"}</td>
                         </tr>
                       ))}
@@ -344,6 +349,7 @@ const ClientReportPage = () => {
                           <td className="py-1.5 text-gray-900">{t.subactivity?.name ?? "—"}</td>
                           <td className="py-1.5"><span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">{t.status}</span></td>
                           <td className="py-1.5 text-gray-600">{t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—"}</td>
+                          <td className="py-1.5 text-gray-600">{t.completedAt ? new Date(t.completedAt).toLocaleDateString() : "—"}</td>
                           <td className="py-1.5 text-gray-600">{t.frequency ?? "—"}</td>
                         </tr>
                       ))}
@@ -369,6 +375,7 @@ const ClientReportPage = () => {
                   <th className="text-left py-1.5 font-medium text-gray-600">Subactivity</th>
                   <th className="text-left py-1.5 font-medium text-gray-600">Status</th>
                   <th className="text-left py-1.5 font-medium text-gray-600">Due date</th>
+                  <th className="text-left py-1.5 font-medium text-gray-600">Completed AT</th>
                   <th className="text-left py-1.5 font-medium text-gray-600">Frequency</th>
                 </tr>
               </thead>
@@ -383,6 +390,7 @@ const ClientReportPage = () => {
                       </span>
                     </td>
                     <td className="py-1.5 text-gray-600">{t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—"}</td>
+                    <td className="py-1.5 text-gray-600">{t.completedAt ? new Date(t.completedAt).toLocaleDateString() : "—"}</td>
                     <td className="py-1.5 text-gray-600">{t.frequency ?? "—"}</td>
                   </tr>
                 ))}
@@ -405,6 +413,7 @@ const ClientReportPage = () => {
                   <th className="text-left py-1.5 font-medium text-gray-600">Subactivity</th>
                   <th className="text-left py-1.5 font-medium text-gray-600">Status</th>
                   <th className="text-left py-1.5 font-medium text-gray-600">Due date</th>
+                  <th className="text-left py-1.5 font-medium text-gray-600">Completed AT</th>
                   <th className="text-left py-1.5 font-medium text-gray-600">Frequency</th>
                 </tr>
               </thead>
@@ -419,6 +428,7 @@ const ClientReportPage = () => {
                       </span>
                     </td>
                     <td className="py-1.5 text-gray-600">{t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—"}</td>
+                    <td className="py-1.5 text-gray-600">{t.completedAt ? new Date(t.completedAt).toLocaleDateString() : "—"}</td>
                     <td className="py-1.5 text-gray-600">{t.frequency ?? "—"}</td>
                   </tr>
                 ))}

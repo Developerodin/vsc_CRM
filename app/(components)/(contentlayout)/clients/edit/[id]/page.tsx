@@ -1297,6 +1297,57 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
     return true;
   };
 
+  /** Save current form data and stay on the same tab (no redirect). On group tab, also updates group membership. */
+  const handleSaveCurrent = async () => {
+    if (!validateForm()) return;
+    try {
+      setIsSubmitting(true);
+      const clientData = {
+        ...formData,
+        gstNumbers: gstNumbers.filter(gst => gst.state && gst.gstNumber && gst.dateOfRegistration && gst.gstUserId),
+        activities: activityMappings.filter(mapping => mapping.activity && mapping.subactivity),
+        groups: selectedGroups.map(group => group.id),
+        turnoverHistory: turnoverHistory.filter(e => (e.year || '').trim() && (e.turnover || '').trim())
+      };
+      const clientResponse = await fetch(`${Base_url}clients/${params.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(clientData)
+      });
+      if (!clientResponse.ok) {
+        const errorData = await clientResponse.json();
+        throw new Error(errorData.message || 'Failed to update client');
+      }
+      if (activeTab === 'group') {
+        const groupUpdatePromises = selectedGroups.map(async (group) => {
+          try {
+            const groupResponse = await fetch(`${Base_url}groups/${group.id}/clients`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              },
+              body: JSON.stringify({ clientId: params.id })
+            });
+            return groupResponse.ok;
+          } catch {
+            return false;
+          }
+        });
+        await Promise.all(groupUpdatePromises);
+      }
+      toast.success('Changes saved');
+      router.push('/clients');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -2369,24 +2420,48 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                   </div>
                 )}
 
-                {/* Form Actions */}
+                {/* Form Actions: Save (on every tab), Next (except documents), Cancel */}
                 <div className="flex items-center space-x-3 mt-6">
                   <button
-                    type="submit"
+                    type="button"
                     className="ti-btn ti-btn-primary"
                     disabled={isSubmitting}
+                    onClick={handleSaveCurrent}
                   >
                     {isSubmitting ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                         Saving...
                       </>
-                    ) : activeTab === 'general' || activeTab === 'activity' || activeTab === 'group' ? (
-                      'Next'
                     ) : (
-                      'Save Client'
+                      'Save'
                     )}
                   </button>
+                  {activeTab !== 'documents' && (
+                    <button
+                      type="submit"
+                      className="ti-btn ti-btn-primary"
+                      disabled={isSubmitting}
+                    >
+                      Next
+                    </button>
+                  )}
+                  {activeTab === 'documents' && (
+                    <button
+                      type="submit"
+                      className="ti-btn ti-btn-primary"
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Saving...
+                        </>
+                      ) : (
+                        'Save Client'
+                      )}
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="ti-btn ti-btn-secondary"

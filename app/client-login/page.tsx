@@ -1,8 +1,6 @@
 "use client"
-import { basePath } from "@/next.config";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import axios from "axios";
 import { Base_url } from "@/app/api/config/BaseUrl";
 
@@ -212,151 +210,131 @@ export default function ClientLogin() {
   };
 
   return (
-    <div className="container">
-      <div className="flex justify-center authentication authentication-basic items-center h-full text-defaultsize text-defaulttextcolor">
-        <div className="grid grid-cols-12">
-          <div className="xxl:col-span-4 xl:col-span-4 lg:col-span-4 md:col-span-3 sm:col-span-2"></div>
-          <div className="xxl:col-span-4 xl:col-span-4 lg:col-span-4 md:col-span-6 sm:col-span-8 col-span-12">
-            <div className="box !p-4 sm:!p-6 lg:!p-[3rem]">
-              <nav className="!block px-2 sm:px-6 mx-auto" aria-label="Tabs" role="tablist">
-                <div className="flex justify-center space-x-2 bg-light p-2 rounded-md rtl:space-x-reverse">
-                  <div className="flex items-center gap-1 sm:gap-2">
-                    <i className="ri-user-line text-primary text-lg sm:text-xl"></i>
-                    <span className="font-semibold text-primary text-sm sm:text-base">Client Portal</span>
-                  </div>
-                </div>
-              </nav>
-
-              <div className="box-body">
-                {step === 'email' ? (
-                  <>
-                    <p className="h5 font-semibold mb-2 text-center text-lg sm:text-xl">Client Login</p>
-                    {err && (
-                      <div className="p-4 mb-4 bg-danger/40 text-sm border-t-4 border-danger text-danger/60 rounded-lg bg-red-50 dark:bg-gray-800 dark:text-red-400" role="alert">
-                        {err}
-                      </div>
-                    )}
-                    <p className="mb-4 text-[#8c9097] dark:text-white/50 opacity-[0.7] font-normal text-center">
-                      Enter your PAN number to receive a one-time password
-                    </p>
-                    
-                    <form onSubmit={handleGenerateOtp}>
-                      <div className="grid grid-cols-12 gap-y-4">
-                        <div className="xl:col-span-12 col-span-12">
-                          <label htmlFor="client-pan" className="form-label text-default">PAN Number</label>
-                                                     <input 
-                             type="text" 
-                             name="pan" 
-                             className="form-control w-full !rounded-md h-9 sm:h-10 md:h-12 text-sm sm:text-base uppercase" 
-                             id="client-pan" 
-                             value={pan}
-                             onChange={(e) => setPan(e.target.value.toUpperCase())}
-                             placeholder="Enter your PAN (e.g., ABCDE1234F)"
-                             maxLength={10}
-                             required
-                           />
-                        </div>
-                        <div className="xl:col-span-12 col-span-12 grid mt-2">
-                                                     <button 
-                             type="submit"
-                             className="ti-btn ti-btn-primary !bg-primary !text-white !font-medium h-9 sm:h-10 md:h-12 text-sm sm:text-base"
-                             disabled={isLoading}
-                           >
-                             {isLoading ? "Sending OTP..." : "Send OTP"}
-                           </button>
-                        </div>
-                      </div>
-                    </form>
-                  </>
-                ) : (
-                  <>
-                    <p className="h5 font-semibold mb-2 text-center text-lg sm:text-xl">Enter OTP</p>
-                    {err && (
-                      <div className="p-4 mb-4 bg-danger/40 text-sm border-t-4 border-danger text-danger/60 rounded-lg bg-red-50 dark:bg-gray-800 dark:text-red-400" role="alert">
-                        {err}
-                      </div>
-                    )}
-                    {success && (
-                      <div className="p-4 mb-4 bg-success text-sm border-t-4 border-success text-white rounded-lg" role="alert">
-                        {success}
-                      </div>
-                    )}
-                    <p className="mb-4 text-[#8c9097] dark:text-white/50 opacity-[0.7] font-normal text-center">
-                      We've sent a 6-digit code to <strong>{email}</strong>
-                    </p>
-                    
-                    <form onSubmit={handleVerifyOtp}>
-                      <div className="grid grid-cols-12 gap-y-4">
-                        <div className="xl:col-span-12 col-span-12">
-                          <label className="form-label text-default">Enter 6-digit OTP</label>
-                          <div className="grid grid-cols-6 gap-1 sm:gap-2 md:gap-3 mb-4 max-w-xs mx-auto">
-                            {otpDigits.map((digit, index) => (
-                              <input
-                                key={index}
-                                type="tel"
-                                id={`otp-${index}`}
-                                className="form-control w-full h-10 sm:h-12 md:h-14 text-center text-base sm:text-lg md:text-xl font-bold !rounded-md border-2 focus:border-primary !text-defaulttextcolor dark:!text-white !p-0 overflow-visible"
-                                style={{ minWidth: '40px', minHeight: '40px' }}
-                                value={digit}
-                                onChange={(e) => handleOtpChange(index, e.target.value)}
-                                onKeyDown={(e) => handleOtpKeyDown(index, e)}
-                                onPaste={handleOtpPaste}
-                                maxLength={1}
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                autoComplete="off"
-                              />
-                            ))}
-                          </div>
-                        </div>
-                        <div className="xl:col-span-12 col-span-12 grid mt-2">
-                                                     <button 
-                             type="submit"
-                             className="ti-btn ti-btn-primary !bg-primary !text-white !font-medium h-9 sm:h-10 md:h-12 text-sm sm:text-base"
-                             disabled={isLoading || otp.length !== 6}
-                           >
-                             {isLoading ? "Verifying..." : "Verify & Login"}
-                           </button>
-                        </div>
-                      </div>
-                    </form>
-                    
-                    <div className="text-center mt-4">
-                      <button
-                        type="button"
-                        onClick={handleResendOtp}
-                        disabled={isLoading}
-                        className="text-primary hover:text-primary-dark text-sm font-medium disabled:opacity-50"
-                      >
-                        {isLoading ? "Sending..." : "Resend OTP"}
-                      </button>
-                    </div>
-                    
-                    <div className="text-center mt-4">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setStep('email');
-                          setError("");
-                          setSuccess("");
-                          setOtpDigits(['', '', '', '', '', '']);
-                          setOtp("");
-                          setPan("");
-                          setEmail("");
-                        }}
-                        className="text-gray-500 hover:text-gray-700 text-sm"
-                      >
-                        ← Back to Email
-                      </button>
-                    </div>
-                  </>
-                )}
-                
-               
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6" style={{ background: "rgb(240 241 247)" }}>
+      <div className="w-full max-w-md min-w-0">
+        <div className="bg-white shadow-sm border border-gray-100 rounded-lg overflow-hidden">
+          <div className="p-6 pb-4 border-b border-gray-200">
+            <div className="flex items-center gap-2">
+              <div className="w-[3px] h-5 bg-purple-600 rounded-full shrink-0" />
+              <div className="flex items-center gap-2">
+                <i className="ri-user-line text-purple-600 text-lg" />
+                <span className="text-sm font-bold text-gray-800">Client Portal</span>
               </div>
             </div>
           </div>
-          <div className="xxl:col-span-4 xl:col-span-4 lg:col-span-4 md:col-span-3 sm:col-span-2"></div>
+
+          <div className="p-6 pt-4">
+            {step === "email" ? (
+              <>
+                <h1 className="text-sm font-bold text-gray-800 mb-1 text-center">Client Login</h1>
+                <p className="text-[11px] text-[#495057] text-center mb-4">
+                  Enter your PAN number to receive a one-time password
+                </p>
+                {err && (
+                  <div className="mb-4 p-3 rounded border border-red-100 bg-red-50 text-red-600 text-[11px] font-medium" role="alert">
+                    {err}
+                  </div>
+                )}
+                <form onSubmit={handleGenerateOtp} className="space-y-4">
+                  <div>
+                    <label htmlFor="client-pan" className="block text-[11px] font-medium text-[#495057] mb-1.5">
+                      PAN Number
+                    </label>
+                    <input
+                      type="text"
+                      name="pan"
+                      id="client-pan"
+                      value={pan}
+                      onChange={(e) => setPan(e.target.value.toUpperCase())}
+                      placeholder="Enter your PAN (e.g., ABCDE1234F)"
+                      maxLength={10}
+                      required
+                      className="w-full min-h-[2.75rem] bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-2.5 leading-normal focus:ring-0 focus:border-purple-300 placeholder:text-gray-400 box-border uppercase"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm disabled:opacity-50 transition-colors"
+                  >
+                    {isLoading ? "Sending OTP..." : "Send OTP"}
+                  </button>
+                </form>
+              </>
+            ) : (
+              <>
+                <h1 className="text-sm font-bold text-gray-800 mb-1 text-center">Enter OTP</h1>
+                <p className="text-[11px] text-[#495057] text-center mb-4">
+                  We&apos;ve sent a 6-digit code to <strong className="text-gray-900">{email}</strong>
+                </p>
+                {err && (
+                  <div className="mb-4 p-3 rounded border border-red-100 bg-red-50 text-red-600 text-[11px] font-medium" role="alert">
+                    {err}
+                  </div>
+                )}
+                {success && (
+                  <div className="mb-4 p-3 rounded border border-emerald-200 bg-emerald-50 text-emerald-700 text-[11px] font-medium" role="alert">
+                    {success}
+                  </div>
+                )}
+                <form onSubmit={handleVerifyOtp} className="space-y-4">
+                  <div>
+                    <label className="block text-[11px] font-medium text-[#495057] mb-1.5">Enter 6-digit OTP</label>
+                    <div className="grid grid-cols-6 gap-1.5 sm:gap-2 w-full max-w-[280px] sm:max-w-[260px] mx-auto">
+                      {otpDigits.map((digit, i) => (
+                        <input
+                          key={i}
+                          type="tel"
+                          id={`otp-${i}`}
+                          value={digit}
+                          onChange={(e) => handleOtpChange(i, e.target.value)}
+                          onKeyDown={(e) => handleOtpKeyDown(i, e)}
+                          onPaste={handleOtpPaste}
+                          maxLength={1}
+                          inputMode="numeric"
+                          autoComplete="off"
+                          className="w-full min-w-0 h-12 sm:h-11 py-2 px-1 text-center text-xl sm:text-2xl font-bold rounded border-2 border-gray-300 bg-white text-gray-900 focus:ring-0 focus:border-purple-500 focus:outline-none box-border"
+                          style={{ lineHeight: 1.2 }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isLoading || otpDigits.join("").length !== 6}
+                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm disabled:opacity-50 transition-colors"
+                  >
+                    {isLoading ? "Verifying..." : "Verify & Login"}
+                  </button>
+                </form>
+                <div className="flex flex-col items-center gap-2 mt-4">
+                  <button
+                    type="button"
+                    onClick={handleResendOtp}
+                    disabled={isLoading}
+                    className="text-[11px] font-bold text-purple-600 hover:text-purple-700 disabled:opacity-50"
+                  >
+                    {isLoading ? "Sending..." : "Resend OTP"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStep("email");
+                      setError("");
+                      setSuccess("");
+                      setOtpDigits(["", "", "", "", "", ""]);
+                      setOtp("");
+                      setPan("");
+                      setEmail("");
+                    }}
+                    className="text-[11px] font-medium text-gray-500 hover:text-gray-700"
+                  >
+                    ← Back to PAN
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

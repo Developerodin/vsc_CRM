@@ -3,6 +3,7 @@ import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import axios from 'axios'
 import { Base_url } from '@/app/api/config/BaseUrl'
+import { getClientIdDisplay } from '@/app/(components)/(contentlayout)/timelines/utils/timelineClientId'
 import { toast } from 'react-hot-toast'
 
 interface TeamMemberData {
@@ -664,16 +665,22 @@ const TeamMemberDashboard = () => {
       const token = localStorage.getItem('teamMemberToken')
       const refreshToken = localStorage.getItem('teamMemberRefreshToken')
       if (token && refreshToken) {
-        await axios.post(`${Base_url}team-member-auth/logout`, { 
-          refreshToken: refreshToken 
+        await axios.post(`${Base_url}team-member-auth/logout`, {
+          refreshToken: refreshToken
         })
       }
     } catch (error) {
       console.error('Logout error:', error)
     } finally {
-      localStorage.removeItem('teamMemberToken')
-      localStorage.removeItem('teamMemberData')
-      localStorage.removeItem('teamMemberRefreshToken')
+      localStorage.clear()
+      sessionStorage.clear()
+      // Clear cookies accessible to JS (httpOnly cookies must be cleared by server)
+      if (typeof document !== 'undefined' && document.cookie) {
+        document.cookie.split(';').forEach((c) => {
+          const name = c.trim().split('=')[0]
+          document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`
+        })
+      }
       router.push('/team-member-login')
     }
   }
@@ -734,6 +741,18 @@ const TeamMemberDashboard = () => {
     }
   }
 
+  /** Register-style label: Activity - Client - ID label: ID value (GST/TIN/PAN/CIN by activity) */
+  const getTimelineDisplayLabel = (timeline: any): string => {
+    const activity = timeline?.activity?.name || timeline?.activity || 'Unknown Activity'
+    const sub = timeline?.subactivity?.name || timeline?.subactivity
+    const activityPart = sub ? `${activity} - ${sub}` : activity
+    const clientName = timeline?.client?.name || timeline?.client || 'Unknown Client'
+    const { idLabel, idValue } = getClientIdDisplay(timeline)
+    const idPart = (idLabel && idValue) ? ` - ${idLabel}: ${idValue}` : ''
+    const periodPart = timeline?.period ? ` (${timeline.period})` : ''
+    return `${activityPart} - ${clientName}${idPart}${periodPart}`
+  }
+
   /** Derived from reference + completed: both filled → completed, both empty → pending, else ongoing */
   const getDerivedTimelineStatus = (timeline: any): string => {
     const ref = (timeline?.referenceNumber ?? '').toString().trim()
@@ -779,6 +798,13 @@ const TeamMemberDashboard = () => {
       )
       const valid = results.filter((t): t is NonNullable<typeof t> => t !== null)
       setTimelineDetails(valid)
+      // All loaded timelines are included in updates (no Select column)
+      const idsAllTrue: Record<string, boolean> = {}
+      valid.forEach((t) => {
+        const id = t?.id ?? t?._id ?? t?.timelineId
+        if (id) idsAllTrue[String(id)] = true
+      })
+      setSelectedTimelineIds(idsAllTrue)
     } finally {
       setIsLoadingTimelineDetails(false)
     }
@@ -1484,31 +1510,19 @@ const TeamMemberDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4">
-          <div>
-            <h1 className="text-lg sm:text-xl font-semibold text-gray-600 dark:text-gray-300">
-              Welcome, {teamMemberData?.name || 'Team Member'}
-            </h1>
-            {/* {teamMemberData?.branch && (
-              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Branch: {teamMemberData.branch.name}
-              </p>
-            )} */}
-          </div>
-          <div className="flex items-center gap-2 sm:gap-4">
-            <span className="sm:hidden text-xs text-gray-600 dark:text-gray-300">
-              {teamMemberData?.name || 'Team Member'}
-            </span>
-            <button
-              onClick={handleLogout}
-              className="px-2 sm:px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm"
-            >
-              <span className="hidden sm:inline">Logout</span>
-              <i className="sm:hidden ri-logout-box-r-line"></i>
-            </button>
-          </div>
+      {/* Header – spec: page title 14px bold gray-800, buttons 11px bold */}
+      <div className="bg-white shadow-sm border-b border-gray-200">
+        <div className="flex flex-wrap items-center justify-between gap-4 px-4 sm:px-6 py-3">
+          <h1 className="text-[14px] font-bold text-gray-800">
+            Welcome, {teamMemberData?.name || 'Team Member'}
+          </h1>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 transition-colors shadow-sm"
+          >
+            <i className="ri-logout-box-r-line text-xs"></i>
+            <span>Logout</span>
+          </button>
         </div>
       </div>
 
@@ -1539,35 +1553,35 @@ const TeamMemberDashboard = () => {
       {/* Main Content */}
       <div className="p-4 sm:p-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  {accessibleTeamMembers.length > 0 && viewAccessibleTasks ? 'Accessible Team Members\' Tasks' : 'My Tasks'}
-                </h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  {totalResults > 0 ? `${totalResults} task(s) found` : tasks.length > 0 ? `${tasks.length} task(s) found` : 'No tasks available'}
-                </p>
+          <div className="p-[10px]">
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+              <div className="flex items-center gap-2">
+                <div className="w-[3px] h-5 bg-purple-600 rounded-full shrink-0" />
+                <div>
+                  <h2 className="text-sm font-bold text-gray-800">
+                    {accessibleTeamMembers.length > 0 && viewAccessibleTasks ? 'Accessible Team Members\' Tasks' : 'My Tasks'}
+                  </h2>
+                  <p className="text-[11px] text-[#495057] mt-0.5">
+                    {totalResults > 0 ? `${totalResults} task(s) found` : tasks.length > 0 ? `${tasks.length} task(s) found` : 'No tasks available'}
+                  </p>
+                </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
                 {accessibleTeamMembers.length > 0 && (
                   <>
                     <button
                       onClick={openAssignTaskModal}
-                      className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm"
                     >
-                      <i className="ri-add-line mr-1"></i>
-                      Assign Task
+                      <i className="ri-add-line text-xs"></i> Assign Task
                     </button>
                     <button
                       onClick={() => setViewAccessibleTasks(!viewAccessibleTasks)}
-                      className={`px-4 py-2 rounded-md transition-colors text-sm ${
-                        viewAccessibleTasks
-                          ? 'bg-purple-600 text-white hover:bg-purple-700'
-                          : 'bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded shadow-sm ${
+                        viewAccessibleTasks ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'
                       }`}
                     >
-                      <i className={`ri-${viewAccessibleTasks ? 'user-line' : 'team-line'} mr-1`}></i>
+                      <i className={`ri-${viewAccessibleTasks ? 'user-line' : 'team-line'} text-xs`}></i>
                       {viewAccessibleTasks ? 'My Tasks' : 'View All Accessible'}
                     </button>
                   </>
@@ -1575,8 +1589,9 @@ const TeamMemberDashboard = () => {
                 <button
                   onClick={handleRefreshTasks}
                   disabled={tasksLoading}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 text-sm"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm disabled:opacity-50"
                 >
+                  <i className="ri-refresh-line text-xs"></i>
                   {tasksLoading ? 'Loading...' : 'Refresh Tasks'}
                 </button>
                 {/* <button
@@ -1593,14 +1608,14 @@ const TeamMemberDashboard = () => {
               </div>
             </div>
             
-            {/* Filters - All in one row */}
+            {/* Filters */}
             <div className="mb-6 flex flex-wrap items-end gap-3">
-              <div className="flex-shrink-0 min-w-[190px]">
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
+              <div className="flex-shrink-0 min-w-[160px]">
+                <label className="block text-[11px] font-medium text-[#495057] mb-1">Status</label>
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300"
                 >
                   <option value="all">All Status</option>
                   <option value="pending">Pending</option>
@@ -1612,12 +1627,12 @@ const TeamMemberDashboard = () => {
                 </select>
               </div>
               
-              <div className="flex-shrink-0 min-w-[190px]">
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Priority</label>
+              <div className="flex-shrink-0 min-w-[160px]">
+                <label className="block text-[11px] font-medium text-[#495057] mb-1">Priority</label>
                 <select
                   value={priorityFilter}
                   onChange={(e) => setPriorityFilter(e.target.value)}
-                  className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300"
                 >
                   <option value="all">All Priority</option>
                   <option value="low">Low</option>
@@ -1628,34 +1643,31 @@ const TeamMemberDashboard = () => {
                 </select>
               </div>
               
-              <div className="flex-shrink-0 min-w-[190px]">
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Start Date</label>
+              <div className="flex-shrink-0 min-w-[160px]">
+                <label className="block text-[11px] font-medium text-[#495057] mb-1">Start Date</label>
                 <input
                   type="date"
                   value={startDateFilter}
                   onChange={(e) => setStartDateFilter(e.target.value)}
-                  className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
                 />
               </div>
-              
-              <div className="flex-shrink-0 min-w-[190px]">
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">End Date</label>
+              <div className="flex-shrink-0 min-w-[160px]">
+                <label className="block text-[11px] font-medium text-[#495057] mb-1">End Date</label>
                 <input
                   type="date"
                   value={endDateFilter}
                   onChange={(e) => setEndDateFilter(e.target.value)}
-                  className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
                 />
               </div>
-
-              {/* Team Member Filter - Only show when viewing accessible tasks */}
               {viewAccessibleTasks && accessibleTeamMembers.length > 0 && (
-                <div className="flex-shrink-0 min-w-[245px]">
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Team Member</label>
+                <div className="flex-shrink-0 min-w-[200px]">
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1">Team Member</label>
                   <select
                     value={teamMemberFilter}
                     onChange={(e) => setTeamMemberFilter(e.target.value)}
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300"
                   >
                     <option value="all">All Team Members</option>
                     {accessibleTeamMembers.map((member) => (
@@ -1672,11 +1684,8 @@ const TeamMemberDashboard = () => {
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Sort By</label>
                 <select
                   value={sortBy}
-                  onChange={(e) => {
-                    setSortBy(e.target.value)
-                    setCurrentPage(1)
-                  }}
-                  className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onChange={(e) => { setSortBy(e.target.value); setCurrentPage(1) }}
+                  className="w-full bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300"
                 >
                   <option value="createdAt:desc">Newest First</option>
                   <option value="createdAt:asc">Oldest First</option>
@@ -1704,52 +1713,53 @@ const TeamMemberDashboard = () => {
             )}
 
             {/* Tasks Table */}
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto min-h-[300px]">
               {tasksLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div className="flex flex-col items-center justify-center py-20">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 opacity-50"></div>
+                  <span className="mt-2 text-[10px] font-bold text-gray-400 tracking-[0.2em] uppercase">Loading Data</span>
                 </div>
               ) : tasks.length > 0 ? (
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                  <thead className="bg-gray-50 dark:bg-gray-700">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Task Details</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Clients & Activities</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status & Priority</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Timeline</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
+                <table className="w-full border-collapse border border-gray-200">
+                  <thead>
+                    <tr className="bg-gray-50/30">
+                      <th className="px-1.5 py-3 pl-[10px] text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Task Details</th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Clients & Activities</th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Status & Priority</th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Timeline</th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200 pr-[10px]">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  <tbody>
                     {tasks.map((task) => (
-                      <tr key={task._id || task.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                        <td className="px-6 py-4">
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">{task.remarks}</div>
+                      <tr key={task._id || task.id} className="hover:bg-gray-50/50 transition-colors group">
+                        <td className="px-1.5 py-2.5 pl-[10px] border border-gray-200">
+                          <div className="text-[12px] font-medium text-gray-900">{task.remarks}</div>
                           {viewAccessibleTasks && (
-                            <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                            <div className="text-[12px] text-gray-600 mt-1">
                               <i className="ri-user-line mr-1"></i>
                               Assigned to: <span className="font-medium">{getTeamMemberName(task)}</span>
                             </div>
                           )}
                           {hasAssignedBy(task) && (
-                            <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                            <div className="text-[12px] text-gray-600 mt-1">
                               <i className="ri-user-add-line mr-1"></i>
                               Assigned by: <span className="font-medium">{getAssignedByName(task)}</span>
                             </div>
                           )}
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                          <div className="text-[12px] text-gray-500">
                             Branch: {task.branch?.name || 'N/A'}
                           </div>
                           {task.attachments && task.attachments.length > 0 && (
-                            <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                            <div className="text-[11px] text-purple-600 mt-1">
                               📎 {task.attachments.length} attachment(s)
                             </div>
                           )}
-                          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                          <div className="text-[11px] text-gray-400 mt-1">
                             Created: {formatDate(task.createdAt)}
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-1.5 py-2.5 border border-gray-200">
                           {task.timeline && task.timeline.length > 0 ? (
                             <div className="space-y-2">
                               {task.timeline.slice(0, 3).map((timeline, index) => {
@@ -1795,64 +1805,58 @@ const TeamMemberDashboard = () => {
                               )}
                             </div>
                           ) : (
-                            <span className="text-gray-400 text-sm">No timeline data</span>
+                            <span className="text-gray-400 text-[12px]">No timeline data</span>
                           )}
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="flex flex-col gap-2">
-                            <div className="flex items-center gap-2">
-                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(task.status)}`}>
+                        <td className="px-1.5 py-2.5 border border-gray-200">
+                          <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className={`inline-flex px-2 py-0.5 text-[11px] font-medium rounded ${getStatusColor(task.status)}`}>
                                 {task.status.replace('_', ' ')}
                               </span>
                               {task.status === 'delayed' && (
-                                <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200">
-                                  <i className="ri-check-line mr-1"></i>
-                                  Can Complete
+                                <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-medium rounded bg-amber-50 text-amber-700 border border-amber-200">
+                                  <i className="ri-check-line mr-1"></i> Can Complete
                                 </span>
                               )}
                             </div>
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(task.priority)}`}>
+                            <span className={`inline-flex px-2 py-0.5 text-[11px] font-medium rounded w-fit ${getPriorityColor(task.priority)}`}>
                               {task.priority}
                             </span>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-gray-900 dark:text-white">
-                            <div>Start: {formatDate(task.startDate)}</div>
-                            <div>End: {formatDate(task.endDate)}</div>
-                          </div>
+                        <td className="px-1.5 py-2.5 border border-gray-200 text-[12px] text-gray-900">
+                          <div>Start: {formatDate(task.startDate)}</div>
+                          <div>End: {formatDate(task.endDate)}</div>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="flex gap-2 flex-wrap">
+                        <td className="px-1.5 py-2.5 border border-gray-200 pr-[10px]">
+                          <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity flex-wrap">
                             <button
                               onClick={() => openViewDetailsModal(task)}
-                              className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                              className="w-7 h-7 flex items-center justify-center rounded bg-sky-50 text-sky-600 border border-sky-100 hover:bg-sky-100"
                               title="View task details"
                             >
-                              <i className="ri-eye-line mr-1"></i>
-                              View
+                              <i className="ri-eye-line text-xs"></i>
                             </button>
                             {viewAccessibleTasks && (
                               <button
                                 onClick={() => openEditTaskModal(task)}
-                                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                                className="w-7 h-7 flex items-center justify-center rounded bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100"
                                 title="Edit task"
                               >
-                                <i className="ri-edit-2-line mr-1"></i>
-                                Edit
+                                <i className="ri-pencil-line text-xs"></i>
                               </button>
                             )}
                             <button
                               onClick={() => openUpdateModal(task)}
-                              className={`inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                                task.status === 'delayed' 
-                                  ? 'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500' 
-                                  : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
+                              className={`w-7 h-7 flex items-center justify-center rounded ${
+                                task.status === 'delayed'
+                                  ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+                                  : 'bg-purple-600 text-white hover:bg-purple-700 shadow-sm'
                               }`}
-                              title={task.status === 'delayed' ? 'Click to mark as completed' : 'Click to update task status'}
+                              title={task.status === 'delayed' ? 'Mark as completed' : 'Update task status'}
                             >
-                              <i className={task.status === 'delayed' ? 'ri-check-line mr-1' : 'ri-edit-line mr-1'}></i>
-                              {task.status === 'delayed' ? 'Mark Complete' : 'Update Status'}
+                              <i className={`${task.status === 'delayed' ? 'ri-check-line' : 'ri-edit-line'} text-xs`}></i>
                             </button>
                           </div>
                         </td>
@@ -1861,55 +1865,45 @@ const TeamMemberDashboard = () => {
                   </tbody>
                 </table>
               ) : (
-                <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                  <i className="ri-task-line text-4xl mb-3 opacity-50"></i>
-                  <p className="text-lg font-medium">No tasks found</p>
-                  <p className="text-sm">You don't have any tasks assigned at the moment.</p>
+                <div className="flex flex-col items-center justify-center py-20 text-center">
+                  <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                    <i className="ri-task-line text-xl text-gray-200"></i>
+                  </div>
+                  <p className="text-xs font-bold text-gray-400 mb-1">NO TASKS FOUND</p>
+                  <p className="text-[11px] text-gray-500">You don't have any tasks assigned at the moment.</p>
                 </div>
               )}
             </div>
-
-            {/* Pagination Controls */}
             {tasks.length > 0 && (
-              <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 border-t border-gray-200 dark:border-gray-700">
-                <div className="flex items-center space-x-2">
-                  <div className="flex items-center">
-                    <label className="mr-2 text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">Rows per page:</label>
-                    <select
-                      className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      value={itemsPerPage}
-                      onChange={(e) => {
-                        const newItemsPerPage = Number(e.target.value)
-                        setItemsPerPage(newItemsPerPage)
-                        setCurrentPage(1)
-                      }}
-                    >
-                      <option value={10}>10</option>
-                      <option value={25}>25</option>
-                      <option value={50}>50</option>
-                      <option value={100}>100</option>
-                    </select>
-                  </div>
+              <div className="p-[10px] pt-4 border-t border-gray-100 bg-white flex flex-wrap justify-between items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <label className="mr-2 text-[11px] font-medium text-[#495057] whitespace-nowrap">Rows per page:</label>
+                  <select
+                    className="bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300"
+                    value={itemsPerPage}
+                    onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1) }}
+                  >
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center gap-2">
                   <button
                     onClick={() => setCurrentPage(Math.max(currentPage - 1, 1))}
                     disabled={currentPage === 1 || tasksLoading}
-                    className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
                   >
                     Previous
                   </button>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">
-                    {totalResults > 0 ? (
-                      `Showing ${(currentPage - 1) * itemsPerPage + 1} to ${Math.min(currentPage * itemsPerPage, totalResults)} of ${totalResults} entries`
-                    ) : (
-                      "No results"
-                    )}
+                  <span className="text-[11px] font-medium text-[#495057] tracking-tight">
+                    {totalResults > 0 ? `Showing ${(currentPage - 1) * itemsPerPage + 1} to ${Math.min(currentPage * itemsPerPage, totalResults)} of ${totalResults} entries` : "No results"}
                   </span>
                   <button
                     onClick={() => setCurrentPage(Math.min(currentPage + 1, totalPages))}
                     disabled={currentPage === totalPages || totalPages === 0 || tasksLoading}
-                    className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
                   >
                     Next
                   </button>
@@ -1920,30 +1914,27 @@ const TeamMemberDashboard = () => {
         </div>
       </div>
 
-      {/* Update Task Modal */}
+      {/* Update Task Drawer */}
       {showUpdateModal && selectedTask && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-10 mx-auto p-5 border w-full max-w-6xl shadow-lg rounded-md bg-white dark:bg-gray-800 max-h-[92vh] overflow-y-auto">
-            <div className="mt-3">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Update Task Status</h3>
-                <button
-                  onClick={() => setShowUpdateModal(false)}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                >
-                  <i className="ri-close-line text-2xl"></i>
-                </button>
-              </div>
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
+          <div className="fixed right-0 top-0 h-full w-full max-w-[60.48rem] bg-white shadow-xl overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center p-[10px] border-b border-gray-200">
+              <h3 className="text-sm font-bold text-gray-800">Update Task Status</h3>
+              <button onClick={() => setShowUpdateModal(false)} className="p-1 text-gray-500 hover:text-gray-700">
+                <i className="ri-close-line text-xl"></i>
+              </button>
+            </div>
+            <div className="p-[10px] overflow-auto flex-1">
               
               {/* Task Details (Read-Only) */}
-              <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg space-y-4">
-                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Task Details (View Only)</h4>
+              <div className="mb-4 p-3 bg-gray-50 rounded space-y-3">
+                <h4 className="text-[11px] font-bold text-[#495057] uppercase tracking-wider mb-2">Task Details (View Only)</h4>
                 
                 <div className="grid grid-cols-2 gap-4">
                   {viewAccessibleTasks && (
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Assigned To</label>
-                      <p className="text-sm text-gray-900 dark:text-white font-medium">
+                      <label className="block text-[11px] font-medium text-[#495057] mb-1">Assigned To</label>
+                      <p className="text-[12px] text-gray-900 font-medium">
                         <i className="ri-user-line mr-1"></i>
                         {getTeamMemberName(selectedTask)}
                       </p>
@@ -1951,54 +1942,54 @@ const TeamMemberDashboard = () => {
                   )}
                   {hasAssignedBy(selectedTask) && (
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Assigned By</label>
-                      <p className="text-sm text-gray-900 dark:text-white font-medium">
+                      <label className="block text-[11px] font-medium text-[#495057] mb-1">Assigned By</label>
+                      <p className="text-[12px] text-gray-900 font-medium">
                         <i className="ri-user-add-line mr-1"></i>
                         {getAssignedByName(selectedTask)}
                       </p>
                     </div>
                   )}
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Remarks</label>
-                    <p className="text-sm text-gray-900 dark:text-white">{selectedTask.remarks || 'N/A'}</p>
+                    <label className="block text-[11px] font-medium text-[#495057] mb-1">Remarks</label>
+                    <p className="text-[12px] text-gray-900">{selectedTask.remarks || 'N/A'}</p>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Priority</label>
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(selectedTask.priority)}`}>
+                    <label className="block text-[11px] font-medium text-[#495057] mb-1">Priority</label>
+                    <span className={`inline-flex px-2 py-0.5 text-[11px] font-medium rounded ${getPriorityColor(selectedTask.priority)}`}>
                       {selectedTask.priority}
                     </span>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Start Date</label>
-                    <p className="text-sm text-gray-900 dark:text-white">{formatDate(selectedTask.startDate)}</p>
+                    <label className="block text-[11px] font-medium text-[#495057] mb-1">Start Date</label>
+                    <p className="text-[12px] text-gray-900">{formatDate(selectedTask.startDate)}</p>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">End Date</label>
-                    <p className="text-sm text-gray-900 dark:text-white">{formatDate(selectedTask.endDate)}</p>
+                    <label className="block text-[11px] font-medium text-[#495057] mb-1">End Date</label>
+                    <p className="text-[12px] text-gray-900">{formatDate(selectedTask.endDate)}</p>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Branch</label>
-                    <p className="text-sm text-gray-900 dark:text-white">{selectedTask.branch?.name || 'N/A'}</p>
+                    <label className="block text-[11px] font-medium text-[#495057] mb-1">Branch</label>
+                    <p className="text-[12px] text-gray-900">{selectedTask.branch?.name || 'N/A'}</p>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Current Status</label>
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(selectedTask.status)}`}>
+                    <label className="block text-[11px] font-medium text-[#495057] mb-1">Current Status</label>
+                    <span className={`inline-flex px-2 py-0.5 text-[11px] font-medium rounded ${getStatusColor(selectedTask.status)}`}>
                       {selectedTask.status.replace('_', ' ')}
                     </span>
                   </div>
                 </div>
               </div>
               
-              {/* Status Update Section */}
-              <div className="space-y-4">
+              {/* Status Update Section — spec: 11px inputs/labels */}
+              <div className="space-y-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Update Status <span className="text-red-500">*</span></label>
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">Update Status <span className="text-red-500">*</span></label>
                   {selectedTask?.status === 'delayed' ? (
-                    <div className="space-y-2">
-                      <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                        <div className="flex items-center">
-                          <i className="ri-information-line text-yellow-500 text-lg mr-2"></i>
-                          <span className="text-sm text-yellow-800 dark:text-yellow-200">
+                    <div className="space-y-1.5">
+                      <div className="p-2 bg-amber-50 border border-amber-200 rounded">
+                        <div className="flex items-center gap-1.5">
+                          <i className="ri-information-line text-amber-600 text-sm shrink-0"></i>
+                          <span className="text-[11px] font-medium text-amber-800">
                             Delayed tasks can only be marked as completed
                           </span>
                         </div>
@@ -2006,7 +1997,7 @@ const TeamMemberDashboard = () => {
                       <select
                         value={updateForm.status}
                         onChange={(e) => setUpdateForm({...updateForm, status: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300 appearance-none cursor-pointer"
                       >
                         <option value="delayed">Delayed</option>
                         <option value="completed">Completed</option>
@@ -2016,7 +2007,7 @@ const TeamMemberDashboard = () => {
                     <select
                       value={updateForm.status}
                       onChange={(e) => setUpdateForm({...updateForm, status: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300 appearance-none cursor-pointer"
                     >
                       <option value="pending">Pending</option>
                       <option value="ongoing">Ongoing</option>
@@ -2027,48 +2018,39 @@ const TeamMemberDashboard = () => {
                   )}
                 </div>
 
-                {/* Remarks (allow for task-level remarks updates) */}
+                {/* Remarks */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Remarks <span className="text-gray-500 text-xs">(Optional)</span>
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">
+                    Remarks <span className="text-gray-400">(Optional)</span>
                   </label>
                   <textarea
                     value={updateForm.remarks}
                     onChange={(e) => setUpdateForm({ ...updateForm, remarks: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-1.5 border border-gray-200 rounded bg-white text-[#495057] text-[11px] font-medium focus:ring-0 focus:border-purple-300 placeholder:text-gray-400"
                     rows={3}
                     placeholder="Enter remarks..."
                   />
                 </div>
 
-                {/* Timelines Excel-like editor (for selected timelines) */}
-                <div className="mt-2">
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                {/* Related Timelines (Excel) */}
+                <div className="mt-1">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-[11px] font-medium text-[#495057]">
                       Related Timelines (Excel)
                     </label>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => fetchTaskTimelineDetails(selectedTask)}
-                        disabled={isLoadingTimelineDetails}
-                        className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-                      >
-                        {isLoadingTimelineDetails ? 'Loading...' : 'Refresh'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={clearTimelineEdits}
-                        disabled={updatingTask}
-                        className="px-3 py-1 text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50"
-                      >
-                        Clear edits
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => fetchTaskTimelineDetails(selectedTask)}
+                      disabled={isLoadingTimelineDetails}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm disabled:opacity-50"
+                    >
+                      <i className="ri-refresh-line text-xs"></i>
+                      {isLoadingTimelineDetails ? 'Loading...' : 'Refresh'}
+                    </button>
                   </div>
 
                   {selectedTask.timeline && selectedTask.timeline.length === 0 ? (
-                    <div className="text-sm text-gray-500 dark:text-gray-400 p-3 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
+                    <div className="text-[11px] text-[#495057] p-2 bg-gray-50 rounded border border-gray-200">
                       No related timelines available.
                     </div>
                   ) : isLoadingTimelineDetails ? (
@@ -2078,73 +2060,54 @@ const TeamMemberDashboard = () => {
                   ) : timelineDetails.length > 0 ? (
                     <>
                       <div className="overflow-auto border border-gray-200 dark:border-gray-600 rounded" style={{ maxHeight: '320px' }}>
-                        <table className="min-w-full border-collapse">
-                          <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
-                            <tr>
-                              <th className="border border-gray-200 dark:border-gray-600 px-2 py-1.5 text-left text-xs font-semibold text-gray-600 dark:text-gray-200" style={{ width: 70 }}>
-                                Select
-                              </th>
-                              <th className="border border-gray-200 dark:border-gray-600 px-2 py-1.5 text-left text-xs font-semibold text-gray-600 dark:text-gray-200" style={{ minWidth: 180 }}>
-                                Activity
-                              </th>
-                              <th className="border border-gray-200 dark:border-gray-600 px-2 py-1.5 text-left text-xs font-semibold text-gray-600 dark:text-gray-200" style={{ minWidth: 180 }}>
-                                Client
-                              </th>
-                              <th className="border border-gray-200 dark:border-gray-600 px-2 py-1.5 text-left text-xs font-semibold text-gray-600 dark:text-gray-200" style={{ width: 140 }}>
-                                Status
-                              </th>
-                              <th className="border border-gray-200 dark:border-gray-600 px-2 py-1.5 text-left text-xs font-semibold text-gray-600 dark:text-gray-200" style={{ width: 180 }}>
-                                Reference
-                              </th>
-                              <th className="border border-gray-200 dark:border-gray-600 px-2 py-1.5 text-left text-xs font-semibold text-gray-600 dark:text-gray-200" style={{ width: 150 }}>
-                                Completed
-                              </th>
+                        <table className="w-full border-collapse border border-gray-200">
+                          <thead>
+                            <tr className="bg-gray-50/30">
+                              <th className="border border-gray-200 px-1.5 py-3 pl-[10px] text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider" style={{ minWidth: 140 }}>Activity</th>
+                              <th className="border border-gray-200 px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider" style={{ minWidth: 120 }}>Client</th>
+                              <th className="border border-gray-200 px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider" style={{ minWidth: 140 }}>Client ID (GST/TIN/PAN/CIN)</th>
+                              <th className="border border-gray-200 px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider" style={{ width: 100 }}>Status</th>
+                              <th className="border border-gray-200 px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider" style={{ width: 140 }}>Reference</th>
+                              <th className="border border-gray-200 px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider pr-[10px]" style={{ width: 120 }}>Completed</th>
                             </tr>
                           </thead>
-                          <tbody className="bg-white dark:bg-gray-800">
+                          <tbody>
                             {timelineDetails.map((timeline, idx) => {
                               const tid = getTimelineId(timeline) || `row-${idx}`
-                              const isSelected = Boolean(selectedTimelineIds[tid])
                               return (
-                                <tr key={tid} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                                  <td className="border border-gray-200 dark:border-gray-600 px-2 py-1.5">
-                                    <input
-                                      type="checkbox"
-                                      className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                      checked={isSelected}
-                                      onChange={() => toggleTimelineSelected(tid)}
-                                    />
+                                <tr key={tid} className="hover:bg-gray-50/50 transition-colors">
+                                  <td className="border border-gray-200 px-1.5 py-2.5 pl-[10px] text-[12px] text-gray-900">
+                                    <div className="font-medium">{timeline.activity?.name || timeline.activity || 'Unknown Activity'}</div>
+                                    {timeline.subactivity?.name && <div className="text-[11px] text-gray-600 mt-0.5">{timeline.subactivity.name}</div>}
+                                    {timeline.period && <div className="text-[11px] text-gray-500 mt-0.5">Period: {timeline.period}</div>}
                                   </td>
-                                  <td className="border border-gray-200 dark:border-gray-600 px-2 py-1.5 text-xs text-gray-900 dark:text-white">
-                                    <div className="font-medium">
-                                      {timeline.activity?.name || timeline.activity || 'Unknown Activity'}
-                                    </div>
-                                    {timeline.period && (
-                                      <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">Period: {timeline.period}</div>
-                                    )}
+                                  <td className="border border-gray-200 px-1.5 py-2.5 text-[12px] text-gray-900">{timeline.client?.name || timeline.client || 'Unknown Client'}</td>
+                                  <td className="border border-gray-200 px-1.5 py-2.5 text-[12px] text-gray-900">
+                                    {(() => {
+                                      const { idLabel, idValue } = getClientIdDisplay(timeline as Parameters<typeof getClientIdDisplay>[0])
+                                      if (!idLabel && !idValue) return <span className="text-gray-400">–</span>
+                                      return <span><span className="text-gray-500">{idLabel}:</span> <span className="font-mono">{idValue || '–'}</span></span>
+                                    })()}
                                   </td>
-                                  <td className="border border-gray-200 dark:border-gray-600 px-2 py-1.5 text-xs text-gray-900 dark:text-white">
-                                    {timeline.client?.name || timeline.client || 'Unknown Client'}
-                                  </td>
-                                  <td className="border border-gray-200 dark:border-gray-600 px-2 py-1.5">
-                                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium capitalize ${getStatusColor(getDerivedTimelineStatus(timeline))}`}>
+                                  <td className="border border-gray-200 px-1.5 py-2.5">
+                                    <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-medium capitalize ${getStatusColor(getDerivedTimelineStatus(timeline))}`}>
                                       {getDerivedTimelineStatus(timeline)}
                                     </span>
                                   </td>
-                                  <td className="border border-gray-200 dark:border-gray-600 px-2 py-1.5">
+                                  <td className="border border-gray-200 px-1.5 py-2.5">
                                     <input
                                       type="text"
-                                      className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                      className="w-full px-2 py-1 border border-gray-200 rounded bg-white text-[11px] font-medium text-gray-900 focus:ring-0 focus:border-purple-300 placeholder:text-gray-400"
                                       value={timeline.referenceNumber || ''}
                                       onChange={(e) => setTimelineField(timeline, 'referenceNumber', e.target.value)}
                                       disabled={updatingTask}
                                       placeholder="REF-123"
                                     />
                                   </td>
-                                  <td className="border border-gray-200 dark:border-gray-600 px-2 py-1.5">
+                                  <td className="border border-gray-200 px-1.5 py-2.5 pr-[10px]">
                                     <input
                                       type="date"
-                                      className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                      className="w-full px-2 py-1 border border-gray-200 rounded bg-white text-[11px] font-medium text-gray-900 focus:ring-0 focus:border-purple-300"
                                       value={getCompletedAtInputValue(timeline)}
                                       onChange={(e) => setTimelineField(timeline, 'completedAt', e.target.value)}
                                       disabled={updatingTask}
@@ -2156,63 +2119,59 @@ const TeamMemberDashboard = () => {
                           </tbody>
                         </table>
                       </div>
-                      <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                        - Select timeline rows (or edit a row to auto-select). <span className="font-medium">Status</span> is derived: both Reference and Completed filled → completed; both empty → pending; otherwise → ongoing. <span className="font-medium">referenceNumber</span> and <span className="font-medium">completedAt</span> are sent; <span className="font-medium">status</span> is set automatically.<br />
-                        - To clear: set Reference empty and clear Completed date (sends <span className="font-mono">""</span> / <span className="font-mono">null</span>, status becomes pending).
+                      <div className="mt-1.5 text-[11px] text-[#495057]">
+                        Status is derived from Reference + Completed. To clear: set Reference empty and clear Completed date (status becomes pending).
                       </div>
                     </>
                   ) : (
-                    <div className="text-sm text-gray-500 dark:text-gray-400 p-3 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
+                    <div className="text-[11px] text-[#495057] p-2 bg-gray-50 rounded border border-gray-200">
                       Timeline details not loaded. Click Refresh.
                     </div>
                   )}
                 </div>
               </div>
-              
-              <div className="flex justify-end gap-3 mt-6">
-                <button
-                  onClick={closeUpdateModal}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleUpdateTask}
-                  disabled={updatingTask || (selectedTask?.status === 'delayed' && updateForm.status === 'delayed')}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {updatingTask ? 'Updating...' : (selectedTask?.status === 'delayed' ? 'Mark as Completed' : 'Update Task')}
-                </button>
-              </div>
+            </div>
+            <div className="flex justify-end gap-2 p-[10px] border-t border-gray-200">
+              <button
+                onClick={closeUpdateModal}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-white border border-gray-200 text-[#495057] hover:bg-gray-50 shadow-sm"
+              >
+                <i className="ri-close-line text-xs"></i> Cancel
+              </button>
+              <button
+                onClick={handleUpdateTask}
+                disabled={updatingTask || (selectedTask?.status === 'delayed' && updateForm.status === 'delayed')}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm disabled:opacity-50"
+              >
+                <i className="ri-save-line text-xs"></i>
+                {updatingTask ? 'Updating...' : (selectedTask?.status === 'delayed' ? 'Mark as Completed' : 'Update Task')}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* View Task Details Modal */}
+      {/* View Task Details Drawer */}
       {showViewDetailsModal && viewTaskDetails && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-10 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white dark:bg-gray-800 max-h-[90vh] overflow-y-auto">
-            <div className="mt-3">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Task Details (View Only)</h3>
-                <button
-                  onClick={closeViewDetailsModal}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                >
-                  <i className="ri-close-line text-2xl"></i>
-                </button>
-              </div>
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
+          <div className="fixed right-0 top-0 h-full w-full max-w-[60.48rem] bg-white shadow-xl overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center p-[10px] border-b border-gray-200">
+              <h3 className="text-sm font-bold text-gray-800">Task Details (View Only)</h3>
+              <button onClick={closeViewDetailsModal} className="p-1 text-gray-500 hover:text-gray-700">
+                <i className="ri-close-line text-xl"></i>
+              </button>
+            </div>
+            <div className="p-[10px] overflow-auto flex-1">
               
               <div className="space-y-6">
                 {/* Basic Task Information */}
-                <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Task Information</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-3 bg-gray-50 rounded">
+                  <h4 className="text-[11px] font-bold text-[#495057] uppercase tracking-wider mb-3">Task Information</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {viewAccessibleTasks && (
                       <div>
-                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Assigned To</label>
-                        <p className="text-sm text-gray-900 dark:text-white font-medium">
+                        <label className="block text-[11px] font-medium text-[#495057] mb-1">Assigned To</label>
+                        <p className="text-[12px] text-gray-900 font-medium">
                           <i className="ri-user-line mr-1"></i>
                           {getTeamMemberName(viewTaskDetails)}
                         </p>
@@ -2220,8 +2179,8 @@ const TeamMemberDashboard = () => {
                     )}
                     {hasAssignedBy(viewTaskDetails) && (
                       <div>
-                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Assigned By</label>
-                        <p className="text-sm text-gray-900 dark:text-white font-medium">
+                        <label className="block text-[11px] font-medium text-[#495057] mb-1">Assigned By</label>
+                        <p className="text-[12px] text-gray-900 font-medium">
                           <i className="ri-user-add-line mr-1"></i>
                           {getAssignedByName(viewTaskDetails)}
                           {getAssignedByEmail(viewTaskDetails) && (
@@ -2243,47 +2202,47 @@ const TeamMemberDashboard = () => {
                       </span>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Priority</label>
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(viewTaskDetails.priority)}`}>
+                      <label className="block text-[11px] font-medium text-[#495057] mb-1">Priority</label>
+                      <span className={`inline-flex px-2 py-0.5 text-[11px] font-medium rounded ${getPriorityColor(viewTaskDetails.priority)}`}>
                         {viewTaskDetails.priority}
                       </span>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Branch</label>
-                      <p className="text-sm text-gray-900 dark:text-white">
+                      <label className="block text-[11px] font-medium text-[#495057] mb-1">Branch</label>
+                      <p className="text-[12px] text-gray-900">
                         {viewTaskDetails.branch?.name || 'N/A'}
                         {viewTaskDetails.branch?.address && (
-                          <span className="text-xs text-gray-500 dark:text-gray-400 block">
+                          <span className="text-[11px] text-gray-500 block">
                             {viewTaskDetails.branch.address}, {viewTaskDetails.branch.city}, {viewTaskDetails.branch.state}
                           </span>
                         )}
                       </p>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Start Date</label>
-                      <p className="text-sm text-gray-900 dark:text-white">{formatDate(viewTaskDetails.startDate)}</p>
+                      <label className="block text-[11px] font-medium text-[#495057] mb-1">Start Date</label>
+                      <p className="text-[12px] text-gray-900">{formatDate(viewTaskDetails.startDate)}</p>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">End Date</label>
-                      <p className="text-sm text-gray-900 dark:text-white">{formatDate(viewTaskDetails.endDate)}</p>
+                      <label className="block text-[11px] font-medium text-[#495057] mb-1">End Date</label>
+                      <p className="text-[12px] text-gray-900">{formatDate(viewTaskDetails.endDate)}</p>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Created At</label>
-                      <p className="text-sm text-gray-900 dark:text-white">{formatDate(viewTaskDetails.createdAt)}</p>
+                      <label className="block text-[11px] font-medium text-[#495057] mb-1">Created At</label>
+                      <p className="text-[12px] text-gray-900">{formatDate(viewTaskDetails.createdAt)}</p>
                     </div>
                     {viewTaskDetails.updatedAt && (
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Last Updated</label>
-                        <p className="text-sm text-gray-900 dark:text-white">{formatDate(viewTaskDetails.updatedAt)}</p>
-                      </div>
+                    <div>
+                        <label className="block text-[11px] font-medium text-[#495057] mb-1">Last Updated</label>
+                        <p className="text-[12px] text-gray-900">{formatDate(viewTaskDetails.updatedAt)}</p>
+                    </div>
                     )}
                   </div>
                 </div>
 
                 {/* Clients & Timeline Details */}
                 {viewTaskDetails.timeline && viewTaskDetails.timeline.length > 0 && (
-                  <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Clients & Timeline Details</h4>
+                  <div className="p-3 bg-gray-50 rounded">
+                    <h4 className="text-[11px] font-bold text-[#495057] uppercase tracking-wider mb-3">Clients & Timeline Details</h4>
                     <div className="space-y-4">
                       {viewTaskDetails.timeline.map((timeline, index) => {
                         const isPopulated = typeof timeline === 'object' && timeline !== null && 'client' in timeline
@@ -2291,83 +2250,42 @@ const TeamMemberDashboard = () => {
                         
                         if (!isPopulated) {
                           return (
-                            <div key={timelineId} className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <h5 className="text-base font-semibold text-gray-900 dark:text-white mb-1">
-                                    Timeline ID: {timelineId}
-                                  </h5>
-                                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                                    Timeline details are not loaded. Please contact administrator for more information.
-                                  </p>
-                                </div>
-                              </div>
+                            <div key={timelineId} className="p-3 bg-white rounded border border-gray-200">
+                              <h5 className="text-[12px] font-bold text-gray-900 mb-1">Timeline ID: {timelineId}</h5>
+                              <p className="text-[11px] text-gray-500">Timeline details are not loaded.</p>
                             </div>
                           )
                         }
                         
                         return (
-                          <div key={timelineId} className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600">
-                            <div className="flex items-start justify-between mb-3">
+                          <div key={timelineId} className="p-3 bg-white rounded border border-gray-200">
+                            <div className="flex items-start justify-between mb-2">
                               <div>
-                                <h5 className="text-base font-semibold text-gray-900 dark:text-white mb-1">
-                                  {timeline.client?.name || 'N/A'}
-                                </h5>
+                                <h5 className="text-[12px] font-bold text-gray-900 mb-0.5">{timeline.client?.name || 'N/A'}</h5>
                                 {timeline.client && (
-                                  <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-                                    {timeline.client.email && (
-                                      <div className="flex items-center">
-                                        <i className="ri-mail-line mr-1"></i>
-                                        {timeline.client.email}
-                                      </div>
-                                    )}
-                                    {timeline.client.phone && (
-                                      <div className="flex items-center">
-                                        <i className="ri-phone-line mr-1"></i>
-                                        {timeline.client.phone}
-                                      </div>
-                                    )}
+                                  <div className="text-[11px] text-gray-500 space-y-0.5">
+                                    {timeline.client.email && <div className="flex items-center"><i className="ri-mail-line mr-1"></i>{timeline.client.email}</div>}
+                                    {timeline.client.phone && <div className="flex items-center"><i className="ri-phone-line mr-1"></i>{timeline.client.phone}</div>}
                                   </div>
                                 )}
                               </div>
                               {timeline.status && (
-                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(timeline.status)}`}>
-                                  {timeline.status}
-                                </span>
+                                <span className={`inline-flex px-2 py-0.5 text-[11px] font-medium rounded ${getStatusColor(timeline.status)}`}>{timeline.status}</span>
                               )}
                             </div>
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
-                              {timeline.activity?.name && (
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Activity</label>
-                                  <p className="text-sm text-gray-900 dark:text-white">{timeline.activity.name}</p>
-                                </div>
-                              )}
-                              {timeline.subactivity?.name && (
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Subactivity</label>
-                                  <p className="text-sm text-gray-900 dark:text-white">{timeline.subactivity.name}</p>
-                                </div>
-                              )}
-                              {timeline.frequency && (
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Frequency</label>
-                                  <p className="text-sm text-gray-900 dark:text-white">{timeline.frequency}</p>
-                                </div>
-                              )}
-                              {timeline.startDate && (
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Timeline Start</label>
-                                  <p className="text-sm text-gray-900 dark:text-white">{formatDate(timeline.startDate)}</p>
-                                </div>
-                              )}
-                              {timeline.endDate && (
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Timeline End</label>
-                                  <p className="text-sm text-gray-900 dark:text-white">{formatDate(timeline.endDate)}</p>
-                                </div>
-                              )}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2 pt-2 border-t border-gray-200">
+                              {timeline.activity?.name && (<div><label className="block text-[11px] font-medium text-[#495057] mb-0.5">Activity</label><p className="text-[12px] text-gray-900">{timeline.activity.name}</p></div>)}
+                              {timeline.subactivity?.name && (<div><label className="block text-[11px] font-medium text-[#495057] mb-0.5">Subactivity</label><p className="text-[12px] text-gray-900">{timeline.subactivity.name}</p></div>)}
+                              {(() => {
+                                const { idLabel, idValue } = getClientIdDisplay(timeline as Parameters<typeof getClientIdDisplay>[0])
+                                if (idLabel || idValue) {
+                                  return (<div><label className="block text-[11px] font-medium text-[#495057] mb-0.5">Client ID ({idLabel})</label><p className="text-[12px] text-gray-900 font-mono">{idValue || '–'}</p></div>)
+                                }
+                                return null
+                              })()}
+                              {timeline.frequency && (<div><label className="block text-[11px] font-medium text-[#495057] mb-0.5">Frequency</label><p className="text-[12px] text-gray-900">{timeline.frequency}</p></div>)}
+                              {timeline.startDate && (<div><label className="block text-[11px] font-medium text-[#495057] mb-0.5">Timeline Start</label><p className="text-[12px] text-gray-900">{formatDate(timeline.startDate)}</p></div>)}
+                              {timeline.endDate && (<div><label className="block text-[11px] font-medium text-[#495057] mb-0.5">Timeline End</label><p className="text-[12px] text-gray-900">{formatDate(timeline.endDate)}</p></div>)}
                             </div>
                           </div>
                         )
@@ -2378,110 +2296,84 @@ const TeamMemberDashboard = () => {
 
                 {/* Attachments */}
                 {viewTaskDetails.attachments && viewTaskDetails.attachments.length > 0 && (
-                  <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Attachments</h4>
-                    <div className="space-y-2">
+                  <div className="p-3 bg-gray-50 rounded">
+                    <h4 className="text-[11px] font-bold text-[#495057] uppercase tracking-wider mb-2">Attachments</h4>
+                    <div className="space-y-1.5">
                       {viewTaskDetails.attachments.map((attachment) => (
-                        <div key={attachment._id} className="flex items-center justify-between p-2 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-600">
-                          <div className="flex items-center">
-                            <i className="ri-file-line text-gray-400 mr-2"></i>
-                            <span className="text-sm text-gray-900 dark:text-white">{attachment.fileName}</span>
-                          </div>
-                          <a
-                            href={attachment.fileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm"
-                          >
-                            <i className="ri-download-line mr-1"></i>
-                            Download
+                        <div key={attachment._id} className="flex items-center justify-between p-2 bg-white rounded border border-gray-200">
+                          <span className="text-[12px] text-gray-900">{attachment.fileName}</span>
+                          <a href={attachment.fileUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] font-bold text-purple-600 hover:text-purple-700">
+                            <i className="ri-download-line mr-1"></i> Download
                           </a>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
-
-                {/* Metadata */}
                 {viewTaskDetails.metadata && Object.keys(viewTaskDetails.metadata).length > 0 && (
-                  <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Additional Information</h4>
-                    <div className="space-y-2">
+                  <div className="p-3 bg-gray-50 rounded">
+                    <h4 className="text-[11px] font-bold text-[#495057] uppercase tracking-wider mb-2">Additional Information</h4>
+                    <div className="space-y-1">
                       {Object.entries(viewTaskDetails.metadata).map(([key, value]) => (
-                        <div key={key} className="flex">
-                          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 w-32">{key}:</span>
-                          <span className="text-sm text-gray-900 dark:text-white flex-1">{String(value)}</span>
+                        <div key={key} className="flex text-[11px]">
+                          <span className="font-medium text-[#495057] w-28">{key}:</span>
+                          <span className="text-gray-900 flex-1">{String(value)}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
               </div>
-              
-              <div className="flex justify-end gap-3 mt-6">
+            </div>
+            <div className="flex justify-end gap-2 p-[10px] border-t border-gray-200">
+              <button
+                onClick={closeViewDetailsModal}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-white border border-gray-200 text-[#495057] hover:bg-gray-50 shadow-sm"
+              >
+                <i className="ri-close-line text-xs"></i> Close
+              </button>
+              {viewAccessibleTasks && (
                 <button
-                  onClick={closeViewDetailsModal}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500"
+                  onClick={() => { closeViewDetailsModal(); openEditTaskModal(viewTaskDetails); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm"
                 >
-                  Close
+                  <i className="ri-edit-2-line text-xs"></i> Edit Task
                 </button>
-                {viewAccessibleTasks && (
-                  <button
-                    onClick={() => {
-                      closeViewDetailsModal()
-                      openEditTaskModal(viewTaskDetails)
-                    }}
-                    className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
-                  >
-                    <i className="ri-edit-2-line mr-1"></i>
-                    Edit Task
-                  </button>
-                )}
-                <button
-                  onClick={() => {
-                    closeViewDetailsModal()
-                    openUpdateModal(viewTaskDetails)
-                  }}
-                  className={`px-4 py-2 text-sm font-medium text-white rounded-md ${
-                    viewTaskDetails.status === 'delayed' 
-                      ? 'bg-yellow-600 hover:bg-yellow-700' 
-                      : 'bg-blue-600 hover:bg-blue-700'
-                  }`}
-                >
-                  <i className={`ri-${viewTaskDetails.status === 'delayed' ? 'check-line' : 'edit-line'} mr-1`}></i>
-                  {viewTaskDetails.status === 'delayed' ? 'Mark Complete' : 'Update Status'}
-                </button>
-              </div>
+              )}
+              <button
+                onClick={() => { closeViewDetailsModal(); openUpdateModal(viewTaskDetails); }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded shadow-sm ${
+                  viewTaskDetails.status === 'delayed' ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100' : 'bg-purple-600 text-white hover:bg-purple-700'
+                }`}
+              >
+                <i className={`ri-${viewTaskDetails.status === 'delayed' ? 'check-line' : 'edit-line'} text-xs`}></i>
+                {viewTaskDetails.status === 'delayed' ? 'Mark Complete' : 'Update Status'}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Edit Task Modal */}
+      {/* Edit Task Drawer */}
       {showEditTaskModal && editingTask && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-10 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white dark:bg-gray-800 max-h-[90vh] overflow-y-auto">
-            <div className="mt-3">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Edit Task</h3>
-                <button
-                  onClick={closeEditTaskModal}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                >
-                  <i className="ri-close-line text-2xl"></i>
-                </button>
-              </div>
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
+          <div className="fixed right-0 top-0 h-full w-full max-w-[60.48rem] bg-white shadow-xl overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center p-[10px] border-b border-gray-200">
+              <h3 className="text-sm font-bold text-gray-800">Edit Task</h3>
+              <button onClick={closeEditTaskModal} className="p-1 text-gray-500 hover:text-gray-700">
+                <i className="ri-close-line text-xl"></i>
+              </button>
+            </div>
+            <div className="p-[10px] overflow-auto flex-1">
               
               {/* Editable Fields */}
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Team Member <span className="text-red-500">*</span>
-                  </label>
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">Team Member <span className="text-red-500">*</span></label>
                   <select
                     value={editTaskForm.teamMember}
                     onChange={(e) => setEditTaskForm({...editTaskForm, teamMember: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300"
                     required
                   >
                     <option value="">Select a team member</option>
@@ -2495,28 +2387,26 @@ const TeamMemberDashboard = () => {
 
                 {/* Start Date */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Start Date <span className="text-red-500">*</span>
-                  </label>
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">Start Date <span className="text-red-500">*</span></label>
                   <input
                     type="date"
                     value={editTaskForm.startDate}
                     onChange={(e) => setEditTaskForm({...editTaskForm, startDate: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
                     required
                   />
                 </div>
 
                 {/* End Date */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">
                     End Date <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="date"
                     value={editTaskForm.endDate}
                     onChange={(e) => setEditTaskForm({...editTaskForm, endDate: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
                     min={editTaskForm.startDate || new Date().toISOString().split('T')[0]}
                     required
                   />
@@ -2524,13 +2414,13 @@ const TeamMemberDashboard = () => {
 
                 {/* Priority */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">
                     Priority <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={editTaskForm.priority}
                     onChange={(e) => setEditTaskForm({...editTaskForm, priority: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300 appearance-none cursor-pointer"
                     required
                   >
                     <option value="low">Low</option>
@@ -2543,13 +2433,13 @@ const TeamMemberDashboard = () => {
 
                 {/* Branch */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">
                     Branch <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={editTaskForm.branch}
                     onChange={(e) => setEditTaskForm({...editTaskForm, branch: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300 appearance-none cursor-pointer"
                     required
                   >
                     <option value="">Select a branch</option>
@@ -2563,10 +2453,10 @@ const TeamMemberDashboard = () => {
 
                 {/* Related Timelines */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">
                     Related Timelines
                   </label>
-                  <div className="flex items-center space-x-4">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <button
                       type="button"
                       onClick={() => {
@@ -2579,24 +2469,25 @@ const TeamMemberDashboard = () => {
                         setTimelineItemsPerPage(10)
                         fetchTimelines(1, "", true)
                       }}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm"
                     >
-                      Select Timelines ({editSelectedTimelines.length} selected)
+                      <i className="ri-add-line text-xs"></i>
+                      Select Timelines ({editSelectedTimelines.length})
                     </button>
                     {editSelectedTimelines.length > 0 && (
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                      <span className="text-[11px] text-[#495057]">
                         {editSelectedTimelines.length} timeline{editSelectedTimelines.length !== 1 ? 's' : ''} selected
                       </span>
                     )}
                   </div>
                   {editSelectedTimelines.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2">
+                    <div className="mt-2 flex flex-wrap gap-1.5">
                       {editSelectedTimelines.map(timeline => (
-                        <span key={timeline.id} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200">
-                          {timeline.title || `${timeline.activity?.name || 'Unknown Activity'}${timeline.subactivity?.name ? ` - ${timeline.subactivity.name}` : ''} - ${timeline.client?.name || 'Unknown Client'}${timeline.period ? ` (${timeline.period})` : ''}`}
+                        <span key={timeline.id} className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-gray-50 text-gray-800 border border-gray-200">
+                          {timeline.title || getTimelineDisplayLabel(timeline)}
                           <button
                             type="button"
-                            className="ml-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                            className="ml-1.5 text-gray-500 hover:text-gray-700 p-0.5"
                             onClick={() => {
                               setEditSelectedTimelines(prev => prev.filter(t => t.id !== timeline.id))
                               setEditTaskForm(prev => ({
@@ -2605,7 +2496,7 @@ const TeamMemberDashboard = () => {
                               }))
                             }}
                           >
-                            <i className="ri-close-line"></i>
+                            <i className="ri-close-line text-xs"></i>
                           </button>
                         </span>
                       ))}
@@ -2615,13 +2506,13 @@ const TeamMemberDashboard = () => {
                 
                 {/* Remarks */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">
                     Remarks
                   </label>
                   <textarea
                     value={editTaskForm.remarks}
                     onChange={(e) => setEditTaskForm({...editTaskForm, remarks: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
                     rows={3}
                     placeholder="Enter task remarks..."
                   />
@@ -2629,13 +2520,13 @@ const TeamMemberDashboard = () => {
 
                 {/* Status */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">
                     Status
                   </label>
                   <select
                     value={editTaskForm.status}
                     onChange={(e) => setEditTaskForm({...editTaskForm, status: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300 appearance-none cursor-pointer"
                   >
                     <option value="pending">Pending</option>
                     <option value="ongoing">Ongoing</option>
@@ -2648,89 +2539,78 @@ const TeamMemberDashboard = () => {
 
                 {/* Completed Date */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Completed Date <span className="text-gray-500 text-xs">(Optional)</span>
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">
+                    Completed Date <span className="text-gray-400">(Optional)</span>
                   </label>
                   <input
                     type="date"
                     value={editTaskForm.completedAt}
                     onChange={(e) => setEditTaskForm({...editTaskForm, completedAt: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
                     max={editTaskForm.endDate || new Date().toISOString().split('T')[0]}
                   />
                 </div>
 
                 {/* Reference Number */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Reference Number <span className="text-gray-500 text-xs">(Optional)</span>
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">
+                    Reference Number <span className="text-gray-400">(Optional)</span>
                   </label>
                   <input
                     type="text"
                     value={editTaskForm.referenceNumber}
                     onChange={(e) => setEditTaskForm({...editTaskForm, referenceNumber: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
                     placeholder="Enter reference number..."
                   />
                 </div>
               </div>
-              
-              <div className="flex justify-end gap-3 mt-6">
-                <button
-                  onClick={closeEditTaskModal}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500"
-                  disabled={isSavingEdit}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleEditTask}
-                  disabled={isSavingEdit}
-                  className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
-                >
-                  {isSavingEdit ? (
-                    <>
-                      <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <i className="ri-save-line mr-1"></i>
-                      Save Changes
-                    </>
-                  )}
-                </button>
-              </div>
+            </div>
+            <div className="flex justify-end gap-2 p-[10px] border-t border-gray-200">
+              <button
+                onClick={closeEditTaskModal}
+                disabled={isSavingEdit}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-white border border-gray-200 text-[#495057] hover:bg-gray-50 shadow-sm disabled:opacity-50"
+              >
+                <i className="ri-close-line text-xs"></i> Cancel
+              </button>
+              <button
+                onClick={handleEditTask}
+                disabled={isSavingEdit}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm disabled:opacity-50"
+              >
+                {isSavingEdit ? (
+                  <span className="inline-block animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></span>
+                ) : (
+                  <i className="ri-save-line text-xs"></i>
+                )}
+                {isSavingEdit ? 'Saving...' : 'Save Changes'}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Assign Task Modal */}
+      {/* Assign Task Drawer */}
       {showAssignTaskModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white dark:bg-gray-800">
-            <div className="mt-3">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Assign Task to Team Member</h3>
-                <button
-                  onClick={closeAssignTaskModal}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                >
-                  <i className="ri-close-line text-2xl"></i>
-                </button>
-              </div>
-              
-              <div className="space-y-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
+          <div className="fixed right-0 top-0 h-full w-full max-w-[60.48rem] bg-white shadow-xl overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center p-[10px] border-b border-gray-200">
+              <h3 className="text-sm font-bold text-gray-800">Assign Task to Team Member</h3>
+              <button onClick={closeAssignTaskModal} className="p-1 text-gray-500 hover:text-gray-700">
+                <i className="ri-close-line text-xl"></i>
+              </button>
+            </div>
+            <div className="p-[10px] overflow-auto flex-1 space-y-4">
                 {/* Team Member Selection */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">
                     Team Member <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={assignTaskForm.teamMember}
                     onChange={(e) => setAssignTaskForm({...assignTaskForm, teamMember: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300 appearance-none cursor-pointer"
                   >
                     <option value="">Select a team member</option>
                     {accessibleTeamMembers.map((member) => (
@@ -2743,41 +2623,41 @@ const TeamMemberDashboard = () => {
 
                 {/* Start Date */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">
                     Start Date <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="date"
                     value={assignTaskForm.startDate}
                     onChange={(e) => setAssignTaskForm({...assignTaskForm, startDate: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
                     min={new Date().toISOString().split('T')[0]}
                   />
                 </div>
 
                 {/* End Date */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">
                     End Date <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="date"
                     value={assignTaskForm.endDate}
                     onChange={(e) => setAssignTaskForm({...assignTaskForm, endDate: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
                     min={assignTaskForm.startDate || new Date().toISOString().split('T')[0]}
                   />
                 </div>
 
                 {/* Priority */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">
                     Priority <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={assignTaskForm.priority}
                     onChange={(e) => setAssignTaskForm({...assignTaskForm, priority: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300 appearance-none cursor-pointer"
                   >
                     <option value="low">Low</option>
                     <option value="medium">Medium</option>
@@ -2789,13 +2669,13 @@ const TeamMemberDashboard = () => {
 
                 {/* Branch */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">
                     Branch <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={assignTaskForm.branch}
                     onChange={(e) => setAssignTaskForm({...assignTaskForm, branch: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300 appearance-none cursor-pointer"
                   >
                     <option value="">Select a branch</option>
                     {branches.map((branch) => (
@@ -2808,10 +2688,10 @@ const TeamMemberDashboard = () => {
 
                 {/* Related Timelines */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">
                     Related Timelines
                   </label>
-                  <div className="flex items-center space-x-4">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <button
                       type="button"
                       onClick={() => {
@@ -2824,24 +2704,25 @@ const TeamMemberDashboard = () => {
                         setTimelineItemsPerPage(10)
                         fetchTimelines(1, "", true)
                       }}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm"
                     >
-                      Select Timelines ({selectedTimelines.length} selected)
+                      <i className="ri-add-line text-xs"></i>
+                      Select Timelines ({selectedTimelines.length})
                     </button>
                     {selectedTimelines.length > 0 && (
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                      <span className="text-[11px] text-[#495057]">
                         {selectedTimelines.length} timeline{selectedTimelines.length !== 1 ? 's' : ''} selected
                       </span>
                     )}
                   </div>
                   {selectedTimelines.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2">
+                    <div className="mt-2 flex flex-wrap gap-1.5">
                       {selectedTimelines.map(timeline => (
-                        <span key={timeline.id} className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200">
-                          {timeline.title || `${timeline.activity?.name || 'Unknown Activity'}${timeline.subactivity?.name ? ` - ${timeline.subactivity.name}` : ''} - ${timeline.client?.name || 'Unknown Client'}${timeline.period ? ` (${timeline.period})` : ''}`}
+                        <span key={timeline.id} className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-gray-50 text-gray-800 border border-gray-200">
+                          {timeline.title || getTimelineDisplayLabel(timeline)}
                           <button
                             type="button"
-                            className="ml-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                            className="ml-1.5 text-gray-500 hover:text-gray-700 p-0.5"
                             onClick={() => {
                               setSelectedTimelines(prev => prev.filter(t => t.id !== timeline.id))
                               setAssignTaskForm(prev => ({
@@ -2850,7 +2731,7 @@ const TeamMemberDashboard = () => {
                               }))
                             }}
                           >
-                            <i className="ri-close-line"></i>
+                            <i className="ri-close-line text-xs"></i>
                           </button>
                         </span>
                       ))}
@@ -2860,27 +2741,27 @@ const TeamMemberDashboard = () => {
 
                 {/* Remarks */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">
                     Remarks
                   </label>
                   <textarea
                     value={assignTaskForm.remarks}
                     onChange={(e) => setAssignTaskForm({...assignTaskForm, remarks: e.target.value})}
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300 placeholder:text-gray-400"
                     placeholder="Enter task remarks..."
                   />
                 </div>
 
                 {/* Status */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">
                     Status
                   </label>
                   <select
                     value={assignTaskForm.status}
                     onChange={(e) => setAssignTaskForm({...assignTaskForm, status: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300 appearance-none cursor-pointer"
                   >
                     <option value="pending">Pending</option>
                     <option value="ongoing">Ongoing</option>
@@ -2890,80 +2771,75 @@ const TeamMemberDashboard = () => {
 
                 {/* Completed Date */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Completed Date <span className="text-gray-500 text-xs">(Optional)</span>
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">
+                    Completed Date <span className="text-gray-400">(Optional)</span>
                   </label>
                   <input
                     type="date"
                     value={assignTaskForm.completedAt}
                     onChange={(e) => setAssignTaskForm({...assignTaskForm, completedAt: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
                     max={assignTaskForm.endDate || new Date().toISOString().split('T')[0]}
                   />
                 </div>
 
                 {/* Reference Number */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Reference Number <span className="text-gray-500 text-xs">(Optional)</span>
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">
+                    Reference Number <span className="text-gray-400">(Optional)</span>
                   </label>
                   <input
                     type="text"
                     value={assignTaskForm.referenceNumber}
                     onChange={(e) => setAssignTaskForm({...assignTaskForm, referenceNumber: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
                     placeholder="Enter reference number..."
                   />
                 </div>
-              </div>
-              
-              <div className="flex justify-end gap-3 mt-6">
-                <button
-                  onClick={closeAssignTaskModal}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAssignTask}
-                  disabled={assigningTask}
-                  className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
-                >
-                  {assigningTask ? 'Assigning...' : 'Assign Task'}
-                </button>
-              </div>
+            </div>
+            <div className="flex justify-end gap-2 p-[10px] border-t border-gray-200">
+              <button
+                onClick={closeAssignTaskModal}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-white border border-gray-200 text-[#495057] hover:bg-gray-50 shadow-sm"
+              >
+                <i className="ri-close-line text-xs"></i> Cancel
+              </button>
+              <button
+                onClick={handleAssignTask}
+                disabled={assigningTask}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm disabled:opacity-50"
+              >
+                <i className="ri-add-line text-xs"></i>
+                {assigningTask ? 'Assigning...' : 'Assign Task'}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Timeline Selection Modal - Shared for Assign and Edit */}
+      {/* Timeline Selection Drawer - Shared for Assign and Edit */}
       {(showTimelineModal || showEditTimelineModal) && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg w-11/12 max-w-6xl max-h-[90vh] flex flex-col">
-            <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Select Timelines</h2>
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
+          <div className="fixed right-0 top-0 h-full w-full max-w-[80.64rem] bg-white shadow-xl overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center p-[10px] border-b border-gray-200">
+              <h2 className="text-sm font-bold text-gray-800">Select Timelines</h2>
               <button
-                onClick={() => {
-                  setShowTimelineModal(false)
-                  setShowEditTimelineModal(false)
-                }}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                onClick={() => { setShowTimelineModal(false); setShowEditTimelineModal(false); }}
+                className="p-1 text-gray-500 hover:text-gray-700"
               >
-                <i className="ri-close-line text-2xl"></i>
+                <i className="ri-close-line text-xl"></i>
               </button>
             </div>
-
-            <div className="p-4 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+            <div className="p-[10px] border-b border-gray-300 bg-gray-50/30">
               {/* Activity, Subactivity Filter */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                 {/* Activity Filter */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">
                     Filter by Activity
                   </label>
                   <select
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full bg-white border border-gray-300 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300 appearance-none cursor-pointer"
                     value={selectedActivity}
                     onChange={(e) => handleActivityFilterChange(e.target.value)}
                   >
@@ -2978,11 +2854,11 @@ const TeamMemberDashboard = () => {
 
                 {/* Subactivity Filter */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">
                     Filter by Sub Activity
                   </label>
                   <select
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full bg-white border border-gray-300 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300 appearance-none cursor-pointer"
                     value={selectedSubActivity}
                     onChange={(e) => handleSubActivityFilterChange(e.target.value)}
                     disabled={!selectedActivity}
@@ -2994,8 +2870,8 @@ const TeamMemberDashboard = () => {
                       </option>
                     ))}
                   </select>
-                  {!selectedActivity && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Select an activity first</p>
+                    {!selectedActivity && (
+                    <p className="text-[11px] text-gray-500 mt-1">Select an activity first</p>
                   )}
                 </div>
 
@@ -3004,128 +2880,97 @@ const TeamMemberDashboard = () => {
                   <button
                     type="button"
                     onClick={clearTimelineFilters}
-                    className="w-full px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm"
+                    className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-gray-50 text-gray-600 border border-gray-300 hover:bg-gray-100 disabled:opacity-50"
                     disabled={!selectedActivity && !selectedSubActivity && !timelineSearchQuery}
                   >
-                    <i className="ri-refresh-line mr-2"></i>
-                    Clear Filters
+                    <i className="ri-refresh-line text-xs"></i> Clear Filters
                   </button>
                 </div>
               </div>
 
               {/* Search Bar */}
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center gap-2">
                 <div className="relative flex-1">
-                  <div className="flex items-center">
-                    <i className="ri-search-line text-gray-400 text-xl mr-3"></i>
-                    <input
-                      type="text"
-                      placeholder="Search timelines by title, activity, or client..."
-                      className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      value={timelineSearchQuery}
-                      onChange={handleTimelineSearchChange}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          handleTimelineSearchClick()
-                        }
-                      }}
-                    />
-                  </div>
-                  <button 
-                    className="absolute end-0 top-0 px-6 h-full bg-blue-600 text-white hover:bg-blue-700 rounded-r-md"
+                  <i className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none ri-search-line"></i>
+                  <input
+                    type="text"
+                    placeholder="Search timelines by title, activity, or client..."
+                    className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded bg-white text-[#495057] text-[11px] font-medium focus:ring-0 focus:border-purple-300 placeholder:text-gray-400"
+                    value={timelineSearchQuery}
+                    onChange={handleTimelineSearchChange}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleTimelineSearchClick() }}
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-0 top-0 h-full px-3 bg-purple-600 text-white hover:bg-purple-700 rounded-r text-[11px] font-bold"
                     onClick={handleTimelineSearchClick}
                   >
-                    <i className="ri-search-line text-xl"></i>
+                    <i className="ri-search-line text-xs"></i>
                   </button>
                 </div>
               </div>
             </div>
 
-            <div className="flex-1 overflow-auto p-4">
+            <div className="flex-1 overflow-auto p-[10px]">
               {/* Active Filters Summary */}
               {(selectedActivity || selectedSubActivity) && (
-                <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Active Filters:</span>
+                <div className="mb-3 p-2 bg-gray-50 border border-gray-300 rounded">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[11px] font-bold text-[#495057]">Active Filters:</span>
                       {selectedActivity && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-purple-50 text-purple-700 border border-purple-100">
                           Activity: {activities.find(a => a.id === selectedActivity)?.name}
                         </span>
                       )}
                       {selectedSubActivity && selectedActivity && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200">
-                          Sub Activity: {activities.find(a => a.id === selectedActivity)?.subactivities?.find(sa => (sa._id || sa.id) === selectedSubActivity)?.name}
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-purple-50 text-purple-700 border border-purple-100">
+                          Sub: {activities.find(a => a.id === selectedActivity)?.subactivities?.find(sa => (sa._id || sa.id) === selectedSubActivity)?.name}
                         </span>
                       )}
                     </div>
-                    <button
-                      onClick={clearTimelineFilters}
-                      className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm"
-                    >
-                      <i className="ri-close-line mr-1"></i>
-                      Clear All
+                    <button type="button" onClick={clearTimelineFilters} className="text-[11px] font-bold text-purple-600 hover:text-purple-700">
+                      <i className="ri-close-line mr-1"></i> Clear All
                     </button>
                   </div>
                 </div>
               )}
 
               {isLoadingTimelines ? (
-                <div className="flex items-center justify-center h-32">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div className="flex flex-col items-center justify-center py-20">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 opacity-50"></div>
+                  <span className="mt-2 text-[10px] font-bold text-gray-400 tracking-[0.2em] uppercase">Loading Data</span>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead className="bg-gray-50 dark:bg-gray-700">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Select
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Activity
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Sub Activity
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Client
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Period
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Priority
-                        </th>
+                <div className="overflow-x-auto min-h-[300px]">
+                  <table className="w-full border-collapse border border-gray-300">
+                    <thead>
+                      <tr className="bg-gray-50/30">
+                        <th className="px-1.5 py-3 pl-[10px] text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-300">Select</th>
+                        <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-300">Activity</th>
+                        <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-300">Sub Activity</th>
+                        <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-300">Client</th>
+                        <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-300">Client ID (GST/TIN/PAN/CIN)</th>
+                        <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-300">Period</th>
+                        <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-300">Status</th>
+                        <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-300 pr-[10px]">Priority</th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    <tbody>
                       {timelines.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="px-6 py-8 text-center">
-                            <div className="flex flex-col items-center justify-center">
-                              <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-4">
-                                <i className="ri-search-line text-2xl text-gray-400"></i>
+                          <td colSpan={8} className="px-1.5 py-8 pr-[10px] text-center border border-gray-300">
+                            <div className="flex flex-col items-center justify-center py-20">
+                              <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                                <i className="ri-search-line text-xl text-gray-200"></i>
                               </div>
-                              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                                No timelines found
-                              </h3>
-                              <p className="text-gray-500 dark:text-gray-400 text-center mb-4">
-                                {(selectedActivity || selectedSubActivity)
-                                  ? "Try adjusting your filters or search criteria."
-                                  : "No timelines available at the moment."
-                                }
+                              <h3 className="text-xs font-bold text-gray-400 mb-1">NO TIMELINES FOUND</h3>
+                              <p className="text-[11px] text-gray-500 mb-4">
+                                {(selectedActivity || selectedSubActivity) ? "Try adjusting your filters or search criteria." : "No timelines available at the moment."}
                               </p>
                               {(selectedActivity || selectedSubActivity) && (
-                                <button
-                                  onClick={clearTimelineFilters}
-                                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
-                                >
-                                  <i className="ri-refresh-line mr-2"></i>
-                                  Clear Filters
+                                <button onClick={clearTimelineFilters} className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm">
+                                  <i className="ri-refresh-line text-xs"></i> Clear Filters
                                 </button>
                               )}
                             </div>
@@ -3133,11 +2978,11 @@ const TeamMemberDashboard = () => {
                         </tr>
                       ) : (
                         timelines.map((timeline) => (
-                          <tr key={timeline.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                            <td className="px-6 py-4 whitespace-nowrap">
+                          <tr key={timeline.id} className="hover:bg-gray-50/50 transition-colors group">
+                            <td className="px-1.5 py-2.5 pl-[10px] whitespace-nowrap border border-gray-300">
                               <input
                                 type="checkbox"
-                                className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                className="rounded border-2 border-gray-300 text-purple-600 focus:ring-0 focus:border-purple-500 h-3.5 w-3.5"
                                 checked={
                                   showEditTimelineModal
                                     ? editSelectedTimelines.some(t => t.id === timeline.id)
@@ -3152,33 +2997,37 @@ const TeamMemberDashboard = () => {
                                 }}
                               />
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900 dark:text-white">{timeline.activity?.name || 'Unknown Activity'}</div>
+                            <td className="px-1.5 py-2.5 whitespace-nowrap border border-gray-300 text-[12px] text-gray-900">{timeline.activity?.name || 'Unknown Activity'}</td>
+                            <td className="px-1.5 py-2.5 whitespace-nowrap border border-gray-300 text-[12px] text-gray-900">{timeline.subactivity?.name || '-'}</td>
+                            <td className="px-1.5 py-2.5 whitespace-nowrap border border-gray-300 text-[12px] text-gray-900">{timeline.client?.name || 'Unknown Client'}</td>
+                            <td className="px-1.5 py-2.5 whitespace-nowrap border border-gray-300">
+                              {(() => {
+                                const { idLabel, idValue } = getClientIdDisplay(timeline as Parameters<typeof getClientIdDisplay>[0])
+                                if (!idLabel && !idValue) return <span className="text-[12px] text-gray-400">-</span>
+                                return (
+                                  <div className="text-[12px] text-gray-900">
+                                    <span className="text-gray-500">{idLabel}:</span>{' '}
+                                    <span className="font-mono">{idValue || '-'}</span>
+                                  </div>
+                                )
+                              })()}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900 dark:text-white">{timeline.subactivity?.name || '-'}</div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900 dark:text-white">{timeline.client?.name || 'Unknown Client'}</div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900 dark:text-white">{timeline.period || '-'}</div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                timeline.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200' :
-                                timeline.status === 'ongoing' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200' :
-                                timeline.status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200' :
-                                'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-200'
+                            <td className="px-1.5 py-2.5 whitespace-nowrap border border-gray-300 text-[12px] text-gray-900">{timeline.period || '-'}</td>
+                            <td className="px-1.5 py-2.5 whitespace-nowrap border border-gray-300">
+                              <span className={`inline-flex px-2 py-0.5 text-[11px] font-medium rounded ${
+                                timeline.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                timeline.status === 'ongoing' ? 'bg-blue-100 text-blue-800' :
+                                timeline.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-gray-100 text-gray-800'
                               }`}>
                                 {timeline.status || 'N/A'}
                               </span>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                timeline.priority === 'high' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200' :
-                                timeline.priority === 'medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200' :
-                                'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200'
+                            <td className="px-1.5 py-2.5 whitespace-nowrap border border-gray-300 pr-[10px]">
+                              <span className={`inline-flex px-2 py-0.5 text-[11px] font-medium rounded ${
+                                timeline.priority === 'high' ? 'bg-red-100 text-red-800' :
+                                timeline.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-green-100 text-green-800'
                               }`}>
                                 {timeline.priority || 'N/A'}
                               </span>
@@ -3191,75 +3040,55 @@ const TeamMemberDashboard = () => {
                 </div>
               )}
             </div>
-
-            <div className="p-4 border-t dark:border-gray-700 flex justify-between items-center">
-              <div className="flex items-center space-x-2">
-                <div className="flex items-center mr-4">
-                  <label className="mr-2 text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">Rows per page:</label>
-                  <select
-                    className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    value={timelineItemsPerPage}
-                    onChange={(e) => {
-                      const newItemsPerPage = Number(e.target.value)
-                      setTimelineItemsPerPage(newItemsPerPage)
-                      setTimelineCurrentPage(1)
-                      fetchTimelines(1, timelineSearchQuery, false, newItemsPerPage)
-                    }}
-                  >
-                    <option value={10}>10</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                    <option value={500}>500</option>
-                    <option value={1000}>1000</option>
-                  </select>
-                </div>
+            <div className="p-[10px] pt-4 border-t border-gray-100 bg-white flex flex-wrap justify-between items-center gap-4">
+              <div className="flex items-center flex-wrap gap-2">
+                <label className="mr-2 text-[11px] font-medium text-[#495057] whitespace-nowrap">Rows per page:</label>
+                <select
+                  className="bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-gray-300 appearance-none cursor-pointer"
+                  value={timelineItemsPerPage}
+                  onChange={(e) => {
+                    const newItemsPerPage = Number(e.target.value)
+                    setTimelineItemsPerPage(newItemsPerPage)
+                    setTimelineCurrentPage(1)
+                    fetchTimelines(1, timelineSearchQuery, false, newItemsPerPage)
+                  }}
+                >
+                  <option value={10}>10</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value={500}>500</option>
+                  <option value={1000}>1000</option>
+                </select>
                 <button
                   onClick={() => handleTimelinePageChange(Math.max(timelineCurrentPage - 1, 1))}
                   disabled={timelineCurrentPage === 1 || timelines.length === 0}
-                  className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm disabled:opacity-50"
+                  className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   Previous
                 </button>
-                <span className="text-sm text-gray-500 dark:text-gray-400">
-                  {timelineTotalResults > 0 ? (
-                    `Showing ${(timelineCurrentPage - 1) * timelineItemsPerPage + 1} to ${Math.min(timelineCurrentPage * timelineItemsPerPage, timelineTotalResults)} of ${timelineTotalResults} entries`
-                  ) : (
-                    "No results"
-                  )}
+                <span className="text-[11px] font-medium text-[#495057] tracking-tight">
+                  {timelineTotalResults > 0 ? `Showing ${(timelineCurrentPage - 1) * timelineItemsPerPage + 1} to ${Math.min(timelineCurrentPage * timelineItemsPerPage, timelineTotalResults)} of ${timelineTotalResults} entries` : "No results"}
                 </span>
                 <button
                   onClick={() => handleTimelinePageChange(Math.min(timelineCurrentPage + 1, timelineTotalPages))}
                   disabled={timelineCurrentPage === timelineTotalPages || timelineTotalPages === 0 || timelines.length === 0}
-                  className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm disabled:opacity-50"
+                  className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   Next
                 </button>
               </div>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center gap-2">
                 <button
-                  onClick={() => {
-                    setShowTimelineModal(false)
-                    setShowEditTimelineModal(false)
-                  }}
-                  className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm"
+                  onClick={() => { setShowTimelineModal(false); setShowEditTimelineModal(false); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-white border border-gray-200 text-[#495057] hover:bg-gray-50 shadow-sm"
                 >
-                  Cancel
+                  <i className="ri-close-line text-xs"></i> Cancel
                 </button>
                 <button
-                  onClick={() => {
-                    if (showEditTimelineModal) {
-                      handleEditTimelineModalSubmit()
-                    } else {
-                      handleTimelineModalSubmit()
-                    }
-                  }}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                  onClick={() => { if (showEditTimelineModal) handleEditTimelineModalSubmit(); else handleTimelineModalSubmit(); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm"
                 >
-                  Select ({
-                    showEditTimelineModal
-                      ? editSelectedTimelines.length
-                      : selectedTimelines.length
-                  })
+                  Select ({showEditTimelineModal ? editSelectedTimelines.length : selectedTimelines.length})
                 </button>
               </div>
             </div>

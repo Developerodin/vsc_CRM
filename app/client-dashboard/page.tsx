@@ -632,163 +632,143 @@ const ClientDashboard = () => {
 
   if (!clientData) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="flex items-center justify-center h-screen" style={{ background: "rgb(240 241 247)" }}>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 opacity-50"></div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4">
-          <div>
-            <h1 className="text-lg sm:text-xl font-semibold text-gray-600 dark:text-gray-300">Welcome, {clientData.name}</h1>
-            {/* <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Files will be sent to: {clientEmail || 'Loading...'}
-            </p> */}
-          </div>
-          <div className="flex items-center gap-2 sm:gap-4">
-            {/* <span className="hidden sm:block text-sm text-gray-600 dark:text-gray-300">
-              Welcome, {clientData.name}
-            </span> */}
-            <span className="sm:hidden text-xs text-gray-600 dark:text-gray-300">
-              {clientData.name}
-            </span>
-            <button
-              onClick={handleLogout}
-              className="px-2 sm:px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm"
-            >
-              <span className="hidden sm:inline">Logout</span>
-              <i className="sm:hidden ri-logout-box-r-line"></i>
-            </button>
-          </div>
+    <div className="min-h-screen" style={{ background: "rgb(240 241 247)" }}>
+      {/* Header – spec: 14px bold gray-800, logout 11px danger */}
+      <div className="bg-white shadow-sm border-b border-gray-300">
+        <div className="flex flex-wrap items-center justify-between gap-4 px-4 sm:px-6 py-3">
+          <h1 className="text-[14px] font-bold text-gray-800">
+            Welcome, {clientData.name}
+          </h1>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 transition-colors shadow-sm"
+          >
+            <i className="ri-logout-box-r-line text-xs"></i>
+            <span>Logout</span>
+          </button>
         </div>
       </div>
 
-             {/* Error Toast */}
-       {error && (
-         <div className="fixed top-4 right-4 left-4 sm:left-auto z-50 bg-red-100 border border-red-400 text-red-700 px-3 sm:px-4 py-2 sm:py-3 rounded text-sm">
-           <div className="flex items-center justify-between">
-             <span className="truncate">{error}</span>
-             <button onClick={() => setError('')} className="ml-2 sm:ml-4 text-red-500 hover:text-red-700 flex-shrink-0">
-               ×
-             </button>
-           </div>
-         </div>
-       )}
+      {/* Error Toast */}
+      {error && (
+        <div className="fixed top-4 right-4 left-4 sm:left-auto z-50 bg-red-50 border border-red-200 text-red-700 px-3 sm:px-4 py-2 sm:py-3 rounded text-[11px]">
+          <div className="flex items-center justify-between">
+            <span className="truncate">{error}</span>
+            <button onClick={() => setError('')} className="ml-2 sm:ml-4 text-red-500 hover:text-red-700 flex-shrink-0">
+              ×
+            </button>
+          </div>
+        </div>
+      )}
 
-       {/* Success Toast */}
-       {success && (
-         <div className="fixed top-4 right-4 left-4 sm:left-auto z-50 bg-green-100 border border-green-400 text-green-700 px-3 sm:px-4 py-2 sm:py-3 rounded text-sm">
-           <div className="flex items-center justify-between">
-             <span className="truncate">{success}</span>
-             <button onClick={() => setSuccess('')} className="ml-2 sm:ml-4 text-green-500 hover:text-green-700 flex-shrink-0">
-               ×
-             </button>
-           </div>
-         </div>
-       )}
+      {/* Success Toast */}
+      {success && (
+        <div className="fixed top-4 right-4 left-4 sm:left-auto z-50 bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 sm:px-4 py-2 sm:py-3 rounded text-[11px]">
+          <div className="flex items-center justify-between">
+            <span className="truncate">{success}</span>
+            <button onClick={() => setSuccess('')} className="ml-2 sm:ml-4 text-emerald-600 hover:text-emerald-800 flex-shrink-0">
+              ×
+            </button>
+          </div>
+        </div>
+      )}
 
-             {/* Main Content */}
-       <div className="p-4 sm:p-6">
-         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-           <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
-             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
-               <div className="flex items-center gap-3 min-w-0 flex-1">
-                 {/* Back Button */}
-                 {(currentFolder || folderHistory.length > 0) && (
-                   <button
-                     onClick={handleBackToParent}
-                     className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors flex-shrink-0 flex items-center gap-1"
-                     title="Back to parent folder"
-                   >
-                     <i className="ri-arrow-left-line"></i>
-                     <span className="hidden sm:inline">Back</span>
-                   </button>
-                 )}
-                 <div className="min-w-0">
-                   <h2 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white truncate">
-                     {currentFolder ? currentFolder.name : 'Your Files'}
-                   </h2>
-                   <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1 truncate">
-                     {currentFolder 
-                       ? currentFolder.path || currentFolder.description || 'Folder'
-                       : clientFolder 
-                         ? `Location: ${clientFolder.path}` 
-                         : 'Manage your files and folders'}
-                   </p>
-                 </div>
-               </div>
-               {clientFolder && (
-                 <div className="flex items-center gap-2 sm:gap-4">
-                   <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300">
-                     Total: {folderContents.length} item{folderContents.length !== 1 ? 's' : ''}
-                   </p>
-                   <button
-                     onClick={loadClientContents}
-                     disabled={loading}
-                     className="px-2 sm:px-3 py-1 text-xs sm:text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
-                   >
-                     {loading ? (
-                       <>
-                         <i className="ri-loader-4-line animate-spin mr-1"></i>
-                         <span className="hidden sm:inline">Refreshing...</span>
-                         <span className="sm:hidden">...</span>
-                       </>
-                     ) : (
-                       <>
-                         <i className="ri-refresh-line mr-1"></i>
-                         <span className="hidden sm:inline">Refresh</span>
-                         <span className="sm:hidden">Refresh</span>
-                       </>
-                     )}
-                   </button>
-                 </div>
-               )}
-             </div>
-           </div>
+      {/* Main Content */}
+      <div className="p-[10px] sm:p-4">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-300 overflow-hidden">
+          <div className="p-[10px] sm:p-4 border-b border-gray-300">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                {(currentFolder || folderHistory.length > 0) && (
+                  <button
+                    onClick={handleBackToParent}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-white border border-gray-300 text-[#495057] hover:bg-gray-50 shadow-sm flex-shrink-0"
+                    title="Back to parent folder"
+                  >
+                    <i className="ri-arrow-left-line text-xs"></i>
+                    <span>Back</span>
+                  </button>
+                )}
+                <div className="min-w-0">
+                  <h2 className="text-[14px] font-bold text-gray-800 truncate">
+                    {currentFolder ? currentFolder.name : 'Your Files'}
+                  </h2>
+                  <p className="text-[11px] text-[#495057] mt-0.5 truncate">
+                    {currentFolder
+                      ? currentFolder.path || currentFolder.description || 'Folder'
+                      : clientFolder
+                        ? `Location: ${clientFolder.path}`
+                        : 'Manage your files and folders'}
+                  </p>
+                </div>
+              </div>
+              {clientFolder && (
+                <div className="flex items-center gap-2 sm:gap-4">
+                  <p className="text-[11px] font-medium text-[#495057]">
+                    Total: {folderContents.length} item{folderContents.length !== 1 ? 's' : ''}
+                  </p>
+                  <button
+                    onClick={loadClientContents}
+                    disabled={loading}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm disabled:opacity-50 transition-colors"
+                  >
+                    {loading ? (
+                      <>
+                        <i className="ri-loader-4-line animate-spin text-xs"></i>
+                        <span>Refreshing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <i className="ri-refresh-line text-xs"></i>
+                        <span>Refresh</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
 
-          {/* Filters and Search */}
-          <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
-            <div className="space-y-4">
-              {/* Search Bar */}
+          {/* Filters and Search – spec: 11px, border-gray-300, focus purple */}
+          <div className="p-[10px] sm:p-4 border-b border-gray-300 bg-gray-50/50">
+            <div className="space-y-3">
               <div className="relative">
-                <i className="ri-search-line absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                <i className="ri-search-line absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
                 <input
                   type="text"
                   placeholder="Search files and folders..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded bg-white text-[11px] font-medium text-gray-900 placeholder:text-gray-400 focus:ring-0 focus:border-purple-300 transition-all"
                 />
               </div>
-
-              {/* Filter Controls */}
               <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-                {/* File Type Filter */}
                 <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Type:</label>
+                  <label className="text-[11px] font-medium text-[#495057]">Type:</label>
                   <select
                     value={fileTypeFilter}
                     onChange={(e) => setFileTypeFilter(e.target.value as 'all' | 'file' | 'folder')}
-                    className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="bg-white border border-gray-300 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300 appearance-none cursor-pointer"
                   >
                     <option value="all">All</option>
                     <option value="file">Files</option>
                     <option value="folder">Folders</option>
                   </select>
                 </div>
-
-                {/* File Category Filter */}
                 {fileTypeFilter === 'file' && (
                   <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Category:</label>
+                    <label className="text-[11px] font-medium text-[#495057]">Category:</label>
                     <select
                       value={fileCategoryFilter}
                       onChange={(e) => setFileCategoryFilter(e.target.value)}
-                      className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="bg-white border border-gray-300 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300 appearance-none cursor-pointer"
                     >
                       <option value="all">All Categories</option>
                       <option value="Image">Images</option>
@@ -804,14 +784,12 @@ const ClientDashboard = () => {
                     </select>
                   </div>
                 )}
-
-                {/* Date Filter */}
                 <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Date:</label>
+                  <label className="text-[11px] font-medium text-[#495057]">Date:</label>
                   <select
                     value={dateFilter}
                     onChange={(e) => setDateFilter(e.target.value as 'all' | 'today' | 'week' | 'month')}
-                    className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="bg-white border border-gray-300 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300 appearance-none cursor-pointer"
                   >
                     <option value="all">All Time</option>
                     <option value="today">Today</option>
@@ -819,14 +797,12 @@ const ClientDashboard = () => {
                     <option value="month">This Month</option>
                   </select>
                 </div>
-
-                {/* Sort Options */}
                 <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Sort by:</label>
+                  <label className="text-[11px] font-medium text-[#495057]">Sort by:</label>
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value as 'name' | 'date' | 'size' | 'type')}
-                    className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="bg-white border border-gray-300 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300 appearance-none cursor-pointer"
                   >
                     <option value="name">Name</option>
                     <option value="date">Date</option>
@@ -835,19 +811,15 @@ const ClientDashboard = () => {
                   </select>
                   <button
                     onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                    className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                    className="w-7 h-7 flex items-center justify-center rounded border border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
                     title={sortOrder === 'asc' ? 'Sort Descending' : 'Sort Ascending'}
                   >
-                    <i className={`ri-sort-${sortOrder === 'asc' ? 'asc' : 'desc'}`}></i>
+                    <i className={`ri-sort-${sortOrder === 'asc' ? 'asc' : 'desc'} text-xs`}></i>
                   </button>
                 </div>
-
-                {/* Results Count */}
-                <div className="ml-auto text-sm text-gray-600 dark:text-gray-400">
+                <div className="ml-auto text-[11px] font-medium text-[#495057]">
                   Showing {filteredContent.length} of {folderContents.length} items
                 </div>
-
-                {/* Clear Filters */}
                 {(searchTerm || fileTypeFilter !== 'all' || fileCategoryFilter !== 'all' || dateFilter !== 'all') && (
                   <button
                     onClick={() => {
@@ -858,7 +830,7 @@ const ClientDashboard = () => {
                       setSortBy('name')
                       setSortOrder('asc')
                     }}
-                    className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-white border border-gray-300 text-[#495057] hover:bg-gray-50 shadow-sm transition-colors"
                   >
                     Clear Filters
                   </button>
@@ -869,14 +841,10 @@ const ClientDashboard = () => {
 
           {/* Quick Stats */}
           {!loading && folderContents.length > 0 && (
-            <div className="px-4 sm:px-6 py-3 bg-gray-50 dark:bg-gray-700/30 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex flex-wrap items-center gap-4 text-xs sm:text-sm">
-                <span className="text-gray-600 dark:text-gray-400">
-                  Files: {folderContents.filter(item => item.type === 'file').length}
-                </span>
-                <span className="text-gray-600 dark:text-gray-400">
-                  Folders: {folderContents.filter(item => item.type === 'folder').length}
-                </span>
+            <div className="px-[10px] sm:px-4 py-2.5 bg-gray-50/30 border-b border-gray-300">
+              <div className="flex flex-wrap items-center gap-4 text-[11px] font-medium text-[#495057]">
+                <span>Files: {folderContents.filter(item => item.type === 'file').length}</span>
+                <span>Folders: {folderContents.filter(item => item.type === 'folder').length}</span>
                 {(() => {
                   const categories = folderContents
                     .filter(item => item.type === 'file' && item.file)
@@ -885,11 +853,8 @@ const ClientDashboard = () => {
                       acc[category] = (acc[category] || 0) + 1
                       return acc
                     }, {} as Record<string, number>)
-                  
                   return Object.entries(categories).map(([category, count]) => (
-                    <span key={category} className="text-gray-600 dark:text-gray-400">
-                      {category}: {count}
-                    </span>
+                    <span key={category}>{category}: {count}</span>
                   ))
                 })()}
               </div>
@@ -897,118 +862,90 @@ const ClientDashboard = () => {
           )}
 
           {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <div className="flex flex-col items-center justify-center py-20">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 opacity-50"></div>
+              <span className="mt-2 text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Loading</span>
             </div>
-                     ) : filteredContent.length > 0 ? (
-             <div className="divide-y divide-gray-200 dark:divide-gray-700">
-               {filteredContent.map((item) => (
-                 <div
-                   key={item._id}
-                   className={`flex items-center gap-2 sm:gap-4 p-3 sm:p-4 transition-colors ${
-                     item.type === 'folder' 
-                       ? 'hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer' 
-                       : 'hover:bg-gray-50 dark:hover:bg-gray-700'
-                   }`}
-                   onClick={() => item.type === 'folder' && handleItemClick(item)}
-                 >
-                   {/* Icon */}
-                   <div className="flex-shrink-0">
-                     <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                       <i className={`text-lg sm:text-xl ${
-                         item.type === 'folder' 
-                           ? 'ri-folder-2-line text-blue-600 dark:text-blue-400' 
-                           : getFileIcon(item.file?.mimeType || '')
-                       }`}></i>
-                     </div>
-                   </div>
-
-                   {/* Content */}
-                   <div className="flex-1 min-w-0">
-                     <div className="font-medium text-gray-900 dark:text-white truncate text-sm sm:text-base">
-                       {item.type === 'file' ? item.file?.fileName : item.folder?.name}
-                       {item.type === 'folder' && (
-                         <span className="ml-2 text-xs text-gray-400">
-                           <i className="ri-arrow-right-s-line"></i>
-                         </span>
-                       )}
-                     </div>
-                     <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                       {item.type === 'folder' 
-                         ? `Folder • ${item.folder?.description || 'No description'}` 
-                         : `${item.file?.mimeType} • ${formatFileSize(item.file?.fileSize || 0)}`
-                       } • {new Date(item.updatedAt).toLocaleDateString()}
-                     </div>
-                   </div>
-
-                   {/* Actions */}
-                   {item.type === 'file' && item.file && (
-                     <div className="flex items-center gap-1 sm:gap-2" onClick={(e) => e.stopPropagation()}>
-                       {/* {canViewInBrowser(item.file.mimeType) && (
-                         <button
-                           onClick={() => handleViewFile(item.file!)}
-                           className="p-1.5 sm:px-3 sm:py-1 text-xs sm:text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-                           title="View file in browser"
-                         >
-                           <i className="ri-eye-line"></i>
-                           <span className="hidden sm:inline ml-1">View</span>
-                         </button>
-                       )} */}
-                       <button
-                         onClick={() => sendFileToEmail(item.file!)}
-                         disabled={sendingEmail === item.file?.fileName}
-                         className="p-1.5 sm:px-3 sm:py-1 text-xs sm:text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50"
-                         title="Send file to client email"
-                       >
-                         {sendingEmail === item.file?.fileName ? (
-                           <>
-                             <i className="ri-loader-4-line animate-spin"></i>
-                             <span className="hidden sm:inline ml-1">Sending...</span>
-                           </>
-                         ) : (
-                           <>
-                             <i className="ri-mail-line"></i>
-                             <span className="hidden sm:inline ml-1">Email</span>
-                           </>
-                         )}
-                       </button>
-                       <button
-                         onClick={() => handleDownloadFile(item.file!)}
-                         disabled={downloadingFile === item.file?.fileName}
-                         className="p-1.5 sm:px-3 sm:py-1 text-xs sm:text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
-                         title="Download file to device"
-                       >
-                         {downloadingFile === item.file?.fileName ? (
-                           <>
-                             <i className="ri-loader-4-line animate-spin"></i>
-                             <span className="hidden sm:inline ml-1">Downloading...</span>
-                           </>
-                         ) : (
-                           <>
-                             <i className="ri-download-line"></i>
-                             <span className="inline ml-1">Download</span>
-                           </>
-                         )}
-                       </button>
-                     </div>
-                   )}
-                 </div>
-               ))}
-             </div>
+          ) : filteredContent.length > 0 ? (
+            <div className="divide-y divide-gray-300">
+              {filteredContent.map((item) => (
+                <div
+                  key={item._id}
+                  className={`flex items-center gap-2 sm:gap-4 px-[10px] sm:px-4 py-2.5 transition-colors ${
+                    item.type === 'folder'
+                      ? 'hover:bg-gray-50/50 cursor-pointer'
+                      : 'hover:bg-gray-50/50'
+                  }`}
+                  onClick={() => item.type === 'folder' && handleItemClick(item)}
+                >
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded bg-gray-50 border border-gray-300 flex items-center justify-center">
+                      <i className={`text-base ${
+                        item.type === 'folder'
+                          ? 'ri-folder-2-line text-purple-600'
+                          : getFileIcon(item.file?.mimeType || '')
+                      }`}></i>
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[12px] font-medium text-gray-900 truncate">
+                      {item.type === 'file' ? item.file?.fileName : item.folder?.name}
+                      {item.type === 'folder' && (
+                        <span className="ml-1 text-gray-400"><i className="ri-arrow-right-s-line text-xs"></i></span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-[#495057]">
+                      {item.type === 'folder'
+                        ? `Folder • ${item.folder?.description || 'No description'}`
+                        : `${item.file?.mimeType} • ${formatFileSize(item.file?.fileSize || 0)}`
+                      } • {new Date(item.updatedAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                  {item.type === 'file' && item.file && (
+                    <div className="flex items-center gap-1 sm:gap-2" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => sendFileToEmail(item.file!)}
+                        disabled={sendingEmail === item.file?.fileName}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm disabled:opacity-50 transition-colors"
+                        title="Send file to client email"
+                      >
+                        {sendingEmail === item.file?.fileName ? (
+                          <><i className="ri-loader-4-line animate-spin text-xs"></i><span>Sending...</span></>
+                        ) : (
+                          <><i className="ri-mail-line text-xs"></i><span>Email</span></>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleDownloadFile(item.file!)}
+                        disabled={downloadingFile === item.file?.fileName}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-sky-600 text-white hover:bg-sky-700 shadow-sm disabled:opacity-50 transition-colors"
+                        title="Download file"
+                      >
+                        {downloadingFile === item.file?.fileName ? (
+                          <><i className="ri-loader-4-line animate-spin text-xs"></i><span>Downloading...</span></>
+                        ) : (
+                          <><i className="ri-download-line text-xs"></i><span>Download</span></>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           ) : (
-            <div className="text-center py-12 sm:py-16 text-gray-500 dark:text-gray-400">
-              <i className="ri-folder-open-line text-3xl sm:text-4xl mb-3 sm:mb-4 opacity-50"></i>
-              <p className="text-base sm:text-lg font-medium">
-                {searchTerm || fileTypeFilter !== 'all' || fileCategoryFilter !== 'all' || dateFilter !== 'all' 
-                  ? 'No files match your filters' 
-                  : 'No files found'
-                }
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                <i className="ri-folder-open-line text-xl text-gray-200"></i>
+              </div>
+              <p className="text-[12px] font-bold text-gray-400 mb-1">
+                {searchTerm || fileTypeFilter !== 'all' || fileCategoryFilter !== 'all' || dateFilter !== 'all'
+                  ? 'No files match your filters'
+                  : 'No files found'}
               </p>
-              <p className="text-xs sm:text-sm">
+              <p className="text-[11px] text-[#495057] mb-4">
                 {searchTerm || fileTypeFilter !== 'all' || fileCategoryFilter !== 'all' || dateFilter !== 'all'
                   ? 'Try adjusting your search or filters'
-                  : 'Contact your administrator to upload files'
-                }
+                  : 'Contact your administrator to upload files'}
               </p>
               {(searchTerm || fileTypeFilter !== 'all' || fileCategoryFilter !== 'all' || dateFilter !== 'all') && (
                 <button
@@ -1020,7 +957,7 @@ const ClientDashboard = () => {
                     setSortBy('name')
                     setSortOrder('asc')
                   }}
-                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm transition-colors"
                 >
                   Clear All Filters
                 </button>

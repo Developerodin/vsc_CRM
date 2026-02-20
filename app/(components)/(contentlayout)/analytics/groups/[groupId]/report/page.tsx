@@ -150,6 +150,7 @@ const GroupReportPage = () => {
       Subactivity: string;
       Status: string;
       "Due Date": string;
+      "Completed AT": string;
       Frequency: string;
     }[] = [];
     for (const block of filteredClients) {
@@ -167,13 +168,14 @@ const GroupReportPage = () => {
           Subactivity: t.subactivity?.name ?? "—",
           Status: t.status ?? "—",
           "Due Date": t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—",
+          "Completed AT": t.completedAt ? new Date(t.completedAt).toLocaleDateString() : "—",
           Frequency: t.frequency ?? "—",
         });
       }
     }
     const wsGroup = XLSX.utils.json_to_sheet(groupSheet);
     const wsActivity = XLSX.utils.json_to_sheet(
-      activityRows.length ? activityRows : [{ "Client Name": "—", Email: "—", Category: "—", Turnover: "—", Activity: "—", Subactivity: "—", Status: "—", "Due Date": "—", Frequency: "—" }]
+      activityRows.length ? activityRows : [{ "Client Name": "—", Email: "—", Category: "—", Turnover: "—", Activity: "—", Subactivity: "—", Status: "—", "Due Date": "—", "Completed AT": "—", Frequency: "—" }]
     );
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, wsGroup, "Group");
@@ -288,6 +290,7 @@ const GroupReportPage = () => {
                           <th className="text-left py-1 font-medium text-gray-600">Activity</th>
                           <th className="text-left py-1 font-medium text-gray-600">Status</th>
                           <th className="text-left py-1 font-medium text-gray-600">Due</th>
+                          <th className="text-left py-1 font-medium text-gray-600">Completed AT</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -296,12 +299,48 @@ const GroupReportPage = () => {
                             <td className="py-1 text-gray-900">{t.activity?.name ?? "—"}</td>
                             <td className="py-1"><span className="px-1 rounded bg-amber-100">{t.status}</span></td>
                             <td className="py-1 text-gray-600">{t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—"}</td>
+                            <td className="py-1 text-gray-600">{t.completedAt ? new Date(t.completedAt).toLocaleDateString() : "—"}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
                   {block.pendings.length > 5 && <p className="text-[10px] text-gray-500 mt-1">+{block.pendings.length - 5} more</p>}
+                </div>
+              )}
+              {block.timelines.filter((t) => (t.status ?? "").toLowerCase() === "completed").length > 0 && (
+                <div className="mt-3">
+                  <p className="text-[10px] font-medium text-gray-500 mb-1">Completed ({block.timelines.filter((t) => (t.status ?? "").toLowerCase() === "completed").length})</p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-[10px]">
+                      <thead>
+                        <tr className="border-b border-gray-100">
+                          <th className="text-left py-1 font-medium text-gray-600">Activity</th>
+                          <th className="text-left py-1 font-medium text-gray-600">Subactivity</th>
+                          <th className="text-left py-1 font-medium text-gray-600">Status</th>
+                          <th className="text-left py-1 font-medium text-gray-600">Due</th>
+                          <th className="text-left py-1 font-medium text-gray-600">Completed AT</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {block.timelines
+                          .filter((t) => (t.status ?? "").toLowerCase() === "completed")
+                          .slice(0, 10)
+                          .map((t) => (
+                            <tr key={t._id} className="border-b border-gray-50">
+                              <td className="py-1 text-gray-900">{t.activity?.name ?? "—"}</td>
+                              <td className="py-1 text-gray-900">{t.subactivity?.name ?? "—"}</td>
+                              <td className="py-1"><span className="px-1 rounded bg-green-100 text-green-800">{t.status}</span></td>
+                              <td className="py-1 text-gray-600">{t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "—"}</td>
+                              <td className="py-1 text-gray-600">{t.completedAt ? new Date(t.completedAt).toLocaleDateString() : "—"}</td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {block.timelines.filter((t) => (t.status ?? "").toLowerCase() === "completed").length > 10 && (
+                    <p className="text-[10px] text-gray-500 mt-1">+{block.timelines.filter((t) => (t.status ?? "").toLowerCase() === "completed").length - 10} more</p>
+                  )}
                 </div>
               )}
             </div>
