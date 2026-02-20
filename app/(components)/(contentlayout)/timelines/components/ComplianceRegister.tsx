@@ -116,6 +116,8 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
   const [isSaving, setIsSaving] = useState(false);
   const [showFilters, setShowFilters] = useState(true);
   const [entriesToShow, setEntriesToShow] = useState<number | 'all'>(100);
+  /** Sort order: '' = none, 'asc' = A→Z, 'desc' = Z→A (by client name) */
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | ''>('');
   const [isImporting, setIsImporting] = useState(false);
   /** When true, table shows the "Mark NA" column with a button in every row */
   const [showMarkNaColumn, setShowMarkNaColumn] = useState(false);
@@ -365,10 +367,21 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
         : registerData,
     [registerData, effectivePeriod]
   );
+
+  // Alphabetical sort by client name (asc / desc)
+  const sortedData = useMemo(() => {
+    if (!sortOrder) return periodFilteredData;
+    return [...periodFilteredData].sort((a, b) => {
+      const A = (a.clientName || '').trim().toLowerCase();
+      const B = (b.clientName || '').trim().toLowerCase();
+      return sortOrder === 'asc' ? A.localeCompare(B) : B.localeCompare(A);
+    });
+  }, [periodFilteredData, sortOrder]);
+
   const displayedData = useMemo(() => {
-    if (entriesToShow === 'all') return periodFilteredData;
-    return periodFilteredData.slice(0, entriesToShow);
-  }, [periodFilteredData, entriesToShow]);
+    if (entriesToShow === 'all') return sortedData;
+    return sortedData.slice(0, entriesToShow);
+  }, [sortedData, entriesToShow]);
 
   // Save cell value - accepts entry ID or row index (row index is into displayed/period-filtered list)
   const saveCell = async (entryIdOrIndex: string | number, colKey: string, value: string) => {
@@ -384,10 +397,10 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
       return; // No change, skip API call
     }
 
-    // If completedAt is being filled, also update status to "completed"
+    // completedAt filled → status "completed"; cleared → status "pending"
     const updatedEntry = { ...entry, [colKey]: normalizedValue };
-    if (colKey === 'completedAt' && normalizedValue) {
-      updatedEntry.status = 'completed';
+    if (colKey === 'completedAt') {
+      updatedEntry.status = normalizedValue ? 'completed' : 'pending';
     }
 
     // Update the entry in registerData by finding its index
@@ -409,10 +422,7 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
 
       if (colKey === 'completedAt') {
         payload.completedAt = normalizedValue ? new Date(normalizedValue).toISOString() : null;
-        // If date is filled, also set status to "completed"
-        if (normalizedValue) {
-          payload.status = 'completed';
-        }
+        payload.status = normalizedValue ? 'completed' : 'pending';
       }
 
       if (colKey === 'referenceNumber') {
@@ -638,11 +648,12 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
     }
     if (idType === 'tds') return entry.clientTin || '';
     if (idType === 'itr') return entry.clientPan || '';
+    if (idType === 'roc') return entry.clientCin || '';
     return [entry.clientPan, entry.clientCin].filter(Boolean).join(' / ') || '';
   };
 
   const handleExport = async () => {
-    const exportData = periodFilteredData.map(entry => ({
+    const exportData = sortedData.map(entry => ({
       'Timeline ID': entry.timelineId || '',
       'Client Name': entry.clientName || '',
       'Client ID (GST/TIN/PAN/CIN)': getClientIdDisplayValue(entry),
@@ -872,6 +883,9 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
       } else if (idType === 'itr') {
         idLabel = 'PAN';
         idValue = entry.clientPan || '';
+      } else if (idType === 'roc') {
+        idLabel = 'CIN';
+        idValue = entry.clientCin || '';
       } else {
         idLabel = 'PAN / CIN';
         idValue = [entry.clientPan, entry.clientCin].filter(Boolean).join(' / ') || '';
@@ -1315,23 +1329,38 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
               </button>
             )}
             {registerData.length > 0 && (
-            <div className="flex items-center gap-3">
-              <label className="text-[11px] font-medium text-[#495057]">Show:</label>
-              <select
-                className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
-                style={{ width: '120px' }}
-                value={entriesToShow}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setEntriesToShow(value === 'all' ? 'all' : Number(value));
-                }}
-              >
-                <option value={10}>10</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-                <option value={1000}>1000</option>
-                <option value="all">Show All</option>
-              </select>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <label className="text-[11px] font-medium text-[#495057]">Sort by:</label>
+                <select
+                  className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
+                  style={{ width: '140px' }}
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder((e.target.value || '') as 'asc' | 'desc' | '')}
+                >
+                  <option value="">None</option>
+                  <option value="asc">A→Z (Ascending)</option>
+                  <option value="desc">Z→A (Descending)</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-3">
+                <label className="text-[11px] font-medium text-[#495057]">Show:</label>
+                <select
+                  className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
+                  style={{ width: '120px' }}
+                  value={entriesToShow}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setEntriesToShow(value === 'all' ? 'all' : Number(value));
+                  }}
+                >
+                  <option value={10}>10</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value={1000}>1000</option>
+                  <option value="all">Show All</option>
+                </select>
+              </div>
               <span className="text-[11px] font-medium text-[#495057] tracking-tight whitespace-nowrap">
                 Showing {displayedData.length} of {periodFilteredData.length} entries
               </span>

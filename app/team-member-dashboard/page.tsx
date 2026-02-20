@@ -734,6 +734,17 @@ const TeamMemberDashboard = () => {
     }
   }
 
+  /** Derived from reference + completed: both filled → completed, both empty → pending, else ongoing */
+  const getDerivedTimelineStatus = (timeline: any): string => {
+    const ref = (timeline?.referenceNumber ?? '').toString().trim()
+    const completed = timeline?.completedAt
+    const hasRef = ref.length > 0
+    const hasCompleted = Boolean(completed)
+    if (hasRef && hasCompleted) return 'completed'
+    if (!hasRef && !hasCompleted) return 'pending'
+    return 'ongoing'
+  }
+
   const fetchTaskTimelineDetails = async (task: Task) => {
     const token = localStorage.getItem('teamMemberToken')
     if (!token) return
@@ -785,35 +796,41 @@ const TeamMemberDashboard = () => {
     setSelectedTimelineIds(prev => ({ ...prev, [timelineId]: !prev[timelineId] }))
   }
 
-  const setTimelineField = (timeline: any, field: 'status' | 'referenceNumber' | 'completedAt', value: string) => {
+  const setTimelineField = (timeline: any, field: 'referenceNumber' | 'completedAt', value: string) => {
     const timelineId = getTimelineId(timeline)
     if (!timelineId) return
 
     // Editing a row auto-selects it (so payload matches "selected timelines")
     setSelectedTimelineIds(prev => ({ ...prev, [timelineId]: true }))
 
-    // Update visible data immediately (Excel-like feel)
+    const newCompletedAt = field === 'completedAt' ? (value ? new Date(value).toISOString() : null) : (timeline?.completedAt ?? null)
+    const newRef = field === 'referenceNumber' ? value : (timeline?.referenceNumber ?? '')
+    const derivedStatus = (newRef && newCompletedAt) ? 'completed' : (!newRef && !newCompletedAt ? 'pending' : 'ongoing')
+
+    // Update visible data immediately (Excel-like feel); status is derived, not edited
     setTimelineDetails(prev =>
       prev.map(t => {
         const tid = getTimelineId(t)
         if (tid !== timelineId) return t
         if (field === 'completedAt') {
-          return { ...t, completedAt: value ? new Date(value).toISOString() : null }
+          return { ...t, completedAt: newCompletedAt, status: derivedStatus }
         }
-        return { ...t, [field]: value }
+        return { ...t, referenceNumber: value, status: derivedStatus }
       })
     )
 
-    // Track edits for payload (do NOT drop empty values; empty/"null" are meaningful to clear)
+    // Track edits for payload; status is always derived from reference + completed
     setTimelineUpdatesMap(prev => {
       const existing = prev[timelineId] || { timelineId }
-      const next: TimelineUpdatePayload = { ...existing, timelineId }
-      if (field === 'completedAt') {
-        next.completedAt = value ? new Date(value).toISOString() : null
-      } else if (field === 'referenceNumber') {
-        next.referenceNumber = value // allow "" to clear
-      } else if (field === 'status') {
-        next.status = value
+      const effectiveRef = field === 'referenceNumber' ? value : (existing.referenceNumber ?? timeline?.referenceNumber ?? '')
+      const effectiveCompleted = field === 'completedAt' ? newCompletedAt : (existing.completedAt !== undefined ? existing.completedAt : (timeline?.completedAt ?? null))
+      const effectiveStatus = (effectiveRef && effectiveCompleted) ? 'completed' : (!effectiveRef && !effectiveCompleted ? 'pending' : 'ongoing')
+      const next: TimelineUpdatePayload = {
+        ...existing,
+        timelineId,
+        referenceNumber: effectiveRef,
+        completedAt: effectiveCompleted,
+        status: effectiveStatus
       }
       return { ...prev, [timelineId]: next }
     })
@@ -2110,20 +2127,9 @@ const TeamMemberDashboard = () => {
                                     {timeline.client?.name || timeline.client || 'Unknown Client'}
                                   </td>
                                   <td className="border border-gray-200 dark:border-gray-600 px-2 py-1.5">
-                                    <select
-                                      className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                      value={timeline.status || ''}
-                                      onChange={(e) => setTimelineField(timeline, 'status', e.target.value)}
-                                      disabled={updatingTask}
-                                    >
-                                      <option value="">Select</option>
-                                      <option value="pending">Pending</option>
-                                      <option value="ongoing">Ongoing</option>
-                                      <option value="completed">Completed</option>
-                                      <option value="on_hold">On Hold</option>
-                                      <option value="cancelled">Cancelled</option>
-                                      <option value="delayed">Delayed</option>
-                                    </select>
+                                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium capitalize ${getStatusColor(getDerivedTimelineStatus(timeline))}`}>
+                                      {getDerivedTimelineStatus(timeline)}
+                                    </span>
                                   </td>
                                   <td className="border border-gray-200 dark:border-gray-600 px-2 py-1.5">
                                     <input
@@ -2151,8 +2157,8 @@ const TeamMemberDashboard = () => {
                         </table>
                       </div>
                       <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                        - Select timeline rows (or edit a row to auto-select). Only <span className="font-medium">status</span>, <span className="font-medium">referenceNumber</span>, <span className="font-medium">completedAt</span> are sent in <span className="font-medium">timelineUpdates</span>.<br />
-                        - To clear: set Reference empty and clear Completed date (sends <span className="font-mono">""</span> / <span className="font-mono">null</span>).
+                        - Select timeline rows (or edit a row to auto-select). <span className="font-medium">Status</span> is derived: both Reference and Completed filled → completed; both empty → pending; otherwise → ongoing. <span className="font-medium">referenceNumber</span> and <span className="font-medium">completedAt</span> are sent; <span className="font-medium">status</span> is set automatically.<br />
+                        - To clear: set Reference empty and clear Completed date (sends <span className="font-mono">""</span> / <span className="font-mono">null</span>, status becomes pending).
                       </div>
                     </>
                   ) : (

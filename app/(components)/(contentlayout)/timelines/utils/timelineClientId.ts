@@ -1,9 +1,9 @@
 /**
  * Activity-based client ID display for timelines and compliance register.
- * GST → client GST number (for timeline's gst state); TDS → TIN; ITR → PAN; ROC/Audit → PAN / CIN.
+ * GST → GST number; TDS → TIN; ITR → PAN only; ROC → CIN only; Audit/Other → PAN / CIN.
  */
 
-export type ClientIdType = 'gst' | 'tds' | 'itr' | 'roc_audit';
+export type ClientIdType = 'gst' | 'tds' | 'itr' | 'roc' | 'roc_audit';
 
 /** Resolve which client ID type to show from activity/subActivity name */
 export function getClientIdType(activityName?: string, subActivityName?: string): ClientIdType {
@@ -11,7 +11,8 @@ export function getClientIdType(activityName?: string, subActivityName?: string)
   const sub = (subActivityName || '').toLowerCase();
   if (act.includes('gst') || sub.includes('gstr-1') || sub.includes('gstr-3b')) return 'gst';
   if (act.includes('tds') || sub.includes('tds')) return 'tds';
-  if (act.includes('itr') || sub.includes('itr')) return 'itr';
+  if (act.includes('income tax') || act.includes('itr') || sub.includes('itr')) return 'itr';
+  if (act.includes('roc')) return 'roc';
   return 'roc_audit';
 }
 
@@ -71,6 +72,9 @@ export function getClientIdDisplay(timeline: TimelineLike): { idLabel: string; i
   }
   if (idType === 'itr') {
     return { idLabel: 'PAN', idValue: timeline.client?.pan || '' };
+  }
+  if (idType === 'roc') {
+    return { idLabel: 'CIN', idValue: timeline.client?.cinNumber || '' };
   }
   const pan = timeline.client?.pan || '';
   const cin = timeline.client?.cinNumber || '';
