@@ -1,266 +1,198 @@
 "use client"
-import { basePath } from "@/next.config";
-import { auth } from "@/shared/firebase/firebaseapi";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-
+import { useState } from "react";
 import axios from "axios";
 import { Base_url } from "@/app/api/config/BaseUrl";
+import { auth } from "@/shared/firebase/firebaseapi";
 
 export default function Home() {
-  useEffect(() => {
-
-  }, []);
-
   const [passwordshow1, setpasswordshow1] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-
   const [err, setError] = useState("");
-  const [data, setData] = useState({
-   "email": "",
-    "password": "",
-  });
+  const [data, setData] = useState({ email: "", password: "" });
   const { email, password } = data;
-  const changeHandler = (e: any) => {
+  const router = useRouter();
+
+  const changeHandler = (e: React.ChangeEvent<HTMLInputElement>) => {
     setData({ ...data, [e.target.name]: e.target.value });
     setError("");
   };
 
-  const Login = (e: any) => {
+  const Login = (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    auth.signInWithEmailAndPassword(email, password).then(
-      user => { console.log(user); RouteChange(); }).catch(err => { setError(err.message); setIsLoading(false); });
+    auth
+      .signInWithEmailAndPassword(email, password)
+      .then(() => RouteChange())
+      .catch((err) => {
+        setError(err.message);
+        setIsLoading(false);
+      });
   };
 
-  const Login1 = async (e: any) => {
+  const Login1 = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate input fields
     if (!email.trim()) {
       setError("Email is required");
       return;
     }
-    
     if (!password.trim()) {
       setError("Password is required");
       return;
     }
-    
     setIsLoading(true);
-    
     try {
       const response = await axios.post(`${Base_url}auth/login`, {
         email: data.email,
-        password: data.password
+        password: data.password,
       });
-      
-      console.log("Login response:", response.data);
-      
       if (response.data) {
-        // Store tokens and user data based on the provided response structure
         const { user, tokens } = response.data;
-        
-        // Store access token
         localStorage.setItem("token", tokens.access.token);
-        
-        // Store refresh token
         localStorage.setItem("refreshToken", tokens.refresh.token);
-        
-        // Store user data
         localStorage.setItem("user", JSON.stringify(user));
-        
-        // Navigate to dashboard - this will trigger a full page reload
-        // which will re-initialize the branch context with the new user data
         window.location.href = "/dashboard";
       }
     } catch (error: any) {
-      console.error("Login error:", error);
       if (error.response?.status === 401) {
         setError("Invalid email or password");
       } else {
-        setError(error.response?.data?.message || "Login failed. Please try again later.");
+        setError(
+          error.response?.data?.message || "Login failed. Please try again later."
+        );
       }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const router = useRouter();
-  const RouteChange = () => {
-    let path = "/dashboard";
-    router.push(path);
-  };
-
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    try {
-        // Your sign in logic here
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-    } catch (error) {
-        setError("Invalid credentials");
-    } finally {
-        setIsLoading(false);
-    }
-  };
+  const RouteChange = () => router.push("/dashboard");
 
   return (
-    <>
-    <html>
-      <body>
-      <div className="container">
-        <div className="flex justify-center authentication authentication-basic items-center h-full text-defaultsize text-defaulttextcolor">
-          <div className="grid grid-cols-12">
-            <div className="xxl:col-span-4 xl:col-span-4 lg:col-span-4 md:col-span-3 sm:col-span-2"></div>
-            <div className="xxl:col-span-4 xl:col-span-4 lg:col-span-4 md:col-span-6 sm:col-span-8 col-span-12">
-              {/* <div className="my-[2.5rem] flex justify-center">
-                <Link href="/dashboards/crm/">
-                  <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/images/brand-logos/desktop-logo.png`} alt="logo" className="desktop-logo" />
-                  <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/images/brand-logos/desktop-dark.png`} alt="logo" className="desktop-dark" />
-                </Link>
-              </div> */}
+    <div
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{ backgroundColor: "rgb(240 241 247)" }}
+    >
+      <div className="w-full max-w-[400px]">
+        {/* Card per UI spec: bg-white shadow-sm border border-gray-100 */}
+        <div className="bg-white shadow-sm border border-gray-100 rounded-lg overflow-hidden">
+          <div className="p-[10px] sm:p-6">
+            {/* Title strip: accent bar + title (spec: 14px bold gray-800) */}
+            <div className="flex items-center gap-2 mb-1">
+              <span
+                className="w-[3px] h-5 rounded-full flex-shrink-0"
+                style={{ backgroundColor: "#6D28D9" }}
+              />
+              <h1 className="text-sm font-bold text-gray-800">Sign In</h1>
+            </div>
+            <p className="text-[11px] font-medium text-[#949EB7] mb-5 ml-5">
+              Welcome back
+            </p>
 
-              <div className="box !p-[3rem]">
-                <nav className="!block px-6  mx-auto firebase-data" aria-label="Tabs" role="tablist">
-                  <div className="flex justify-center space-x-2 bg-light p-2 rounded-md rtl:space-x-reverse">
+            {err && (
+              <div
+                className="mb-4 p-3 rounded border bg-[#FEF2F2] border-[#FEE2E2] text-[#DC2626] text-[11px] font-medium"
+                role="alert"
+              >
+                {err}
+              </div>
+            )}
 
-                    {/* <button type="button" className="hs-tab-active:bg-primary hs-tab-active:text-white py-2 px-2 inline-flex items-center gap-2 bg-transparent text-sm font-medium text-center text-gray-500 rounded-sm hover:text-primary  dark:text-white/70 dark:hover:text-white active" id="pills-with-brand-color-item-1" data-hs-tab="#pills-with-brand-color-01" aria-controls="pills-with-brand-color-01">
-                      <img src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/images/brand-logos/desktop-logo.png`} alt="user-img" className="avatar avatar-sm w-6 h-6 rounded-full ring-0" />
-                    </button> */}
-                  
-                  </div>
-                </nav>
-
-                <div className="box-body" role="tabpanel" id="pills-with-brand-color-01" aria-labelledby="pills-with-brand-color-item-1">
-
-                  <p className="h5 font-semibold mb-2 text-center">Sign In</p>
-                  {err && <div className="p-4 mb-4 bg-danger/40 text-sm  border-t-4 border-danger text-danger/60 rounded-lg bg-red-50 dark:bg-gray-800 dark:text-red-400" role="alert">
-                    {err}
-                  </div>}
-
-                  <p className="mb-4 text-[#8c9097] dark:text-white/50 opacity-[0.7] font-normal text-center">Welcome</p>
-                  <div className="grid grid-cols-12 gap-y-4">
-                    <div className="xl:col-span-12 col-span-12">
-                      <label htmlFor="signin-email" className="form-label text-default">Email</label>
-                      <input type="text" name="email" className="form-control form-control-lg w-full !rounded-md" id="email" onChange={changeHandler} value={email} />
-                    </div>
-                    <div className="xl:col-span-12 col-span-12 mb-2">
-                      <label htmlFor="signin-password" className="form-label text-default block">Password<Link href="#!" className="float-right text-danger">Forget password ?</Link></label>
-                      <div className="input-group">
-                        <input name="password" type={(passwordshow1) ? 'text' : "password"} value={password} onChange={changeHandler} className="form-control  !border-s form-control-lg !rounded-s-md" id="signin-password" placeholder="password" />
-                        <button onClick={() => setpasswordshow1(!passwordshow1)} aria-label="button" className="ti-btn ti-btn-light !rounded-s-none !mb-0" type="button" id="button-addon2"><i className={`${passwordshow1 ? 'ri-eye-line' : 'ri-eye-off-line'} align-middle`}></i></button>
-                      </div>
-                      {/* <div className="mt-2">
-                        <div className="form-check !ps-0">
-                          <input className="form-check-input" type="checkbox" defaultValue="" id="defaultCheck1" />
-                          <label className="form-check-label text-[#8c9097] dark:text-white/50 font-normal" htmlFor="defaultCheck1">
-                            Remember password ?
-                          </label>
-                        </div>
-                      </div> */}
-                    </div>
-                    <div className="xl:col-span-12 col-span-12 grid mt-0">
-                      <button onClick={Login1}  className="ti-btn ti-btn-primary !bg-primary !text-white !font-medium">{isLoading ? "Signing In..." : "Sign In"}</button>
-                    </div>
-                  </div>
-                  {/* <div className="text-center">
-                    <p className="text-[0.75rem] text-[#8c9097] dark:text-white/50 mt-4">Dont have an account? <Link href="#!" className="text-primary">Sign Up</Link></p>
-                  </div>
-                  <div className="text-center my-4 authentication-barrier">
-                    <span>OR</span>
-                  </div>
-                  <div className="btn-list text-center">
-                    <button aria-label="button" type="button" className="ti-btn ti-btn-icon ti-btn-light me-[0.365rem]">
-                      <i className="ri-facebook-line font-bold text-dark opacity-[0.7]"></i>
-                    </button>
-                    <button aria-label="button" type="button" className="ti-btn ti-btn-icon ti-btn-light me-[0.365rem]">
-                      <i className="ri-google-line font-bold text-dark opacity-[0.7]"></i>
-                    </button>
-                    <button aria-label="button" type="button" className="ti-btn ti-btn-icon ti-btn-light">
-                      <i className="ri-twitter-x-line font-bold text-dark opacity-[0.7]"></i>
-                    </button>
-                  </div> */}
+            <form onSubmit={Login1} className="space-y-4">
+              <div>
+                <label
+                  htmlFor="signin-email"
+                  className="block text-[11px] font-medium text-[#495057] mb-1.5"
+                >
+                  Email
+                </label>
+                <input
+                  type="text"
+                  name="email"
+                  id="signin-email"
+                  value={email}
+                  onChange={changeHandler}
+                  placeholder="you@example.com"
+                  className="w-full bg-white border border-gray-200 text-[11px] font-medium text-[#495057] pl-3 pr-3 py-2 rounded focus:ring-0 focus:border-purple-300 placeholder:text-gray-400 transition-all"
+                />
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label
+                    htmlFor="signin-password"
+                    className="block text-[11px] font-medium text-[#495057]"
+                  >
+                    Password
+                  </label>
+                  <Link
+                    href="#!"
+                    className="text-[11px] font-medium text-[#DC2626] hover:underline"
+                  >
+                    Forgot password?
+                  </Link>
                 </div>
-                <div className="box-body hidden" role="tabpanel" id="pills-with-brand-color-02" aria-labelledby="pills-with-brand-color-item-2">
-                  <p className="h5 font-semibold mb-2 text-center">Sign In</p>
-                  {err && <div className="p-4 mb-4 bg-danger/40 text-sm  border-t-4 border-danger text-danger/60 rounded-lg bg-red-50 dark:bg-gray-800 dark:text-red-400" role="alert">
-                    {err}
-                  </div>}
-                  <p className="mb-4 text-[#8c9097] dark:text-white/50 opacity-[0.7] font-normal text-center">Welcome back Jhon !</p>
-                  <div className="grid grid-cols-12 gap-y-4">
-                    <div className="xl:col-span-12 col-span-12">
-                      <label htmlFor="signin-email" className="form-label text-default">Email</label>
-                      <input type="email" name="email" className="form-control form-control-lg w-full !rounded-md" id="email" onChange={changeHandler} value={email} placeholder="Email" />
-                    </div>
-                    <div className="xl:col-span-12 col-span-12 mb-2">
-                      <label htmlFor="signin-password" className="form-label text-default block">Password<Link href="#!" className="float-right text-danger">Forget password ?</Link></label>
-                      <div className="input-group">
-                        <input name="password" type={(passwordshow1) ? 'text' : "password"} value={password} onChange={changeHandler} className="form-control form-control-lg !rounded-s-md" id="signin-password" placeholder="password" />
-                        <button onClick={() => setpasswordshow1(!passwordshow1)} aria-label="button" className="ti-btn ti-btn-light !rounded-s-none !mb-0" type="button" id="button-addon2"><i className={`${passwordshow1 ? 'ri-eye-line' : 'ri-eye-off-line'} align-middle`}></i></button>
-                      </div>
-                      <div className="mt-2">
-                        <div className="form-check !ps-0">
-                          <input className="form-check-input" type="checkbox" defaultValue="" id="defaultCheck1" />
-                          <label className="form-check-label text-[#8c9097] dark:text-white/50 font-normal" htmlFor="defaultCheck1">
-                            Remember password ?
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="xl:col-span-12 col-span-12 grid mt-2">
-                      <button onClick={Login} className="ti-btn ti-btn-primary !bg-primary !text-white !font-medium">Sign In</button>
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-[0.75rem] text-[#8c9097] dark:text-white/50 mt-4">Dont have an account? <Link href="#!" className="text-primary">Sign Up</Link></p>
-                  </div>
-                  
-                  {/* Portal Navigation */}
-                  <div className="text-center my-4">
-                    <p className="text-[0.75rem] text-[#8c9097] dark:text-white/50 mb-3">Access Other Portals</p>
-                    <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                      <Link 
-                        href="/client-login" 
-                        className="ti-btn ti-btn-outline-primary !text-primary !border-primary hover:!bg-primary hover:!text-white text-xs px-3 py-2"
-                      >
-                        <i className="ri-user-line mr-1"></i>
-                        Client Portal
-                      </Link>
-                      <Link 
-                        href="/team-member-login" 
-                        className="ti-btn ti-btn-outline-secondary !text-secondary !border-secondary hover:!bg-secondary hover:!text-white text-xs px-3 py-2"
-                      >
-                        <i className="ri-team-line mr-1"></i>
-                        Team Portal
-                      </Link>
-                    </div>
-                  </div>
-                  
-                  <div className="text-center my-4 authentication-barrier">
-                    <span>OR</span>
-                  </div>
-                  <div className="btn-list text-center">
-                    <button aria-label="button" type="button" className="ti-btn ti-btn-icon ti-btn-light me-[0.365rem]">
-                      <i className="ri-facebook-line font-bold text-dark opacity-[0.7]"></i>
-                    </button>
-                    <button aria-label="button" type="button" className="ti-btn ti-btn-icon ti-btn-light me-[0.365rem]">
-                      <i className="ri-google-line font-bold text-dark opacity-[0.7]"></i>
-                    </button>
-                    <button aria-label="button" type="button" className="ti-btn ti-btn-icon ti-btn-light">
-                      <i className="ri-twitter-x-line font-bold text-dark opacity-[0.7]"></i>
-                    </button>
-                  </div>
+                <div className="flex rounded border border-gray-200 focus-within:border-purple-300 transition-colors overflow-hidden">
+                  <input
+                    name="password"
+                    type={passwordshow1 ? "text" : "password"}
+                    id="signin-password"
+                    value={password}
+                    onChange={changeHandler}
+                    placeholder="••••••••"
+                    className="flex-1 min-w-0 bg-white text-[11px] font-medium text-[#495057] pl-3 py-2 focus:ring-0 focus:outline-none placeholder:text-gray-400 border-0"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setpasswordshow1(!passwordshow1)}
+                    aria-label={passwordshow1 ? "Hide password" : "Show password"}
+                    className="flex items-center justify-center w-10 h-[2.25rem] bg-gray-50 border-l border-gray-200 text-[#495057] hover:bg-gray-100 hover:text-gray-800 transition-colors shrink-0"
+                  >
+                    <i className={`text-base ${passwordshow1 ? "ti ti-eye-off" : "ti ti-eye"}`} />
+                  </button>
                 </div>
               </div>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {isLoading ? (
+                  <>
+                    <span className="inline-block h-3.5 w-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                    Signing in...
+                  </>
+                ) : (
+                  "Sign In"
+                )}
+              </button>
+            </form>
+
+            {/* Portal links – secondary style per spec */}
+            <div className="mt-6 pt-4 border-t border-gray-100">
+              <p className="text-[11px] font-medium text-[#7987A1] mb-3 text-center">
+                Access other portals
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                <Link
+                  href="/client-login"
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-bold rounded bg-white border border-gray-200 text-[#495057] hover:bg-gray-50 shadow-sm transition-colors"
+                >
+                  <i className="ri-user-line text-xs" />
+                  Client Portal
+                </Link>
+                <Link
+                  href="/team-member-login"
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-bold rounded bg-white border border-gray-200 text-[#495057] hover:bg-gray-50 shadow-sm transition-colors"
+                >
+                  <i className="ri-team-line text-xs" />
+                  Team Portal
+                </Link>
+              </div>
             </div>
-            <div className="xxl:col-span-4 xl:col-span-4 lg:col-span-4 md:col-span-3 sm:col-span-2"></div>
           </div>
         </div>
       </div>
-      </body>
-    </html>
-    </>
+    </div>
   );
 }
