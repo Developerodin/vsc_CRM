@@ -55,6 +55,7 @@ const Filemanager = () => {
     const [fileRowsPerPage, setFileRowsPerPage] = useState(100); // Match API limit
     const [expandedFolders, setExpandedFolders] = useState<string[]>([]);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
+    const [typeFilter, setTypeFilter] = useState<'all' | 'file' | 'folder'>('all'); // Filter near search/filter icon
     const [folderHistory, setFolderHistory] = useState<string[]>([]); // Track folder navigation history
     const [contextMenu, setContextMenu] = useState<{
         visible: boolean;
@@ -325,58 +326,47 @@ const Filemanager = () => {
         return user.name || user.email || 'Unknown User';
     };
 
-    // VS Code-like folder tree component with improved UI
+    // Folder tree - design spec: 11px/12px typography, consistent spacing
     const FolderTree = ({ folders, level = 0 }: { folders: any[]; level?: number }) => (
         <ul className="space-y-0.5">
             {folders.map(folder => {
                 const isActive = currentFolder?.id === folder.id;
                 const isExpanded = expandedFolders.includes(folder.id);
                 const hasChildren = folder.children && folder.children.length > 0;
-                
                 return (
                     <li key={folder.id} className="relative group">
                         <div
-                            className={`flex items-center gap-1 px-2 py-1.5 rounded cursor-pointer transition-colors duration-150
-                                ${isActive ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}
+                            className={`flex items-center gap-1.5 px-2 py-1.5 rounded cursor-pointer transition-colors duration-150
+                                ${isActive ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'hover:bg-gray-50/50 dark:hover:bg-gray-700'}
                             `}
-                            style={{ paddingLeft: `${level * 16 + 8}px` }}
+                            style={{ paddingLeft: `${level * 14 + 8}px` }}
                             onClick={() => handleFolderClick(folder.id)}
                         >
-                            {/* Expand/Collapse Arrow */}
                             {hasChildren && (
                                 <button
-                                    className="flex items-center justify-center w-4 h-4 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
-                                    onClick={e => { 
-                                        e.stopPropagation(); 
-                                        toggleExpand(folder.id); 
-                                    }}
+                                    type="button"
+                                    className="flex items-center justify-center w-4 h-4 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors flex-shrink-0"
+                                    onClick={e => { e.stopPropagation(); toggleExpand(folder.id); }}
                                     title={isExpanded ? 'Collapse' : 'Expand'}
                                 >
                                     <i className={`ri-arrow-${isExpanded ? 'down' : 'right'}-s-line text-xs transition-transform duration-200`}></i>
                                 </button>
                             )}
-                            
-                            {/* Folder Icon */}
-                            <span className="flex items-center justify-center w-4 h-4 mr-2">
-                                <i className={`ri-folder-${isExpanded ? 'open' : '2'}-line text-sm ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`}></i>
+                            <span className="flex items-center justify-center w-4 h-4 flex-shrink-0">
+                                <i className={`ri-folder-${isExpanded ? 'open' : '2'}-line text-xs ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`}></i>
                             </span>
-                            
-                            {/* Folder Name */}
-                            <span className="truncate text-sm font-medium flex-1">
+                            <span className="truncate text-[11px] font-medium text-[#323251] dark:text-gray-200 flex-1">
                                 {folder.name}
                             </span>
-                            
-                            {/* Context Menu */}
                             <button
-                                className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+                                type="button"
+                                className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded flex-shrink-0"
                                 onClick={(e) => handleItemContextMenu(e, { id: folder.id, type: 'folder', folder } as Folder)}
                                 title="Folder options"
                             >
                                 <i className="ri-more-2-fill text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-xs"></i>
                             </button>
                         </div>
-                        
-                        {/* Nested Children */}
                         {hasChildren && isExpanded && (
                             <FolderTree folders={folder.children} level={level + 1} />
                         )}
@@ -412,11 +402,13 @@ const Filemanager = () => {
                 }
             });
         }
+        if (typeFilter === 'file') files = files.filter(f => f.type === 'file');
+        if (typeFilter === 'folder') files = files.filter(f => f.type === 'folder');
         // --- NORMALIZE IDs ---
         return files.map(f => {
             return { ...f, id: (f as any)._id };
         });
-    }, [fileSearch, folderContents]);
+    }, [fileSearch, typeFilter, folderContents]);
 
     const totalFileResults = pagination?.totalResults || filteredFiles.length;
     const totalFilePages = pagination?.totalPages || Math.ceil(totalFileResults / fileRowsPerPage);
@@ -780,14 +772,14 @@ const Filemanager = () => {
                 </div>
             )}
 
-            <div className="file-manager-container p-2 gap-1 sm:!flex !block text-defaulttextcolor text-defaultsize h-[calc(100vh-8rem)]">
-                {/* Sidebar: Folders vertical card */}
-                <div className="bg-white dark:bg-bodybg shadow-md p-2 w-full max-w-xs mr-4 h-full overflow-y-auto rounded-lg">
-                    {/* Folder tree header */}
-                    <div className="flex items-center justify-between border-b border-defaultborder dark:border-defaultborder/10 px-5 py-2 bg-light/60 rounded-t-lg mb-2">
-                        <div className="flex items-center gap-3">
-                            <h6 className="font-semibold text-[1rem] m-0">Folders</h6>
+            <div className="file-manager-container p-[10px] gap-2 sm:!flex !block text-defaulttextcolor h-[calc(100vh-8rem)]">
+                {/* Sidebar: Folders vertical card - design spec typography & buttons */}
+                <div className="bg-white dark:bg-bodybg shadow-sm border border-gray-100 dark:border-gray-700 p-[10px] w-full max-w-xs mr-4 h-full overflow-y-auto rounded-lg">
+                    <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-600 px-[10px] py-2.5 bg-gray-50/30 dark:bg-gray-800/50 rounded-t-lg mb-2">
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-bold text-[#495057] uppercase tracking-wider leading-none">Folders</span>
                             <HelpIcon
+                              className="!w-5 !h-5 !min-w-[20px] [&_i]:!text-xs"
                               title="File Manager"
                               content={
                                 <div>
@@ -847,27 +839,29 @@ const Filemanager = () => {
                               }
                             />
                           </div>
-                        <div className="flex gap-2">
+                        <div className="flex items-center gap-1.5">
                             <button
-                                className="ti-btn ti-btn-primary ti-btn-xs flex items-center gap-1 px-2 py-1 text-xs font-medium shadow-sm hover:bg-primary-dark transition"
+                                type="button"
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded transition-colors bg-purple-600 text-white hover:bg-purple-700 shadow-sm"
                                 onClick={() => setCreateFolderModalOpen(true)}
                             >
-                                <i className="ri-add-circle-line text-base"></i> New
+                                <i className="ri-add-circle-line text-xs"></i> New
                             </button>
                             <button
-                                className="ti-btn ti-btn-danger ti-btn-xs flex items-center gap-1 px-2 py-1 text-xs font-medium shadow-sm transition disabled:opacity-50"
+                                type="button"
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded transition-colors bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 shadow-sm disabled:opacity-50"
                                 disabled={!currentFolder}
                                 onClick={() => currentFolder && handleDeleteItem(currentFolder)}
                             >
-                                <i className="ri-delete-bin-line text-base"></i> Delete
+                                <i className="ri-delete-bin-line text-xs"></i> Delete
                             </button>
                         </div>
                     </div>
-                    {/* Beautified FolderTree */}
                     <div className="pt-1 pb-2 pr-1">
                         {loading ? (
-                            <div className="flex items-center justify-center py-8">
-                                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                            <div className="flex flex-col items-center justify-center py-8 gap-2">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 opacity-50"></div>
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Loading</span>
                             </div>
                         ) : (
                             <FolderTree folders={folderTree} />
@@ -884,110 +878,117 @@ const Filemanager = () => {
                                 <div className="flex items-center justify-between gap-4">
                                     {/* Left section: Back button and folder info */}
                                     <div className="flex items-center gap-3 min-w-0 flex-1">
-                                        {/* Back Button */}
+                                        {/* Back Button - design spec: 11px bold, secondary */}
                                         {folderHistory.length > 0 && (
                                             <button
-                                                className="ti-btn ti-btn-light ti-btn-sm flex items-center gap-1 px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-gray-200 transition flex-shrink-0 mr-3"
+                                                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded transition-colors bg-white border border-gray-200 text-[#495057] hover:bg-gray-50 shadow-sm flex-shrink-0"
                                                 onClick={handleBackToParent}
                                                 title="Back to parent folder"
                                             >
-                                                <i className="ri-arrow-left-line text-base"></i>
+                                                <i className="ri-arrow-left-s-line text-sm"></i>
                                                 <span className="hidden sm:inline">Back</span>
                                             </button>
                                         )}
-                                        <div className="flex flex-col min-w-0">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <h2 className="text-lg font-semibold text-defaulttextcolor m-0 truncate">{currentFolder.folder.name}</h2>
+                                        <div className="flex flex-col min-w-0 gap-0.5">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="text-[12px] font-bold text-[#323251] truncate">{currentFolder.folder.name}</span>
                                                 {currentFolder.folder.description && (
-                                                    <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded whitespace-nowrap">
+                                                    <span className="text-[10px] font-medium text-gray-500 bg-gray-50 border border-gray-200 px-1.5 py-0.5 rounded whitespace-nowrap">
                                                         {currentFolder.folder.description}
                                                     </span>
                                                 )}
                                             </div>
-                                            <span className="text-xs text-gray-400 mt-1">
+                                            <span className="text-[10px] text-gray-500">
                                                 Created by: {getUserDisplayName(currentFolder.folder.createdBy)}
                                             </span>
                                         </div>
                                     </div>
-                                    {/* Right section: Action buttons */}
-                                    <div className="flex gap-2 flex-shrink-0">
-                                    <button
-                                        className="ti-btn ti-btn-danger flex items-center gap-2 px-4 py-2 text-sm font-medium shadow-sm transition disabled:opacity-50"
-                                        disabled={selectedIds.length === 0}
-                                        onClick={handleDeleteSelected}
-                                    >
-                                        <i className="ri-delete-bin-line text-lg"></i> Delete{selectedIds.length > 0 && ` (${selectedIds.length})`}
-                                    </button>
-                                    <button
-                                        className="ti-btn ti-btn-warning flex items-center gap-2 px-4 py-2 text-sm font-medium shadow-sm transition disabled:opacity-50"
-                                        disabled={selectedIds.length === 0}
-                                        onClick={handleExportPath}
-                                    >
-                                        <i className="ri-share-forward-line text-lg"></i> Export Path{selectedIds.length > 0 && ` (${selectedIds.length})`}
-                                    </button>
-                                    <button
-                                        className="ti-btn ti-btn-info flex items-center gap-2 px-4 py-2 text-sm font-medium shadow-sm transition disabled:opacity-50"
-                                        disabled={selectedIds.length === 0}
-                                        onClick={handleDownloadSelected}
-                                    >
-                                        <i className="ri-download-2-line text-lg"></i> Download{selectedIds.length > 0 && ` (${selectedIds.length})`}
-                                    </button>
-                                    <button
-                                        className="ti-btn ti-btn-primary flex items-center gap-2 px-4 py-2 text-sm font-medium shadow-sm hover:bg-primary-dark transition"
-                                        onClick={() => setShowUploadModal(true)}
-                                    >
-                                        <i className="ri-upload-2-line text-lg"></i> Upload
-                                    </button>
+                                    {/* Right section: Action buttons - design spec 11px bold */}
+                                    <div className="flex flex-wrap items-center gap-1.5 flex-shrink-0">
+                                        <button
+                                            type="button"
+                                            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded transition-colors bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 shadow-sm disabled:opacity-50"
+                                            disabled={selectedIds.length === 0}
+                                            onClick={handleDeleteSelected}
+                                        >
+                                            <i className="ri-delete-bin-line text-xs"></i> Delete{selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded transition-colors bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 shadow-sm disabled:opacity-50"
+                                            disabled={selectedIds.length === 0}
+                                            onClick={handleExportPath}
+                                        >
+                                            <i className="ri-share-forward-line text-xs"></i> Export Path{selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded transition-colors bg-sky-50 text-sky-600 border border-sky-100 hover:bg-sky-100 shadow-sm disabled:opacity-50"
+                                            disabled={selectedIds.length === 0}
+                                            onClick={handleDownloadSelected}
+                                        >
+                                            <i className="ri-download-2-line text-xs"></i> Download{selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded transition-colors bg-purple-600 text-white hover:bg-purple-700 shadow-sm"
+                                            onClick={() => setShowUploadModal(true)}
+                                        >
+                                            <i className="ri-upload-2-line text-xs"></i> Upload
+                                        </button>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Search, view mode, and controls */}
+                            {/* Search, view mode, font size, and controls */}
                             <div className="flex flex-wrap justify-between items-center mb-4 gap-2 px-6 pt-4 flex-shrink-0">
                                 <div className="flex items-center gap-4">
-                                    {/* View Mode Toggle */}
-                                    <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+                                    {/* View Mode Toggle - design spec 11px */}
+                                    <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded p-1">
                                         <button
-                                            className={`p-2 rounded-md transition-all duration-200 ${viewMode === 'grid' ? 'bg-white dark:bg-gray-600 shadow-sm' : 'hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+                                            className={`p-1.5 rounded transition-all duration-200 text-[11px] font-bold ${viewMode === 'grid' ? 'bg-white dark:bg-gray-600 shadow-sm text-[#495057]' : 'hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-500'}`}
                                             onClick={() => setViewMode('grid')}
                                             title="Grid View"
                                         >
-                                            <i className="ri-grid-line text-lg"></i>
+                                            <i className="ri-grid-line text-xs"></i>
                                         </button>
                                         <button
-                                            className={`p-2 rounded-md transition-all duration-200 ${viewMode === 'list' ? 'bg-white dark:bg-gray-600 shadow-sm' : 'hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+                                            className={`p-1.5 rounded transition-all duration-200 text-[11px] font-bold ${viewMode === 'list' ? 'bg-white dark:bg-gray-600 shadow-sm text-[#495057]' : 'hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-500'}`}
                                             onClick={() => setViewMode('list')}
                                             title="List View"
                                         >
-                                            <i className="ri-list-check text-lg"></i>
+                                            <i className="ri-list-check text-xs"></i>
                                         </button>
                                     </div>
-                                    
-                                    {/* Items Count */}
-                                    <span className="text-sm text-gray-500">
+                                    {/* Items Count - 11px per spec */}
+                                    <span className="text-[11px] font-medium text-[#495057]">
                                         {filteredFiles.length} item{filteredFiles.length !== 1 ? 's' : ''}
                                     </span>
                                 </div>
                                 
-                                {/* Search Modal Trigger */}
+                                {/* Search + filter: select box near search (filter) icon, not on folder icon */}
                                 <div className="flex items-center gap-2">
                                     <div className="relative flex-1 max-w-xs">
                                         <input
                                             type="text"
-                                            className="form-control py-3 pr-10 cursor-pointer"
+                                            className="form-control py-2 pr-10 pl-9 text-[11px] font-medium border-gray-200 rounded cursor-pointer min-w-[140px]"
                                             placeholder="Search client subfolders..."
                                             value=""
                                             readOnly
                                             onClick={openSearchModal}
                                         />
-                                        <button 
-                                            className="absolute end-0 top-0 px-4 h-full"
-                                            onClick={openSearchModal}
-                                        >
-                                            <i className="ri-search-line text-lg"></i>
-                                        </button>
+                                        <i className="ri-search-line absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none"></i>
                                     </div>
-                                    
+                                    <select
+                                        value={typeFilter}
+                                        onChange={e => setTypeFilter(e.target.value as 'all' | 'file' | 'folder')}
+                                        className="bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300 appearance-none cursor-pointer"
+                                        title="Filter by type"
+                                    >
+                                        <option value="all">All</option>
+                                        <option value="file">Files</option>
+                                        <option value="folder">Folders</option>
+                                    </select>
                                     {/* Old Search Mode Dropdown - Replaced with Modal */}
                                     {/* <div className="dropdown">
                                         <button 
@@ -1064,63 +1065,105 @@ const Filemanager = () => {
                                             if (item.type === 'file' && (!item.file || item.file === null)) return false;
                                             if (item.type === 'folder' && (!item.folder || item.folder === null)) return false;
                                             return true;
-                                        }).map((item) => (
+                                        }).map((item) => {
+                                            const contentSizeClass = 'text-[11px]';
+                                            const metaSizeClass = 'text-[10px]';
+                                            return (
                                             <div
                                                 key={item.id}
-                                                className={`group relative ${viewMode === 'grid' 
-                                                    ? 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-all duration-200 cursor-pointer' 
-                                                    : 'flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-all duration-200 cursor-pointer'
+                                                className={`group relative flex ${viewMode === 'grid' 
+                                                    ? 'flex-col bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-all duration-200 cursor-pointer' 
+                                                    : 'flex-row items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-all duration-200 cursor-pointer'
                                                 }`}
                                                 onClick={() => handleItemClick(item)}
                                             >
-                                                {/* Selection Checkbox */}
-                                                <input
-                                                    type="checkbox"
-                                                    className={`absolute top-2 left-2 z-10 opacity-100 transition-opacity duration-200`}
-                                                    checked={selectedIds.includes(item.id)}
-                                                    onChange={e => {
-                                                        e.stopPropagation();
-                                                        setSelectedIds(prev =>
-                                                            prev.includes(item.id) ? prev.filter(i => i !== item.id) : [...prev, item.id]
-                                                        );
-                                                    }}
-                                                />
-
-                                                {/* Icon */}
-                                                <div className={`flex items-center justify-center ${viewMode === 'grid' ? 'w-16 h-16 mb-3' : 'w-10 h-10'}`}>
-                                                    <div className={`w-full h-full rounded-lg flex items-center justify-center ${
-                                                        item.type === 'folder' 
-                                                            ? 'bg-blue-100 dark:bg-blue-900/30' 
-                                                            : 'bg-gray-100 dark:bg-gray-700'
-                                                    }`}>
-                                                        <i className={`text-2xl ${
-                                                            item.type === 'folder' 
-                                                                ? 'ri-folder-2-line text-blue-600 dark:text-blue-400' 
-                                                                : getFileIcon(item.type === 'file' && item.file ? item.file.mimeType : '')
-                                                        }`}></i>
+                                                {/* List: checkbox then icon then content. Click checkbox only toggles selection, does not open item. */}
+                                                {viewMode === 'list' && (
+                                                    <div
+                                                        className="flex-shrink-0 cursor-pointer p-0.5"
+                                                        onClick={e => e.stopPropagation()}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            className="rounded border-2 border-gray-400 text-purple-600 focus:ring-0 focus:ring-offset-0 h-4 w-4 flex-shrink-0 cursor-pointer"
+                                                            checked={selectedIds.includes(item.id)}
+                                                            onChange={e => {
+                                                                e.stopPropagation();
+                                                                setSelectedIds(prev =>
+                                                                    prev.includes(item.id) ? prev.filter(i => i !== item.id) : [...prev, item.id]
+                                                                );
+                                                            }}
+                                                            onClick={e => e.stopPropagation()}
+                                                        />
                                                     </div>
-                                                </div>
-
-                                                {/* Content */}
-                                                <div className={`flex-1 min-w-0 ${viewMode === 'grid' ? 'text-center' : ''}`}>
-                                                    <div className="font-medium text-sm truncate">
-                                                        {item.type === 'file' ? ((item as FileItem).file?.fileName || 'Unknown File') : (item as Folder).folder.name}
-                                                    </div>
-                                                    {viewMode === 'grid' && (
-                                                        <div className="text-xs text-gray-500 mt-1">
+                                                )}
+                                                {viewMode === 'grid' && (
+                                                    <div className="flex flex-col w-full">
+                                                        <div className="flex items-center gap-2 justify-center mb-2">
+                                                            <div onClick={e => e.stopPropagation()} className="flex-shrink-0 cursor-pointer p-0.5">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    className="rounded border-2 border-gray-400 text-purple-600 focus:ring-0 focus:ring-offset-0 h-4 w-4 flex-shrink-0 cursor-pointer"
+                                                                    checked={selectedIds.includes(item.id)}
+                                                                    onChange={e => {
+                                                                        e.stopPropagation();
+                                                                        setSelectedIds(prev =>
+                                                                            prev.includes(item.id) ? prev.filter(i => i !== item.id) : [...prev, item.id]
+                                                                        );
+                                                                    }}
+                                                                    onClick={e => e.stopPropagation()}
+                                                                />
+                                                            </div>
+                                                            <div className={`flex items-center justify-center w-14 h-14 rounded-lg flex-shrink-0 ${
+                                                                item.type === 'folder' 
+                                                                    ? 'bg-blue-100 dark:bg-blue-900/30' 
+                                                                    : 'bg-gray-100 dark:bg-gray-700'
+                                                            }`}>
+                                                                <i className={`text-2xl ${
+                                                                    item.type === 'folder' 
+                                                                        ? 'ri-folder-2-line text-blue-600 dark:text-blue-400' 
+                                                                        : getFileIcon(item.type === 'file' && item.file ? item.file.mimeType : '')
+                                                                }`}></i>
+                                                            </div>
+                                                        </div>
+                                                        <div className={`font-medium truncate w-full text-center ${contentSizeClass}`}>
+                                                            {item.type === 'file' ? ((item as FileItem).file?.fileName || 'Unknown File') : (item as Folder).folder.name}
+                                                        </div>
+                                                        <div className={`${metaSizeClass} text-gray-500 mt-1 text-center`}>
                                                             {item.type === 'folder' ? 'Folder' : formatFileSize((item as FileItem).file?.fileSize || 0)}
                                                         </div>
-                                                    )}
-                                                    {viewMode === 'list' && (
-                                                        <div className="text-xs text-gray-500">
-                                                            {item.type === 'folder' ? 'Folder' : ((item as FileItem).file?.mimeType || 'Unknown')} • {formatFileSize((item as FileItem).file?.fileSize || 0)} • {new Date(item.updatedAt).toLocaleDateString()}
+                                                    </div>
+                                                )}
+                                                {viewMode === 'list' && (
+                                                    <>
+                                                        {/* Icon - next to checkbox */}
+                                                        <div className="flex items-center justify-center w-10 h-10 flex-shrink-0">
+                                                            <div className={`w-full h-full rounded-lg flex items-center justify-center ${
+                                                                item.type === 'folder' 
+                                                                    ? 'bg-blue-100 dark:bg-blue-900/30' 
+                                                                    : 'bg-gray-100 dark:bg-gray-700'
+                                                            }`}>
+                                                                <i className={`text-2xl ${
+                                                                    item.type === 'folder' 
+                                                                        ? 'ri-folder-2-line text-blue-600 dark:text-blue-400' 
+                                                                        : getFileIcon(item.type === 'file' && item.file ? item.file.mimeType : '')
+                                                                }`}></i>
+                                                            </div>
                                                         </div>
-                                                    )}
-                                                </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className={`font-medium truncate ${contentSizeClass}`}>
+                                                                {item.type === 'file' ? ((item as FileItem).file?.fileName || 'Unknown File') : (item as Folder).folder.name}
+                                                            </div>
+                                                            <div className={`${metaSizeClass} text-gray-500`}>
+                                                                {item.type === 'folder' ? 'Folder' : ((item as FileItem).file?.mimeType || 'Unknown')} • {formatFileSize((item as FileItem).file?.fileSize || 0)} • {new Date(item.updatedAt).toLocaleDateString()}
+                                                            </div>
+                                                        </div>
+                                                    </>
+                                                )}
 
                                                 {/* Three-dot menu */}
                                                 <button
-                                                    className={`${viewMode === 'grid' ? 'absolute top-2 right-2' : 'ml-2'} opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded`}
+                                                    className={`${viewMode === 'grid' ? 'absolute top-2 right-2' : 'ml-2 flex-shrink-0'} opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded`}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         handleItemContextMenu(e, item);
@@ -1130,7 +1173,7 @@ const Filemanager = () => {
                                                     <i className="ri-more-2-fill text-gray-500 hover:text-primary"></i>
                                                 </button>
                                             </div>
-                                        ))}
+                                        );})}
                                     </div>
                                 ) : (
                                     <div className="text-center py-16 text-gray-500">
@@ -1141,66 +1184,42 @@ const Filemanager = () => {
                                 )}
                             </div>
 
-                            {/* Pagination */}
+                            {/* Pagination: Prev | 1 to 10 | Next */}
                             {totalFilePages > 1 && (
-                                <div className="flex justify-between items-center mt-4 px-6 pb-4 flex-shrink-0">
-                                    <div className="text-sm text-gray-500">
-                                        Showing {totalFileResults === 0 ? 0 : (filePage - 1) * 100 + 1} to {totalFileResults === 0 ? 0 : Math.min(filePage * 100, totalFileResults)} of {totalFileResults} entries
+                                <div className="flex justify-between items-center mt-4 px-6 pb-4 flex-shrink-0 border-t border-gray-100 bg-white">
+                                    <div className="text-[11px] font-medium text-[#495057]">
+                                        Showing {totalFileResults === 0 ? 0 : (filePage - 1) * fileRowsPerPage + 1} to {totalFileResults === 0 ? 0 : Math.min(filePage * fileRowsPerPage, totalFileResults)} of {totalFileResults}
                                     </div>
-                                    <nav aria-label="Page navigation" className="">
-                                        <ul className="flex flex-wrap items-center">
-                                            <li className={`page-item ${filePage === 1 ? 'disabled' : ''}`}>
-                                                <button
-                                                    className="page-link py-2 px-3 ml-0 leading-tight text-gray-500 bg-white rounded-l-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                                                    onClick={() => {
-                                                        const newPage = Math.max(filePage - 1, 1);
-                                                        setFilePage(newPage);
-                                                        if (fileSearch.trim()) {
-                                                            searchFiles(fileSearch, { includeSubfolders: true, page: newPage });
-                                                        } else if (currentFolder) {
-                                                            loadFolderContents(currentFolder.id, newPage);
-                                                        }
-                                                    }}
-                                                    disabled={filePage === 1}
-                                                >
-                                                    Previous
-                                                </button>
-                                            </li>
-                                            {Array.from({ length: totalFilePages }, (_, i) => i + 1).map(page => (
-                                                <li key={page} className="page-item">
-                                                    <button
-                                                        className={`page-link py-2 px-3 leading-tight border border-gray-300 ${filePage === page ? 'bg-primary text-white hover:bg-primary-dark' : 'bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-700'}`}
-                                                        onClick={() => {
-                                                            setFilePage(page);
-                                                            if (fileSearch.trim()) {
-                                                                searchFiles(fileSearch, { includeSubfolders: true, page: page });
-                                                            } else if (currentFolder) {
-                                                                loadFolderContents(currentFolder.id, page);
-                                                            }
-                                                        }}
-                                                    >
-                                                        {page}
-                                                    </button>
-                                                </li>
-                                            ))}
-                                            <li className={`page-item ${filePage === totalFilePages ? 'disabled' : ''}`}>
-                                                <button
-                                                    className="page-link py-2 px-3 leading-tight text-gray-500 bg-white rounded-r-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                                                    onClick={() => {
-                                                        const newPage = Math.min(filePage + 1, totalFilePages);
-                                                        setFilePage(newPage);
-                                                        if (fileSearch.trim()) {
-                                                            searchFiles(fileSearch, { includeSubfolders: true, page: newPage });
-                                                        } else if (currentFolder) {
-                                                            loadFolderContents(currentFolder.id, newPage);
-                                                        }
-                                                    }}
-                                                    disabled={filePage === totalFilePages}
-                                                >
-                                                    Next
-                                                </button>
-                                            </li>
-                                        </ul>
+                                    <nav aria-label="Page navigation" className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-white border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            onClick={() => {
+                                                const newPage = Math.max(filePage - 1, 1);
+                                                setFilePage(newPage);
+                                                if (fileSearch.trim()) searchFiles(fileSearch, { includeSubfolders: true, page: newPage });
+                                                else if (currentFolder) loadFolderContents(currentFolder.id, newPage);
+                                            }}
+                                            disabled={filePage === 1}
+                                        >
+                                            Prev
+                                        </button>
+                                        <span className="text-[11px] font-medium text-[#495057] px-2">
+                                            {(filePage - 1) * fileRowsPerPage + 1} to {Math.min(filePage * fileRowsPerPage, totalFileResults)}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-white border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            onClick={() => {
+                                                const newPage = Math.min(filePage + 1, totalFilePages);
+                                                setFilePage(newPage);
+                                                if (fileSearch.trim()) searchFiles(fileSearch, { includeSubfolders: true, page: newPage });
+                                                else if (currentFolder) loadFolderContents(currentFolder.id, newPage);
+                                            }}
+                                            disabled={filePage === totalFilePages}
+                                        >
+                                            Next
+                                        </button>
                                     </nav>
                                 </div>
                             )}
@@ -1222,12 +1241,13 @@ const Filemanager = () => {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
                     <div className="bg-white dark:bg-bodybg rounded-lg shadow-lg p-6 w-full max-w-sm relative">
                         <button
-                            className="absolute top-3 right-3 ti-btn ti-btn-icon ti-btn-sm ti-btn-danger"
+                            type="button"
+                            className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center rounded bg-red-50 text-red-400 border border-red-100 hover:bg-red-100 text-xs"
                             onClick={() => setCreateFolderModalOpen(false)}
                         >
                             <i className="ri-close-line"></i>
                         </button>
-                        <h2 className="text-lg font-semibold mb-4 text-defaulttextcolor">
+                        <h2 className="text-sm font-bold text-gray-800 mb-4">
                             {contextMenu?.itemType === 'folder' ? `Create Subfolder in "${contextMenu.itemName}"` : 'Create Folder'}
                         </h2>
                         <input
@@ -1245,9 +1265,9 @@ const Filemanager = () => {
                             onChange={e => setNewFolderDescription(e.target.value)}
                             rows={3}
                         />
-                        <div className="flex justify-end gap-2">
-                            <button className="ti-btn ti-btn-light" onClick={() => setCreateFolderModalOpen(false)}>Cancel</button>
-                            <button className="ti-btn ti-btn-primary" onClick={handleCreateFolder} disabled={!newFolderName.trim()}>Create</button>
+                        <div className="flex justify-end gap-1.5">
+                            <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-white border border-gray-200 text-[#495057] hover:bg-gray-50 shadow-sm" onClick={() => setCreateFolderModalOpen(false)}>Cancel</button>
+                            <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm disabled:opacity-50" onClick={handleCreateFolder} disabled={!newFolderName.trim()}>Create</button>
                         </div>
                     </div>
                 </div>
@@ -1258,7 +1278,8 @@ const Filemanager = () => {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
                     <div className="bg-white dark:bg-bodybg rounded-lg shadow-lg p-8 w-full max-w-lg relative">
                         <button
-                            className="absolute top-3 right-3 ti-btn ti-btn-icon ti-btn-sm ti-btn-danger"
+                            type="button"
+                            className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center rounded bg-red-50 text-red-400 border border-red-100 hover:bg-red-100 text-xs"
                             onClick={() => { setShowUploadModal(false); setUploadFiles([]); }}
                         >
                             <i className="ri-close-line"></i>
@@ -1302,7 +1323,8 @@ const Filemanager = () => {
                                         </div>
                                         <span className="text-xs text-gray-500 ml-2">{Math.round((uploadProgress[file.name] || 0))}%</span>
                                         <button
-                                            className="ti-btn ti-btn-icon ti-btn-sm ti-btn-danger ml-2"
+                                            type="button"
+                                            className="w-7 h-7 flex items-center justify-center rounded bg-red-50 text-red-400 border border-red-100 hover:bg-red-100 text-xs ml-2 flex-shrink-0"
                                             onClick={() => handleRemoveUploadFile(file.name)}
                                         >
                                             <i className="ri-close-line"></i>
@@ -1313,7 +1335,8 @@ const Filemanager = () => {
                         )}
                         <div className="flex justify-end mt-4">
                             <button
-                                className="ti-btn ti-btn-primary"
+                                type="button"
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm disabled:opacity-50"
                                 disabled={uploadFiles.length === 0 || loading}
                                 onClick={handleUpload}
                             >
@@ -1329,12 +1352,13 @@ const Filemanager = () => {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
                     <div className="bg-white dark:bg-bodybg rounded-lg shadow-lg p-6 w-full max-w-sm relative">
                         <button
-                            className="absolute top-3 right-3 ti-btn ti-btn-icon ti-btn-sm ti-btn-danger"
+                            type="button"
+                            className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center rounded bg-red-50 text-red-400 border border-red-100 hover:bg-red-100 text-xs"
                             onClick={closeRenameModal}
                         >
                             <i className="ri-close-line"></i>
                         </button>
-                        <h2 className="text-lg font-semibold mb-4 text-defaulttextcolor">Rename {renameItemType === 'file' ? 'File' : 'Folder'}</h2>
+                        <h2 className="text-sm font-bold text-gray-800 mb-4">Rename {renameItemType === 'file' ? 'File' : 'Folder'}</h2>
                         <input
                             type="text"
                             className="form-control mb-4"
@@ -1342,9 +1366,9 @@ const Filemanager = () => {
                             onChange={e => setRenameItemName(e.target.value)}
                             autoFocus
                         />
-                        <div className="flex justify-end gap-2">
-                            <button className="ti-btn ti-btn-light" onClick={closeRenameModal}>Cancel</button>
-                            <button className="ti-btn ti-btn-primary" onClick={handleRenameSave} disabled={!renameItemName.trim()}>Save</button>
+                        <div className="flex justify-end gap-1.5">
+                            <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-white border border-gray-200 text-[#495057] hover:bg-gray-50 shadow-sm" onClick={closeRenameModal}>Cancel</button>
+                            <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm disabled:opacity-50" onClick={handleRenameSave} disabled={!renameItemName.trim()}>Save</button>
                         </div>
                     </div>
                 </div>
@@ -1500,15 +1524,17 @@ const Filemanager = () => {
                                     <p><strong>Attachment:</strong> {emailModal.file.file?.fileName} ({formatFileSize(emailModal.file.file?.fileSize || 0)})</p>
                                 </div>
                             </div>
-                            <div className="flex justify-end gap-2">
-                                <button 
-                                    className="ti-btn ti-btn-light" 
+                            <div className="flex justify-end gap-1.5">
+                                <button
+                                    type="button"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-white border border-gray-200 text-[#495057] hover:bg-gray-50 shadow-sm"
                                     onClick={() => setEmailModal({ visible: false, file: null, email: '', loading: false })}
                                 >
                                     Cancel
                                 </button>
-                                <button 
-                                    className="ti-btn ti-btn-primary" 
+                                <button
+                                    type="button"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm disabled:opacity-50"
                                     onClick={() => {
                                             const currentFile = emailModal.file;
                                             if (!currentFile) return; // Guard clause for null check
@@ -1555,20 +1581,23 @@ const Filemanager = () => {
                 </div>
             )}
 
-            {/* Search Modal */}
+            {/* Search Modal - design spec typography & spacing */}
             {searchModal.visible && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-                    <div className="bg-white dark:bg-bodybg rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
-                        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-                            <div className="flex items-center gap-3">
-                                <i className="ri-search-line text-xl text-primary"></i>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                    <div className="bg-white dark:bg-bodybg rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+                        <div className="flex items-center justify-between p-[10px] border-b border-gray-200 dark:border-gray-700">
+                            <div className="flex items-center gap-2">
+                                <span className="flex items-center justify-center w-8 h-8 rounded bg-purple-50 dark:bg-purple-900/20">
+                                    <i className="ri-search-line text-purple-600 dark:text-purple-400 text-sm"></i>
+                                </span>
                                 <div>
-                                    <h3 className="font-semibold text-lg">Search Client Subfolders</h3>
-                                    <p className="text-sm text-gray-500">Find and navigate to client folders</p>
+                                    <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100">Search Client Subfolders</h3>
+                                    <p className="text-[11px] text-[#495057] dark:text-gray-400">Find and navigate to client folders</p>
                                 </div>
                             </div>
                             <button
-                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                                type="button"
+                                className="w-7 h-7 flex items-center justify-center rounded bg-red-50 text-red-400 border border-red-100 hover:bg-red-100 text-xs"
                                 onClick={closeSearchModal}
                                 title="Close"
                             >
@@ -1576,73 +1605,70 @@ const Filemanager = () => {
                             </button>
                         </div>
 
-                        <div className="p-6">
-                            {/* Search Input */}
-                            <div className="mb-4">
+                        <div className="p-[10px] overflow-auto">
+                            <div className="mb-3">
                                 <div className="relative">
                                     <input
                                         type="text"
-                                        className="form-control py-3 pr-10 w-full"
+                                        className="bg-white border border-gray-200 dark:border-gray-600 pl-8 pr-3 py-1.5 text-[11px] font-medium rounded focus:ring-0 focus:border-purple-300 w-full placeholder:text-gray-400"
                                         placeholder="Type client name..."
                                         value={searchModal.query}
                                         onChange={(e) => handleSearchQueryChange(e.target.value)}
                                         autoFocus
                                     />
-                                    <div className="absolute end-0 top-0 px-4 h-full flex items-center">
+                                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none">
                                         {searchModal.loading ? (
-                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                                            <span className="animate-spin inline-block rounded-full h-3.5 w-3.5 border-2 border-gray-300 border-t-purple-600"></span>
                                         ) : (
-                                            <i className="ri-search-line text-lg text-gray-400"></i>
+                                            <i className="ri-search-line"></i>
                                         )}
-                                    </div>
+                                    </span>
                                 </div>
                             </div>
 
-                            {/* Search Results */}
-                            <div className="border border-gray-200 dark:border-gray-700 rounded-lg max-h-96 overflow-y-auto">
+                            <div className="border border-gray-200 dark:border-gray-700 rounded min-h-[200px] max-h-[50vh] overflow-y-auto">
                                 {searchModal.loading && (
-                                    <div className="flex items-center justify-center py-8">
-                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                                        <span className="ml-3 text-gray-600">Searching...</span>
+                                    <div className="flex flex-col items-center justify-center py-12 gap-2">
+                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 opacity-50"></div>
+                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Searching...</span>
                                     </div>
                                 )}
 
                                 {!searchModal.loading && searchModal.query && searchModal.results.length === 0 && (
-                                    <div className="flex flex-col items-center justify-center py-8 text-gray-500">
-                                        <i className="ri-search-line text-3xl mb-2"></i>
-                                        <p>No results found for "{searchModal.query}"</p>
-                                        <p className="text-sm">Try searching with different keywords</p>
+                                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                                        <span className="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center mb-2">
+                                            <i className="ri-search-line text-gray-400 text-lg"></i>
+                                        </span>
+                                        <p className="text-[12px] font-bold text-gray-400 mb-0.5">No results for &quot;{searchModal.query}&quot;</p>
+                                        <p className="text-[10px] text-gray-500">Try different keywords</p>
                                     </div>
                                 )}
 
                                 {!searchModal.loading && !searchModal.query && (
-                                    <div className="flex flex-col items-center justify-center py-8 text-gray-500">
-                                        <i className="ri-search-2-line text-3xl mb-2"></i>
-                                        <p>Start typing to search for client folders</p>
+                                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                                        <span className="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center mb-2">
+                                            <i className="ri-search-2-line text-gray-400 text-lg"></i>
+                                        </span>
+                                        <p className="text-[11px] font-medium text-gray-500">Start typing to search client folders</p>
                                     </div>
                                 )}
 
                                 {searchModal.results.length > 0 && (
-                                    <div className="space-y-2 p-4">
+                                    <div className="divide-y divide-gray-100 dark:divide-gray-700">
                                         {searchModal.results.map((item) => (
                                             <div
                                                 key={item.id}
-                                                className="group relative flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-all duration-200 cursor-pointer"
+                                                className="flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50/50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors"
                                                 onClick={() => handleSelectSearchResult(item)}
                                             >
-                                                {/* Icon */}
-                                                <div className="flex items-center justify-center w-10 h-10">
-                                                    <div className="w-full h-full rounded-lg flex items-center justify-center bg-blue-100 dark:bg-blue-900/30">
-                                                        <i className="ri-folder-2-line text-2xl text-blue-600 dark:text-blue-400"></i>
-                                                    </div>
-                                                </div>
-
-                                                {/* Content */}
+                                                <span className="flex items-center justify-center w-8 h-8 rounded bg-blue-100 dark:bg-blue-900/30 flex-shrink-0">
+                                                    <i className="ri-folder-2-line text-blue-600 dark:text-blue-400 text-sm"></i>
+                                                </span>
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="font-medium text-sm truncate">
+                                                    <div className="text-[11px] font-medium text-[#323251] dark:text-gray-200 truncate">
                                                         {item.type === 'folder' ? (item.folder?.name || (item as any).name) : item.file?.fileName}
                                                     </div>
-                                                    <div className="text-xs text-gray-500">
+                                                    <div className="text-[10px] text-gray-500">
                                                         Folder • {new Date(item.updatedAt).toLocaleDateString()}
                                                     </div>
                                                 </div>
@@ -1652,51 +1678,32 @@ const Filemanager = () => {
                                 )}
                             </div>
 
-                            {/* Pagination */}
+                            {/* Pagination: Prev | 1 to 10 | Next */}
                             {searchModal.totalPages > 1 && (
                                 <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                                    <div className="text-sm text-gray-600">
-                                        Showing {searchModal.results.length === 0 ? 0 : (searchModal.page - 1) * 10 + 1} to {Math.min(searchModal.page * 10, searchModal.totalResults)} of {searchModal.totalResults} results
+                                    <div className="text-[11px] font-medium text-[#495057]">
+                                        Showing {(searchModal.page - 1) * 10 + 1} to {Math.min(searchModal.page * 10, searchModal.totalResults)} of {searchModal.totalResults} results
                                     </div>
-                                    <nav aria-label="Search pagination">
-                                        <ul className="flex items-center gap-1">
-                                            <li>
-                                                <button
-                                                    className="px-3 py-2 text-sm leading-tight text-gray-500 bg-white border border-gray-300 rounded-l-lg hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700"
-                                                    onClick={() => handleSearchPageChange(searchModal.page - 1)}
-                                                    disabled={searchModal.page === 1}
-                                                >
-                                                    Previous
-                                                </button>
-                                            </li>
-                                            {Array.from({ length: Math.min(5, searchModal.totalPages) }, (_, i) => {
-                                                const pageNum = searchModal.page - 2 + i;
-                                                if (pageNum < 1 || pageNum > searchModal.totalPages) return null;
-                                                return (
-                                                    <li key={pageNum}>
-                                                        <button
-                                                            className={`px-3 py-2 text-sm leading-tight border ${
-                                                                searchModal.page === pageNum
-                                                                    ? 'bg-primary text-white border-primary'
-                                                                    : 'text-gray-500 bg-white border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700'
-                                                            }`}
-                                                            onClick={() => handleSearchPageChange(pageNum)}
-                                                        >
-                                                            {pageNum}
-                                                        </button>
-                                                    </li>
-                                                );
-                                            })}
-                                            <li>
-                                                <button
-                                                    className="px-3 py-2 text-sm leading-tight text-gray-500 bg-white border border-gray-300 rounded-r-lg hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700"
-                                                    onClick={() => handleSearchPageChange(searchModal.page + 1)}
-                                                    disabled={searchModal.page === searchModal.totalPages}
-                                                >
-                                                    Next
-                                                </button>
-                                            </li>
-                                        </ul>
+                                    <nav aria-label="Search pagination" className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-white border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700 disabled:opacity-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400"
+                                            onClick={() => handleSearchPageChange(searchModal.page - 1)}
+                                            disabled={searchModal.page === 1}
+                                        >
+                                            Prev
+                                        </button>
+                                        <span className="text-[11px] font-medium text-[#495057] px-2">
+                                            {(searchModal.page - 1) * 10 + 1} to {Math.min(searchModal.page * 10, searchModal.totalResults)}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-white border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700 disabled:opacity-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400"
+                                            onClick={() => handleSearchPageChange(searchModal.page + 1)}
+                                            disabled={searchModal.page === searchModal.totalPages}
+                                        >
+                                            Next
+                                        </button>
                                     </nav>
                                 </div>
                             )}

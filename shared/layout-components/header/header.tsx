@@ -16,6 +16,7 @@ const Header = ({ local_varaiable, ThemeChanger }:any) => {
   const { branches, selectedBranch, setSelectedBranch, loading } = useBranchContext();
 
   const [passwordshow1, setpasswordshow1] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const data=  <span className="font-[600] py-[0.25rem] px-[0.45rem] rounded-[0.25rem] bg-pinkmain/10 text-pinkmain text-[0.625rem]">Free shipping</span>
 
@@ -773,10 +774,18 @@ const Header = ({ local_varaiable, ThemeChanger }:any) => {
                   className="hs-dropdown-toggle ti-dropdown-toggle !gap-2 !p-0 flex-shrink-0 sm:me-2 me-0 !rounded-full !shadow-none text-xs align-middle !border-0 !shadow-transparent ">
                   <img className="inline-block rounded-full " src={`${process.env.NODE_ENV === "production" ? basePath : ""}/assets/images/faces/9.jpg`} width="32" height="32" alt="Image Description" />
                 </button>
-                <div className="md:block hidden dropdown-profile">
+                <div className="md:block hidden dropdown-profile me-4">
                   <p className="font-semibold mb-0 leading-none text-[#536485] text-[0.813rem] ">Admin</p>
                   {/* <span className="opacity-[0.7] font-normal text-[#536485] block text-[0.6875rem] ">Web Designer</span> */}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setShowLogoutModal(true)}
+                  className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs font-medium text-white bg-danger hover:bg-danger/90"
+                >
+                  <i className="ti ti-logout text-[0.875rem]"></i>
+                  Logout
+                </button>
                 <div
                   className="hs-dropdown-menu ti-dropdown-menu !-mt-3 border-0 w-[11rem] !p-0 border-defaultborder hidden main-header-dropdown  pt-0 overflow-hidden header-profile-dropdown dropdown-menu-end"
                   aria-labelledby="dropdown-profile">
@@ -802,7 +811,7 @@ const Header = ({ local_varaiable, ThemeChanger }:any) => {
                     <li><Link className="w-full ti-dropdown-item !text-[0.8125rem] !p-[0.65rem] !gap-x-0 !inline-flex" href="#!"><i
                       className="ti ti-headset text-[1.125rem] me-2 opacity-[0.7] !inline-flex"></i>Support</Link></li> */}
                     <li><button 
-                      onClick={logout}
+                      onClick={() => setShowLogoutModal(true)}
                       className="w-full ti-dropdown-item !text-[0.8125rem] !p-[0.65rem] !gap-x-0 !inline-flex text-left"
                     >
                       <i className="ti ti-logout text-[1.125rem] me-2 opacity-[0.7] !inline-flex"></i>Log Out
@@ -822,6 +831,48 @@ const Header = ({ local_varaiable, ThemeChanger }:any) => {
         </nav>
       </div>
       <Modalsearch />
+      {/* Logout confirmation modal */}
+      {showLogoutModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
+            onClick={() => setShowLogoutModal(false)}
+            aria-hidden
+          />
+          <div
+            className="relative w-full max-w-[20rem] rounded-xl border border-defaultborder dark:border-white/10 bg-white dark:bg-bodybg shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-center pt-8 pb-2 px-6">
+              <div className="mx-auto w-14 h-14 rounded-full bg-danger/10 flex items-center justify-center mb-4">
+                <i className="ti ti-logout text-2xl text-danger" />
+              </div>
+              <h3 className="text-base font-semibold text-defaulttextcolor dark:text-white mb-1">
+                Log out?
+              </h3>
+              <p className="text-sm text-[#8c9097] dark:text-white/50 mb-0">
+                Are you sure you want to sign out?
+              </p>
+            </div>
+            <div className="flex gap-3 p-5 pt-4 border-t border-defaultborder dark:border-white/10">
+              <button
+                type="button"
+                onClick={() => setShowLogoutModal(false)}
+                className="ti-btn ti-btn-light flex-1"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowLogoutModal(false); logout(); }}
+                className="ti-btn ti-btn-danger flex-1"
+              >
+                Log out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Fragment>
   )
 }

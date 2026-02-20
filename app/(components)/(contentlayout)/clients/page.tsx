@@ -1739,28 +1739,28 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
           <div className="box !bg-transparent border-0 shadow-none">
             <div className="box-header flex justify-between items-center">
               <h1 className="box-title text-2xl font-semibold">Clients</h1>
-              <div className="box-tools flex items-center space-x-2">
+              <div className="box-tools flex flex-wrap items-center gap-2">
                 {selectedClients.length > 0 && (
                   <button
                     type="button"
-                    className="ti-btn ti-btn-danger"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded transition-colors bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 shadow-sm disabled:opacity-50"
                     onClick={handleDeleteSelected}
                     disabled={isDeleting}
                   >
                     {isDeleting ? (
                       <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white me-2 inline-block"></div>
+                        <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-red-600"></div>
                         Deleting...
                       </>
                     ) : (
                       <>
-                        <i className="ri-delete-bin-line me-2"></i>
-                        Delete Selected ({selectedClients.length})
+                        <i className="ri-delete-bin-line text-xs"></i>
+                        Delete ({selectedClients.length})
                       </>
                     )}
                   </button>
                 )}
-                {/* Import/Export Buttons */}
+                {/* Import */}
                 <div className="relative group">
                   <input
                     type="file"
@@ -1771,48 +1771,51 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                   />
                   <button
                     type="button"
-                    className="ti-btn ti-btn-success"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded transition-colors bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm"
                     onClick={() => fileInputRef.current?.click()}
                   >
-                    <i className="ri-download-2-line me-2"></i> Import
+                    <i className="ri-download-2-line text-xs"></i> Import
                   </button>
                 </div>
                 {importProgress !== null && (
-                  <div className="w-40 h-3 bg-gray-200 rounded-full overflow-hidden flex items-center ml-2">
+                  <div className="w-24 h-2.5 bg-gray-200 rounded-full overflow-hidden flex items-center">
                     <div
                       className="bg-primary h-full transition-all duration-200"
                       style={{ width: `${importProgress}%` }}
                     ></div>
-                    <span className="ml-2 text-xs text-gray-700">
+                    <span className="ml-1.5 text-[10px] text-gray-600 font-medium">
                       {importProgress}%
                     </span>
                   </div>
                 )}
                 <button
                   type="button"
-                  className="ti-btn ti-btn-secondary"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded transition-colors bg-white border border-gray-200 text-[#495057] hover:bg-gray-50 shadow-sm"
                   onClick={handleDownloadTemplate}
                   title="Download Excel template with sample data"
                 >
-                  <i className="ri-file-download-line me-2"></i> Template
+                  <i className="ri-file-download-line text-xs"></i> Template
                 </button>
                 <button
                   type="button"
-                  className="ti-btn ti-btn-primary"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded transition-colors bg-white border border-gray-200 text-[#495057] hover:bg-gray-50 shadow-sm"
                   onClick={handleExport}
                 >
-                  <i className="ri-upload-2-line me-2"></i> Export
+                  <i className="ri-upload-2-line text-xs"></i> Export
                 </button>
                 <button
                   type="button"
-                  className="ti-btn ti-btn-secondary"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded transition-colors bg-sky-50 text-sky-600 border border-sky-100 hover:bg-sky-100 shadow-sm"
                   onClick={() => setShowBulkEmailDrawer(true)}
                   title="Bulk email & templates"
                 >
-                  <i className="ri-mail-send-line me-2"></i> Bulk Email
+                  <i className="ri-mail-send-line text-xs"></i> Bulk Email
                 </button>
-                <Link href="/clients/add" className="ti-btn ti-btn-primary">
-                  <i className="ri-add-line me-2"></i> Add New Client
+                <Link
+                  href="/clients/add"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded transition-colors bg-purple-600 text-white hover:bg-purple-700 shadow-sm"
+                >
+                  <i className="ri-add-line text-xs"></i> Add New Client
                 </Link>
               </div>
             </div>

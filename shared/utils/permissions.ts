@@ -251,15 +251,21 @@ export const hasRolePermission = (permission: keyof NavigationPermissions | 'set
   };
 };
 
+/** Clears all cookies by setting each to expired. */
+function clearAllCookies() {
+  document.cookie.split(';').forEach((c) => {
+    const name = c.replace(/^ +/, '').split('=')[0];
+    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+  });
+}
+
 export const logout = () => {
   if (typeof window === 'undefined') return;
-  
-  // Clear all authentication data
-  localStorage.removeItem('user');
-  localStorage.removeItem('token');
-  localStorage.removeItem('refreshToken');
-  
-  // Redirect to login page
+
+  localStorage.clear();
+  sessionStorage.clear();
+  clearAllCookies();
+
   window.location.href = '/';
 };
 
