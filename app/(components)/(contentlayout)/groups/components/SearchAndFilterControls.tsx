@@ -27,14 +27,9 @@ const SearchAndFilterControls: React.FC<SearchAndFilterControlsProps> = ({
 }) => {
   return (
     <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
-      {/* Rows per page selector */}
-      <div className="flex items-center w-full lg:w-auto">
-        <label className="mr-2 text-sm text-gray-600 whitespace-nowrap">Rows per page:</label>
-        <select
-          className="form-select w-auto text-sm"
-          value={itemsPerPage}
-          onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
-        >
+      <div className="flex items-center gap-2">
+        <label className="text-[11px] font-medium text-[#495057] whitespace-nowrap">Rows per page:</label>
+        <select className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300" value={itemsPerPage} onChange={(e) => onItemsPerPageChange(Number(e.target.value))}>
           <option value={10}>10</option>
           <option value={50}>50</option>
           <option value={100}>100</option>
@@ -42,37 +37,12 @@ const SearchAndFilterControls: React.FC<SearchAndFilterControlsProps> = ({
           <option value={1000}>1000</option>
         </select>
       </div>
-
-      {/* Search and filters */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
-        {/* Search bar */}
-        <div className="relative flex-grow sm:max-w-xs">
-          <input
-            type="text"
-            className="form-control py-2 w-full"
-            placeholder="Search by name..."
-            value={filters.name}
-            onChange={(e) => onFilterChange(e.target.value)}
-          />
-        </div>
-
-        {/* Filter button */}
-        <button
-          className={`ti-btn py-2 w-full sm:w-auto ${
-            hasActiveAdvancedFilters ? 'ti-btn-primary' : 'ti-btn-secondary'
-          }`}
-          onClick={onToggleAdvancedFilters}
-        >
-          <i className="ri-filter-3-line me-2"></i>
-          Filters {hasActiveAdvancedFilters && `(${Object.values(filters).filter(v => v !== '').length + (hasActiveAdvancedFilters ? 1 : 0)})`}
+      <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+        <input type="text" className="bg-white border border-gray-200 pl-3 pr-3 py-1.5 text-[11px] rounded focus:ring-0 focus:border-purple-300 placeholder:text-gray-400 w-full sm:max-w-[160px]" placeholder="Name..." value={filters.name} onChange={(e) => onFilterChange(e.target.value)} />
+        <button type="button" className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded ${hasActiveAdvancedFilters ? "bg-purple-600 text-white hover:bg-purple-700" : "bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100"}`} onClick={onToggleAdvancedFilters}>
+          <i className="ri-filter-3-line text-xs" /> Filters {hasActiveAdvancedFilters ? "(on)" : ""}
         </button>
-
-        {/* Sort dropdown */}
-        <select
-          className="form-select py-2 w-full sm:w-auto"
-          value={sortBy}
-          onChange={(e) => onSortChange(e.target.value)}
-        >
+        <select className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300" value={sortBy} onChange={(e) => onSortChange(e.target.value)}>
           <option value="name:asc">Name (A-Z)</option>
           <option value="name:desc">Name (Z-A)</option>
           <option value="createdAt:desc">Newest First</option>
@@ -80,14 +50,8 @@ const SearchAndFilterControls: React.FC<SearchAndFilterControlsProps> = ({
           <option value="sortOrder:asc">Sort Order (Low-High)</option>
           <option value="sortOrder:desc">Sort Order (High-Low)</option>
         </select>
-
-        {/* Reset button */}
-        <button
-          className="ti-btn ti-btn-secondary py-2 w-full sm:w-auto"
-          onClick={onReset}
-        >
-          <i className="ri-refresh-line me-2"></i>
-          Reset
+        <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100" onClick={onReset}>
+          <i className="ri-refresh-line text-xs" /> Reset
         </button>
       </div>
     </div>

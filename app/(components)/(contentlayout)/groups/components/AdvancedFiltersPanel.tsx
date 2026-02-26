@@ -19,20 +19,11 @@ const AdvancedFiltersPanel: React.FC<AdvancedFiltersPanelProps> = ({
   if (!showAdvancedFilters) return null;
 
   return (
-    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* Client Name Filter */}
+    <div className="bg-gray-50 border border-gray-200 rounded p-3 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Client Name
-          </label>
-          <input
-            type="text"
-            className="form-control w-full"
-            placeholder="Search by client name..."
-            value={advancedFilters.clientName}
-            onChange={(e) => onUpdateFilter('clientName', e.target.value)}
-          />
+          <label className="block text-[11px] font-medium text-[#495057] mb-1">Client name</label>
+          <input type="text" className="w-full bg-white border border-gray-200 pl-3 pr-3 py-1.5 text-[11px] rounded focus:ring-0 focus:border-purple-300 placeholder:text-gray-400" placeholder="Search by client name..." value={advancedFilters.clientName} onChange={(e) => onUpdateFilter('clientName', e.target.value)} />
         </div>
 
         {/* Task Count Range - Commented out */}
@@ -102,14 +93,9 @@ const AdvancedFiltersPanel: React.FC<AdvancedFiltersPanelProps> = ({
         </div> */}
       </div>
 
-      {/* Filter Actions */}
-      <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-gray-200">
-        <button
-          className="ti-btn ti-btn-secondary"
-          onClick={onClearFilters}
-        >
-          <i className="ri-refresh-line me-2"></i>
-          Clear Filters
+      <div className="flex justify-end mt-3 pt-3 border-t border-gray-200">
+        <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200" onClick={onClearFilters}>
+          <i className="ri-refresh-line text-xs" /> Clear filters
         </button>
       </div>
     </div>

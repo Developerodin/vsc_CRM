@@ -863,63 +863,25 @@ const GroupsPage = () => {
     }
   };
 
-  // Function to render task status badges
-  const renderTaskStatus = (taskStats: any, groupId: string) => {
+  const renderTaskStatus = (taskStats: any) => {
     if (isLoadingTaskStats) {
       return (
-        <div className="text-center text-gray-400 text-xs">
-          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary mx-auto mb-1"></div>
-          Loading...
+        <div className="flex items-center gap-1 text-[10px] text-gray-400">
+          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-purple-600" />
+          Loading
         </div>
       );
     }
-
-    if (taskStats.total === 0) {
-      return (
-        <div className="text-center text-gray-400 text-xs">
-          <i className="ri-task-line mr-1"></i>
-          No tasks
-        </div>
-      );
+    if (!taskStats || taskStats.total === 0) {
+      return <span className="text-[11px] text-gray-400">No tasks</span>;
     }
-
     return (
-      <div className="space-y-1">
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-gray-600">Total: {taskStats.total}</span>
-        </div>
-        <div className="flex flex-wrap gap-1">
-          {taskStats.pending > 0 && (
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-warning text-black">
-              {taskStats.pending} Pending
-            </span>
-          )}
-          {taskStats.ongoing > 0 && (
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary text-black">
-              {taskStats.ongoing} Ongoing
-            </span>
-          )}
-          {taskStats.completed > 0 && (
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success text-black">
-              {taskStats.completed} Completed
-            </span>
-          )}
-          {taskStats.onHold > 0 && (
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-              {taskStats.onHold} On Hold
-            </span>
-          )}
-          {taskStats.cancelled > 0 && (
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-              {taskStats.cancelled} Cancelled
-            </span>
-          )}
-          {taskStats.delayed > 0 && (
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-danger text-black">
-              {taskStats.delayed} Delayed
-            </span>
-          )}
-        </div>
+      <div className="flex flex-wrap gap-0.5">
+        <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-700 border border-gray-200">{taskStats.total} total</span>
+        {taskStats.pending > 0 && <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-800 border border-amber-100">{taskStats.pending} P</span>}
+        {taskStats.ongoing > 0 && <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-50 text-sky-700 border border-sky-100">{taskStats.ongoing} O</span>}
+        {taskStats.completed > 0 && <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">{taskStats.completed} C</span>}
+        {taskStats.delayed > 0 && <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-600 border border-red-100">{taskStats.delayed} D</span>}
       </div>
     );
   };
@@ -990,6 +952,8 @@ const GroupsPage = () => {
     setCurrentPage(1);
   };
 
+  const hasActiveFilters = !!(filters.name || hasActiveAdvancedFilters());
+
   return (
     <div className="main-content">
       <Toaster position="top-right" />
@@ -997,103 +961,76 @@ const GroupsPage = () => {
 
       <div className="grid grid-cols-12 gap-6">
         <div className="col-span-12">
-          {/* Page Header */}
-          <div className="box !bg-transparent border-0 shadow-none">
-            <div className="box-header flex justify-between items-center">
-              <h1 className="box-title text-2xl font-semibold">Groups</h1>
-              <div className="box-tools flex items-center space-x-2">
+          <div className="bg-white shadow-sm border border-gray-100 overflow-hidden rounded mb-6">
+            <div className="p-[10px] flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <span className="w-[3px] h-5 bg-purple-600 rounded-full shrink-0" aria-hidden />
+                <h1 className="text-[0.875rem] font-bold text-gray-800">Groups</h1>
+              </div>
+              <div className="flex items-center gap-1.5">
                 {selectedGroups.length > 0 && (
-                  <button
-                    type="button"
-                    className="ti-btn ti-btn-danger"
-                    onClick={handleDeleteSelected}
-                  >
-                    <i className="ri-delete-bin-line me-2"></i>
-                    Delete Selected ({selectedGroups.length})
+                  <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-red-50 text-red-600 border border-red-100 hover:bg-red-100" onClick={handleDeleteSelected}>
+                    <i className="ri-delete-bin-line text-xs" /> Delete Selected ({selectedGroups.length})
                   </button>
                 )}
-                {/* Import/Export Buttons */}
-                <div className="relative group">
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    className="hidden"
-                    accept=".xlsx,.xls"
-                    onChange={handleImport}
-                  />
-                  <button
-                    type="button"
-                    className="ti-btn ti-btn-success"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <i className="ri-download-2-line me-2"></i> Import
-                  </button>
-                </div>
+                <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx,.xls" onChange={handleImport} />
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm">
+                  <i className="ri-download-2-line text-xs" /> Import
+                </button>
                 {importProgress !== null && (
-                  <div className="w-40 h-3 bg-gray-200 rounded-full overflow-hidden flex items-center ml-2">
-                    <div
-                      className="bg-primary h-full transition-all duration-200"
-                      style={{ width: `${importProgress}%` }}
-                    ></div>
-                    <span className="ml-2 text-xs text-gray-700">
-                      {importProgress}%
-                    </span>
+                  <div className="w-24 h-2.5 bg-gray-200 rounded-full overflow-hidden flex items-center">
+                    <div className="bg-purple-600 h-full transition-all duration-200" style={{ width: `${importProgress}%` }} />
+                    <span className="ml-1.5 text-[10px] text-gray-600 font-medium">{importProgress}%</span>
                   </div>
                 )}
-                <button
-                  type="button"
-                  className="ti-btn ti-btn-primary"
-                  onClick={handleExport}
-                >
-                  <i className="ri-upload-2-line me-2"></i> Export
+                <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm" onClick={handleExport}>
+                  <i className="ri-upload-2-line text-xs" /> Export
                 </button>
-                <Link
-                  href="/groups/add"
-                  className="ti-btn ti-btn-primary"
-                >
-                  <i className="ri-add-line me-2"></i> Add New Group
+                <Link href="/groups/add" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm">
+                  <i className="ri-add-line text-xs" /> Add New Group
                 </Link>
               </div>
             </div>
           </div>
 
-          {/* Statistics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            {/* Total Groups Card */}
-            <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="bg-purple-50 border border-purple-200 rounded p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-sm font-medium text-primary">Total Groups</span>
-                  <p className="text-2xl font-bold text-primary mt-1">
-                    {totalResults}
-                  </p>
+                  <span className="text-[11px] font-bold text-purple-700">Total Groups</span>
+                  <p className="text-lg font-bold text-[#323251] mt-0.5">{totalResults}</p>
                 </div>
-                <div className="bg-primary/20 p-3 rounded-full">
-                  <i className="ri-folder-line text-primary text-xl"></i>
+                <div className="w-9 h-9 bg-purple-100 rounded-full flex items-center justify-center">
+                  <i className="ri-folder-line text-purple-600 text-sm" />
                 </div>
               </div>
             </div>
-
-            {/* Total Clients Card */}
-            <div className="bg-success/10 border border-success/20 rounded-lg p-4">
+            <div className="bg-sky-50 border border-sky-200 rounded p-4 opacity-90">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-sm font-medium text-success">Total Clients</span>
-                  <p className="text-2xl font-bold text-success mt-1">
-                    {totalClients}
-                  </p>
+                  <span className="text-[11px] font-bold text-sky-700">Total Clients</span>
+                  <p className="text-lg font-bold text-[#323251] mt-0.5">{totalClients}</p>
                 </div>
-                <div className="bg-success/20 p-3 rounded-full">
-                  <i className="ri-user-line text-success text-xl"></i>
+                <div className="w-9 h-9 bg-sky-100 rounded-full flex items-center justify-center">
+                  <i className="ri-user-line text-sky-600 text-sm" />
+                </div>
+              </div>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded p-4 opacity-90">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-amber-700">Selected</span>
+                  <p className="text-lg font-bold text-[#323251] mt-0.5">{selectedGroups.length}</p>
+                </div>
+                <div className="w-9 h-9 bg-amber-100 rounded-full flex items-center justify-center">
+                  <i className="ri-checkbox-circle-line text-amber-600 text-sm" />
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Content Box */}
-          <div className="box">
-            <div className="box-body">
-              {/* Search and Filter Controls */}
+          <div className="bg-white shadow-sm border border-gray-100 overflow-hidden rounded">
+            <div className="p-[10px]">
               <SearchAndFilterControls
                 filters={filters}
                 sortBy={sortBy}
@@ -1113,23 +1050,6 @@ const GroupsPage = () => {
                 onReset={handleReset}
               />
 
-              {/* Clear Search Button */}
-              {filters.name && (
-                <div className="mb-4 flex justify-end">
-                  <button
-                    onClick={() => {
-                      setFilters(prev => ({ ...prev, name: "" }));
-                      setCurrentPage(1);
-                    }}
-                    className="ti-btn ti-btn-secondary"
-                  >
-                    <i className="ri-close-line me-2"></i>
-                    Clear Search
-                  </button>
-                </div>
-              )}
-
-              {/* Advanced Filters Panel */}
               <AdvancedFiltersPanel
                 showAdvancedFilters={showAdvancedFilters}
                 advancedFilters={advancedFilters}
@@ -1137,252 +1057,104 @@ const GroupsPage = () => {
                 onClearFilters={handleClearAllFilters}
               />
 
-              {/* Active Filters Summary */}
               <ActiveFiltersSummary
                 advancedFilters={advancedFilters}
                 onClearAll={handleClearAllFilters}
               />
 
-              {/* Advanced Filters Summary */}
-              {/* {hasActiveAdvancedFilters() && (
-                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <span className="text-sm font-medium text-blue-800">Active Advanced Filters:</span>
-                      
-                      {advancedFilters.clientName && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                          Client: {advancedFilters.clientName}
-                        </span>
-                      )}
-                      
-                     
-                    </div>
-                    <button
-                      onClick={handleClearAllFilters}
-                      className="text-blue-600 hover:text-blue-800 text-sm"
-                    >
-                      <i className="ri-close-line me-1"></i>
-                      Clear All Advanced Filters
-                    </button>
-                  </div>
-                </div>
-              )} */}
-
-              {/* Search Results Indicator */}
-              {filters.name && (
-                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <i className="ri-search-line text-green-600 mr-2"></i>
-                      <span className="text-sm font-medium text-green-800">
-                        Search Results for "{filters.name}": {groups.length} groups found
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setFilters(prev => ({ ...prev, name: "" }));
-                  setCurrentPage(1);
-                }}
-                      className="text-green-600 hover:text-green-800 text-sm"
-                    >
-                      <i className="ri-close-line mr-1"></i>
-                      Clear Search
-                    </button>
+              {hasActiveFilters && (
+                <div className="mb-4 p-3 bg-sky-50 border border-sky-100 rounded">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="text-[11px] font-bold text-sky-700">Filters active</span>
+                    <button onClick={handleReset} className="text-[11px] font-bold text-sky-600 hover:text-sky-800"><i className="ri-close-line text-xs" /> Clear</button>
                   </div>
                 </div>
               )}
 
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                </div>
-              ) : error ? (
-                <div className="text-center py-8 text-red-500">
-                  <i className="ri-error-warning-line text-3xl mb-2"></i>
-                  <p>{error}</p>
-                </div>
-              ) : (
-                <div className="table-responsive">
-                  <table className="table whitespace-nowrap table-bordered min-w-full">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            className="form-checkbox"
-                            checked={selectedGroups.length === groups.length}
-                            onChange={handleSelectAll}
-                          />
-                        </th>
-                        <th className="px-4 py-3">Group Name</th>
-                        <th className="px-4 py-3">Number of Clients</th>
-                        <th className="px-4 py-3">Created Date</th>
-                        <th className="px-4 py-3">Tasks</th>
-                        <th className="px-4 py-3">Actions</th>
+              <div className="overflow-x-auto min-h-[200px] border border-gray-200 rounded">
+                <table className="w-full border-collapse border border-gray-200">
+                  <thead>
+                    <tr className="bg-gray-50/30">
+                      <th className="pl-[10px] pr-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200 w-10">
+                        <input type="checkbox" className="rounded border-gray-200 text-purple-600 focus:ring-0 h-3.5 w-3.5" checked={selectedGroups.length === groups.length && groups.length > 0} onChange={handleSelectAll} />
+                      </th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Group Name</th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Clients</th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Created</th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Tasks</th>
+                      <th className="pl-1.5 pr-[10px] py-3 text-right text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {isLoading ? (
+                      <tr>
+                        <td colSpan={6} className="text-center py-20 border border-gray-200">
+                          <div className="flex flex-col items-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 opacity-50" />
+                            <p className="mt-3 text-[10px] text-gray-400 font-bold uppercase">Loading</p>
+                          </div>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {groups.length > 0 ? (
-                        groups.map((group: GroupWithTasks, index: number) => (
-                          <tr
-                            key={group.id}
-                            className={`border-b border-gray-200 ${
-                              index % 2 === 0 ? "bg-gray-50" : ""
-                            }`}
-                          >
-                            <td>
-                              <input
-                                type="checkbox"
-                                className="form-check-input"
-                                checked={selectedGroups.includes(group.id)}
-                                onChange={() => handleGroupSelect(group.id)}
-                              />
-                            </td>
-                            <td>{group.name}</td>
-                            <td>{group.clients ? group.clients.length : 0}</td>
-                            <td>{new Date(group.createdAt).toLocaleDateString()}</td>
-                                               <td className="px-4 py-3">
-                              {renderTaskStatus(group.taskStats, group.id)}
-                            </td>
-                            <td>
-                              <div className="flex space-x-2">
-                                <button
-                                  className="ti-btn ti-btn-info ti-btn-sm"
-                                  onClick={() => handleViewClients(group)}
-                                >
-                                  <i className="ri-eye-line"></i>
-                                </button>
-                                <Link
-                                  href={`/groups/edit/${group.id}`}
-                                  className="ti-btn ti-btn-primary ti-btn-sm"
-                                >
-                                  <i className="ri-edit-line"></i>
-                                </Link>
-                                <button
-                                  className="ti-btn ti-btn-danger ti-btn-sm"
-                                  onClick={() => handleDelete(group.id)}
-                                >
-                                  <i className="ri-delete-bin-line"></i>
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={7} className="text-center py-8">
-                            <div className="flex flex-col items-center justify-center">
-                              <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
-                                <i className="ri-folder-line text-4xl text-primary"></i>
-                              </div>
-                              <h3 className="text-xl font-medium mb-2">
-                                {filters.name ? 'No Search Results Found' : 'No Groups Found'}
-                              </h3>
-                              <p className="text-gray-500 text-center mb-6">
-                                {filters.name 
-                                  ? `No groups found matching "${filters.name}". Try adjusting your search terms.`
-                                  : 'Start by adding your first group.'
-                                }
-                              </p>
-                              {filters.name ? (
-                                <button
-                                  onClick={() => {
-                                    setFilters(prev => ({ ...prev, name: "" }));
-                                    setCurrentPage(1);
-                                  }}
-                                  className="ti-btn ti-btn-primary"
-                                >
-                                  <i className="ri-refresh-line me-2"></i>
-                                  Clear Search
-                                </button>
-                              ) : (
-                              <Link
-                                href="/groups/add"
-                                className="ti-btn ti-btn-primary"
-                              >
-                                <i className="ri-add-line me-2"></i> Add First
-                                Group
-                              </Link>
-                              )}
+                    ) : error ? (
+                      <tr>
+                        <td colSpan={6} className="text-center text-red-600 py-20 text-[12px] font-medium border border-gray-200">{error}</td>
+                      </tr>
+                    ) : groups.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="text-center py-20 border border-gray-200">
+                          <div className="flex flex-col items-center">
+                            <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                              <i className="ri-folder-line text-xl text-gray-200" />
+                            </div>
+                            <p className="text-xs font-bold text-gray-400 mb-1">NO GROUPS</p>
+                            <p className="text-[11px] text-gray-500 mb-4">{hasActiveFilters ? "No groups match your filters." : "Start by adding your first group."}</p>
+                            {hasActiveFilters ? (
+                              <button onClick={handleReset} className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700"><i className="ri-refresh-line text-xs" /> Clear Filters</button>
+                            ) : (
+                              <Link href="/groups/add" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700"><i className="ri-add-line text-xs" /> Add First Group</Link>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      groups.map((group: GroupWithTasks) => (
+                        <tr key={group.id} className="hover:bg-gray-50/50 group">
+                          <td className="pl-[10px] pr-1.5 py-2.5 border border-gray-200">
+                            <input type="checkbox" checked={selectedGroups.includes(group.id)} onChange={() => handleGroupSelect(group.id)} className="rounded border-gray-200 text-purple-600 focus:ring-0 h-3.5 w-3.5" />
+                          </td>
+                          <td className="px-1.5 py-2.5 text-[12px] font-medium text-[#323251] border border-gray-200">{group.name}</td>
+                          <td className="px-1.5 py-2.5 text-[12px] text-[#495057] border border-gray-200">{group.clients ? group.clients.length : 0}</td>
+                          <td className="px-1.5 py-2.5 text-[12px] text-[#495057] border border-gray-200">{new Date(group.createdAt).toLocaleDateString()}</td>
+                          <td className="px-1.5 py-2.5 border border-gray-200">{renderTaskStatus(group.taskStats)}</td>
+                          <td className="pl-1.5 pr-[10px] py-2.5 border border-gray-200">
+                            <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100">
+                              <button type="button" onClick={() => handleViewClients(group)} className="w-7 h-7 rounded flex items-center justify-center bg-sky-50 text-sky-600 border border-sky-100 hover:bg-sky-100" title="View clients"><i className="ri-eye-line text-sm" /></button>
+                              <Link href={`/groups/edit/${group.id}`} className="w-7 h-7 rounded flex items-center justify-center bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100" title="Edit"><i className="ri-pencil-line text-sm" /></Link>
+                              <button type="button" onClick={() => handleDelete(group.id)} className="w-7 h-7 rounded flex items-center justify-center bg-red-50 text-red-600 border border-red-100 hover:bg-red-100" title="Delete"><i className="ri-delete-bin-line text-sm" /></button>
                             </div>
                           </td>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
 
-              {/* Pagination */}
-              {!isLoading && !error && (
-                <div className="flex justify-between items-center mt-4">
-                  <div className="text-sm text-gray-500">
-                    Showing{" "}
-                    {totalResults === 0
-                      ? 0
-                      : (currentPage - 1) * itemsPerPage + 1}{" "}
-                    to{" "}
-                    {totalResults === 0
-                      ? 0
-                      : Math.min(currentPage * itemsPerPage, totalResults)}{" "}
-                    of {totalResults} entries
+              {!isLoading && !error && groups.length > 0 && (
+                <div className="flex flex-wrap justify-between items-center gap-4 p-[10px] pt-4 border-t border-gray-100">
+                  <div className="text-[11px] font-medium text-[#495057]">
+                    Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, totalResults)} of {totalResults} entries
                   </div>
-                  <nav aria-label="Page navigation" className="">
-                    <ul className="flex flex-wrap items-center">
-                      <li
-                        className={`page-item ${
-                          currentPage === 1 ? "disabled" : ""
-                        }`}
-                      >
-                        <button
-                          className="page-link py-2 px-3 ml-0 leading-tight text-gray-500 bg-white rounded-l-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                          onClick={() =>
-                            setCurrentPage((prev) => Math.max(prev - 1, 1))
-                          }
-                          disabled={currentPage === 1}
-                        >
-                          Previous
-                        </button>
-                      </li>
-                      {getPagination(currentPage, totalPages).map((page, idx) =>
-                        page === "..." ? (
-                          <li key={"ellipsis-" + idx} className="page-item">
-                            <span className="px-3">...</span>
-                          </li>
-                        ) : (
-                          <li key={page} className="page-item">
-                            <button
-                              className={`page-link py-2 px-3 leading-tight border border-gray-300 ${
-                                currentPage === page
-                                  ? "bg-primary text-white hover:bg-primary-dark"
-                                  : "bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                              }`}
-                              onClick={() => setCurrentPage(Number(page))}
-                            >
-                              {page}
-                            </button>
-                          </li>
-                        )
-                      )}
-                      <li
-                        className={`page-item ${
-                          currentPage === totalPages ? "disabled" : ""
-                        }`}
-                      >
-                        <button
-                          className="page-link py-2 px-3 leading-tight text-gray-500 bg-white rounded-r-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                          onClick={() =>
-                            setCurrentPage((prev) =>
-                              Math.min(prev + 1, totalPages)
-                            )
-                          }
-                          disabled={currentPage === totalPages}
-                        >
-                          Next
-                        </button>
-                      </li>
-                    </ul>
+                  <nav className="flex flex-wrap items-center gap-1">
+                    <button className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30" onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))} disabled={currentPage === 1}>Previous</button>
+                    {getPagination(currentPage, totalPages).map((page, idx) =>
+                      page === "..." ? (
+                        <span key={"e-" + idx} className="px-2 text-[10px] text-gray-300">...</span>
+                      ) : (
+                        <button key={page} className={`w-7 h-7 flex items-center justify-center text-[11px] font-bold rounded ${currentPage === page ? "bg-purple-600 text-white shadow-md" : "text-gray-400 hover:bg-gray-50"}`} onClick={() => setCurrentPage(Number(page))}>{page}</button>
+                      )
+                    )}
+                    <button className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30" onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages}>Next</button>
                   </nav>
                 </div>
               )}
@@ -1391,195 +1163,70 @@ const GroupsPage = () => {
         </div>
       </div>
 
-      {/* Client Modal */}
+      {/* Clients drawer */}
       {showClientModal && selectedGroup && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen px-4">
-            <div className="fixed inset-0 bg-black opacity-50"></div>
-            <div className="relative bg-white rounded-lg shadow-xl w-full max-w-4xl">
-              <div className="flex items-center justify-between p-4 border-b">
-                <h3 className="text-xl font-semibold">
-                  Clients in {selectedGroup.name}
-                </h3>
-                <button
-                  onClick={() => {
-                    setShowClientModal(false);
-                    setAvailableClients([]);
-                    setClientSearchQuery("");
-                    setClientCurrentPage(1);
-                  }}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <i className="ri-close-line text-2xl"></i>
-                </button>
-              </div>
-
-              <div className="p-4">
-                <div className="mb-4">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      className="form-control py-3 pr-10"
-                      placeholder="Search clients..."
-                      value={clientSearchQuery}
-                      onChange={(e) => setClientSearchQuery(e.target.value)}
-                    />
-                    <button className="absolute end-0 top-0 px-4 h-full">
-                      <i className="ri-search-line text-lg"></i>
-                    </button>
-                  </div>
+        <>
+          <div className="fixed inset-0 z-40 bg-black/40" aria-hidden onClick={() => { setShowClientModal(false); setAvailableClients([]); setClientSearchQuery(""); setClientCurrentPage(1); }} />
+          <div className="fixed right-0 top-0 z-50 h-full w-full max-w-md bg-white shadow-xl border-l border-gray-200 flex flex-col">
+            <div className="p-[10px] border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-[0.875rem] font-bold text-gray-800">Clients in {selectedGroup.name}</h3>
+              <button type="button" onClick={() => { setShowClientModal(false); setAvailableClients([]); setClientSearchQuery(""); setClientCurrentPage(1); }} className="w-7 h-7 rounded flex items-center justify-center text-gray-500 hover:bg-gray-100">
+                <i className="ri-close-line text-lg" />
+              </button>
+            </div>
+            <div className="p-[10px] flex-1 overflow-auto">
+              <input type="text" className="w-full bg-white border border-gray-200 pl-3 pr-3 py-1.5 text-[11px] rounded focus:ring-0 focus:border-purple-300 placeholder:text-gray-400 mb-3" placeholder="Search clients..." value={clientSearchQuery} onChange={(e) => setClientSearchQuery(e.target.value)} />
+              {isLoadingClients ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 opacity-50" />
                 </div>
-
-                {/* Client Search Results Indicator */}
-                {clientSearchQuery && (
-                  <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <i className="ri-search-line text-green-600 mr-2"></i>
-                        <span className="text-sm font-medium text-green-800">
-                          Search Results for "{clientSearchQuery}": {availableClients.length} clients found
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setClientSearchQuery("");
-                          setClientCurrentPage(1);
-                        }}
-                        className="text-green-600 hover:text-green-800 text-sm"
-                      >
-                        <i className="ri-close-line mr-1"></i>
-                        Clear Search
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {isLoadingClients ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                  </div>
-                ) : (
-                  <div className="table-responsive">
-                    <table className="table whitespace-nowrap table-bordered min-w-full">
-                      <thead>
-                        <tr className="border-b border-gray-200">
-                          <th scope="col" className="text-start">Name</th>
-                          <th scope="col" className="text-start">Email</th>
-                          <th scope="col" className="text-start">Phone</th>
-                          <th scope="col" className="text-start">City</th>
-                          <th scope="col" className="text-start">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Array.isArray(availableClients) && availableClients.length > 0 ? (
-                          availableClients.map((client) => (
-                            <tr key={client.id} className="border-b border-gray-200">
-                              <td>{client.name}</td>
-                              <td>{client.email}</td>
-                              <td>{client.phone}</td>
-                              <td>{client.city}</td>
-                              <td>
-                                <button
-                                  className="ti-btn ti-btn-danger ti-btn-sm"
-                                  onClick={() => handleRemoveClient(client.id)}
-                                >
-                                  <i className="ri-delete-bin-line"></i>
-                                </button>
-                              </td>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr>
-                            <td colSpan={5} className="text-center py-8">
-                              <div className="flex flex-col items-center justify-center">
-                                <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-                                  <i className="ri-search-line text-2xl text-gray-400"></i>
-                                </div>
-                                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                                  {clientSearchQuery ? 'No Clients Found' : 'No Clients Available'}
-                                </h3>
-                                <p className="text-gray-500 text-center mb-4">
-                                  {clientSearchQuery 
-                                    ? `No clients found matching "${clientSearchQuery}". Try adjusting your search terms.`
-                                    : 'This group has no clients assigned yet.'
-                                  }
-                                </p>
-                                {clientSearchQuery && (
-                                  <button
-                                    onClick={() => {
-                                      setClientSearchQuery("");
-                                      setClientCurrentPage(1);
-                                    }}
-                                    className="ti-btn ti-btn-primary"
-                                  >
-                                    <i className="ri-refresh-line me-2"></i>
-                                    Clear Search
-                                  </button>
-                                )}
-                              </div>
+              ) : (
+                <div className="overflow-x-auto border border-gray-200 rounded">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50/30">
+                        <th className="px-2 py-2 text-left text-[11px] font-bold text-[#495057] uppercase border border-gray-200">Name</th>
+                        <th className="px-2 py-2 text-left text-[11px] font-bold text-[#495057] uppercase border border-gray-200">Email</th>
+                        <th className="px-2 py-2 text-right text-[11px] font-bold text-[#495057] uppercase border border-gray-200 w-16">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Array.isArray(availableClients) && availableClients.length > 0 ? (
+                        availableClients.map((client) => (
+                          <tr key={client.id} className="hover:bg-gray-50/50">
+                            <td className="px-2 py-2 text-[12px] font-medium text-[#323251] border border-gray-200">{client.name}</td>
+                            <td className="px-2 py-2 text-[12px] text-[#495057] border border-gray-200 truncate max-w-[140px]">{client.email}</td>
+                            <td className="px-2 py-2 text-right border border-gray-200">
+                              <button type="button" onClick={() => handleRemoveClient(client.id)} className="w-7 h-7 rounded flex items-center justify-center bg-red-50 text-red-600 border border-red-100 hover:bg-red-100" title="Remove"><i className="ri-delete-bin-line text-sm" /></button>
                             </td>
                           </tr>
-                        )}
-                      </tbody>
-                    </table>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={3} className="text-center py-8 text-[12px] text-[#495057] border border-gray-200">
+                            {clientSearchQuery ? `No clients matching "${clientSearchQuery}"` : "No clients in this group."}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {!isLoadingClients && clientTotalPages > 1 && (
+                <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-100">
+                  <span className="text-[11px] font-medium text-[#495057]">
+                    {(clientCurrentPage - 1) * 10 + 1}–{Math.min(clientCurrentPage * 10, clientTotalResults)} of {clientTotalResults}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button type="button" className="w-7 h-7 flex items-center justify-center text-[11px] font-bold rounded text-gray-400 hover:bg-gray-50 disabled:opacity-30" onClick={() => setClientCurrentPage((p) => Math.max(p - 1, 1))} disabled={clientCurrentPage === 1}>Prev</button>
+                    {getPagination(clientCurrentPage, clientTotalPages).map((p, i) => p === "..." ? <span key={`c-${i}`} className="px-1 text-[10px] text-gray-300">...</span> : <button key={p} type="button" className={`w-7 h-7 flex items-center justify-center text-[11px] font-bold rounded ${clientCurrentPage === p ? "bg-purple-600 text-white" : "text-gray-400 hover:bg-gray-50"}`} onClick={() => setClientCurrentPage(Number(p))}>{p}</button>)}
+                    <button type="button" className="w-7 h-7 flex items-center justify-center text-[11px] font-bold rounded text-gray-400 hover:bg-gray-50 disabled:opacity-30" onClick={() => setClientCurrentPage((p) => Math.min(p + 1, clientTotalPages))} disabled={clientCurrentPage === clientTotalPages}>Next</button>
                   </div>
-                )}
-
-                {/* Client Pagination */}
-                {!isLoadingClients && clientTotalPages > 1 && (
-                  <div className="flex justify-between items-center mt-4">
-                    <div className="text-sm text-gray-500">
-                      Showing {clientTotalResults === 0 ? 0 : (clientCurrentPage - 1) * 10 + 1} to{" "}
-                      {Math.min(clientCurrentPage * 10, clientTotalResults)} of {clientTotalResults} entries
-                    </div>
-                    <nav aria-label="Page navigation">
-                      <ul className="flex flex-wrap items-center">
-                        <li className={`page-item ${clientCurrentPage === 1 ? "disabled" : ""}`}>
-                          <button
-                            className="page-link py-2 px-3 ml-0 leading-tight text-gray-500 bg-white rounded-l-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                            onClick={() => setClientCurrentPage((prev) => Math.max(prev - 1, 1))}
-                            disabled={clientCurrentPage === 1}
-                          >
-                            Previous
-                          </button>
-                        </li>
-                        {getPagination(clientCurrentPage, clientTotalPages).map((page, idx) =>
-                          page === "..." ? (
-                            <li key={"ellipsis-" + idx} className="page-item">
-                              <span className="px-3">...</span>
-                            </li>
-                          ) : (
-                            <li key={page} className="page-item">
-                              <button
-                                className={`page-link py-2 px-3 leading-tight border border-gray-300 ${
-                                  clientCurrentPage === page
-                                    ? "bg-primary text-white hover:bg-primary-dark"
-                                    : "bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                                }`}
-                                onClick={() => setClientCurrentPage(Number(page))}
-                              >
-                                {page}
-                              </button>
-                            </li>
-                          )
-                        )}
-                        <li className={`page-item ${clientCurrentPage === clientTotalPages ? "disabled" : ""}`}>
-                          <button
-                            className="page-link py-2 px-3 leading-tight text-gray-500 bg-white rounded-r-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                            onClick={() => setClientCurrentPage((prev) => Math.min(prev + 1, clientTotalPages))}
-                            disabled={clientCurrentPage === clientTotalPages}
-                          >
-                            Next
-                          </button>
-                        </li>
-                      </ul>
-                    </nav>
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
