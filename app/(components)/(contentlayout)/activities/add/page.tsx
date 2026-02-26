@@ -378,22 +378,24 @@ const AddActivityPage = () => {
       
       <div className="grid grid-cols-12 gap-6">
         <div className="col-span-12">
-          {/* Page Header */}
-          <div className="box !bg-transparent border-0 shadow-none">
-            <div className="box-header flex justify-between items-center">
-              <h1 className="box-title text-2xl font-semibold">Add New Activity</h1>
+          {/* Page Header – timelines-style */}
+          <div className="bg-white shadow-sm border border-gray-100 overflow-hidden rounded mb-6">
+            <div className="p-[10px] flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <span className="w-[3px] h-5 bg-purple-600 rounded-full shrink-0" aria-hidden />
+                <h1 className="text-[0.875rem] font-bold text-gray-800">Add New Activity</h1>
+              </div>
               <nav className="flex" aria-label="Breadcrumb">
-                <ol className="inline-flex items-center space-x-1 md:space-x-3">
+                <ol className="inline-flex items-center space-x-1 md:space-x-3 text-[11px] font-medium">
                   <li className="inline-flex items-center">
-                    <Link href="/activities" className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-primary">
-                      <i className="ri-home-line mr-2"></i>
-                      Activities
+                    <Link href="/activities" className="inline-flex items-center text-gray-500 hover:text-purple-600">
+                      <i className="ri-home-line mr-1" /> Activities
                     </Link>
                   </li>
                   <li>
                     <div className="flex items-center">
-                      <i className="ri-arrow-right-s-line text-gray-400 mx-2"></i>
-                      <span className="text-sm font-medium text-gray-500">Add New Activity</span>
+                      <i className="ri-arrow-right-s-line text-gray-400 mx-1" />
+                      <span className="text-gray-500">Add New Activity</span>
                     </div>
                   </li>
                 </ol>
@@ -401,9 +403,9 @@ const AddActivityPage = () => {
             </div>
           </div>
 
-          {/* Form Box */}
-          <div className="box">
-            <div className="box-body">
+          {/* Form Box – timelines-style card */}
+          <div className="bg-white shadow-sm border border-gray-100 overflow-hidden rounded">
+            <div className="p-6">
               <form onSubmit={handleSubmit}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Activity Name */}

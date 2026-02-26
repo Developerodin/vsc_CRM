@@ -50,27 +50,26 @@ const AddBusinessMasterPage = () => {
 
       <div className="grid grid-cols-12 gap-6">
         <div className="col-span-12">
-          {/* Page Header */}
-          <div className="box !bg-transparent border-0 shadow-none">
-            <div className="box-header flex justify-between items-center">
-              <h1 className="box-title text-2xl font-semibold">Add Business Type</h1>
-              <div className="box-tools flex items-center space-x-2">
-                <Link href="/settings/business-master" className="ti-btn ti-btn-secondary">
-                  <i className="ri-arrow-left-line me-2"></i>
-                  Back to Business Master
-                </Link>
+          {/* Page Header – timelines-style */}
+          <div className="bg-white shadow-sm border border-gray-100 overflow-hidden rounded mb-6">
+            <div className="p-[10px] flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <span className="w-[3px] h-5 bg-purple-600 rounded-full shrink-0" aria-hidden />
+                <h1 className="text-[0.875rem] font-bold text-gray-800">Add Business Type</h1>
               </div>
+              <Link href="/settings/business-master" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200">
+                <i className="ri-arrow-left-line text-xs" /> Back to Business Master
+              </Link>
             </div>
           </div>
 
-          {/* Content Box */}
-          <div className="box">
-            <div className="box-body">
+          {/* Content Box – timelines-style */}
+          <div className="bg-white shadow-sm border border-gray-100 overflow-hidden rounded">
+            <div className="p-6">
               <form onSubmit={handleSubmit} className="max-w-2xl">
                 <div className="grid grid-cols-1 gap-6">
-                  {/* Name Field */}
                   <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="name" className="block text-[11px] font-bold text-[#495057] mb-1">
                       Business Type Name <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -79,39 +78,26 @@ const AddBusinessMasterPage = () => {
                       name="name"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="form-control w-full"
+                      className="w-full bg-white border border-gray-200 text-[12px] rounded px-3 py-2 focus:ring-0 focus:border-purple-300"
                       placeholder="Enter business type name"
                       required
                     />
-                    <p className="text-sm text-gray-500 mt-1">
-                      Enter a descriptive name for the business type (e.g., Private Limited, Partnership, Sole Proprietorship)
+                    <p className="text-[11px] text-[#495057] mt-1">
+                      e.g. Private Limited, Partnership, Sole Proprietorship
                     </p>
                   </div>
 
-                  {/* Form Actions */}
-                  <div className="flex items-center justify-end space-x-3 pt-6 border-t border-gray-200">
-                    <Link
-                      href="/settings/business-master"
-                      className="ti-btn ti-btn-secondary"
-                    >
+                  <div className="flex items-center gap-2 pt-4 border-t border-gray-100">
+                    <Link href="/settings/business-master" className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-bold rounded bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200">
                       Cancel
                     </Link>
                     <button
                       type="submit"
                       disabled={isSubmitting || !name.trim()}
-                      className="ti-btn ti-btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm disabled:opacity-50"
                     >
-                      {isSubmitting ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Creating...
-                        </>
-                      ) : (
-                        <>
-                          <i className="ri-save-line me-2"></i>
-                          Create Business Type
-                        </>
-                      )}
+                      {isSubmitting ? <i className="ri-loader-4-line animate-spin text-xs" /> : null}
+                      {isSubmitting ? "Creating..." : "Create Business Type"}
                     </button>
                   </div>
                 </div>

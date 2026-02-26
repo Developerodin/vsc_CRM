@@ -428,6 +428,8 @@ const ActivitiesPage = () => {
     return pages;
   }
 
+  const hasActiveFilters = !!filters.name;
+
   return (
     <div className="main-content">
       <Toaster position="top-right" />
@@ -435,80 +437,83 @@ const ActivitiesPage = () => {
 
       <div className="grid grid-cols-12 gap-6">
         <div className="col-span-12">
-          {/* Page Header */}
-          <div className="box !bg-transparent border-0 shadow-none">
-            <div className="box-header flex justify-between items-center">
-              <h1 className="box-title text-2xl font-semibold">Activities</h1>
-              <div className="box-tools flex items-center space-x-2">
-              {selectedActivities.length > 0 && (
-                  <button
-                    type="button"
-                    className="ti-btn ti-btn-danger"
-                    onClick={handleDeleteSelected}
-                  >
-                    <i className="ri-delete-bin-line me-2"></i>
-                    Delete Selected ({selectedActivities.length})
+          {/* Page Header – timelines-style */}
+          <div className="bg-white shadow-sm border border-gray-100 overflow-hidden rounded mb-6">
+            <div className="p-[10px] flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <span className="w-[3px] h-5 bg-purple-600 rounded-full shrink-0" aria-hidden />
+                <h1 className="text-[0.875rem] font-bold text-gray-800">Activities</h1>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {selectedActivities.length > 0 && (
+                  <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-red-50 text-red-600 border border-red-100 hover:bg-red-100" onClick={handleDeleteSelected}>
+                    <i className="ri-delete-bin-line text-xs" /> Delete Selected ({selectedActivities.length})
                   </button>
                 )}
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleImport}
-                  accept=".xlsx,.xls"
-                  className="hidden"
-                />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="ti-btn ti-btn-success"
-                >
-                  <i className="ri-download-2-line me-2"></i>
-                  Import
+                <input type="file" ref={fileInputRef} onChange={handleImport} accept=".xlsx,.xls" className="hidden" />
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm">
+                  <i className="ri-download-2-line text-xs" /> Import
                 </button>
                 {importProgress !== null && (
-                  <div className="w-40 h-3 bg-gray-200 rounded-full overflow-hidden flex items-center ml-2">
-                    <div
-                      className="bg-primary h-full transition-all duration-200"
-                      style={{ width: `${importProgress}%` }}
-                    ></div>
-                    <span className="ml-2 text-xs text-gray-700">
-                      {importProgress}%
-                    </span>
+                  <div className="w-24 h-2.5 bg-gray-200 rounded-full overflow-hidden flex items-center">
+                    <div className="bg-purple-600 h-full transition-all duration-200" style={{ width: `${importProgress}%` }} />
+                    <span className="ml-1.5 text-[10px] text-gray-600 font-medium">{importProgress}%</span>
                   </div>
                 )}
-                <button
-                  type="button"
-                  className="ti-btn ti-btn-primary"
-                  onClick={handleExport}
-                >
-                  <i className="ri-upload-2-line me-2"></i> Export
+                <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm" onClick={handleExport}>
+                  <i className="ri-upload-2-line text-xs" /> Export
                 </button>
-                <Link
-                  href="/activities/add"
-                  className="ti-btn ti-btn-primary"
-                >
-                  <i className="ri-add-line me-2"></i>
-                  Add New Activity
+                <Link href="/activities/add" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm">
+                  <i className="ri-add-line text-xs" /> Add New Activity
                 </Link>
               </div>
             </div>
           </div>
 
-          {/* Content Box */}
-          <div className="box">
-            <div className="box-body">
-              {/* Search and Sort */}
+          {/* Summary card */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="bg-purple-50 border border-purple-200 rounded p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-purple-700">Total Activities</span>
+                  <p className="text-lg font-bold text-[#323251] mt-0.5">{totalResults}</p>
+                </div>
+                <div className="w-9 h-9 bg-purple-100 rounded-full flex items-center justify-center">
+                  <i className="ri-stack-line text-purple-600 text-sm" />
+                </div>
+              </div>
+            </div>
+            <div className="bg-sky-50 border border-sky-200 rounded p-4 opacity-90">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-sky-700">On this page</span>
+                  <p className="text-lg font-bold text-[#323251] mt-0.5">{activities.length}</p>
+                </div>
+                <div className="w-9 h-9 bg-sky-100 rounded-full flex items-center justify-center">
+                  <i className="ri-file-list-3-line text-sky-600 text-sm" />
+                </div>
+              </div>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded p-4 opacity-90">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-amber-700">Selected</span>
+                  <p className="text-lg font-bold text-[#323251] mt-0.5">{selectedActivities.length}</p>
+                </div>
+                <div className="w-9 h-9 bg-amber-100 rounded-full flex items-center justify-center">
+                  <i className="ri-checkbox-circle-line text-amber-600 text-sm" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Content Box – timelines-style */}
+          <div className="bg-white shadow-sm border border-gray-100 overflow-hidden rounded">
+            <div className="p-[10px]">
               <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
-                {/* Rows per page selector */}
-                <div className="flex items-center w-full lg:w-auto">
-                  <label className="mr-2 text-sm text-gray-600 whitespace-nowrap">Rows per page:</label>
-                  <select
-                    className="form-select w-auto text-sm"
-                    value={itemsPerPage}
-                    onChange={(e) => {
-                      setItemsPerPage(Number(e.target.value));
-                      setCurrentPage(1);
-                    }}
-                  >
+                <div className="flex items-center gap-2">
+                  <label className="text-[11px] font-medium text-[#495057] whitespace-nowrap">Rows per page:</label>
+                  <select className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300" value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}>
                     <option value={10}>10</option>
                     <option value={50}>50</option>
                     <option value={100}>100</option>
@@ -516,33 +521,9 @@ const ActivitiesPage = () => {
                     <option value={1000}>1000</option>
                   </select>
                 </div>
-
-                {/* Search and filters */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
-                  {/* Search bar */}
-                  <div className="relative flex-grow sm:max-w-xs">
-                    <input
-                      type="text"
-                      className="form-control py-2 w-full"
-                      placeholder="Search by name..."
-                      value={filters.name}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setFilters(prev => ({
-                          ...prev,
-                          name: value
-                        }));
-                        setCurrentPage(1);
-                      }}
-                    />
-                  </div>
-
-                  {/* Sort dropdown */}
-                  <select
-                    className="form-select py-2 w-full sm:w-auto"
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                  >
+                  <input type="text" className="bg-white border border-gray-200 pl-3 pr-3 py-1.5 text-[11px] rounded focus:ring-0 focus:border-purple-300 placeholder:text-gray-400 font-medium w-full sm:max-w-[200px]" placeholder="Search by name..." value={filters.name} onChange={(e) => { setFilters(prev => ({ ...prev, name: e.target.value })); setCurrentPage(1); }} />
+                  <select className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300 w-full sm:w-auto min-w-[100px]" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
                     <option value="name:asc">Name (A-Z)</option>
                     <option value="name:desc">Name (Z-A)</option>
                     <option value="createdAt:desc">Newest First</option>
@@ -550,120 +531,84 @@ const ActivitiesPage = () => {
                     <option value="sortOrder:asc">Sort Order (Low-High)</option>
                     <option value="sortOrder:desc">Sort Order (High-Low)</option>
                   </select>
-
-                  {/* Reset button */}
-                  <button
-                    className="ti-btn ti-btn-secondary py-2 w-full sm:w-auto"
-                    onClick={() => {
-                      setFilters({
-                        name: ""
-                      });
-                      setSortBy("name:asc");
-                    }}
-                  >
-                    <i className="ri-refresh-line me-2"></i>
-                    Reset
+                  <button className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100" onClick={() => { setFilters({ name: "" }); setSortBy("name:asc"); }}>
+                    <i className="ri-refresh-line text-xs" /> Reset
                   </button>
                 </div>
               </div>
 
-              {/* Import Progress */}
-              {/* {importProgress > 0 && importProgress < 100 && (
-                <div className="mb-4">
-                  <div className="flex justify-between mb-1">
-                    <span>Importing...</span>
-                    <span>{Math.round(importProgress)}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-primary h-2 rounded-full"
-                      style={{ width: `${importProgress}%` }}
-                    ></div>
+              {hasActiveFilters && (
+                <div className="mb-4 p-3 bg-sky-50 border border-sky-100 rounded">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="text-[11px] font-bold text-sky-700">Active filter: Name — {filters.name}</span>
+                    <button onClick={() => { setFilters({ name: "" }); setCurrentPage(1); }} className="text-[11px] font-bold text-sky-600 hover:text-sky-800"><i className="ri-close-line text-xs" /> Clear</button>
                   </div>
                 </div>
-              )} */}
+              )}
 
-              {/* Activities Table */}
-              <div className="table-responsive">
-                <table className="table whitespace-nowrap table-bordered">
+              <div className="overflow-x-auto min-h-[200px] border border-gray-200 rounded">
+                <table className="w-full border-collapse border border-gray-200">
                   <thead>
-                    <tr>
-                      <th className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          className="form-checkbox"
-                          checked={selectedActivities.length === activities.length && activities.length > 0}
-                          onChange={handleSelectAll}
-                        />
+                    <tr className="bg-gray-50/30">
+                      <th className="pl-[10px] pr-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200 w-10">
+                        <input type="checkbox" className="rounded border-gray-200 text-purple-600 focus:ring-0 h-3.5 w-3.5" checked={selectedActivities.length === activities.length && activities.length > 0} onChange={handleSelectAll} />
                       </th>
-                      <th className="px-4 py-3">Activity Name</th>
-                      <th className="px-4 py-3">Sub-Activities</th>
-                      <th className="px-4 py-3">Actions</th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Activity Name</th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Sub-Activities</th>
+                      <th className="pl-1.5 pr-[10px] py-3 text-right text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {isLoading ? (
                       <tr>
-                        <td colSpan={4} className="text-center py-4">
-                          <div className="flex justify-center">
-                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                        <td colSpan={4} className="text-center py-20 border border-gray-200">
+                          <div className="flex flex-col items-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 opacity-50" />
+                            <p className="mt-3 text-[10px] text-gray-400 font-bold uppercase">Loading</p>
                           </div>
                         </td>
                       </tr>
                     ) : error ? (
                       <tr>
-                        <td colSpan={4} className="text-center text-red-500 py-4">
-                          {error}
-                        </td>
+                        <td colSpan={4} className="text-center text-red-600 py-20 text-[12px] font-medium border border-gray-200">{error}</td>
                       </tr>
                     ) : activities.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="text-center py-4">
-                          No activities found
+                        <td colSpan={4} className="text-center py-20 border border-gray-200">
+                          <div className="flex flex-col items-center">
+                            <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                              <i className="ri-stack-line text-xl text-gray-200" />
+                            </div>
+                            <p className="text-xs font-bold text-gray-400 mb-1">NO ACTIVITIES</p>
+                            <p className="text-[11px] text-gray-500 mb-4">{hasActiveFilters ? "No activities match your filter." : "Start by adding your first activity."}</p>
+                            {hasActiveFilters ? (
+                              <button onClick={() => { setFilters({ name: "" }); setCurrentPage(1); }} className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700"><i className="ri-refresh-line text-xs" /> Clear Filter</button>
+                            ) : (
+                              <Link href="/activities/add" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700"><i className="ri-add-line text-xs" /> Add First Activity</Link>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ) : (
                       activities.map((activity) => (
-                        <tr key={activity.id}>
-                          <td className="px-4 py-3">
-                            <input
-                              type="checkbox"
-                              className="form-checkbox"
-                              checked={selectedActivities.includes(activity.id)}
-                              onChange={() => handleSelectActivity(activity.id)}
-                            />
+                        <tr key={activity.id} className="hover:bg-gray-50/50 group">
+                          <td className="pl-[10px] pr-1.5 py-2.5 border border-gray-200">
+                            <input type="checkbox" checked={selectedActivities.includes(activity.id)} onChange={() => handleSelectActivity(activity.id)} className="rounded border-gray-200 text-purple-600 focus:ring-0 h-3.5 w-3.5" />
                           </td>
-                          <td className="px-4 py-3">
-                            {activity.name}
-                          </td>
-                          <td className="px-4 py-3">
+                          <td className="px-1.5 py-2.5 text-[12px] font-medium text-[#323251] border border-gray-200">{activity.name}</td>
+                          <td className="px-1.5 py-2.5 border border-gray-200">
                             {activity.subactivities && activity.subactivities.length > 0 ? (
-                              <button
-                                onClick={() => handleSubActivitiesClick(activity)}
-                                className="text-blue-600 hover:text-blue-800 font-medium cursor-pointer hover:underline"
-                              >
-                                {activity.subactivities.length} sub-activit{activity.subactivities.length === 1 ? 'y' : 'ies'}
+                              <button type="button" onClick={() => handleSubActivitiesClick(activity)} className="text-[12px] font-medium text-purple-600 hover:text-purple-700 cursor-pointer">
+                                {activity.subactivities.length} sub-activit{activity.subactivities.length === 1 ? "y" : "ies"}
                               </button>
                             ) : (
-                              <span className="text-gray-400 text-sm">No sub-activities</span>
+                              <span className="text-[11px] text-gray-400">No sub-activities</span>
                             )}
                           </td>
-                          <td className="px-4 py-3">
-                            <div className="flex space-x-2">
-                              <Link
-                                href={`/activities/edit/${activity.id}`}
-                                className="ti-btn ti-btn-primary ti-btn-sm"
-                                title="Edit"
-                              >
-                                <i className="ri-edit-line"></i>
-                              </Link>
-                              <button
-                                onClick={() => handleDelete(activity.id)}
-                                className="ti-btn ti-btn-danger ti-btn-sm"
-                                title="Delete"
-                              >
-                                <i className="ri-delete-bin-line"></i>
-                              </button>
+                          <td className="pl-1.5 pr-[10px] py-2.5 border border-gray-200">
+                            <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100">
+                              <Link href={`/activities/edit/${activity.id}`} className="w-7 h-7 rounded flex items-center justify-center bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100" title="Edit"><i className="ri-pencil-line text-sm" /></Link>
+                              <button type="button" onClick={() => handleDelete(activity.id)} className="w-7 h-7 rounded flex items-center justify-center bg-red-50 text-red-600 border border-red-100 hover:bg-red-100" title="Delete"><i className="ri-delete-bin-line text-sm" /></button>
                             </div>
                           </td>
                         </tr>
@@ -673,75 +618,21 @@ const ActivitiesPage = () => {
                 </table>
               </div>
 
-              {/* Pagination */}
-              {!isLoading && !error && (
-                <div className="flex justify-between items-center mt-4">
-                  <div className="text-sm text-gray-500">
-                    Showing{" "}
-                    {totalResults === 0
-                      ? 0
-                      : (currentPage - 1) * itemsPerPage + 1}{" "}
-                    to{" "}
-                    {totalResults === 0
-                      ? 0
-                      : Math.min(currentPage * itemsPerPage, totalResults)}{" "}
-                    of {totalResults} entries
+              {!isLoading && !error && activities.length > 0 && (
+                <div className="flex flex-wrap justify-between items-center gap-4 p-[10px] pt-4 border-t border-gray-100">
+                  <div className="text-[11px] font-medium text-[#495057]">
+                    Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, totalResults)} of {totalResults} entries
                   </div>
-                  <nav aria-label="Page navigation" className="">
-                    <ul className="flex flex-wrap items-center">
-                      <li
-                        className={`page-item ${
-                          currentPage === 1 ? "disabled" : ""
-                        }`}
-                      >
-                        <button
-                          className="page-link py-2 px-3 ml-0 leading-tight text-gray-500 bg-white rounded-l-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                          onClick={() =>
-                            setCurrentPage((prev) => Math.max(prev - 1, 1))
-                          }
-                          disabled={currentPage === 1}
-                        >
-                          Previous
-                        </button>
-                      </li>
-                      {getPagination(currentPage, totalPages).map((page, idx) =>
-                        page === "..." ? (
-                          <li key={"ellipsis-" + idx} className="page-item">
-                            <span className="px-3">...</span>
-                          </li>
-                        ) : (
-                          <li key={page} className="page-item">
-                            <button
-                              className={`page-link py-2 px-3 leading-tight border border-gray-300 ${
-                                currentPage === page
-                                  ? "bg-primary text-white hover:bg-primary-dark"
-                                  : "bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                              }`}
-                              onClick={() => setCurrentPage(Number(page))}
-                            >
-                              {page}
-                            </button>
-                          </li>
-                        )
-                      )}
-                      <li
-                        className={`page-item ${
-                          currentPage === totalPages ? "disabled" : ""
-                        }`}
-                      >
-                        <button
-                          className="page-link py-2 px-3 leading-tight text-gray-500 bg-white rounded-r-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                          onClick={() =>
-                            setCurrentPage((prev) =>
-                              Math.min(prev + 1, totalPages)
-                            )
-                          }
-                          disabled={currentPage === totalPages}
-                        >
-                          Next
-                        </button>
-                      </li>
-                    </ul>
+                  <nav className="flex flex-wrap items-center gap-1">
+                    <button className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30" onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))} disabled={currentPage === 1}>Previous</button>
+                    {getPagination(currentPage, totalPages).map((page, idx) =>
+                      page === "..." ? (
+                        <span key={"e-" + idx} className="px-2 text-[10px] text-gray-300">...</span>
+                      ) : (
+                        <button key={page} className={`w-7 h-7 flex items-center justify-center text-[11px] font-bold rounded ${currentPage === page ? "bg-purple-600 text-white shadow-md" : "text-gray-400 hover:bg-gray-50"}`} onClick={() => setCurrentPage(Number(page))}>{page}</button>
+                      )
+                    )}
+                    <button className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30" onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages}>Next</button>
                   </nav>
                 </div>
               )}
@@ -750,101 +641,51 @@ const ActivitiesPage = () => {
         </div>
       </div>
 
-      {/* Sub-Activities Modal */}
+      {/* Sub-Activities Drawer – timelines-style */}
       {showSubActivitiesModal && selectedActivity && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden">
-            <div className="flex justify-between items-center p-6 border-b">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Sub-Activities: {selectedActivity.name}
-              </h3>
-              <button
-                onClick={() => setShowSubActivitiesModal(false)}
-                className="text-gray-400 hover:text-gray-600 text-xl font-bold"
-              >
-                ×
-              </button>
+        <>
+          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setShowSubActivitiesModal(false)} aria-hidden />
+          <div className="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-xl border-l border-gray-200 z-50 flex flex-col">
+            <div className="flex justify-between items-center p-[10px] border-b border-gray-200">
+              <h3 className="text-sm font-bold text-gray-800">Sub-Activities: {selectedActivity.name}</h3>
+              <button type="button" onClick={() => setShowSubActivitiesModal(false)} className="p-1.5 text-gray-500 hover:text-gray-700 rounded hover:bg-gray-100"><i className="ri-close-line text-lg" /></button>
             </div>
-            
-            <div className="p-6 overflow-y-auto max-h-[60vh]">
+            <div className="flex-1 overflow-auto p-4 space-y-3">
               {selectedActivity.subactivities && selectedActivity.subactivities.length > 0 ? (
-                <div className="space-y-4">
-                  {selectedActivity.subactivities.map((subActivity, index) => (
-                    <div key={subActivity._id || index} className="border rounded-lg p-4 bg-gray-50">
-                      <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-medium text-gray-900 text-lg">
-                          {subActivity.name}
-                        </h4>
-                        {subActivity.frequency && (
-                          <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
-                            {subActivity.frequency}
-                          </span>
-                        )}
-                      </div>
-                      
-                      {subActivity.frequency && subActivity.frequencyConfig && (
-                        <div className="text-sm text-gray-600">
-                          {(() => {
-                            const { frequency, frequencyConfig } = subActivity;
-                            switch (frequency) {
-                              case 'Hourly':
-                                return `Every ${frequencyConfig.hourlyInterval} hour${frequencyConfig.hourlyInterval > 1 ? 's' : ''}`;
-                              case 'Daily':
-                                return `Daily at ${frequencyConfig.dailyTime || 'specified time'}`;
-                              case 'Weekly':
-                                const days = frequencyConfig.weeklyDays?.length > 0 
-                                  ? frequencyConfig.weeklyDays.join(', ') 
-                                  : 'specified days';
-                                const time = frequencyConfig.weeklyTime || 'specified time';
-                                return `Weekly on ${days} at ${time}`;
-                              case 'Monthly':
-                                const day = frequencyConfig.monthlyDay || 'specified day';
-                                const monthTime = frequencyConfig.monthlyTime || 'specified time';
-                                return `Monthly on day ${day} at ${monthTime}`;
-                              case 'Quarterly':
-                                const months = frequencyConfig.quarterlyMonths?.length > 0 
-                                  ? frequencyConfig.quarterlyMonths.join(', ') 
-                                  : 'specified months';
-                                const quarterDay = frequencyConfig.quarterlyDay || 'specified day';
-                                const quarterTime = frequencyConfig.quarterlyTime || 'specified time';
-                                return `Quarterly on day ${quarterDay} of ${months} at ${quarterTime}`;
-                              case 'Yearly':
-                                const yearMonth = frequencyConfig.yearlyMonth || 'specified month';
-                                const yearDate = frequencyConfig.yearlyDate || 'specified date';
-                                const yearTime = frequencyConfig.yearlyTime || 'specified time';
-                                return `Yearly on ${yearDate} ${yearMonth} at ${yearTime}`;
-                              default:
-                                return 'Frequency configured';
-                            }
-                          })()}
-                        </div>
-                      )}
-                      
-                      {(!subActivity.frequency || !subActivity.frequencyConfig) && (
-                        <div className="text-sm text-gray-500 italic">
-                          No frequency configured
-                        </div>
-                      )}
+                selectedActivity.subactivities.map((subActivity, index) => (
+                  <div key={subActivity._id || index} className="border border-gray-200 rounded p-3 bg-gray-50/50">
+                    <div className="flex justify-between items-start mb-1">
+                      <h4 className="text-[12px] font-bold text-[#323251]">{subActivity.name}</h4>
+                      {subActivity.frequency && <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700 border border-sky-200">{subActivity.frequency}</span>}
                     </div>
-                  ))}
-                </div>
+                    {subActivity.frequency && subActivity.frequencyConfig && (
+                      <div className="text-[11px] text-[#495057]">
+                        {(() => {
+                          const { frequency, frequencyConfig } = subActivity;
+                          switch (frequency) {
+                            case 'Hourly': return `Every ${frequencyConfig.hourlyInterval} hour(s)`;
+                            case 'Daily': return `Daily at ${frequencyConfig.dailyTime || '—'}`;
+                            case 'Weekly': return `Weekly on ${frequencyConfig.weeklyDays?.join(', ') || '—'} at ${frequencyConfig.weeklyTime || '—'}`;
+                            case 'Monthly': return `Monthly day ${frequencyConfig.monthlyDay} at ${frequencyConfig.monthlyTime || '—'}`;
+                            case 'Quarterly': return `Quarterly ${frequencyConfig.quarterlyMonths?.join(', ')}`;
+                            case 'Yearly': return `Yearly ${frequencyConfig.yearlyDate} ${frequencyConfig.yearlyMonth}`;
+                            default: return 'Configured';
+                          }
+                        })()}
+                      </div>
+                    )}
+                    {(!subActivity.frequency || !subActivity.frequencyConfig) && <div className="text-[11px] text-gray-500 italic">No frequency</div>}
+                  </div>
+                ))
               ) : (
-                <div className="text-center text-gray-500 py-8">
-                  No sub-activities found for this activity.
-                </div>
+                <p className="text-[11px] text-gray-500 text-center py-6">No sub-activities for this activity.</p>
               )}
             </div>
-            
-            <div className="flex justify-end p-6 border-t bg-gray-50">
-              <button
-                onClick={() => setShowSubActivitiesModal(false)}
-                className="ti-btn ti-btn-secondary"
-              >
-                Close
-              </button>
+            <div className="p-[10px] border-t border-gray-200">
+              <button type="button" onClick={() => setShowSubActivitiesModal(false)} className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-bold rounded bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200">Close</button>
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

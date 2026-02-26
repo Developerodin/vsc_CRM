@@ -1729,17 +1729,16 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
   };
 
   return (
-    <div className="main-content">
+    <div className="main-content !p-[10px]" style={{ backgroundColor: "rgb(240 241 247)" }}>
       <Toaster position="top-right" />
       <Seo title="Clients" />
 
-      <div className="grid grid-cols-12 gap-6">
-        <div className="col-span-12">
-          {/* Page Header */}
-          <div className="box !bg-transparent border-0 shadow-none">
-            <div className="box-header flex justify-between items-center">
-              <h1 className="box-title text-2xl font-semibold">Clients</h1>
-              <div className="box-tools flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-2">
+          <span className="w-[3px] h-5 bg-purple-600 rounded-full shrink-0" aria-hidden />
+          <h1 className="text-[14px] font-bold text-gray-800">Clients</h1>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
                 {selectedClients.length > 0 && (
                   <button
                     type="button"
@@ -1817,41 +1816,40 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                 >
                   <i className="ri-add-line text-xs"></i> Add New Client
                 </Link>
-              </div>
-            </div>
-          </div>
+        </div>
+      </div>
 
-          {/* Content Box */}
-          <div className="box">
-            <div className="box-body">
+      {/* Content Card */}
+      <div className="bg-white shadow-sm border border-gray-400 overflow-hidden rounded">
+        <div className="p-[10px]">
               {/* Search and Sort */}
               <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
                 {/* Left Section: Rows per page and Total clients */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full lg:w-auto">
                   {/* Rows per page selector */}
                   <div className="flex items-center">
-                    <label className="mr-2 text-sm text-gray-600 whitespace-nowrap">Rows per page:</label>
+                    <label className="mr-2 text-[11px] font-medium text-[#495057] whitespace-nowrap">Rows per page:</label>
                     <select
-                      className="form-select w-auto text-sm"
+                      className="bg-white border border-gray-400 text-[#323251] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-500 appearance-none cursor-pointer w-auto [&_option]:text-[#323251] [&_option]:bg-white"
                       value={itemsPerPage}
                       onChange={(e) => {
                         setItemsPerPage(Number(e.target.value));
                         setCurrentPage(1);
                       }}
                     >
-                      <option value={10}>10</option>
-                      <option value={50}>50</option>
-                      <option value={100}>100</option>
-                      <option value={500}>500</option>
-                      <option value={1000}>1000</option>
+                      <option value={10} className="text-[#323251] bg-white">10</option>
+                      <option value={50} className="text-[#323251] bg-white">50</option>
+                      <option value={100} className="text-[#323251] bg-white">100</option>
+                      <option value={500} className="text-[#323251] bg-white">500</option>
+                      <option value={1000} className="text-[#323251] bg-white">1000</option>
                     </select>
                   </div>
 
                   {/* Total clients count */}
                   <div className="flex items-center">
-                    <span className="text-sm font-medium text-gray-700 whitespace-nowrap">
-                      <i className="ri-group-line mr-1 text-primary"></i>
-                      Total Clients: <span className="text-primary font-semibold">{totalResults}</span>
+                    <span className="text-[11px] font-medium text-[#495057] whitespace-nowrap">
+                      <i className="ri-group-line mr-1 text-purple-600"></i>
+                      Total Clients: <span className="text-purple-600 font-bold">{totalResults}</span>
                     </span>
                   </div>
 
@@ -1859,7 +1857,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                   {selectedClients.length > 0 && (
                     <button
                       type="button"
-                      className="ti-btn ti-btn-success whitespace-nowrap"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm whitespace-nowrap"
                       onClick={() => setShowBulkActivityModal(true)}
                       title="Assign Activity to Selected Clients"
                     >
@@ -1875,18 +1873,18 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                   <div className="relative flex-grow sm:max-w-xs">
                     <input
                       type="text"
-                      className="form-control py-2 w-full pl-10 pr-4"
+                      className="bg-white border border-gray-400 pl-8 pr-3 py-1.5 text-[11px] rounded focus:ring-0 focus:border-purple-500 min-w-[120px] w-full placeholder:text-gray-400 font-medium transition-all text-[#323251]"
                       placeholder="Search by name, email, phone, city, business type, PAN..."
                       value={searchQuery}
                       onChange={(e) => {
                         setSearchQuery(e.target.value);
                       }}
                     />
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none">
                       {isSearching ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600"></div>
                       ) : (
-                      <i className="ri-search-line text-gray-400"></i>
+                      <i className="ri-search-line"></i>
                       )}
                     </div>
                     {searchQuery && (
@@ -1903,15 +1901,15 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
 
                   {/* Filter button */}
                   <button
-                    className={`ti-btn py-2 w-full sm:w-auto ${
-                      showAdvancedFilters ? 'ti-btn-primary' : 'ti-btn-secondary'
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded transition-colors w-full sm:w-auto ${
+                      showAdvancedFilters ? 'bg-purple-600 text-white hover:bg-purple-700 shadow-sm' : 'bg-white border border-gray-200 text-[#495057] hover:bg-gray-50 shadow-sm'
                     }`}
                     onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
                   >
-                    <i className={`ri-filter-${showAdvancedFilters ? 'fill' : 'line'} me-2`}></i>
+                    <i className={`ri-filter-${showAdvancedFilters ? 'fill' : 'line'} text-xs`}></i>
                     Filters
                     {Object.values(filters).some(f => f !== "") && (
-                      <span className="ml-2 bg-primary text-white text-xs rounded-full px-2 py-1">
+                      <span className="px-1.5 py-0.5 text-[10px] font-bold text-gray-500 bg-gray-100 rounded">
                         {Object.values(filters).filter(f => f !== "").length}
                       </span>
                     )}
@@ -1919,21 +1917,21 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
 
                   {/* Sort dropdown */}
                   <select
-                    className="form-select py-2 w-full sm:w-auto"
+                    className="bg-white border border-gray-400 text-[#323251] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-500 appearance-none cursor-pointer w-full sm:w-auto [&_option]:text-[#323251] [&_option]:bg-white"
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
                   >
-                    <option value="name:asc">Name (A-Z)</option>
-                    <option value="name:desc">Name (Z-A)</option>
-                    <option value="createdAt:desc">Newest First</option>
-                    <option value="createdAt:asc">Oldest First</option>
-                    <option value="sortOrder:asc">Sort Order (Low-High)</option>
-                    <option value="sortOrder:desc">Sort Order (High-Low)</option>
+                    <option value="name:asc" className="text-[#323251] bg-white">Name (A-Z)</option>
+                    <option value="name:desc" className="text-[#323251] bg-white">Name (Z-A)</option>
+                    <option value="createdAt:desc" className="text-[#323251] bg-white">Newest First</option>
+                    <option value="createdAt:asc" className="text-[#323251] bg-white">Oldest First</option>
+                    <option value="sortOrder:asc" className="text-[#323251] bg-white">Sort Order (Low-High)</option>
+                    <option value="sortOrder:desc" className="text-[#323251] bg-white">Sort Order (High-Low)</option>
                   </select>
 
                   {/* Reset button */}
                   <button
-                    className="ti-btn ti-btn-secondary py-2 w-full sm:w-auto"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-white border border-gray-200 text-[#495057] hover:bg-gray-50 shadow-sm w-full sm:w-auto"
                     onClick={() => {
                       setSearchQuery("");
                       setDebouncedSearchQuery("");
@@ -1972,7 +1970,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
 
               {/* Advanced Filters Panel */}
               {showAdvancedFilters && (
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+                <div className="bg-gray-50 border border-gray-400 rounded-lg p-4 mb-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {/* Category Filter */}
                     <div>
@@ -1980,7 +1978,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         Category
                       </label>
                       <select
-                        className="form-select w-full"
+                        className="bg-white border border-gray-400 text-[#323251] text-[11px] font-medium rounded px-3 py-1.5 pr-8 w-full focus:ring-0 focus:border-purple-500 appearance-none cursor-pointer [&_option]:text-[#323251] [&_option]:bg-white"
                         value={filters.category}
                         onChange={(e) => {
                           setFilters(prev => ({ ...prev, category: e.target.value }));
@@ -2000,7 +1998,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         Business Type
                       </label>
                       <select
-                        className="form-select w-full"
+                        className="bg-white border border-gray-400 text-[#323251] text-[11px] font-medium rounded px-3 py-1.5 pr-8 w-full focus:ring-0 focus:border-purple-500 appearance-none cursor-pointer [&_option]:text-[#323251] [&_option]:bg-white"
                         value={filters.businessType}
                         onChange={(e) => {
                           setFilters(prev => ({ ...prev, businessType: e.target.value }));
@@ -2027,7 +2025,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         Entity Type
                       </label>
                       <select
-                        className="form-select w-full"
+                        className="bg-white border border-gray-400 text-[#323251] text-[11px] font-medium rounded px-3 py-1.5 pr-8 w-full focus:ring-0 focus:border-purple-500 appearance-none cursor-pointer [&_option]:text-[#323251] [&_option]:bg-white"
                         value={filters.entityType}
                         onChange={(e) => {
                           setFilters(prev => ({ ...prev, entityType: e.target.value }));
@@ -2054,7 +2052,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         Activity
                       </label>
                       <select
-                        className="form-select w-full"
+                        className="bg-white border border-gray-400 text-[#323251] text-[11px] font-medium rounded px-3 py-1.5 pr-8 w-full focus:ring-0 focus:border-purple-500 appearance-none cursor-pointer [&_option]:text-[#323251] [&_option]:bg-white"
                         value={filters.activity}
                         onChange={(e) => {
                           setFilters(prev => ({
@@ -2085,7 +2083,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         Subactivity
                       </label>
                       <select
-                        className="form-select w-full"
+                        className="bg-white border border-gray-400 text-[#323251] text-[11px] font-medium rounded px-3 py-1.5 pr-8 w-full focus:ring-0 focus:border-purple-500 appearance-none cursor-pointer [&_option]:text-[#323251] [&_option]:bg-white"
                         value={filters.subactivity}
                         onChange={(e) => {
                           setFilters(prev => ({ ...prev, subactivity: e.target.value }));
@@ -2229,7 +2227,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         Status
                       </label>
                       <select
-                        className="form-select w-full"
+                        className="bg-white border border-gray-400 text-[#323251] text-[11px] font-medium rounded px-3 py-1.5 pr-8 w-full focus:ring-0 focus:border-purple-500 appearance-none cursor-pointer [&_option]:text-[#323251] [&_option]:bg-white"
                         value={filters.status}
                         onChange={(e) => {
                           setFilters(prev => ({ ...prev, status: e.target.value }));
@@ -2244,7 +2242,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                   </div>
 
                   {/* Filter Actions */}
-                  <div className="flex justify-end mt-4 pt-4 border-t border-gray-200">
+                  <div className="flex justify-end mt-4 pt-4 border-t border-gray-400">
                     <button
                       className="ti-btn ti-btn-secondary me-2"
                       onClick={() => {
@@ -2484,8 +2482,9 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
               )}
 
               {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <div className="flex flex-col items-center justify-center py-20">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 opacity-50"></div>
+                  <span className="text-[10px] text-gray-400 font-bold tracking-[0.2em] uppercase mt-2">Loading Data</span>
                 </div>
               ) : error ? (
                 <div className="text-center py-8 text-red-500">
@@ -2510,24 +2509,24 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                     </div>
                   )}
                   
-                  <div className="table-responsive">
-                    <table className="table whitespace-nowrap table-bordered min-w-full">
+                  <div className="overflow-x-auto min-h-[300px]">
+                    <table className="w-full border-collapse border border-gray-400 whitespace-nowrap min-w-full">
                       <thead>
-                        <tr className="border-b border-gray-200">
-                          <th className="px-4 py-3">
+                        <tr className="bg-[rgba(249,250,251,0.3)]">
+                          <th className="w-[40px] px-1.5 py-3 pl-[10px] text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-400">
                             <input
                               type="checkbox"
-                              className="form-checkbox border-gray-500"
+                              className="rounded border-gray-400 text-purple-600 focus:ring-0 h-3.5 w-3.5"
                               checked={selectedClients.length === clients.length}
                               onChange={handleSelectAll}
                             />
                           </th>
-                          <th className="px-4 py-3">Client</th>
-                          <th className="px-4 py-3">City</th>
-                          <th className="px-4 py-3">Created Date</th>
-                          <th className="px-4 py-3">Status</th>
-                          <th className="px-4 py-3">Task Status</th>
-                          <th className="px-4 py-3">Actions</th>
+                          <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-400">Client</th>
+                          <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-400">City</th>
+                          <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-400">Created Date</th>
+                          <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-400">Status</th>
+                          <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-400">Task Status</th>
+                          <th className="px-1.5 py-3 pr-[10px] text-right text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-400">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2535,33 +2534,30 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                           clients.map((client: ClientWithTasks, index: number) => (
                             <tr
                               key={client.id}
-                              className={`border-b border-gray-200 ${
-                                index % 2 === 0 ? "bg-gray-50" : ""
-                              }`}
+                              className="hover:bg-[rgba(249,250,251,0.5)] transition-colors group border-b border-gray-400"
                             >
-                              <td>
+                              <td className="px-1.5 py-2.5 pl-[10px] border border-gray-400 w-[40px]">
                                 <input
                                   type="checkbox"
-                                  className="form-check-input"
+                                  className="rounded border-gray-400 text-purple-600 focus:ring-0 h-3.5 w-3.5"
                                   checked={selectedClients.includes(client.id)}
                                   onChange={() => handleClientSelect(client.id)}
-                                  style={{ borderColor: 'black',borderWidth: '1px' }}
                                 />
                               </td>
-                              <td>
+                              <td className="px-1.5 py-2.5 border border-gray-400">
                                 <div className="flex flex-col">
                                   <button
                                     onClick={() => router.push(`/analytics/clients/${client.id}/overview`)}
-                                    className="font-medium text-gray-900 hover:text-blue-600 hover:underline cursor-pointer text-left"
+                                    className="text-[12px] font-medium text-purple-600 hover:text-purple-700 transition-colors cursor-pointer text-left"
                                   >
                                     {client.name}
                                   </button>
-                                  <div className="text-sm text-gray-500 flex items-center">
-                                    <i className="ri-mail-line mr-1 text-gray-400"></i>
+                                  <div className="text-[12px] text-gray-600 flex items-center">
+                                    <i className="ri-mail-line mr-1 text-gray-400 text-xs"></i>
                                     {client.email}
                                   </div>
-                                  <div className="text-sm text-gray-500 flex items-center">
-                                    <i className="ri-phone-line mr-1 text-gray-400"></i>
+                                  <div className="text-[12px] text-gray-600 flex items-center">
+                                    <i className="ri-phone-line mr-1 text-gray-400 text-xs"></i>
                                     {client.phone}
                                   </div>
                                   {client.category && (
@@ -2604,20 +2600,20 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                                   )}
                                 </div>
                               </td>
-                              <td>{client.district || 'N/A'}</td>
-                              <td>
-                                <div className="text-sm text-gray-700">
+                              <td className="px-1.5 py-2.5 border border-gray-400 text-[12px] text-[#323251]">{client.district || "N/A"}</td>
+                              <td className="px-1.5 py-2.5 border border-gray-400">
+                                <div className="text-[12px] text-[#323251]">
                                   <i className="ri-calendar-line mr-1 text-gray-400"></i>
                                   {formatDate(client.createdAt)}
                                 </div>
                               </td>
-                              <td>
+                              <td className="px-1.5 py-2.5 border border-gray-400">
                                 <div className="relative group">
                                   <button
-                                    className={`px-2 py-1 text-xs rounded-full cursor-pointer transition-all duration-200 ${
-                                      client.status === 'active' ? 'bg-success text-white hover:bg-success-dark' : 
-                                      client.status === 'inactive' ? 'bg-danger text-white hover:bg-danger-dark' :
-                                      'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                                    className={`px-2 py-1 text-[11px] font-bold rounded cursor-pointer transition-all duration-200 ${
+                                      client.status === "active" ? "bg-emerald-600 text-white hover:bg-emerald-700" :
+                                      client.status === "inactive" ? "bg-red-600 text-white hover:bg-red-700" :
+                                      "bg-gray-50 text-gray-600 border border-gray-400 hover:bg-gray-100"
                                     }`}
                                     onClick={() => {
                                       // Toggle dropdown visibility
@@ -2636,55 +2632,51 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                                   {/* Status Dropdown */}
                                   <div
                                     id={`status-dropdown-${client.id}`}
-                                    className="status-dropdown hidden absolute z-10 mt-1 w-32 bg-white border border-gray-200 rounded-md shadow-lg"
+                                    className="status-dropdown hidden absolute z-10 mt-1 w-32 bg-white border border-gray-400 rounded-md shadow-lg"
                                   >
                                     <div className="py-1">
                                       <button
-                                        className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                        className="block w-full text-left px-3 py-2 text-[11px] font-medium text-[#323251] hover:bg-gray-50/50"
                                         onClick={() => {
-                                          handleStatusChange(client.id, 'Active');
-                                          document.getElementById(`status-dropdown-${client.id}`)?.classList.add('hidden');
+                                          handleStatusChange(client.id, "Active");
+                                          document.getElementById(`status-dropdown-${client.id}`)?.classList.add("hidden");
                                         }}
                                       >
-                                        <span className="inline-block w-2 h-2 bg-success rounded-full mr-2"></span>
+                                        <span className="inline-block w-2 h-2 bg-emerald-600 rounded-full mr-2"></span>
                                         Active
                                       </button>
                                       <button
-                                        className="block w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                        className="block w-full text-left px-3 py-2 text-[11px] font-medium text-[#323251] hover:bg-gray-50/50"
                                         onClick={() => {
-                                          handleStatusChange(client.id, 'Inactive');
-                                          document.getElementById(`status-dropdown-${client.id}`)?.classList.add('hidden');
+                                          handleStatusChange(client.id, "Inactive");
+                                          document.getElementById(`status-dropdown-${client.id}`)?.classList.add("hidden");
                                         }}
                                       >
-                                        <span className="inline-block w-2 h-2 bg-danger rounded-full mr-2"></span>
+                                        <span className="inline-block w-2 h-2 bg-red-600 rounded-full mr-2"></span>
                                         Inactive
                                       </button>
                                     </div>
                                   </div>
                                 </div>
                               </td>
-                              <td>
+                              <td className="px-1.5 py-2.5 border border-gray-400">
                                 {renderTaskStatus(client.taskStats, client.id)}
                               </td>
-                              <td>
-                                <div className="flex space-x-2">
+                              <td className="px-1.5 py-2.5 pr-[10px] border border-gray-400">
+                                <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
                                   <Link
                                     href={`/clients/edit/${client.id}`}
-                                    className="ti-btn ti-btn-primary ti-btn-sm"
+                                    className="w-7 h-7 flex items-center justify-center rounded bg-emerald-50 text-emerald-400 border border-emerald-100 hover:bg-emerald-100 transition-colors"
+                                    title="Edit"
                                   >
-                                    <i className="ri-edit-line"></i>
+                                    <i className="ri-pencil-line text-xs"></i>
                                   </Link>
-                                  {/* <button
-                                    className="ti-btn ti-btn-success ti-btn-sm"
-                                    title="View Files"
-                                  >
-                                    <i className="ri-folder-line"></i>
-                                  </button> */}
                                   <button
-                                    className="ti-btn ti-btn-danger ti-btn-sm"
+                                    className="w-7 h-7 flex items-center justify-center rounded bg-red-50 text-red-400 border border-red-100 hover:bg-red-100 transition-colors"
                                     onClick={() => handleDelete(client.id)}
+                                    title="Delete"
                                   >
-                                    <i className="ri-delete-bin-line"></i>
+                                    <i className="ri-delete-bin-line text-xs"></i>
                                   </button>
                                 </div>
                               </td>
@@ -2692,27 +2684,26 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                           ))
                         ) : (
                           <tr>
-                            <td colSpan={8} className="text-center py-8">
+                            <td colSpan={7} className="text-center py-20 border border-gray-400">
                               <div className="flex flex-col items-center justify-center">
-                                <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
-                                  <i className="ri-folder-line text-4xl text-primary"></i>
+                                <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                                  <i className="ri-folder-line text-xl text-gray-200"></i>
                                 </div>
-                                <h3 className="text-xl font-medium mb-2">
-                                  {debouncedSearchQuery ? 'No Search Results Found' : 'No Clients Found'}
-                                </h3>
-                                <p className="text-gray-500 text-center mb-6">
-                                  {debouncedSearchQuery 
-                                    ? `No clients found matching "${debouncedSearchQuery}". Try adjusting your search terms.`
-                                    : 'Start by adding your first client.'
+                                <p className="text-xs font-bold text-gray-400 mb-1">
+                                  {debouncedSearchQuery ? "NO SEARCH RESULTS FOUND" : "DATA EMPTY"}
+                                </p>
+                                <p className="text-[12px] text-[#495057] text-center mb-4 max-w-sm">
+                                  {debouncedSearchQuery
+                                    ? `No clients found matching "${debouncedSearchQuery}". Try adjusting your search.`
+                                    : "Start by adding your first client."
                                   }
                                 </p>
                                 {!debouncedSearchQuery && (
                                   <Link
                                     href="/clients/add"
-                                    className="ti-btn ti-btn-primary"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm"
                                   >
-                                    <i className="ri-add-line mr-2"></i> Add First
-                                    Client
+                                    <i className="ri-add-line text-xs"></i> Add First Client
                                   </Link>
                                 )}
                               </div>
@@ -2727,30 +2718,17 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
 
               {/* Pagination */}
               {!isLoading && !error && (
-                <div className="flex justify-between items-center mt-4">
-                  <div className="text-sm text-gray-500">
-                    Showing{" "}
-                    {totalResults === 0
-                      ? 0
-                      : (currentPage - 1) * itemsPerPage + 1}{" "}
-                    to{" "}
-                    {totalResults === 0
-                      ? 0
-                      : Math.min(currentPage * itemsPerPage, totalResults)}{" "}
-                    of {totalResults} entries
+                <div className="p-[10px] pt-4 border-t border-gray-400 bg-white flex flex-wrap justify-between items-center gap-4 rounded-b">
+                  <div className="text-[11px] font-medium text-[#495057] tracking-tight">
+                    Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
+                    {Math.min(currentPage * itemsPerPage, totalResults)} of {totalResults} entries
                   </div>
-                  <nav aria-label="Page navigation" className="">
-                    <ul className="flex flex-wrap items-center">
-                      <li
-                        className={`page-item ${
-                          currentPage === 1 ? "disabled" : ""
-                        }`}
-                      >
+                  <nav aria-label="Page navigation">
+                    <ul className="flex flex-wrap items-center gap-1">
+                      <li>
                         <button
-                          className="page-link py-2 px-3 ml-0 leading-tight text-gray-500 bg-white rounded-l-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                          onClick={() =>
-                            setCurrentPage((prev) => Math.max(prev - 1, 1))
-                          }
+                          className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed rounded transition-colors"
+                          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                           disabled={currentPage === 1}
                         >
                           Previous
@@ -2758,16 +2736,16 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                       </li>
                       {getPagination(currentPage, totalPages).map((page, idx) =>
                         page === "..." ? (
-                          <li key={"ellipsis-" + idx} className="page-item">
-                            <span className="px-3">...</span>
+                          <li key={"ellipsis-" + idx}>
+                            <span className="text-[10px] text-gray-300 px-1">...</span>
                           </li>
                         ) : (
-                          <li key={page} className="page-item">
+                          <li key={page}>
                             <button
-                              className={`page-link py-2 px-3 leading-tight border border-gray-300 ${
+                              className={`w-7 h-7 flex items-center justify-center text-[11px] font-bold rounded transition-colors ${
                                 currentPage === page
-                                  ? "bg-primary text-white hover:bg-primary-dark"
-                                  : "bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                                  ? "bg-purple-600 text-white shadow-md"
+                                  : "text-gray-400 hover:bg-gray-50"
                               }`}
                               onClick={() => setCurrentPage(Number(page))}
                             >
@@ -2776,18 +2754,10 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                           </li>
                         )
                       )}
-                      <li
-                        className={`page-item ${
-                          currentPage === totalPages ? "disabled" : ""
-                        }`}
-                      >
+                      <li>
                         <button
-                          className="page-link py-2 px-3 leading-tight text-gray-500 bg-white rounded-r-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                          onClick={() =>
-                            setCurrentPage((prev) =>
-                              Math.min(prev + 1, totalPages)
-                            )
-                          }
+                          className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed rounded transition-colors"
+                          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
                           disabled={currentPage === totalPages}
                         >
                           Next
@@ -2797,8 +2767,6 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                   </nav>
                 </div>
               )}
-            </div>
-          </div>
         </div>
       </div>
 
@@ -2813,61 +2781,60 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
 
       {/* Bulk Activity Assignment Modal */}
       {showBulkActivityModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-            {/* Background overlay */}
-            <div 
-              className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
-              onClick={() => {
-                if (!isBulkAssigning) {
-                  setShowBulkActivityModal(false);
-                  setSelectedActivityId("");
-                  setSelectedSubactivityId("");
-                }
-              }}
-            ></div>
+        <div
+          className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center"
+          onClick={() => {
+            if (!isBulkAssigning) {
+              setShowBulkActivityModal(false);
+              setSelectedActivityId("");
+              setSelectedSubactivityId("");
+            }
+          }}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="flex justify-between items-center p-[10px] border-b border-gray-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                <i className="ri-task-line text-xs"></i>
+                Assign Activity to {selectedClients.length} Client(s)
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isBulkAssigning) {
+                    setShowBulkActivityModal(false);
+                    setSelectedActivityId("");
+                    setSelectedSubactivityId("");
+                  }
+                }}
+                className="text-gray-500 hover:text-gray-700 p-1 rounded"
+                disabled={isBulkAssigning}
+                aria-label="Close"
+              >
+                <i className="ri-close-line text-xl"></i>
+              </button>
+            </div>
 
-            {/* Modal panel */}
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              {/* Modal header */}
-              <div className="bg-primary px-6 py-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-white">
-                    <i className="ri-task-line mr-2"></i>
-                    Assign Activity to {selectedClients.length} Client(s)
-                  </h3>
-                  <button
-                    onClick={() => {
-                      if (!isBulkAssigning) {
-                        setShowBulkActivityModal(false);
-                        setSelectedActivityId("");
-                        setSelectedSubactivityId("");
-                      }
-                    }}
-                    className="text-white hover:text-gray-200"
-                    disabled={isBulkAssigning}
-                  >
-                    <i className="ri-close-line text-xl"></i>
-                  </button>
-                </div>
-              </div>
-
-              {/* Modal body */}
-              <div className="bg-white px-6 py-4">
+            <div className="p-[10px] overflow-auto flex-1">
                 <div className="space-y-4">
                   {/* Activity Selection */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-[11px] font-medium text-[#495057] mb-2">
                       Select Activity <span className="text-red-500">*</span>
                     </label>
                     {isLoadingActivities ? (
                       <div className="flex items-center justify-center py-4">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                        <span className="ml-2 text-sm text-gray-600">Loading activities...</span>
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600 opacity-50"></div>
+                        <span className="ml-2 text-[11px] text-[#495057]">Loading activities...</span>
                       </div>
                     ) : (
                       <select
-                        className="form-select w-full"
+                        className="bg-white border border-gray-400 text-[#323251] text-[11px] font-medium rounded px-3 py-1.5 pr-8 w-full focus:ring-0 focus:border-purple-500 appearance-none cursor-pointer [&_option]:text-[#323251] [&_option]:bg-white"
                         value={selectedActivityId}
                         onChange={(e) => {
                           setSelectedActivityId(e.target.value);
@@ -2888,7 +2855,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                   {/* Subactivity Selection */}
                   {selectedActivityId && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-[11px] font-medium text-[#495057] mb-2">
                         Select Subactivity (Optional)
                       </label>
                       {(() => {
@@ -2907,7 +2874,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
 
                         return (
                           <select
-                            className="form-select w-full"
+                            className="bg-white border border-gray-400 text-[#323251] text-[11px] font-medium rounded px-3 py-1.5 pr-8 w-full focus:ring-0 focus:border-purple-500 appearance-none cursor-pointer [&_option]:text-[#323251] [&_option]:bg-white"
                             value={selectedSubactivityId}
                             onChange={(e) => setSelectedSubactivityId(e.target.value)}
                             disabled={isBulkAssigning}
@@ -2926,11 +2893,11 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                   )}
 
                   {/* Info message */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div className="bg-sky-50 border border-sky-100 rounded p-3">
                     <div className="flex items-start">
-                      <i className="ri-information-line text-blue-600 mr-2 mt-0.5"></i>
-                      <div className="text-sm text-blue-800">
-                        <p className="font-medium mb-1">About this action:</p>
+                      <i className="ri-information-line text-sky-600 text-xs mr-2 mt-0.5"></i>
+                      <div className="text-[12px] text-[#495057]">
+                        <p className="font-bold text-[#323251] mb-1">About this action:</p>
                         <ul className="list-disc list-inside space-y-1">
                           <li>This will create timelines for {selectedClients.length} selected client(s)</li>
                           <li>Initial status will be set to "Pending"</li>
@@ -2940,42 +2907,38 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                     </div>
                   </div>
                 </div>
-              </div>
+            </div>
 
-              {/* Modal footer */}
-              <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3">
-                <button
-                  type="button"
-                  className="ti-btn ti-btn-secondary"
-                  onClick={() => {
-                    setShowBulkActivityModal(false);
-                    setSelectedActivityId("");
-                    setSelectedSubactivityId("");
-                  }}
-                  disabled={isBulkAssigning}
-                >
-                  <i className="ri-close-line mr-1"></i>
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="ti-btn ti-btn-primary"
-                  onClick={handleBulkActivityAssignment}
-                  disabled={isBulkAssigning || !selectedActivityId}
-                >
-                  {isBulkAssigning ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white me-2 inline-block"></div>
-                      Assigning...
-                    </>
-                  ) : (
-                    <>
-                      <i className="ri-check-line mr-1"></i>
-                      Assign Activity
-                    </>
-                  )}
-                </button>
-              </div>
+            <div className="flex justify-end p-[10px] border-t border-gray-200 gap-2">
+              <button
+                type="button"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-white border border-gray-200 text-[#495057] hover:bg-gray-50 shadow-sm"
+                onClick={() => {
+                  setShowBulkActivityModal(false);
+                  setSelectedActivityId("");
+                  setSelectedSubactivityId("");
+                }}
+                disabled={isBulkAssigning}
+              >
+                <i className="ri-close-line text-xs"></i> Cancel
+              </button>
+              <button
+                type="button"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm"
+                onClick={handleBulkActivityAssignment}
+                disabled={isBulkAssigning || !selectedActivityId}
+              >
+                {isBulkAssigning ? (
+                  <>
+                    <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></div>
+                    Assigning...
+                  </>
+                ) : (
+                  <>
+                    <i className="ri-check-line text-xs"></i> Assign Activity
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

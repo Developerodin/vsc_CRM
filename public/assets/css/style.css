@@ -7194,7 +7194,7 @@ input.gridjs-input {
     @apply w-[94%] ms-auto me-auto;
   }
   [data-nav-layout=horizontal] .content .main-content {
-    @apply w-[94%] mx-auto;
+    @apply w-full max-w-[100%] px-4;
   }
   [data-nav-layout=horizontal] .app-sidebar .main-sidebar,
   [data-nav-layout=horizontal] .app-sidebar .simplebar-mask {
@@ -10960,7 +10960,7 @@ code {
 }
 
 .main-content {
-  @apply sm:px-6 px-6;
+  @apply sm:px-4 px-3;
 }
 
 .content {

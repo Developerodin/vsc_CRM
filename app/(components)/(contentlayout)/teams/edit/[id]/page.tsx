@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Seo from "@/shared/layout-components/seo/seo";
 import { toast, Toaster } from "react-hot-toast";
 import axios from "axios";
@@ -392,7 +393,7 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
     return (
       <div className="main-content">
         <div className="flex items-center justify-center min-h-screen">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
         </div>
       </div>
     );
@@ -403,14 +404,33 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
       <Toaster position="top-right" />
       <Seo title="Edit Team Member" />
 
-      <div className="box !bg-transparent border-0 shadow-none mb-4">
-        <div className="box-header">
-          <h1 className="box-title text-2xl font-semibold">Edit Team Member</h1>
+      {/* Page Header – timelines-style */}
+      <div className="bg-white shadow-sm border border-gray-100 overflow-hidden rounded mb-6">
+        <div className="p-[10px] flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <span className="w-[3px] h-5 bg-purple-600 rounded-full shrink-0" aria-hidden />
+            <h1 className="text-[0.875rem] font-bold text-gray-800">Edit Team Member</h1>
+          </div>
+          <nav className="flex" aria-label="Breadcrumb">
+            <ol className="inline-flex items-center space-x-1 md:space-x-3 text-[11px] font-medium">
+              <li className="inline-flex items-center">
+                <Link href="/teams" className="inline-flex items-center text-gray-500 hover:text-purple-600">
+                  <i className="ri-home-line mr-1" /> Teams
+                </Link>
+              </li>
+              <li>
+                <div className="flex items-center">
+                  <i className="ri-arrow-right-s-line text-gray-400 mx-1" />
+                  <span className="text-gray-500">Edit</span>
+                </div>
+              </li>
+            </ol>
+          </nav>
         </div>
       </div>
 
-      <div className="box">
-        <div className="box-body">
+      <div className="bg-white shadow-sm border border-gray-100 overflow-hidden rounded">
+        <div className="p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Name */}
@@ -589,10 +609,10 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
             {/* Accessible Team Members */}
             <div className="form-group">
               <label className="form-label">Accessible Team Members</label>
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  className="ti-btn ti-btn-primary"
+                  className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm"
                   onClick={() => {
                     setShowTeamMemberModal(true);
                     setTeamMemberSearchQuery("");
@@ -632,160 +652,95 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
               )}
             </div>
 
-            <div className="flex justify-end space-x-4">
+            <div className="flex justify-end gap-2">
               <button
                 type="button"
-                className="ti-btn ti-btn-secondary"
+                className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-bold rounded bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200"
                 onClick={() => router.push("/teams")}
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="ti-btn ti-btn-primary"
+                className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm disabled:opacity-50"
                 disabled={isSubmitting}
               >
-                {isSubmitting ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Updating...
-                  </>
-                ) : (
-                  "Update Team Member"
-                )}
+                {isSubmitting ? <i className="ri-loader-4-line animate-spin text-xs" /> : null}
+                {isSubmitting ? "Updating..." : "Update Team Member"}
               </button>
             </div>
           </form>
         </div>
       </div>
 
-      {/* Team Member Selection Modal */}
+      {/* Team Member Selection Drawer – timelines-style */}
       {showTeamMemberModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg w-11/12 max-w-4xl max-h-[90vh] flex flex-col">
-            <div className="p-4 border-b flex justify-between items-center">
-              <h2 className="text-xl font-semibold">Select Accessible Team Members</h2>
-              <button
-                onClick={() => setShowTeamMemberModal(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <i className="ri-close-line text-2xl"></i>
+        <>
+          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setShowTeamMemberModal(false)} aria-hidden />
+          <div className="fixed top-0 right-0 h-full w-full max-w-2xl bg-white shadow-xl border-l border-gray-200 z-50 flex flex-col">
+            <div className="flex justify-between items-center p-[10px] border-b border-gray-200">
+              <h2 className="text-sm font-bold text-gray-800">Select Accessible Team Members</h2>
+              <button type="button" onClick={() => setShowTeamMemberModal(false)} className="p-1.5 text-gray-500 hover:text-gray-700 rounded hover:bg-gray-100">
+                <i className="ri-close-line text-lg" />
               </button>
             </div>
-
-            <div className="p-4 border-b bg-gray-50">
-              <div className="flex items-center space-x-4">
-                <div className="relative flex-1">
-                  <div className="flex items-center">
-                    <i className="ri-search-line text-gray-400 text-xl mr-3"></i>
-                    <input
-                      type="text"
-                      placeholder="Search team members by name or email..."
-                      className="form-control py-4 pr-20 text-lg border-2 border-gray-300 focus:border-primary focus:ring-2 focus:ring-primary/20 bg-white"
-                      value={teamMemberSearchQuery}
-                      onChange={handleTeamMemberSearchChange}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          handleTeamMemberSearchClick();
-                        }
-                      }}
-                    />
-                  </div>
-                  <button 
-                    className="absolute end-0 top-0 px-6 h-full bg-primary text-white hover:bg-primary-dark rounded-r-md"
-                    onClick={handleTeamMemberSearchClick}
-                  >
-                    <i className="ri-search-line text-xl"></i>
-                  </button>
-                </div>
+            <div className="p-4 border-b border-gray-100 bg-gray-50/50">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Search by name or email..."
+                  className="flex-1 bg-white border border-gray-200 text-[12px] rounded px-3 py-2 focus:ring-0 focus:border-purple-300"
+                  value={teamMemberSearchQuery}
+                  onChange={handleTeamMemberSearchChange}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleTeamMemberSearchClick(); }}
+                />
+                <button type="button" className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700" onClick={handleTeamMemberSearchClick}>
+                  <i className="ri-search-line text-xs" />
+                </button>
                 {teamMemberSearchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTeamMemberSearchQuery("");
-                      fetchTeamMembersModal(1, "");
-                    }}
-                    className="ti-btn ti-btn-secondary"
-                  >
-                    <i className="ri-close-line me-2"></i>
+                  <button type="button" className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-bold rounded bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200" onClick={() => { setTeamMemberSearchQuery(""); fetchTeamMembersModal(1, ""); }}>
                     Clear
                   </button>
                 )}
               </div>
             </div>
-
             <div className="flex-1 overflow-auto p-4">
               {isLoadingTeamMembers ? (
                 <div className="flex items-center justify-center h-32">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                <div className="overflow-x-auto border border-gray-200 rounded">
+                  <table className="min-w-full border-collapse">
+                    <thead className="bg-gray-50/30">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Select
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Name
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Email
-                        </th>
+                        <th className="px-3 py-2 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Select</th>
+                        <th className="px-3 py-2 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Name</th>
+                        <th className="px-3 py-2 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Email</th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {allTeamMembers.length === 0 ? (
+                    <tbody>
+                      {allTeamMembers.filter(tm => tm.id !== params.id).length === 0 ? (
                         <tr>
-                          <td colSpan={3} className="px-6 py-8 text-center">
-                            <div className="flex flex-col items-center justify-center">
-                              <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-                                <i className="ri-search-line text-2xl text-gray-400"></i>
-                              </div>
-                              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                                {teamMemberSearchQuery ? 'No Team Members Found' : 'No Team Members Available'}
-                              </h3>
-                              <p className="text-gray-500 text-center mb-4">
-                                {teamMemberSearchQuery 
-                                  ? `No team members found matching "${teamMemberSearchQuery}". Try adjusting your search terms.`
-                                  : 'No team members available at the moment.'
-                                }
-                              </p>
-                              {teamMemberSearchQuery && (
-                                <button
-                                  onClick={() => {
-                                    setTeamMemberSearchQuery("");
-                                    fetchTeamMembersModal(1, "");
-                                  }}
-                                  className="ti-btn ti-btn-primary"
-                                >
-                                  <i className="ri-refresh-line me-2"></i>
-                                  Clear Search
-                                </button>
-                              )}
-                            </div>
+                          <td colSpan={3} className="px-4 py-8 text-center text-[12px] text-gray-500 border border-gray-200">
+                            {teamMemberSearchQuery ? "No team members found. Try clearing the search." : "No team members available."}
+                            {teamMemberSearchQuery && (
+                              <button type="button" className="mt-2 block mx-auto px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700" onClick={() => { setTeamMemberSearchQuery(""); fetchTeamMembersModal(1, ""); }}>
+                                Clear Search
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ) : (
                         allTeamMembers
-                          .filter(tm => tm.id !== params.id) // Exclude current team member
+                          .filter(tm => tm.id !== params.id)
                           .map((teamMember) => (
-                            <tr key={teamMember.id} className="hover:bg-gray-50">
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <input
-                                  type="checkbox"
-                                  className="form-checkbox h-5 w-5 text-primary"
-                                  checked={selectedAccessibleTeamMembers.some(tm => tm.id === teamMember.id)}
-                                  onChange={() => handleTeamMemberSelect(teamMember)}
-                                />
+                            <tr key={teamMember.id} className="hover:bg-gray-50/50 border-b border-gray-100">
+                              <td className="px-3 py-2 border border-gray-200">
+                                <input type="checkbox" className="rounded border-gray-200 text-purple-600 focus:ring-0 h-3.5 w-3.5" checked={selectedAccessibleTeamMembers.some(tm => tm.id === teamMember.id)} onChange={() => handleTeamMemberSelect(teamMember)} />
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-medium text-gray-900">{teamMember.name}</div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-900">{teamMember.email}</div>
-                              </td>
+                              <td className="px-3 py-2 text-[12px] font-medium text-[#323251] border border-gray-200">{teamMember.name}</td>
+                              <td className="px-3 py-2 text-[12px] text-[#495057] border border-gray-200">{teamMember.email}</td>
                             </tr>
                           ))
                       )}
@@ -794,48 +749,19 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
                 </div>
               )}
             </div>
-
-            <div className="p-4 border-t flex justify-between items-center">
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => handleTeamMemberPageChange(Math.max(teamMemberCurrentPage - 1, 1))}
-                  disabled={teamMemberCurrentPage === 1}
-                  className="ti-btn ti-btn-secondary"
-                >
-                  Previous
-                </button>
-                <span className="text-sm text-gray-500">
-                  {teamMemberTotalPages > 0 ? (
-                    `Page ${teamMemberCurrentPage} of ${teamMemberTotalPages}`
-                  ) : (
-                    "No pages"
-                  )}
-                </span>
-                <button
-                  onClick={() => handleTeamMemberPageChange(Math.min(teamMemberCurrentPage + 1, teamMemberTotalPages))}
-                  disabled={teamMemberCurrentPage === teamMemberTotalPages || teamMemberTotalPages === 0}
-                  className="ti-btn ti-btn-secondary"
-                >
-                  Next
-                </button>
+            <div className="p-[10px] border-t border-gray-200 flex justify-between items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => handleTeamMemberPageChange(Math.max(teamMemberCurrentPage - 1, 1))} disabled={teamMemberCurrentPage === 1} className="px-3 py-1.5 text-[11px] font-bold rounded bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200 disabled:opacity-50">Previous</button>
+                <span className="text-[11px] text-[#495057]">Page {teamMemberCurrentPage} of {teamMemberTotalPages || 1}</span>
+                <button type="button" onClick={() => handleTeamMemberPageChange(Math.min(teamMemberCurrentPage + 1, teamMemberTotalPages))} disabled={teamMemberCurrentPage === teamMemberTotalPages || teamMemberTotalPages === 0} className="px-3 py-1.5 text-[11px] font-bold rounded bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200 disabled:opacity-50">Next</button>
               </div>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => setShowTeamMemberModal(false)}
-                  className="ti-btn ti-btn-secondary"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleTeamMemberModalSubmit}
-                  className="ti-btn ti-btn-primary"
-                >
-                  Select ({selectedAccessibleTeamMembers.length})
-                </button>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => setShowTeamMemberModal(false)} className="px-3 py-2 text-[11px] font-bold rounded bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200">Cancel</button>
+                <button type="button" onClick={handleTeamMemberModalSubmit} className="px-3 py-2 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700">Select ({selectedAccessibleTeamMembers.length})</button>
               </div>
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

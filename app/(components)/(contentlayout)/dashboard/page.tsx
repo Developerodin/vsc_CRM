@@ -68,95 +68,6 @@ interface TopActivity {
   frequency: number;
 }
 
-// Skeleton Components
-const CardSkeleton = () => (
-  <div className="box overflow-hidden h-full animate-pulse">
-    <div className="box-body flex flex-col justify-between">
-      <div className='flex flex-col'>
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <div className="w-[2.5rem] h-[2.5rem] rounded-full bg-gray-300"></div>
-          </div>
-        </div>
-        <div className="mb-4">
-          <div className="h-4 bg-gray-300 rounded w-24 mb-2"></div>
-          <div className="h-8 bg-gray-300 rounded w-16"></div>
-        </div>
-      </div>
-      <div className="flex justify-end">
-        <div className="h-4 bg-gray-300 rounded w-16"></div>
-      </div>
-    </div>
-  </div>
-);
-
-const ChartSkeleton = () => (
-  <div className="box h-full animate-pulse">
-    <div className="box-header justify-between">
-      <div className="h-6 bg-gray-300 rounded w-32"></div>
-      <div className="w-[1.75rem] h-[1.75rem] bg-gray-300 rounded"></div>
-    </div>
-    <div className="box-body overflow-hidden">
-      <div className="flex items-center justify-center h-[250px]">
-        <div className="w-48 h-48 bg-gray-300 rounded-full"></div>
-      </div>
-    </div>
-    <div className="grid grid-cols-4 border-t border-dashed dark:border-defaultborder/10">
-      {[1, 2, 3, 4].map((i) => (
-        <div key={i} className="col !p-0">
-          <div className={`p-[0.95rem] text-center ${i < 4 ? 'border-e border-dashed dark:border-defaultborder/10' : ''}`}>
-            <div className="h-3 bg-gray-300 rounded w-12 mb-1 mx-auto"></div>
-            <div className="h-5 bg-gray-300 rounded w-8 mx-auto"></div>
-          </div>
-        </div>
-      ))}
-    </div>
-  </div>
-);
-
-const LineChartSkeleton = () => (
-  <div className="box h-full animate-pulse">
-    <div className="box-header justify-between">
-      <div className="h-6 bg-gray-300 rounded w-40"></div>
-      <div className="w-[1.75rem] h-[1.75rem] bg-gray-300 rounded"></div>
-    </div>
-    <div className="box-body !py-5">
-      <div className="h-[350px] bg-gray-300 rounded"></div>
-    </div>
-  </div>
-);
-
-const TableCardSkeleton = () => (
-  <div className="box h-full animate-pulse">
-    <div className="box-header justify-between">
-      <div className="h-6 bg-gray-300 rounded w-32"></div>
-      <div className="w-[1.75rem] h-[1.75rem] bg-gray-300 rounded"></div>
-    </div>
-    <div className="box-body">
-      <div className="overflow-x-auto">
-        <table className="table">
-          <thead>
-            <tr>
-              <th className="h-4 bg-gray-300 rounded w-16"></th>
-              <th className="h-4 bg-gray-300 rounded w-24"></th>
-              <th className="h-4 bg-gray-300 rounded w-20"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {[1, 2, 3, 4, 5].map((i) => (
-              <tr key={i}>
-                <td className="h-4 bg-gray-300 rounded w-8"></td>
-                <td className="h-4 bg-gray-300 rounded w-32"></td>
-                <td className="h-4 bg-gray-300 rounded w-12"></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-);
-
 const Dashboard = () => {
   const { branches, selectedBranch, setSelectedBranch, loading: contextLoading } = useBranchContext();
   const router = useRouter();
@@ -675,18 +586,23 @@ const Dashboard = () => {
   if (contextLoading) {
     return (
       <Fragment>
-        <Seo title={"Crm"} />
-        <div className="md:flex block items-center justify-between my-[1.5rem] page-header-breadcrumb">
-          <div>
-            <p className="font-semibold text-[1.125rem] text-defaulttextcolor dark:text-defaulttextcolor/70 !mb-0 ">Welcome back!</p>
-            <p className="font-normal text-[#8c9097] dark:text-white/50 text-[0.813rem]">Track your sales activity, leads and deals here.</p>
+        <Seo title="Dashboard" />
+        <div className="bg-white shadow-sm border border-gray-100 overflow-hidden rounded mb-6">
+          <div className="p-[10px] flex items-center gap-2">
+            <span className="w-[3px] h-5 bg-purple-600 rounded-full shrink-0" aria-hidden />
+            <h1 className="text-[0.875rem] font-bold text-gray-800">Dashboard</h1>
           </div>
         </div>
-        
-        <div className="flex flex-wrap gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
           {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="flex-1 min-w-[200px]">
-              <CardSkeleton />
+            <div key={i} className="bg-gray-50 border border-gray-200 rounded p-4 animate-pulse">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="h-3 bg-gray-200 rounded w-20 mb-2" />
+                  <div className="h-6 bg-gray-200 rounded w-12" />
+                </div>
+                <div className="w-9 h-9 bg-gray-200 rounded-full" />
+              </div>
             </div>
           ))}
         </div>
@@ -696,155 +612,94 @@ const Dashboard = () => {
 
   return (
     <Fragment>
-      <Seo title={"Crm"} />
-      <div className="md:flex block items-center justify-between my-[1.5rem] page-header-breadcrumb">
-        <div>
-          <p className="font-semibold text-[1.125rem] text-defaulttextcolor dark:text-defaulttextcolor/70 !mb-0 ">Welcome back!</p>
-          <p className="font-normal text-[#8c9097] dark:text-white/50 text-[0.813rem]">Track your sales activity, leads and deals here.</p>
+      <Seo title="Dashboard" />
+      <div className="bg-white shadow-sm border border-gray-100 overflow-hidden rounded mb-6">
+        <div className="p-[10px] flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <span className="w-[3px] h-5 bg-purple-600 rounded-full shrink-0" aria-hidden />
+            <div>
+              <h1 className="text-[0.875rem] font-bold text-gray-800">Dashboard</h1>
+              <p className="text-[11px] text-[#495057] mt-0.5">Track your sales activity, leads and deals here.</p>
+            </div>
+          </div>
         </div>
       </div>
-      
-      {/* First Row: Five Cards */}
-      <div className="flex flex-wrap gap-6 mb-6">
+
+      {/* Summary cards – timelines-style */}
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
         {isLoadingDashboard ? (
-          <>
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="flex-1 min-w-[200px]">
-                <CardSkeleton />
+          [1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="bg-gray-50 border border-gray-200 rounded p-4 animate-pulse">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="h-3 bg-gray-200 rounded w-20 mb-2" />
+                  <div className="h-6 bg-gray-200 rounded w-12" />
+                </div>
+                <div className="w-9 h-9 bg-gray-200 rounded-full" />
               </div>
-            ))}
-          </>
+            </div>
+          ))
         ) : (
           <>
-            <div className="flex-1 min-w-[200px]">
-              <div className="box overflow-hidden h-full">
-                <div className="box-body flex flex-col justify-between">
-                  <div className='flex flex-col'>
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <span className="!text-[0.8rem]  !w-[2.5rem] !h-[2.5rem] !leading-[2.5rem] !rounded-full inline-flex items-center justify-center bg-primary">
-                          <i className="ti ti-building text-[1rem] text-white"></i>
-                        </span>
-                      </div>
-                    </div>
-                    <div className="mb-4">
-                      <p className="text-[#8c9097] dark:text-white/50 text-[0.813rem] mb-2">Total Branches</p>
-                      <h4 className="font-semibold text-[1.5rem] !mb-0">
-                        {dashboardData.totalBranches.toLocaleString()}
-                      </h4>
-                    </div>
-                  </div>
-                  <div className="flex justify-end">
-                    <Link className="text-primary text-[0.813rem] hover:underline" href="/branches" scroll={false}>
-                      View All<i className="ti ti-arrow-narrow-right ms-2 font-semibold inline-block"></i>
-                    </Link>
-                  </div>
+            <div className="bg-purple-50 border border-purple-200 rounded p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-purple-700">Total Branches</span>
+                  <p className="text-lg font-bold text-[#323251] mt-0.5">{dashboardData.totalBranches.toLocaleString()}</p>
+                </div>
+                <div className="w-9 h-9 bg-purple-100 rounded-full flex items-center justify-center">
+                  <i className="ri-building-line text-purple-600 text-sm" />
                 </div>
               </div>
+              <Link className="mt-3 inline-flex items-center gap-1 text-[11px] font-bold text-purple-600 hover:text-purple-800" href="/branches" scroll={false}>View All <i className="ri-arrow-right-line text-xs" /></Link>
             </div>
-            <div className="flex-1 min-w-[200px]">
-              <div className="box overflow-hidden h-full">
-                <div className="box-body flex flex-col justify-between">
-                  <div className='flex flex-col'>
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <span className="!text-[0.8rem]  !w-[2.5rem] !h-[2.5rem] !leading-[2.5rem] !rounded-full inline-flex items-center justify-center bg-secondary">
-                          <i className="ti ti-users text-[1rem] text-white"></i>
-                        </span>
-                      </div>
-                    </div>
-                    <div className="mb-4">
-                      <p className="text-[#8c9097] dark:text-white/50 text-[0.813rem] mb-2">Total Customers</p>
-                      <h4 className="font-semibold text-[1.5rem] !mb-0">
-                        {dashboardData.totalCustomers.toLocaleString()}
-                      </h4>
-                    </div>
-                  </div>
-                  <div className="flex justify-end">
-                    <Link className="text-secondary text-[0.813rem] hover:underline" href="/clients" scroll={false}>
-                      View All<i className="ti ti-arrow-narrow-right ms-2 font-semibold inline-block"></i>
-                    </Link>
-                  </div>
+            <div className="bg-sky-50 border border-sky-200 rounded p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-sky-700">Total Customers</span>
+                  <p className="text-lg font-bold text-[#323251] mt-0.5">{dashboardData.totalCustomers.toLocaleString()}</p>
+                </div>
+                <div className="w-9 h-9 bg-sky-100 rounded-full flex items-center justify-center">
+                  <i className="ri-user-line text-sky-600 text-sm" />
                 </div>
               </div>
+              <Link className="mt-3 inline-flex items-center gap-1 text-[11px] font-bold text-sky-600 hover:text-sky-800" href="/clients" scroll={false}>View All <i className="ri-arrow-right-line text-xs" /></Link>
             </div>
-            <div className="flex-1 min-w-[200px]">
-              <div className="box overflow-hidden h-full">
-                <div className="box-body flex flex-col justify-between">
-                  <div className='flex flex-col'>
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <span className="!text-[0.8rem]  !w-[2.5rem] !h-[2.5rem] !leading-[2.5rem] !rounded-full inline-flex items-center justify-center bg-success">
-                          <i className="ti ti-share text-[1rem] text-white"></i>
-                        </span>
-                      </div>
-                    </div>
-                    <div className="mb-4">
-                      <p className="text-[#8c9097] dark:text-white/50 text-[0.813rem] mb-2">Total Team</p>
-                      <h4 className="font-semibold text-[1.5rem] !mb-0">
-                        {dashboardData.totalTeams.toLocaleString()}
-                      </h4>
-                    </div>
-                  </div>
-                  <div className="flex justify-end">
-                    <Link className="text-success text-[0.813rem] hover:underline" href="/teams" scroll={false}>
-                      View All<i className="ti ti-arrow-narrow-right ms-2 font-semibold inline-block"></i>
-                    </Link>
-                  </div>
+            <div className="bg-emerald-50 border border-emerald-200 rounded p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-emerald-700">Total Teams</span>
+                  <p className="text-lg font-bold text-[#323251] mt-0.5">{dashboardData.totalTeams.toLocaleString()}</p>
+                </div>
+                <div className="w-9 h-9 bg-emerald-100 rounded-full flex items-center justify-center">
+                  <i className="ri-team-line text-emerald-600 text-sm" />
                 </div>
               </div>
+              <Link className="mt-3 inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 hover:text-emerald-800" href="/teams" scroll={false}>View All <i className="ri-arrow-right-line text-xs" /></Link>
             </div>
-            <div className="flex-1 min-w-[200px]">
-              <div className="box overflow-hidden h-full">
-                <div className="box-body flex flex-col justify-between">
-                  <div className='flex flex-col'>
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <span className="!text-[0.8rem]  !w-[2.5rem] !h-[2.5rem] !leading-[2.5rem] !rounded-full inline-flex items-center justify-center bg-warning">
-                          <i className="ti ti-briefcase text-[1rem] text-white"></i>
-                        </span>
-                      </div>
-                    </div>
-                    <div className="mb-4">
-                      <p className="text-[#8c9097] dark:text-white/50 text-[0.813rem] mb-2">Total Activities</p>
-                      <h4 className="font-semibold text-[1.5rem] !mb-0">
-                        {dashboardData.totalActivities.toLocaleString()}
-                      </h4>
-                    </div>
-                  </div>
-                  <div className="flex justify-end">
-                    <Link className="text-warning text-[0.813rem] hover:underline" href="/activities" scroll={false}>
-                      View All<i className="ti ti-arrow-narrow-right ms-2 font-semibold inline-block"></i>
-                    </Link>
-                  </div>
+            <div className="bg-amber-50 border border-amber-200 rounded p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-amber-700">Total Activities</span>
+                  <p className="text-lg font-bold text-[#323251] mt-0.5">{dashboardData.totalActivities.toLocaleString()}</p>
+                </div>
+                <div className="w-9 h-9 bg-amber-100 rounded-full flex items-center justify-center">
+                  <i className="ri-briefcase-line text-amber-600 text-sm" />
                 </div>
               </div>
+              <Link className="mt-3 inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 hover:text-amber-800" href="/activities" scroll={false}>View All <i className="ri-arrow-right-line text-xs" /></Link>
             </div>
-            <div className="flex-1 min-w-[200px]">
-              <div className="box overflow-hidden h-full">
-                <div className="box-body flex flex-col justify-between">
-                  <div className='flex flex-col'>
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <span className="!text-[0.8rem]  !w-[2.5rem] !h-[2.5rem] !leading-[2.5rem] !rounded-full inline-flex items-center justify-center bg-info">
-                          <i className="ti ti-checklist text-[1rem] text-white"></i>
-                        </span>
-                      </div>
-                    </div>
-                    <div className="mb-4">
-                      <p className="text-[#8c9097] dark:text-white/50 text-[0.813rem] mb-2">Ongoing Tasks</p>
-                      <h4 className="font-semibold text-[1.5rem] !mb-0">
-                        {dashboardData.totalOngoingTasks.toLocaleString()}
-                      </h4>
-                    </div>
-                  </div>
-                  <div className="flex justify-end">
-                    <Link className="text-info text-[0.813rem] hover:underline" href="/tasks" scroll={false}>
-                      View All<i className="ti ti-arrow-narrow-right ms-2 font-semibold inline-block"></i>
-                    </Link>
-                  </div>
+            <div className="bg-violet-50 border border-violet-200 rounded p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-violet-700">Ongoing Tasks</span>
+                  <p className="text-lg font-bold text-[#323251] mt-0.5">{dashboardData.totalOngoingTasks.toLocaleString()}</p>
+                </div>
+                <div className="w-9 h-9 bg-violet-100 rounded-full flex items-center justify-center">
+                  <i className="ri-checkbox-circle-line text-violet-600 text-sm" />
                 </div>
               </div>
+              <Link className="mt-3 inline-flex items-center gap-1 text-[11px] font-bold text-violet-600 hover:text-violet-800" href="/tasks" scroll={false}>View All <i className="ri-arrow-right-line text-xs" /></Link>
             </div>
           </>
         )}
@@ -970,111 +825,99 @@ const Dashboard = () => {
         </div> */}
       </div>
 
-      {/* Top Clients and Top Activities */}
-      <div className="grid grid-cols-12 gap-x-6 mb-6">
-        <div className="lg:col-span-12 col-span-12">
-          {isLoadingTopClients ? (
-            <TableCardSkeleton />
-          ) : (
-            <div className="box h-full">
-              <div className="box-header justify-between">
-                <div className="box-title">
-                  Top 5 Clients
-                </div>
+      {/* Top Clients and Top Activities – timelines-style */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div className="bg-white shadow-sm border border-gray-100 overflow-hidden rounded">
+          <div className="p-[10px] border-b border-gray-100">
+            <h2 className="text-[0.875rem] font-bold text-gray-800">Top 5 Clients</h2>
+          </div>
+          <div className="p-[10px]">
+            {isLoadingTopClients ? (
+              <div className="h-[200px] flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 opacity-50" />
               </div>
-              <div className="box-body">
-                <div className="overflow-x-auto">
-                  <table className="table w-full [&_th]:!text-center [&_td]:!text-center">
-                    <thead>
-                      <tr>
-                        <th className="text-[0.75rem] font-medium text-[#8c9097] dark:text-white/50 w-1/6">Rank</th>
-                        <th className="text-[0.75rem] font-medium text-[#8c9097] dark:text-white/50 w-2/3">Client Name</th>
-                        <th className="text-[0.75rem] font-medium text-[#8c9097] dark:text-white/50 w-1/6">Frequency</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {topClients.length > 0 ? (
-                        topClients.map((client) => (
-                          <tr key={client.ranking}>
-                            <td className="text-[0.875rem]">
-                              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium ${
-                                client.ranking === 1 ? 'bg-yellow-100 text-yellow-800' :
-                                client.ranking === 2 ? 'bg-gray-100 text-gray-800' :
-                                client.ranking === 3 ? 'bg-orange-100 text-orange-800' :
-                                'bg-blue-100 text-blue-800'
-                              }`}>
-                                {client.ranking}
-                              </span>
-                            </td>
-                            <td className="text-[0.875rem] font-medium">{client.name}</td>
-                            <td className="text-[0.875rem] text-[#8c9097] dark:text-white/50">{client.frequency}</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={3} className="text-center text-[0.875rem] text-[#8c9097] dark:text-white/50 py-4">
-                            No clients data available
+            ) : (
+              <div className="overflow-x-auto border border-gray-200 rounded">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50/30">
+                      <th className="px-3 py-2.5 text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200 text-center w-16">Rank</th>
+                      <th className="px-3 py-2.5 text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200 text-center">Client Name</th>
+                      <th className="px-3 py-2.5 text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200 text-center w-20">Frequency</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topClients.length > 0 ? (
+                      topClients.map((client) => (
+                        <tr key={client.ranking} className="hover:bg-gray-50/50">
+                          <td className="px-3 py-2.5 text-center border border-gray-200">
+                            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-bold ${
+                              client.ranking === 1 ? 'bg-amber-100 text-amber-800' :
+                              client.ranking === 2 ? 'bg-gray-100 text-gray-800' :
+                              client.ranking === 3 ? 'bg-orange-100 text-orange-800' :
+                              'bg-sky-100 text-sky-800'
+                            }`}>{client.ranking}</span>
                           </td>
+                          <td className="px-3 py-2.5 text-[12px] font-medium text-[#323251] border border-gray-200 text-center">{client.name}</td>
+                          <td className="px-3 py-2.5 text-[12px] text-[#495057] border border-gray-200 text-center">{client.frequency}</td>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={3} className="text-center text-[12px] text-[#495057] py-8 border border-gray-200">No clients data available</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-        <div className="lg:col-span-12 col-span-12">
-          {isLoadingTopActivities ? (
-            <TableCardSkeleton />
-          ) : (
-            <div className="box h-full">
-              <div className="box-header justify-between">
-                <div className="box-title">
-                  Top 5 Activities
-                </div>
+        <div className="bg-white shadow-sm border border-gray-100 overflow-hidden rounded">
+          <div className="p-[10px] border-b border-gray-100">
+            <h2 className="text-[0.875rem] font-bold text-gray-800">Top 5 Activities</h2>
+          </div>
+          <div className="p-[10px]">
+            {isLoadingTopActivities ? (
+              <div className="h-[200px] flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 opacity-50" />
               </div>
-              <div className="box-body">
-                <div className="overflow-x-auto">
-                  <table className="table w-full [&_th]:!text-center [&_td]:!text-center">
-                    <thead>
-                      <tr>
-                        <th className="text-[0.75rem] font-medium text-[#8c9097] dark:text-white/50 w-1/6">Rank</th>
-                        <th className="text-[0.75rem] font-medium text-[#8c9097] dark:text-white/50 w-2/3">Activity Name</th>
-                        <th className="text-[0.75rem] font-medium text-[#8c9097] dark:text-white/50 w-1/6">Frequency</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {topActivities.length > 0 ? (
-                        topActivities.map((activity) => (
-                          <tr key={activity.ranking}>
-                            <td className="text-[0.875rem]">
-                              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium ${
-                                activity.ranking === 1 ? 'bg-yellow-100 text-yellow-800' :
-                                activity.ranking === 2 ? 'bg-gray-100 text-gray-800' :
-                                activity.ranking === 3 ? 'bg-orange-100 text-orange-800' :
-                                'bg-blue-100 text-blue-800'
-                              }`}>
-                                {activity.ranking}
-                              </span>
-                            </td>
-                            <td className="text-[0.875rem] font-medium">{activity.name}</td>
-                            <td className="text-[0.875rem] text-[#8c9097] dark:text-white/50">{activity.frequency}</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={3} className="text-center text-[0.875rem] text-[#8c9097] dark:text-white/50 py-4">
-                            No activities data available
+            ) : (
+              <div className="overflow-x-auto border border-gray-200 rounded">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50/30">
+                      <th className="px-3 py-2.5 text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200 text-center w-16">Rank</th>
+                      <th className="px-3 py-2.5 text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200 text-center">Activity Name</th>
+                      <th className="px-3 py-2.5 text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200 text-center w-20">Frequency</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topActivities.length > 0 ? (
+                      topActivities.map((activity) => (
+                        <tr key={activity.ranking} className="hover:bg-gray-50/50">
+                          <td className="px-3 py-2.5 text-center border border-gray-200">
+                            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-bold ${
+                              activity.ranking === 1 ? 'bg-amber-100 text-amber-800' :
+                              activity.ranking === 2 ? 'bg-gray-100 text-gray-800' :
+                              activity.ranking === 3 ? 'bg-orange-100 text-orange-800' :
+                              'bg-sky-100 text-sky-800'
+                            }`}>{activity.ranking}</span>
                           </td>
+                          <td className="px-3 py-2.5 text-[12px] font-medium text-[#323251] border border-gray-200 text-center">{activity.name}</td>
+                          <td className="px-3 py-2.5 text-[12px] text-[#495057] border border-gray-200 text-center">{activity.frequency}</td>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={3} className="text-center text-[12px] text-[#495057] py-8 border border-gray-200">No activities data available</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
@@ -1098,33 +941,29 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Monthly Tasks Chart */}
-      <div className="grid grid-cols-12 gap-x-6 mb-6">
-        <div className="lg:col-span-12 col-span-12">
-          {isLoadingMonthly ? (
-            <LineChartSkeleton />
-          ) : (
-            <div className="box h-full">
-              <div className="box-header justify-between">
-                <div className="box-title">
-                  Assigned Tasks by Month
-                </div>
+      {/* Monthly Tasks Chart – timelines-style */}
+      <div className="mb-6">
+        <div className="bg-white shadow-sm border border-gray-100 overflow-hidden rounded">
+          <div className="p-[10px] border-b border-gray-100">
+            <h2 className="text-[0.875rem] font-bold text-gray-800">Assigned Tasks by Month</h2>
+          </div>
+          <div className="p-[10px]">
+            {isLoadingMonthly ? (
+              <div className="h-[350px] bg-gray-50 rounded flex items-center justify-center animate-pulse">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600 opacity-50" />
               </div>
-              <div className="box-body !py-5">
-                <div id="task-completion-chart">
-                  <ReactApexChart 
-                    options={taskChartOptions} 
-                    series={[
-                      { name: 'Assigned Tasks', data: monthlyTaskData.assigned }
-                    ]} 
-                    type="line" 
-                    width="100%" 
-                    height={350} 
-                  />
-                </div>
+            ) : (
+              <div id="task-completion-chart" className="min-h-[350px]">
+                <ReactApexChart
+                  options={taskChartOptions}
+                  series={[{ name: 'Assigned Tasks', data: monthlyTaskData.assigned }]}
+                  type="line"
+                  width="100%"
+                  height={350}
+                />
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </Fragment>

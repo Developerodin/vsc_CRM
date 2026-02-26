@@ -114,15 +114,16 @@ export const MenuItems: any = [
     path: "/clients",
   },
 
-  {
-    icon: TaskIcon,
-    title: "Tasks",
-    type: "link",
-    active: false,
-    selected: false,
-    dirchange: false,
-    path: "/tasks",
-  },
+  // Tasks – hidden from navbar (commented out)
+  // {
+  //   icon: TaskIcon,
+  //   title: "Tasks",
+  //   type: "link",
+  //   active: false,
+  //   selected: false,
+  //   dirchange: false,
+  //   path: "/tasks",
+  // },
 
   {
     icon: GroupsIcon,

@@ -181,91 +181,91 @@ export function BulkEmailDrawer({
   return (
     <>
       <div
-        className="fixed inset-0 z-40 bg-black/50"
+        className="fixed inset-0 z-40 bg-black bg-opacity-50"
         aria-hidden
         onClick={onClose}
       />
       <div
-        className="fixed top-0 right-0 z-50 h-full w-full max-w-md bg-white shadow-xl flex flex-col"
+        className="fixed right-0 top-0 z-50 h-full w-full max-w-md bg-white shadow-xl flex flex-col"
         role="dialog"
         aria-label="Bulk email"
       >
-        <div className="flex items-center justify-between border-b px-4 py-3 bg-primary text-white">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <i className="ri-mail-send-line" /> Bulk Email
+        <div className="flex justify-between items-center p-[10px] border-b border-gray-200">
+          <h2 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+            <i className="ri-mail-send-line text-xs" /> Bulk Email
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded hover:bg-white/20"
+            className="text-gray-500 hover:text-gray-700 p-1 rounded"
             aria-label="Close"
           >
             <i className="ri-close-line text-xl" />
           </button>
         </div>
 
-        <div className="flex border-b">
+        <div className="flex border-b border-gray-200">
           <button
             type="button"
-            className={`flex-1 py-3 text-sm font-medium ${tab === "templates" ? "border-b-2 border-primary text-primary" : "text-gray-600"}`}
+            className={`flex-1 py-3 text-[11px] font-bold ${tab === "templates" ? "border-b-2 border-purple-600 text-purple-600" : "text-[#495057]"}`}
             onClick={() => setTab("templates")}
           >
             Templates
           </button>
           <button
             type="button"
-            className={`flex-1 py-3 text-sm font-medium ${tab === "send" ? "border-b-2 border-primary text-primary" : "text-gray-600"}`}
+            className={`flex-1 py-3 text-[11px] font-bold ${tab === "send" ? "border-b-2 border-purple-600 text-purple-600" : "text-[#495057]"}`}
             onClick={() => setTab("send")}
           >
             Send bulk
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto p-[10px]">
           {tab === "templates" && (
             <div className="space-y-4">
               {formMode !== "none" ? (
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <h3 className="font-medium">{formMode === "create" ? "New template" : "Edit template"}</h3>
-                    <button type="button" onClick={closeForm} className="text-gray-500 hover:text-gray-700 text-sm">
+                    <h3 className="text-sm font-bold text-gray-800">{formMode === "create" ? "New template" : "Edit template"}</h3>
+                    <button type="button" onClick={closeForm} className="text-[11px] font-bold text-gray-500 hover:text-gray-700">
                       Cancel
                     </button>
                   </div>
                   <input
                     type="text"
                     placeholder="Template name *"
-                    className="form-control w-full"
+                    className="bg-white border border-gray-200 px-3 py-1.5 text-[11px] rounded focus:ring-0 focus:border-purple-300 w-full placeholder:text-gray-400 font-medium transition-all"
                     value={form.name}
                     onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                   />
                   <input
                     type="text"
                     placeholder="Subject *"
-                    className="form-control w-full"
+                    className="bg-white border border-gray-200 px-3 py-1.5 text-[11px] rounded focus:ring-0 focus:border-purple-300 w-full placeholder:text-gray-400 font-medium transition-all"
                     value={form.subject}
                     onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))}
                   />
-                  <div className="text-xs text-gray-500 mb-1">Placeholders: {PLACEHOLDER_HINT}</div>
+                  <div className="text-[10px] text-gray-500 mb-1">Placeholders: {PLACEHOLDER_HINT}</div>
                   <textarea
                     placeholder="HTML body (optional)"
-                    className="form-control w-full min-h-[120px] font-mono text-sm"
+                    className="bg-white border border-gray-200 px-3 py-1.5 text-[11px] rounded focus:ring-0 focus:border-purple-300 w-full min-h-[120px] font-mono resize-y placeholder:text-gray-400"
                     value={form.bodyHtml}
                     onChange={(e) => setForm((f) => ({ ...f, bodyHtml: e.target.value }))}
                   />
-                  <label className="block text-sm font-medium text-gray-700 mt-3 mb-1">
+                  <label className="block text-[11px] font-medium text-[#495057] mt-3 mb-1">
                     Plain text (optional)
                   </label>
                   <textarea
                     placeholder="Plain-text fallback for email clients that don’t support HTML"
-                    className="form-control w-full min-h-[120px] text-sm resize-y"
+                    className="bg-white border border-gray-200 px-3 py-1.5 text-[11px] rounded focus:ring-0 focus:border-purple-300 w-full min-h-[120px] resize-y placeholder:text-gray-400"
                     value={form.bodyText}
                     onChange={(e) => setForm((f) => ({ ...f, bodyText: e.target.value }))}
                     rows={5}
                   />
                   <button
                     type="button"
-                    className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none"
+                    className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm disabled:opacity-50 disabled:pointer-events-none transition-colors"
                     onClick={handleSave}
                     disabled={saving}
                   >
@@ -276,52 +276,60 @@ export function BulkEmailDrawer({
                 <>
                   <button
                     type="button"
-                    className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                    className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
                     onClick={openCreate}
                   >
-                    <i className="ri-add-line text-base" /> Create template
+                    <i className="ri-add-line text-xs" /> Create template
                   </button>
                   {loadingTemplates ? (
-                    <div className="py-6 text-center text-gray-500 text-sm">Loading templates...</div>
+                    <div className="py-20 flex flex-col items-center justify-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 opacity-50" />
+                      <span className="text-[10px] text-gray-400 font-bold tracking-[0.2em] uppercase mt-2">Loading templates</span>
+                    </div>
                   ) : templates.length === 0 ? (
-                    <div className="py-6 text-center text-gray-500 text-sm">No templates yet. Create one above.</div>
+                    <div className="py-20 text-center">
+                      <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i className="ri-mail-line text-xl text-gray-200" />
+                      </div>
+                      <p className="text-xs font-bold text-gray-400">No templates yet. Create one above.</p>
+                    </div>
                   ) : (
                     <ul className="space-y-2">
                       {templates.map((t) => (
                         <li
                           key={tid(t)}
-                          className="border rounded-lg p-3 flex flex-col gap-2"
+                          className="border border-gray-200 rounded p-3 flex flex-col gap-2 bg-white"
                         >
-                          <div className="font-medium text-sm">{t.name}</div>
-                          <div className="text-xs text-gray-600 truncate">{t.subject}</div>
-                          <div className="flex gap-1.5">
+                          <div className="text-[12px] font-medium text-[#323251]">{t.name}</div>
+                          <div className="text-[11px] text-[#495057] truncate">{t.subject}</div>
+                          <div className="flex items-center justify-end gap-1">
                             <button
                               type="button"
-                              className="inline-flex items-center justify-center p-2 rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-800"
+                              className="w-7 h-7 flex items-center justify-center rounded bg-emerald-50 text-emerald-400 border border-emerald-100 hover:bg-emerald-100 transition-colors"
                               onClick={() => openEdit(t)}
                               title="Edit"
                             >
-                              <i className="ri-edit-line text-base" />
+                              <i className="ri-pencil-line text-xs" />
                             </button>
                             <button
                               type="button"
-                              className="inline-flex items-center justify-center p-2 rounded-md text-red-600 hover:bg-red-50 disabled:opacity-50"
+                              className="w-7 h-7 flex items-center justify-center rounded bg-red-50 text-red-400 border border-red-100 hover:bg-red-100 disabled:opacity-50 transition-colors"
                               onClick={() => handleDelete(tid(t))}
                               disabled={deletingId === tid(t)}
                               title="Delete"
                             >
-                              <i className="ri-delete-bin-line text-base" />
+                              <i className="ri-delete-bin-line text-xs" />
                             </button>
                             <button
                               type="button"
-                              className="inline-flex items-center justify-center p-2 rounded-md text-green-600 hover:bg-green-50"
+                              className="w-7 h-7 flex items-center justify-center rounded bg-blue-50 text-blue-400 border border-blue-100 hover:bg-blue-100 transition-colors"
                               onClick={() => {
                                 setSendTemplateId(tid(t));
                                 setTab("send");
                               }}
                               title="Use to send"
                             >
-                              <i className="ri-send-plane-line text-base" />
+                              <i className="ri-send-plane-line text-xs" />
                             </button>
                           </div>
                         </li>
@@ -336,9 +344,9 @@ export function BulkEmailDrawer({
           {tab === "send" && (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Template</label>
+                <label className="block text-[11px] font-medium text-[#495057] mb-1">Template</label>
                 <select
-                  className="form-select w-full"
+                  className="bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 w-full focus:ring-0 focus:border-gray-300 appearance-none cursor-pointer"
                   value={sendTemplateId}
                   onChange={(e) => setSendTemplateId(e.target.value)}
                 >
@@ -349,19 +357,20 @@ export function BulkEmailDrawer({
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Send to</label>
+                <label className="block text-[11px] font-medium text-[#495057] mb-2">Send to</label>
                 <div className="space-y-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
+                  <label className="flex items-center gap-2 cursor-pointer text-[12px] text-[#323251]">
                     <input
                       type="radio"
                       name="scope"
                       checked={sendScope === "selected"}
                       onChange={() => setSendScope("selected")}
+                      className="rounded border-gray-200 text-purple-600 focus:ring-0"
                     />
                     <span>Selected clients only</span>
                   </label>
                   {sendScope === "selected" && (
-                    <div className="ml-5 mt-2 p-3 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-700">
+                    <div className="ml-5 mt-2 p-3 rounded bg-gray-50 border border-gray-200 text-[12px] text-[#495057]">
                       {effectiveSelectedIds.length > 0 ? (
                         <>
                           <strong>{effectiveSelectedIds.length}</strong> client(s) selected from the table.
@@ -378,22 +387,24 @@ export function BulkEmailDrawer({
                     </div>
                   )}
                   {branchId && (
-                    <label className="flex items-center gap-2 cursor-pointer">
+                    <label className="flex items-center gap-2 cursor-pointer text-[12px] text-[#323251]">
                       <input
                         type="radio"
                         name="scope"
                         checked={sendScope === "branch"}
                         onChange={() => setSendScope("branch")}
+                        className="rounded border-gray-200 text-purple-600 focus:ring-0"
                       />
                       <span>All in this branch</span>
                     </label>
                   )}
-                  <label className="flex items-center gap-2 cursor-pointer">
+                  <label className="flex items-center gap-2 cursor-pointer text-[12px] text-[#323251]">
                     <input
                       type="radio"
                       name="scope"
                       checked={sendScope === "all"}
                       onChange={() => setSendScope("all")}
+                      className="rounded border-gray-200 text-purple-600 focus:ring-0"
                     />
                     <span>All clients{totalClientsCount ? ` (${totalClientsCount})` : ""}</span>
                   </label>
@@ -401,15 +412,15 @@ export function BulkEmailDrawer({
               </div>
               <button
                 type="button"
-                className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none"
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm disabled:opacity-50 disabled:pointer-events-none transition-colors"
                 onClick={handleSend}
                 disabled={sending || !sendTemplateId}
               >
                 {sending ? "Sending..." : "Send bulk email"}
               </button>
               {sendResult && (
-                <div className="border rounded-lg p-3 space-y-2 bg-gray-50 text-sm">
-                  <div className="font-medium">Result</div>
+                <div className="border border-gray-200 rounded p-3 space-y-2 bg-gray-50 text-[12px]">
+                  <div className="font-bold text-[#323251]">Result</div>
                   <div>Sent: <span className="text-green-600">{sendResult.sent}</span></div>
                   <div>Failed: <span className="text-red-600">{sendResult.failed}</span></div>
                   <div>Skipped (no email): <span className="text-gray-600">{sendResult.skipped}</span></div>

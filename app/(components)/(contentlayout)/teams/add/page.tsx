@@ -171,22 +171,24 @@ const AddTeamPage = () => {
 
       <div className="grid grid-cols-12 gap-6">
         <div className="col-span-12">
-          {/* Page Header */}
-          <div className="box !bg-transparent border-0 shadow-none">
-            <div className="box-header flex justify-between items-center">
-              <h1 className="box-title text-2xl font-semibold">Add New Team Member</h1>
+          {/* Page Header – timelines-style: accent bar, compact title, breadcrumb */}
+          <div className="bg-white shadow-sm border border-gray-100 overflow-hidden rounded mb-6">
+            <div className="p-[10px] flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <span className="w-[3px] h-5 bg-purple-600 rounded-full shrink-0" aria-hidden />
+                <h1 className="text-[0.875rem] font-bold text-gray-800">Add New Team Member</h1>
+              </div>
               <nav className="flex" aria-label="Breadcrumb">
-                <ol className="inline-flex items-center space-x-1 md:space-x-3">
+                <ol className="inline-flex items-center space-x-1 md:space-x-3 text-[11px] font-medium">
                   <li className="inline-flex items-center">
-                    <Link href="/teams" className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-primary">
-                      <i className="ri-home-line mr-2"></i>
-                      Teams
+                    <Link href="/teams" className="inline-flex items-center text-gray-500 hover:text-purple-600">
+                      <i className="ri-home-line mr-1" /> Teams
                     </Link>
                   </li>
                   <li>
                     <div className="flex items-center">
-                      <i className="ri-arrow-right-s-line text-gray-400 mx-2"></i>
-                      <span className="text-sm font-medium text-gray-500">Add New Team Member</span>
+                      <i className="ri-arrow-right-s-line text-gray-400 mx-1" />
+                      <span className="text-gray-500">Add New Team Member</span>
                     </div>
                   </li>
                 </ol>
@@ -194,9 +196,9 @@ const AddTeamPage = () => {
             </div>
           </div>
 
-          {/* Form Box */}
-          <div className="box">
-            <div className="box-body">
+          {/* Form Box – timelines-style card */}
+          <div className="bg-white shadow-sm border border-gray-100 overflow-hidden rounded">
+            <div className="p-6">
               <form onSubmit={handleSubmit}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Team Member Name */}
@@ -378,25 +380,19 @@ const AddTeamPage = () => {
                     </div>
                   </div>
 
-                  {/* Form Actions */}
-                  <div className="flex items-center space-x-3 col-span-1 md:col-span-2">
+                  {/* Form Actions – compact purple buttons */}
+                  <div className="flex items-center gap-2 col-span-1 md:col-span-2">
                     <button
                       type="submit"
-                      className="ti-btn ti-btn-primary"
+                      className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm disabled:opacity-50"
                       disabled={isLoading}
                     >
-                      {isLoading ? (
-                        <>
-                          <i className="ri-loader-4-line animate-spin mr-2"></i>
-                          Saving...
-                        </>
-                      ) : (
-                        "Save Team Member"
-                      )}
+                      {isLoading ? <i className="ri-loader-4-line animate-spin text-xs" /> : null}
+                      {isLoading ? "Saving..." : "Save Team Member"}
                     </button>
                     <button
                       type="button"
-                      className="ti-btn ti-btn-secondary"
+                      className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-bold rounded bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200"
                       onClick={() => router.push("/teams")}
                       disabled={isLoading}
                     >

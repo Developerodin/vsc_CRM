@@ -51,7 +51,7 @@ function Layout({children, local_varaiable, ThemeChanger}:any) {
               <head>
               <meta name="keywords" content=" nextjs app router, nextjs template, tailwind nextjs, next js themes, next js tailwind,  tailwind, admin, tailwindcss nextjs, nextjs admin templates, tailwind admin template, nextjs admin template, nextjs typescript, admin template, tailwind dashboard, tailwind css dashboard" />
               </head>
-             <body className={`${local_varaiable.body ? local_varaiable.body : ''}`}>
+             <body className={`${local_varaiable.body ? local_varaiable.body : ''}`} style={{backgroundColor: '#f1f1f1',margin: '0',padding: '0'}}>
               {theme.pageloading && children}
              </body>
           </html>

@@ -361,6 +361,8 @@ const UsersPage = () => {
     return pages;
   }
 
+  const hasActiveFilters = !!(filters.name || filters.email || filters.role || filters.assignedBranch);
+
   return (
     <div className="main-content">
       <Toaster position="top-right" />
@@ -368,79 +370,80 @@ const UsersPage = () => {
 
       <div className="grid grid-cols-12 gap-6">
         <div className="col-span-12">
-          {/* Page Header */}
-          <div className="box !bg-transparent border-0 shadow-none">
-            <div className="box-header flex justify-between items-center">
-              <h1 className="box-title text-2xl font-semibold">Users</h1>
-              <div className="box-tools flex items-center space-x-2">
+          <div className="bg-white shadow-sm border border-gray-100 overflow-hidden rounded mb-6">
+            <div className="p-[10px] flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <span className="w-[3px] h-5 bg-purple-600 rounded-full shrink-0" aria-hidden />
+                <h1 className="text-[0.875rem] font-bold text-gray-800">Users</h1>
+              </div>
+              <div className="flex items-center gap-1.5">
                 {selectedUsers.length > 0 && (
-                  <button
-                    type="button"
-                    className="ti-btn ti-btn-danger"
-                    onClick={handleDeleteSelected}
-                  >
-                    <i className="ri-delete-bin-line me-2"></i>
-                    Delete Selected ({selectedUsers.length})
+                  <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-red-50 text-red-600 border border-red-100 hover:bg-red-100" onClick={handleDeleteSelected}>
+                    <i className="ri-delete-bin-line text-xs" /> Delete Selected ({selectedUsers.length})
                   </button>
                 )}
-                {/* Import/Export Buttons */}
-                <div className="relative group">
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    className="hidden"
-                    accept=".xlsx,.xls"
-                    onChange={handleImport}
-                  />
-                  <button
-                    type="button"
-                    className="ti-btn ti-btn-success"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <i className="ri-download-2-line me-2"></i> Import
-                  </button>
-                </div>
+                <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx,.xls" onChange={handleImport} />
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm">
+                  <i className="ri-download-2-line text-xs" /> Import
+                </button>
                 {importProgress !== null && (
-                  <div className="w-40 h-3 bg-gray-200 rounded-full overflow-hidden flex items-center ml-2">
-                    <div
-                      className="bg-primary h-full transition-all duration-200"
-                      style={{ width: `${importProgress}%` }}
-                    ></div>
-                    <span className="ml-2 text-xs text-gray-700">
-                      {importProgress}%
-                    </span>
+                  <div className="w-24 h-2.5 bg-gray-200 rounded-full overflow-hidden flex items-center">
+                    <div className="bg-purple-600 h-full transition-all duration-200" style={{ width: `${importProgress}%` }} />
+                    <span className="ml-1.5 text-[10px] text-gray-600 font-medium">{importProgress}%</span>
                   </div>
                 )}
-                <button
-                  type="button"
-                  className="ti-btn ti-btn-primary"
-                  onClick={handleExport}
-                >
-                  <i className="ri-upload-2-line me-2"></i> Export
+                <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm" onClick={handleExport}>
+                  <i className="ri-upload-2-line text-xs" /> Export
                 </button>
-                <Link href="/users/add" className="ti-btn ti-btn-primary">
-                  <i className="ri-add-line me-2"></i> Add New User
+                <Link href="/users/add" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm">
+                  <i className="ri-add-line text-xs" /> Add New User
                 </Link>
               </div>
             </div>
           </div>
 
-          {/* Content Box */}
-          <div className="box">
-            <div className="box-body">
-              {/* Search and Sort */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="bg-purple-50 border border-purple-200 rounded p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-purple-700">Total</span>
+                  <p className="text-lg font-bold text-[#323251] mt-0.5">{totalResults}</p>
+                </div>
+                <div className="w-9 h-9 bg-purple-100 rounded-full flex items-center justify-center">
+                  <i className="ri-user-line text-purple-600 text-sm" />
+                </div>
+              </div>
+            </div>
+            <div className="bg-sky-50 border border-sky-200 rounded p-4 opacity-90">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-sky-700">On page</span>
+                  <p className="text-lg font-bold text-[#323251] mt-0.5">{users.length}</p>
+                </div>
+                <div className="w-9 h-9 bg-sky-100 rounded-full flex items-center justify-center">
+                  <i className="ri-file-list-3-line text-sky-600 text-sm" />
+                </div>
+              </div>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded p-4 opacity-90">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-amber-700">Selected</span>
+                  <p className="text-lg font-bold text-[#323251] mt-0.5">{selectedUsers.length}</p>
+                </div>
+                <div className="w-9 h-9 bg-amber-100 rounded-full flex items-center justify-center">
+                  <i className="ri-checkbox-circle-line text-amber-600 text-sm" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white shadow-sm border border-gray-100 overflow-hidden rounded">
+            <div className="p-[10px]">
               <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
-                {/* Rows per page selector */}
-                <div className="flex items-center w-full lg:w-auto">
-                  <label className="mr-2 text-sm text-gray-600 whitespace-nowrap">Rows per page:</label>
-                  <select
-                    className="form-select w-auto text-sm"
-                    value={itemsPerPage}
-                    onChange={(e) => {
-                      setItemsPerPage(Number(e.target.value));
-                      setCurrentPage(1);
-                    }}
-                  >
+                <div className="flex items-center gap-2">
+                  <label className="text-[11px] font-medium text-[#495057] whitespace-nowrap">Rows per page:</label>
+                  <select className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300" value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}>
                     <option value={10}>10</option>
                     <option value={50}>50</option>
                     <option value={100}>100</option>
@@ -448,89 +451,18 @@ const UsersPage = () => {
                     <option value={1000}>1000</option>
                   </select>
                 </div>
-
-                {/* Search and filters */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
-                  {/* Search bar */}
-                  <div className="relative flex-grow sm:max-w-xs">
-                    <input
-                      type="text"
-                      className="form-control py-2 w-full"
-                      placeholder="Search by name..."
-                      value={filters.name}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setFilters(prev => ({
-                          ...prev,
-                          name: value,
-                        }));
-                        setCurrentPage(1);
-                      }}
-                    />
-                  </div>
-
-                  {/* Email filter */}
-                  <input
-                    type="email"
-                    className="form-control py-2 w-full sm:max-w-xs"
-                    placeholder="Filter by email..."
-                    value={filters.email}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setFilters(prev => ({
-                        ...prev,
-                        email: value,
-                      }));
-                      setCurrentPage(1);
-                    }}
-                  />
-
-                  {/* Role filter */}
-                  <select
-                    className="form-select py-2 w-full sm:w-auto"
-                    value={filters.role}
-                    onChange={(e) => {
-                      setFilters(prev => ({
-                        ...prev,
-                        role: e.target.value,
-                      }));
-                      setCurrentPage(1);
-                    }}
-                  >
+                <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+                  <input type="text" className="bg-white border border-gray-200 pl-3 pr-3 py-1.5 text-[11px] rounded focus:ring-0 focus:border-purple-300 placeholder:text-gray-400 w-full sm:max-w-[140px]" placeholder="Name..." value={filters.name} onChange={(e) => { setFilters(prev => ({ ...prev, name: e.target.value })); setCurrentPage(1); }} />
+                  <input type="email" className="bg-white border border-gray-200 pl-3 pr-3 py-1.5 text-[11px] rounded focus:ring-0 focus:border-purple-300 placeholder:text-gray-400 w-full sm:max-w-[140px]" placeholder="Email..." value={filters.email} onChange={(e) => { setFilters(prev => ({ ...prev, email: e.target.value })); setCurrentPage(1); }} />
+                  <select className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300 min-w-[100px]" value={filters.role} onChange={(e) => { setFilters(prev => ({ ...prev, role: e.target.value })); setCurrentPage(1); }}>
                     <option value="">All Roles</option>
-                    {roles.map((role) => (
-                      <option key={role.id} value={role.id}>
-                        {role.name}
-                      </option>
-                    ))}
+                    {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                   </select>
-
-                  {/* Branch filter */}
-                  <select
-                    className="form-select py-2 w-full sm:w-auto"
-                    value={filters.assignedBranch}
-                    onChange={(e) => {
-                      setFilters(prev => ({
-                        ...prev,
-                        assignedBranch: e.target.value,
-                      }));
-                      setCurrentPage(1);
-                    }}
-                  >
+                  <select className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300 min-w-[100px]" value={filters.assignedBranch} onChange={(e) => { setFilters(prev => ({ ...prev, assignedBranch: e.target.value })); setCurrentPage(1); }}>
                     <option value="">All Branches</option>
-                    {branches.map((branch) => (
-                      <option key={branch.id} value={branch.id}>
-                        {branch.name}
-                      </option>
-                    ))}
+                    {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                   </select>
-
-                  {/* Sort dropdown */}
-                  <select
-                    className="form-select py-2 w-full sm:w-auto"
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                  >
+                  <select className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
                     <option value="name:asc">Name (A-Z)</option>
                     <option value="name:desc">Name (Z-A)</option>
                     <option value="email:asc">Email (A-Z)</option>
@@ -538,211 +470,112 @@ const UsersPage = () => {
                     <option value="createdAt:desc">Newest First</option>
                     <option value="createdAt:asc">Oldest First</option>
                   </select>
-
-                  {/* Reset button */}
-                  <button
-                    className="ti-btn ti-btn-secondary py-2 w-full sm:w-auto"
-                    onClick={() => {
-                      setFilters({
-                        name: "",
-                        email: "",
-                        role: "",
-                        assignedBranch: "",
-                      });
-                      setSortBy("name:asc");
-                    }}
-                  >
-                    <i className="ri-refresh-line me-2"></i>
-                    Reset
+                  <button className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100" onClick={() => { setFilters({ name: "", email: "", role: "", assignedBranch: "" }); setSortBy("name:asc"); }}>
+                    <i className="ri-refresh-line text-xs" /> Reset
                   </button>
                 </div>
               </div>
 
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                </div>
-              ) : error ? (
-                <div className="text-center py-8 text-red-500">
-                  <i className="ri-error-warning-line text-3xl mb-2"></i>
-                  <p>{error}</p>
-                </div>
-              ) : (
-                <div className="table-responsive">
-                  <table className="table whitespace-nowrap table-bordered min-w-full">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            className="form-checkbox"
-                            checked={selectedUsers.length === users.length}
-                            onChange={handleSelectAll}
-                          />
-                        </th>
-                        <th className="px-4 py-3">Name</th>
-                        <th className="px-4 py-3">Email</th>
-                        <th className="px-4 py-3">Role</th>
-                        <th className="px-4 py-3">Assigned Branch</th>
-                        <th className="px-4 py-3">Email Verified</th>
-                        <th className="px-4 py-3">Created At</th>
-                        <th className="px-4 py-3">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {users.length > 0 ? (
-                        users.map((user: User, index: number) => (
-                          <tr
-                            key={user.id}
-                            className={`border-b border-gray-200 ${
-                              index % 2 === 0 ? "bg-gray-50" : ""
-                            }`}
-                          >
-                            <td>
-                              <input
-                                type="checkbox"
-                                className="form-check-input"
-                                checked={selectedUsers.includes(user.id)}
-                                onChange={() => handleUserSelect(user.id)}
-                              />
-                            </td>
-                            <td>{user.name}</td>
-                            <td>{user.email}</td>
-                            <td>
-                              <span className="badge bg-primary/10 text-primary">
-                                {user.role?.name || 'N/A'}
-                              </span>
-                            </td>
-                            <td>
-                              {user.assignedBranch ? (
-                                <span className="badge bg-secondary/10 text-secondary">
-                                  {user.assignedBranch.name}
-                                </span>
-                              ) : (
-                                <span className="text-gray-500">Not Assigned</span>
-                              )}
-                            </td>
-                            <td>
-                              <span className={`badge ${user.isEmailVerified ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
-                                {user.isEmailVerified ? 'Verified' : 'Pending'}
-                              </span>
-                            </td>
-                            <td>{new Date(user.createdAt).toLocaleDateString()}</td>
-                            <td>
-                              <div className="flex space-x-2">
-                                <Link
-                                  href={`/users/edit/${user.id}`}
-                                  className="ti-btn ti-btn-primary ti-btn-sm"
-                                >
-                                  <i className="ri-edit-line"></i>
-                                </Link>
-                                <button
-                                  className="ti-btn ti-btn-danger ti-btn-sm"
-                                  onClick={() => handleDelete(user.id)}
-                                >
-                                  <i className="ri-delete-bin-line"></i>
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={8} className="text-center py-8">
-                            <div className="flex flex-col items-center justify-center">
-                              <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
-                                <i className="ri-user-line text-4xl text-primary"></i>
-                              </div>
-                              <h3 className="text-xl font-medium mb-2">
-                                No Users Found
-                              </h3>
-                              <p className="text-gray-500 text-center mb-6">
-                                Start by adding your first user.
-                              </p>
-                              <Link
-                                href="/users/add"
-                                className="ti-btn ti-btn-primary"
-                              >
-                                <i className="ri-add-line me-2"></i> Add First User
-                              </Link>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+              {hasActiveFilters && (
+                <div className="mb-4 p-3 bg-sky-50 border border-sky-100 rounded">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="text-[11px] font-bold text-sky-700">Filters active</span>
+                    <button onClick={() => { setFilters({ name: "", email: "", role: "", assignedBranch: "" }); setCurrentPage(1); }} className="text-[11px] font-bold text-sky-600 hover:text-sky-800"><i className="ri-close-line text-xs" /> Clear</button>
+                  </div>
                 </div>
               )}
 
-              {/* Pagination */}
-              {!isLoading && !error && (
-                <div className="flex justify-between items-center mt-4">
-                  <div className="text-sm text-gray-500">
-                    Showing{" "}
-                    {totalResults === 0
-                      ? 0
-                      : (currentPage - 1) * itemsPerPage + 1}{" "}
-                    to{" "}
-                    {totalResults === 0
-                      ? 0
-                      : Math.min(currentPage * itemsPerPage, totalResults)}{" "}
-                    of {totalResults} entries
+              <div className="overflow-x-auto min-h-[200px] border border-gray-200 rounded">
+                <table className="w-full border-collapse border border-gray-200">
+                  <thead>
+                    <tr className="bg-gray-50/30">
+                      <th className="pl-[10px] pr-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200 w-10">
+                        <input type="checkbox" className="rounded border-gray-200 text-purple-600 focus:ring-0 h-3.5 w-3.5" checked={selectedUsers.length === users.length && users.length > 0} onChange={handleSelectAll} />
+                      </th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Name</th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Email</th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Role</th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Branch</th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Verified</th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Created</th>
+                      <th className="pl-1.5 pr-[10px] py-3 text-right text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {isLoading ? (
+                      <tr>
+                        <td colSpan={8} className="text-center py-20 border border-gray-200">
+                          <div className="flex flex-col items-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 opacity-50" />
+                            <p className="mt-3 text-[10px] text-gray-400 font-bold uppercase">Loading</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : error ? (
+                      <tr>
+                        <td colSpan={8} className="text-center text-red-600 py-20 text-[12px] font-medium border border-gray-200">{error}</td>
+                      </tr>
+                    ) : users.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="text-center py-20 border border-gray-200">
+                          <div className="flex flex-col items-center">
+                            <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                              <i className="ri-user-line text-xl text-gray-200" />
+                            </div>
+                            <p className="text-xs font-bold text-gray-400 mb-1">NO USERS</p>
+                            <p className="text-[11px] text-gray-500 mb-4">{hasActiveFilters ? "No users match your filters." : "Start by adding your first user."}</p>
+                            {hasActiveFilters ? (
+                              <button onClick={() => { setFilters({ name: "", email: "", role: "", assignedBranch: "" }); setCurrentPage(1); }} className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700"><i className="ri-refresh-line text-xs" /> Clear Filters</button>
+                            ) : (
+                              <Link href="/users/add" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700"><i className="ri-add-line text-xs" /> Add First User</Link>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      users.map((user: User) => (
+                        <tr key={user.id} className="hover:bg-gray-50/50 group">
+                          <td className="pl-[10px] pr-1.5 py-2.5 border border-gray-200">
+                            <input type="checkbox" checked={selectedUsers.includes(user.id)} onChange={() => handleUserSelect(user.id)} className="rounded border-gray-200 text-purple-600 focus:ring-0 h-3.5 w-3.5" />
+                          </td>
+                          <td className="px-1.5 py-2.5 text-[12px] font-medium text-[#323251] border border-gray-200">{user.name}</td>
+                          <td className="px-1.5 py-2.5 text-[12px] text-[#495057] border border-gray-200">{user.email}</td>
+                          <td className="px-1.5 py-2.5 border border-gray-200">
+                            <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-100">{user.role?.name || "N/A"}</span>
+                          </td>
+                          <td className="px-1.5 py-2.5 text-[12px] text-[#495057] border border-gray-200">{user.assignedBranch?.name || "—"}</td>
+                          <td className="px-1.5 py-2.5 border border-gray-200">
+                            <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${user.isEmailVerified ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-amber-50 text-amber-700 border-amber-100"}`}>{user.isEmailVerified ? "Verified" : "Pending"}</span>
+                          </td>
+                          <td className="px-1.5 py-2.5 text-[12px] text-[#495057] border border-gray-200">{new Date(user.createdAt).toLocaleDateString()}</td>
+                          <td className="pl-1.5 pr-[10px] py-2.5 border border-gray-200">
+                            <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100">
+                              <Link href={`/users/edit/${user.id}`} className="w-7 h-7 rounded flex items-center justify-center bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100" title="Edit"><i className="ri-pencil-line text-sm" /></Link>
+                              <button type="button" onClick={() => handleDelete(user.id)} className="w-7 h-7 rounded flex items-center justify-center bg-red-50 text-red-600 border border-red-100 hover:bg-red-100" title="Delete"><i className="ri-delete-bin-line text-sm" /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {!isLoading && !error && users.length > 0 && (
+                <div className="flex flex-wrap justify-between items-center gap-4 p-[10px] pt-4 border-t border-gray-100">
+                  <div className="text-[11px] font-medium text-[#495057]">
+                    Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, totalResults)} of {totalResults} entries
                   </div>
-                  <nav aria-label="Page navigation" className="">
-                    <ul className="flex flex-wrap items-center">
-                      <li
-                        className={`page-item ${
-                          currentPage === 1 ? "disabled" : ""
-                        }`}
-                      >
-                        <button
-                          className="page-link py-2 px-3 ml-0 leading-tight text-gray-500 bg-white rounded-l-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                          onClick={() =>
-                            setCurrentPage((prev) => Math.max(prev - 1, 1))
-                          }
-                          disabled={currentPage === 1}
-                        >
-                          Previous
-                        </button>
-                      </li>
-                      {getPagination(currentPage, totalPages).map((page, idx) =>
-                        page === "..." ? (
-                          <li key={"ellipsis-" + idx} className="page-item">
-                            <span className="px-3">...</span>
-                          </li>
-                        ) : (
-                          <li key={page} className="page-item">
-                            <button
-                              className={`page-link py-2 px-3 leading-tight border border-gray-300 ${
-                                currentPage === page
-                                  ? "bg-primary text-white hover:bg-primary-dark"
-                                  : "bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                              }`}
-                              onClick={() => setCurrentPage(Number(page))}
-                            >
-                              {page}
-                            </button>
-                          </li>
-                        )
-                      )}
-                      <li
-                        className={`page-item ${
-                          currentPage === totalPages ? "disabled" : ""
-                        }`}
-                      >
-                        <button
-                          className="page-link py-2 px-3 leading-tight text-gray-500 bg-white rounded-r-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                          onClick={() =>
-                            setCurrentPage((prev) =>
-                              Math.min(prev + 1, totalPages)
-                            )
-                          }
-                          disabled={currentPage === totalPages}
-                        >
-                          Next
-                        </button>
-                      </li>
-                    </ul>
+                  <nav className="flex flex-wrap items-center gap-1">
+                    <button className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30" onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))} disabled={currentPage === 1}>Previous</button>
+                    {getPagination(currentPage, totalPages).map((page, idx) =>
+                      page === "..." ? (
+                        <span key={"e-" + idx} className="px-2 text-[10px] text-gray-300">...</span>
+                      ) : (
+                        <button key={page} className={`w-7 h-7 flex items-center justify-center text-[11px] font-bold rounded ${currentPage === page ? "bg-purple-600 text-white shadow-md" : "text-gray-400 hover:bg-gray-50"}`} onClick={() => setCurrentPage(Number(page))}>{page}</button>
+                      )
+                    )}
+                    <button className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30" onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages}>Next</button>
                   </nav>
                 </div>
               )}

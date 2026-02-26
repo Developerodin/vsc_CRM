@@ -296,6 +296,8 @@ const RolesPage = () => {
     return pages;
   }
 
+  const hasActiveFilters = !!(filters.name || filters.isActive);
+
   return (
     <div className="main-content">
       <Toaster position="top-right" />
@@ -303,79 +305,80 @@ const RolesPage = () => {
 
       <div className="grid grid-cols-12 gap-6">
         <div className="col-span-12">
-          {/* Page Header */}
-          <div className="box !bg-transparent border-0 shadow-none">
-            <div className="box-header flex justify-between items-center">
-              <h1 className="box-title text-2xl font-semibold">Roles</h1>
-              <div className="box-tools flex items-center space-x-2">
+          <div className="bg-white shadow-sm border border-gray-100 overflow-hidden rounded mb-6">
+            <div className="p-[10px] flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <span className="w-[3px] h-5 bg-purple-600 rounded-full shrink-0" aria-hidden />
+                <h1 className="text-[0.875rem] font-bold text-gray-800">Roles</h1>
+              </div>
+              <div className="flex items-center gap-1.5">
                 {selectedRoles.length > 0 && (
-                  <button
-                    type="button"
-                    className="ti-btn ti-btn-danger"
-                    onClick={handleDeleteSelected}
-                  >
-                    <i className="ri-delete-bin-line me-2"></i>
-                    Delete Selected ({selectedRoles.length})
+                  <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-red-50 text-red-600 border border-red-100 hover:bg-red-100" onClick={handleDeleteSelected}>
+                    <i className="ri-delete-bin-line text-xs" /> Delete Selected ({selectedRoles.length})
                   </button>
                 )}
-                {/* Import/Export Buttons */}
-                <div className="relative group">
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    className="hidden"
-                    accept=".xlsx,.xls"
-                    onChange={handleImport}
-                  />
-                  <button
-                    type="button"
-                    className="ti-btn ti-btn-success"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <i className="ri-download-2-line me-2"></i> Import
-                  </button>
-                </div>
+                <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx,.xls" onChange={handleImport} />
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm">
+                  <i className="ri-download-2-line text-xs" /> Import
+                </button>
                 {importProgress !== null && (
-                  <div className="w-40 h-3 bg-gray-200 rounded-full overflow-hidden flex items-center ml-2">
-                    <div
-                      className="bg-primary h-full transition-all duration-200"
-                      style={{ width: `${importProgress}%` }}
-                    ></div>
-                    <span className="ml-2 text-xs text-gray-700">
-                      {importProgress}%
-                    </span>
+                  <div className="w-24 h-2.5 bg-gray-200 rounded-full overflow-hidden flex items-center">
+                    <div className="bg-purple-600 h-full transition-all duration-200" style={{ width: `${importProgress}%` }} />
+                    <span className="ml-1.5 text-[10px] text-gray-600 font-medium">{importProgress}%</span>
                   </div>
                 )}
-                <button
-                  type="button"
-                  className="ti-btn ti-btn-primary"
-                  onClick={handleExport}
-                >
-                  <i className="ri-upload-2-line me-2"></i> Export
+                <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm" onClick={handleExport}>
+                  <i className="ri-upload-2-line text-xs" /> Export
                 </button>
-                <Link href="/roles/add" className="ti-btn ti-btn-primary">
-                  <i className="ri-add-line me-2"></i> Add New Role
+                <Link href="/roles/add" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm">
+                  <i className="ri-add-line text-xs" /> Add New Role
                 </Link>
               </div>
             </div>
           </div>
 
-          {/* Content Box */}
-          <div className="box">
-            <div className="box-body">
-              {/* Search and Sort */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="bg-purple-50 border border-purple-200 rounded p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-purple-700">Total</span>
+                  <p className="text-lg font-bold text-[#323251] mt-0.5">{totalResults}</p>
+                </div>
+                <div className="w-9 h-9 bg-purple-100 rounded-full flex items-center justify-center">
+                  <i className="ri-shield-user-line text-purple-600 text-sm" />
+                </div>
+              </div>
+            </div>
+            <div className="bg-sky-50 border border-sky-200 rounded p-4 opacity-90">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-sky-700">On page</span>
+                  <p className="text-lg font-bold text-[#323251] mt-0.5">{roles.length}</p>
+                </div>
+                <div className="w-9 h-9 bg-sky-100 rounded-full flex items-center justify-center">
+                  <i className="ri-file-list-3-line text-sky-600 text-sm" />
+                </div>
+              </div>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded p-4 opacity-90">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-amber-700">Selected</span>
+                  <p className="text-lg font-bold text-[#323251] mt-0.5">{selectedRoles.length}</p>
+                </div>
+                <div className="w-9 h-9 bg-amber-100 rounded-full flex items-center justify-center">
+                  <i className="ri-checkbox-circle-line text-amber-600 text-sm" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white shadow-sm border border-gray-100 overflow-hidden rounded">
+            <div className="p-[10px]">
               <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
-                {/* Rows per page selector */}
-                <div className="flex items-center w-full lg:w-auto">
-                  <label className="mr-2 text-sm text-gray-600 whitespace-nowrap">Rows per page:</label>
-                  <select
-                    className="form-select w-auto text-sm"
-                    value={itemsPerPage}
-                    onChange={(e) => {
-                      setItemsPerPage(Number(e.target.value));
-                      setCurrentPage(1);
-                    }}
-                  >
+                <div className="flex items-center gap-2">
+                  <label className="text-[11px] font-medium text-[#495057] whitespace-nowrap">Rows per page:</label>
+                  <select className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300" value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}>
                     <option value={10}>10</option>
                     <option value={50}>50</option>
                     <option value={100}>100</option>
@@ -383,267 +386,132 @@ const RolesPage = () => {
                     <option value={1000}>1000</option>
                   </select>
                 </div>
-
-                {/* Search and filters */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
-                  {/* Search bar */}
-                  <div className="relative flex-grow sm:max-w-xs">
-                    <input
-                      type="text"
-                      className="form-control py-2 w-full"
-                      placeholder="Search by name..."
-                      value={filters.name}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setFilters(prev => ({
-                          ...prev,
-                          name: value,
-                        }));
-                        setCurrentPage(1);
-                      }}
-                    />
-                  </div>
-
-                  {/* Status filter */}
-                  <select
-                    className="form-select py-2 w-full sm:w-auto"
-                    value={filters.isActive}
-                    onChange={(e) => {
-                      setFilters(prev => ({
-                        ...prev,
-                        isActive: e.target.value,
-                      }));
-                      setCurrentPage(1);
-                    }}
-                  >
+                <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+                  <input type="text" className="bg-white border border-gray-200 pl-3 pr-3 py-1.5 text-[11px] rounded focus:ring-0 focus:border-purple-300 placeholder:text-gray-400 w-full sm:max-w-[140px]" placeholder="Name..." value={filters.name} onChange={(e) => { setFilters(prev => ({ ...prev, name: e.target.value })); setCurrentPage(1); }} />
+                  <select className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300 min-w-[100px]" value={filters.isActive} onChange={(e) => { setFilters(prev => ({ ...prev, isActive: e.target.value })); setCurrentPage(1); }}>
                     <option value="">All Status</option>
                     <option value="Active">Active</option>
                     <option value="Inactive">Inactive</option>
                   </select>
-
-                  {/* Sort dropdown */}
-                  <select
-                    className="form-select py-2 w-full sm:w-auto"
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                  >
+                  <select className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
                     <option value="name:asc">Name (A-Z)</option>
                     <option value="name:desc">Name (Z-A)</option>
                     <option value="createdAt:desc">Newest First</option>
                     <option value="createdAt:asc">Oldest First</option>
                   </select>
-
-                  {/* Reset button */}
-                  <button
-                    className="ti-btn ti-btn-secondary py-2 w-full sm:w-auto"
-                    onClick={() => {
-                      setFilters({
-                        name: "",
-                        isActive: "",
-                      });
-                      setSortBy("name:asc");
-                    }}
-                  >
-                    <i className="ri-refresh-line me-2"></i>
-                    Reset
+                  <button className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100" onClick={() => { setFilters({ name: "", isActive: "" }); setSortBy("name:asc"); }}>
+                    <i className="ri-refresh-line text-xs" /> Reset
                   </button>
                 </div>
               </div>
 
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                </div>
-              ) : error ? (
-                <div className="text-center py-8 text-red-500">
-                  <i className="ri-error-warning-line text-3xl mb-2"></i>
-                  <p>{error}</p>
-                </div>
-              ) : (
-                <div className="table-responsive">
-                  <table className="table whitespace-nowrap table-bordered min-w-full">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            className="form-checkbox"
-                            checked={selectedRoles.length === roles.length}
-                            onChange={handleSelectAll}
-                          />
-                        </th>
-                        <th className="px-4 py-3">Name</th>
-                        <th className="px-4 py-3">Description</th>
-                        <th className="px-4 py-3">Status</th>
-                        <th className="px-4 py-3">Permissions</th>
-                        <th className="px-4 py-3">Created At</th>
-                        <th className="px-4 py-3">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {roles.length > 0 ? (
-                        roles.map((role: Role, index: number) => (
-                          <tr
-                            key={role.id}
-                            className={`border-b border-gray-200 ${
-                              index % 2 === 0 ? "bg-gray-50" : ""
-                            }`}
-                          >
-                            <td>
-                              <input
-                                type="checkbox"
-                                className="form-check-input"
-                                checked={selectedRoles.includes(role.id)}
-                                onChange={() => handleRoleSelect(role.id)}
-                              />
-                            </td>
-                            <td className="font-medium">{role.name}</td>
-                            <td>
-                              {role.description ? (
-                                <span className="text-gray-600">{role.description}</span>
-                              ) : (
-                                <span className="text-gray-400 italic">No description</span>
-                              )}
-                            </td>
-                            <td>
-                              <span className={`badge ${role.isActive ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}>
-                                {role.isActive ? 'Active' : 'Inactive'}
-                              </span>
-                            </td>
-                            <td>
-                              {role.permissions && role.permissions.length > 0 ? (
-                                <div className="flex flex-wrap gap-1">
-                                  {role.permissions.slice(0, 3).map((permission, idx) => (
-                                    <span key={idx} className="badge bg-primary/10 text-primary text-xs">
-                                      {permission}
-                                    </span>
-                                  ))}
-                                  {role.permissions.length > 3 && (
-                                    <span className="badge bg-gray-100 text-gray-600 text-xs">
-                                      +{role.permissions.length - 3} more
-                                    </span>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="text-gray-400 italic">No permissions</span>
-                              )}
-                            </td>
-                            <td>{new Date(role.createdAt).toLocaleDateString()}</td>
-                            <td>
-                              <div className="flex space-x-2">
-                                <Link
-                                  href={`/roles/edit/${role.id}`}
-                                  className="ti-btn ti-btn-primary ti-btn-sm"
-                                >
-                                  <i className="ri-edit-line"></i>
-                                </Link>
-                                <button
-                                  className="ti-btn ti-btn-danger ti-btn-sm"
-                                  onClick={() => handleDelete(role.id)}
-                                >
-                                  <i className="ri-delete-bin-line"></i>
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={7} className="text-center py-8">
-                            <div className="flex flex-col items-center justify-center">
-                              <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
-                                <i className="ri-shield-user-line text-4xl text-primary"></i>
-                              </div>
-                              <h3 className="text-xl font-medium mb-2">
-                                No Roles Found
-                              </h3>
-                              <p className="text-gray-500 text-center mb-6">
-                                Start by adding your first role.
-                              </p>
-                              <Link
-                                href="/roles/add"
-                                className="ti-btn ti-btn-primary"
-                              >
-                                <i className="ri-add-line me-2"></i> Add First Role
-                              </Link>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+              {hasActiveFilters && (
+                <div className="mb-4 p-3 bg-sky-50 border border-sky-100 rounded">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="text-[11px] font-bold text-sky-700">Filters active</span>
+                    <button onClick={() => { setFilters({ name: "", isActive: "" }); setCurrentPage(1); }} className="text-[11px] font-bold text-sky-600 hover:text-sky-800"><i className="ri-close-line text-xs" /> Clear</button>
+                  </div>
                 </div>
               )}
 
-              {/* Pagination */}
-              {!isLoading && !error && (
-                <div className="flex justify-between items-center mt-4">
-                  <div className="text-sm text-gray-500">
-                    Showing{" "}
-                    {totalResults === 0
-                      ? 0
-                      : (currentPage - 1) * itemsPerPage + 1}{" "}
-                    to{" "}
-                    {totalResults === 0
-                      ? 0
-                      : Math.min(currentPage * itemsPerPage, totalResults)}{" "}
-                    of {totalResults} entries
+              <div className="overflow-x-auto min-h-[200px] border border-gray-200 rounded">
+                <table className="w-full border-collapse border border-gray-200">
+                  <thead>
+                    <tr className="bg-gray-50/30">
+                      <th className="pl-[10px] pr-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200 w-10">
+                        <input type="checkbox" className="rounded border-gray-200 text-purple-600 focus:ring-0 h-3.5 w-3.5" checked={selectedRoles.length === roles.length && roles.length > 0} onChange={handleSelectAll} />
+                      </th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Name</th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Description</th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Status</th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Permissions</th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Created</th>
+                      <th className="pl-1.5 pr-[10px] py-3 text-right text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {isLoading ? (
+                      <tr>
+                        <td colSpan={7} className="text-center py-20 border border-gray-200">
+                          <div className="flex flex-col items-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 opacity-50" />
+                            <p className="mt-3 text-[10px] text-gray-400 font-bold uppercase">Loading</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : error ? (
+                      <tr>
+                        <td colSpan={7} className="text-center text-red-600 py-20 text-[12px] font-medium border border-gray-200">{error}</td>
+                      </tr>
+                    ) : roles.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="text-center py-20 border border-gray-200">
+                          <div className="flex flex-col items-center">
+                            <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                              <i className="ri-shield-user-line text-xl text-gray-200" />
+                            </div>
+                            <p className="text-xs font-bold text-gray-400 mb-1">NO ROLES</p>
+                            <p className="text-[11px] text-gray-500 mb-4">{hasActiveFilters ? "No roles match your filters." : "Start by adding your first role."}</p>
+                            {hasActiveFilters ? (
+                              <button onClick={() => { setFilters({ name: "", isActive: "" }); setCurrentPage(1); }} className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700"><i className="ri-refresh-line text-xs" /> Clear Filters</button>
+                            ) : (
+                              <Link href="/roles/add" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700"><i className="ri-add-line text-xs" /> Add First Role</Link>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      roles.map((role: Role) => (
+                        <tr key={role.id} className="hover:bg-gray-50/50 group">
+                          <td className="pl-[10px] pr-1.5 py-2.5 border border-gray-200">
+                            <input type="checkbox" checked={selectedRoles.includes(role.id)} onChange={() => handleRoleSelect(role.id)} className="rounded border-gray-200 text-purple-600 focus:ring-0 h-3.5 w-3.5" />
+                          </td>
+                          <td className="px-1.5 py-2.5 text-[12px] font-medium text-[#323251] border border-gray-200">{role.name}</td>
+                          <td className="px-1.5 py-2.5 text-[12px] text-[#495057] border border-gray-200 max-w-[180px] truncate" title={role.description || undefined}>{role.description || "—"}</td>
+                          <td className="px-1.5 py-2.5 border border-gray-200">
+                            <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${role.isActive ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-red-50 text-red-600 border-red-100"}`}>{role.isActive ? "Active" : "Inactive"}</span>
+                          </td>
+                          <td className="px-1.5 py-2.5 border border-gray-200">
+                            {role.permissions?.length ? (
+                              <div className="flex flex-wrap gap-0.5">
+                                {role.permissions.slice(0, 2).map((p, idx) => (
+                                  <span key={idx} className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-100">{p}</span>
+                                ))}
+                                {role.permissions.length > 2 && <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-50 text-gray-500 border border-gray-100">+{role.permissions.length - 2}</span>}
+                              </div>
+                            ) : (
+                              <span className="text-[11px] text-gray-400">—</span>
+                            )}
+                          </td>
+                          <td className="px-1.5 py-2.5 text-[12px] text-[#495057] border border-gray-200">{new Date(role.createdAt).toLocaleDateString()}</td>
+                          <td className="pl-1.5 pr-[10px] py-2.5 border border-gray-200">
+                            <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100">
+                              <Link href={`/roles/edit/${role.id}`} className="w-7 h-7 rounded flex items-center justify-center bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100" title="Edit"><i className="ri-pencil-line text-sm" /></Link>
+                              <button type="button" onClick={() => handleDelete(role.id)} className="w-7 h-7 rounded flex items-center justify-center bg-red-50 text-red-600 border border-red-100 hover:bg-red-100" title="Delete"><i className="ri-delete-bin-line text-sm" /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {!isLoading && !error && roles.length > 0 && (
+                <div className="flex flex-wrap justify-between items-center gap-4 p-[10px] pt-4 border-t border-gray-100">
+                  <div className="text-[11px] font-medium text-[#495057]">
+                    Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, totalResults)} of {totalResults} entries
                   </div>
-                  <nav aria-label="Page navigation" className="">
-                    <ul className="flex flex-wrap items-center">
-                      <li
-                        className={`page-item ${
-                          currentPage === 1 ? "disabled" : ""
-                        }`}
-                      >
-                        <button
-                          className="page-link py-2 px-3 ml-0 leading-tight text-gray-500 bg-white rounded-l-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                          onClick={() =>
-                            setCurrentPage((prev) => Math.max(prev - 1, 1))
-                          }
-                          disabled={currentPage === 1}
-                        >
-                          Previous
-                        </button>
-                      </li>
-                      {getPagination(currentPage, totalPages).map((page, idx) =>
-                        page === "..." ? (
-                          <li key={"ellipsis-" + idx} className="page-item">
-                            <span className="px-3">...</span>
-                          </li>
-                        ) : (
-                          <li key={page} className="page-item">
-                            <button
-                              className={`page-link py-2 px-3 leading-tight border border-gray-300 ${
-                                currentPage === page
-                                  ? "bg-primary text-white hover:bg-primary-dark"
-                                  : "bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                              }`}
-                              onClick={() => setCurrentPage(Number(page))}
-                            >
-                              {page}
-                            </button>
-                          </li>
-                        )
-                      )}
-                      <li
-                        className={`page-item ${
-                          currentPage === totalPages ? "disabled" : ""
-                        }`}
-                      >
-                        <button
-                          className="page-link py-2 px-3 leading-tight text-gray-500 bg-white rounded-r-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                          onClick={() =>
-                            setCurrentPage((prev) =>
-                              Math.min(prev + 1, totalPages)
-                            )
-                          }
-                          disabled={currentPage === totalPages}
-                        >
-                          Next
-                        </button>
-                      </li>
-                    </ul>
+                  <nav className="flex flex-wrap items-center gap-1">
+                    <button className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30" onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))} disabled={currentPage === 1}>Previous</button>
+                    {getPagination(currentPage, totalPages).map((page, idx) =>
+                      page === "..." ? (
+                        <span key={"e-" + idx} className="px-2 text-[10px] text-gray-300">...</span>
+                      ) : (
+                        <button key={page} className={`w-7 h-7 flex items-center justify-center text-[11px] font-bold rounded ${currentPage === page ? "bg-purple-600 text-white shadow-md" : "text-gray-400 hover:bg-gray-50"}`} onClick={() => setCurrentPage(Number(page))}>{page}</button>
+                      )
+                    )}
+                    <button className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30" onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages}>Next</button>
                   </nav>
                 </div>
               )}

@@ -471,14 +471,14 @@ const TasksPage = () => {
     return pages;
   }
 
-  const getPriorityColor = (priority: string) => {
+  const getPriorityBadgeClass = (priority: string) => {
     switch (priority) {
-      case 'critical': return 'bg-red-500';
-      case 'urgent': return 'bg-orange-500';
-      case 'high': return 'bg-yellow-500';
-      case 'medium': return 'bg-blue-500';
-      case 'low': return 'bg-green-500';
-      default: return 'bg-gray-500';
+      case 'critical': return 'bg-red-50 text-red-700 border border-red-200';
+      case 'urgent': return 'bg-orange-50 text-orange-700 border border-orange-200';
+      case 'high': return 'bg-amber-50 text-amber-700 border border-amber-200';
+      case 'medium': return 'bg-sky-50 text-sky-700 border border-sky-200';
+      case 'low': return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+      default: return 'bg-gray-50 text-gray-600 border border-gray-200';
     }
   };
 
@@ -510,143 +510,120 @@ const TasksPage = () => {
       <Toaster position="top-right" />
       <Seo title="Tasks" />
 
-      {/* Page Header */}
-      <div className="box !bg-transparent border-0 shadow-none mb-6">
-        <div className="box-header flex justify-between items-center">
-          <h1 className="box-title text-2xl font-semibold">Task Management</h1>
-          <div className="box-tools flex items-center space-x-2">
-            {selectedTasks.length > 0 && (
-              <button
-                type="button"
-                className="ti-btn ti-btn-danger"
-                onClick={handleDeleteSelected}
-              >
-                <i className="ri-delete-bin-line me-2"></i>
-                Delete Selected ({selectedTasks.length})
-              </button>
-            )}
-          </div>
+      {/* Page Header - spec: accent bar, 14px bold title */}
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-2">
+          <div className="w-[3px] h-5 bg-purple-600 rounded-full shrink-0" />
+          <h1 className="text-sm font-bold text-gray-800">Task Management</h1>
         </div>
+        {selectedTasks.length > 0 && (
+          <button
+            type="button"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 transition-colors shadow-sm"
+            onClick={handleDeleteSelected}
+          >
+            <i className="ri-delete-bin-line text-xs"></i>
+            Delete Selected ({selectedTasks.length})
+          </button>
+        )}
       </div>
 
-      {/* Status Summary Cards */}
+      {/* Status Summary Cards - spec colors */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-        {/* Pending Card */}
-        <div 
-          className="bg-warning/10 border border-warning/20 rounded-lg p-4 cursor-pointer hover:bg-warning/20 transition-colors"
+        <div
+          className="bg-sky-50 border border-sky-100 rounded-lg p-4 cursor-pointer hover:bg-sky-100/50 transition-colors"
           onClick={() => setFilters({ ...filters, status: 'pending' })}
         >
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-sm font-medium text-warning">Pending</span>
-              <p className="text-2xl font-bold text-warning">
-                {tasks.filter(t => t?.status === 'pending').length}
-              </p>
+              <span className="text-[11px] font-bold text-sky-600 uppercase tracking-wider">Pending</span>
+              <p className="text-xl font-bold text-[#323251] mt-0.5">{tasks.filter(t => t?.status === 'pending').length}</p>
             </div>
-            <div className="bg-warning/20 p-3 rounded-full">
-              <i className="ri-time-line text-warning text-xl"></i>
+            <div className="w-10 h-10 bg-sky-100 rounded-full flex items-center justify-center">
+              <i className="ri-time-line text-sky-600 text-lg"></i>
             </div>
           </div>
         </div>
-
-        {/* Ongoing Card */}
-        <div 
-          className="bg-primary/10 border border-primary/20 rounded-lg p-4 cursor-pointer hover:bg-primary/20 transition-colors"
+        <div
+          className="bg-[rgba(132,90,223,0.08)] border border-purple-100 rounded-lg p-4 cursor-pointer hover:bg-purple-50/50 transition-colors"
           onClick={() => setFilters({ ...filters, status: 'ongoing' })}
         >
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-sm font-medium text-primary">Ongoing</span>
-              <p className="text-2xl font-bold text-primary">
-                {tasks.filter(t => t?.status === 'ongoing').length}
-              </p>
+              <span className="text-[11px] font-bold text-purple-600 uppercase tracking-wider">Ongoing</span>
+              <p className="text-xl font-bold text-[#323251] mt-0.5">{tasks.filter(t => t?.status === 'ongoing').length}</p>
             </div>
-            <div className="bg-primary/20 p-3 rounded-full">
-              <i className="ri-loader-4-line text-primary text-xl"></i>
+            <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+              <i className="ri-loader-4-line text-purple-600 text-lg"></i>
             </div>
           </div>
         </div>
-
-        {/* Completed Card */}
-        <div 
-          className="bg-success/10 border border-success/20 rounded-lg p-4 cursor-pointer hover:bg-success/20 transition-colors"
+        <div
+          className="bg-emerald-50 border border-emerald-100 rounded-lg p-4 cursor-pointer hover:bg-emerald-100/50 transition-colors"
           onClick={() => setFilters({ ...filters, status: 'completed' })}
         >
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-sm font-medium text-success">Completed</span>
-              <p className="text-2xl font-bold text-success">
-                {tasks.filter(t => t?.status === 'completed').length}
-              </p>
+              <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Completed</span>
+              <p className="text-xl font-bold text-[#323251] mt-0.5">{tasks.filter(t => t?.status === 'completed').length}</p>
             </div>
-            <div className="bg-success/20 p-3 rounded-full">
-              <i className="ri-check-line text-success text-xl"></i>
+            <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
+              <i className="ri-check-line text-emerald-600 text-lg"></i>
             </div>
           </div>
         </div>
-
-        {/* On Hold Card */}
-        <div 
-          className="bg-warning/10 border border-warning/20 rounded-lg p-4 cursor-pointer hover:bg-warning/20 transition-colors"
+        <div
+          className="bg-amber-50 border border-amber-200 rounded-lg p-4 cursor-pointer hover:bg-amber-100/50 transition-colors"
           onClick={() => setFilters({ ...filters, status: 'on_hold' })}
         >
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-sm font-medium text-warning">On Hold</span>
-              <p className="text-2xl font-bold text-warning">
-                {tasks.filter(t => t?.status === 'on_hold').length}
-              </p>
+              <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">On Hold</span>
+              <p className="text-xl font-bold text-[#323251] mt-0.5">{tasks.filter(t => t?.status === 'on_hold').length}</p>
             </div>
-            <div className="bg-warning/20 p-3 rounded-full">
-              <i className="ri-pause-line text-warning text-xl"></i>
+            <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+              <i className="ri-pause-line text-amber-700 text-lg"></i>
             </div>
           </div>
         </div>
-
-        {/* Delayed Card */}
-        <div 
-          className="bg-danger/10 border border-danger/20 rounded-lg p-4 cursor-pointer hover:bg-danger/20 transition-colors"
+        <div
+          className="bg-red-50 border border-red-100 rounded-lg p-4 cursor-pointer hover:bg-red-100/50 transition-colors"
           onClick={() => setFilters({ ...filters, status: 'delayed' })}
         >
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-sm font-medium text-danger">Delayed</span>
-              <p className="text-2xl font-bold text-danger">
-                {tasks.filter(t => t?.status === 'delayed').length}
-              </p>
+              <span className="text-[11px] font-bold text-red-600 uppercase tracking-wider">Delayed</span>
+              <p className="text-xl font-bold text-[#323251] mt-0.5">{tasks.filter(t => t?.status === 'delayed').length}</p>
             </div>
-            <div className="bg-danger/20 p-3 rounded-full">
-              <i className="ri-error-warning-line text-danger text-xl"></i>
+            <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+              <i className="ri-error-warning-line text-red-600 text-lg"></i>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Active Filters Summary */}
+      {/* Active Filters Summary - spec info/sky */}
       {(filters.status || filters.priority || (filters.startDate && filters.endDate)) && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <span className="text-sm font-medium text-blue-800">Active Filters:</span>
-              
+        <div className="mb-4 p-3 bg-sky-50 border border-sky-100 rounded-lg">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center flex-wrap gap-2">
+              <span className="text-[11px] font-bold text-sky-700">Active Filters:</span>
               {filters.status && (
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800">
                   Status: {filters.status.charAt(0).toUpperCase() + filters.status.slice(1)}
                 </span>
               )}
-              
               {filters.priority && (
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800">
                   Priority: {filters.priority.charAt(0).toUpperCase() + filters.priority.slice(1)}
                 </span>
               )}
-              
               {filters.startDate && filters.endDate && (
                 <>
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800">
                     From: {new Date(filters.startDate).toLocaleDateString()}
                   </span>
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800">
                     To: {new Date(filters.endDate).toLocaleDateString()}
                   </span>
                 </>
@@ -654,33 +631,26 @@ const TasksPage = () => {
             </div>
             <button
               onClick={() => {
-                setFilters(prev => ({ 
-                  ...prev, 
-                  status: "", 
-                  priority: "",
-                  startDate: "", 
-                  endDate: "" 
-                }));
+                setFilters(prev => ({ ...prev, status: "", priority: "", startDate: "", endDate: "" }));
                 setCurrentPage(1);
-                // Clear URL parameters
                 router.push('/tasks');
               }}
-              className="text-blue-600 hover:text-blue-800 text-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded text-sky-600 hover:text-sky-800 hover:bg-sky-100 transition-colors"
             >
-              <i className="ri-close-line me-1"></i>
+              <i className="ri-close-line text-xs"></i>
               Clear All Filters
             </button>
           </div>
         </div>
       )}
 
-      {/* Simple Filters Row */}
+      {/* Simple Filters Row - spec: 11px, gray-200 border, purple focus */}
       <div className="flex flex-col gap-4 mb-4">
         <div className="flex flex-wrap items-center gap-3 w-full">
-          <div className="flex items-center flex-shrink-0">
-            <label className="mr-2 text-sm text-gray-600 whitespace-nowrap">Rows per page:</label>
+          <div className="flex items-center flex-shrink-0 gap-2">
+            <label className="text-[11px] font-medium text-[#495057] whitespace-nowrap">Rows per page:</label>
             <select
-              className="form-select text-sm min-w-[80px]"
+              className="bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300 min-w-[80px] cursor-pointer appearance-none"
               value={itemsPerPage}
               onChange={(e) => {
                 setItemsPerPage(Number(e.target.value));
@@ -696,9 +666,10 @@ const TasksPage = () => {
           </div>
 
           <div className="relative flex-grow min-w-[150px] sm:min-w-[200px]">
+            <i className="ri-search-line absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none" />
             <input
               type="text"
-              className="form-control py-2 w-full"
+              className="bg-white border border-gray-200 pl-8 pr-3 py-1.5 text-[11px] rounded focus:ring-0 focus:border-purple-300 w-full min-w-[120px] placeholder:text-gray-400 font-medium transition-all"
               placeholder="Search tasks..."
               value={searchInputValue}
               onChange={handleSearchChange}
@@ -706,7 +677,7 @@ const TasksPage = () => {
           </div>
 
           <select
-            className="form-select py-2 w-full sm:w-auto min-w-[120px]"
+            className="bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300 w-full sm:w-auto min-w-[120px] cursor-pointer appearance-none"
             value={filters.status}
             onChange={(e) => {
               setFilters(prev => ({ ...prev, status: e.target.value }));
@@ -723,7 +694,7 @@ const TasksPage = () => {
           </select>
 
           <select
-            className="form-select py-2 w-full sm:w-auto min-w-[120px]"
+            className="bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300 w-full sm:w-auto min-w-[120px] cursor-pointer appearance-none"
             value={filters.priority}
             onChange={(e) => {
               setFilters(prev => ({ ...prev, priority: e.target.value }));
@@ -741,7 +712,7 @@ const TasksPage = () => {
           <div className="relative w-full sm:w-auto min-w-[140px]">
             <input
               type="date"
-              className={`form-control py-2 w-full ${!filters.startDate ? 'text-transparent' : ''} ${filters.startDate ? 'border-primary' : ''}`}
+              className={`bg-white border rounded pl-3 pr-3 py-1.5 text-[11px] font-medium w-full focus:ring-0 focus:border-purple-300 transition-all ${!filters.startDate ? 'text-transparent' : ''} ${filters.startDate ? 'border-purple-300' : 'border-gray-200'}`}
               value={filters.startDate}
               onChange={(e) => {
                 setFilters(prev => ({ ...prev, startDate: e.target.value }));
@@ -750,29 +721,23 @@ const TasksPage = () => {
               onClick={(e) => {
                 const input = e.target as HTMLInputElement;
                 input.focus();
-                if (typeof input.showPicker === 'function') {
-                  input.showPicker();
-                }
+                if (typeof input.showPicker === 'function') input.showPicker();
               }}
               title="Start Date From"
               style={!filters.startDate ? { color: 'transparent' } : {}}
             />
             {!filters.startDate && (
-              <div 
-                className="absolute inset-0 flex items-center px-3 text-gray-500 bg-white cursor-pointer pointer-events-none"
-              >
-                <span className="text-xs sm:text-sm">Start Date</span>
+              <div className="absolute inset-0 flex items-center px-3 text-gray-400 bg-white cursor-pointer pointer-events-none rounded border border-gray-200">
+                <span className="text-[11px]">Start Date</span>
               </div>
             )}
-            {filters.startDate && (
-              <div className="absolute -top-2 -right-2 w-3 h-3 bg-primary rounded-full"></div>
-            )}
+            {filters.startDate && <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-purple-600 rounded-full" />}
           </div>
 
           <div className="relative w-full sm:w-auto min-w-[140px]">
             <input
               type="date"
-              className={`form-control py-2 w-full ${!filters.endDate ? 'text-transparent' : ''} ${filters.endDate ? 'border-primary' : ''}`}
+              className={`bg-white border rounded pl-3 pr-3 py-1.5 text-[11px] font-medium w-full focus:ring-0 focus:border-purple-300 transition-all ${!filters.endDate ? 'text-transparent' : ''} ${filters.endDate ? 'border-purple-300' : 'border-gray-200'}`}
               value={filters.endDate}
               onChange={(e) => {
                 setFilters(prev => ({ ...prev, endDate: e.target.value }));
@@ -781,27 +746,21 @@ const TasksPage = () => {
               onClick={(e) => {
                 const input = e.target as HTMLInputElement;
                 input.focus();
-                if (typeof input.showPicker === 'function') {
-                  input.showPicker();
-                }
+                if (typeof input.showPicker === 'function') input.showPicker();
               }}
               title="End Date Until"
               style={!filters.endDate ? { color: 'transparent' } : {}}
             />
             {!filters.endDate && (
-              <div 
-                className="absolute inset-0 flex items-center px-3 text-gray-500 bg-white cursor-pointer pointer-events-none"
-              >
-                <span className="text-xs sm:text-sm">End Date</span>
+              <div className="absolute inset-0 flex items-center px-3 text-gray-400 bg-white cursor-pointer pointer-events-none rounded border border-gray-200">
+                <span className="text-[11px]">End Date</span>
               </div>
             )}
-            {filters.endDate && (
-              <div className="absolute -top-2 -right-2 w-3 h-3 bg-primary rounded-full"></div>
-            )}
+            {filters.endDate && <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-purple-600 rounded-full" />}
           </div>
 
           <select
-            className="form-select py-2 w-full sm:w-auto min-w-[140px]"
+            className="bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300 w-full sm:w-auto min-w-[140px] cursor-pointer appearance-none"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
           >
@@ -814,99 +773,92 @@ const TasksPage = () => {
           </select>
 
           <button
-            className="ti-btn ti-btn-secondary py-2 w-full sm:w-auto whitespace-nowrap"
+            type="button"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-white border border-gray-200 text-[#495057] hover:bg-gray-50 shadow-sm transition-colors whitespace-nowrap"
             onClick={() => {
               setSearchInputValue("");
-              setFilters({
-                status: "",
-                priority: "",
-                branch: "",
-                teamMember: "",
-                startDate: "",
-                endDate: "",
-                today: "false",
-              });
+              setFilters({ status: "", priority: "", branch: "", teamMember: "", startDate: "", endDate: "", today: "false" });
               setSortBy("createdAt:desc");
               setCurrentPage(1);
             }}
           >
-            <i className="ri-refresh-line me-2"></i>
+            <i className="ri-refresh-line text-xs"></i>
             Reset
           </button>
         </div>
       </div>
 
-      {/* Delayed Tasks Warning */}
+      {/* Delayed Tasks Warning - spec amber */}
       {tasks.some(task => task.status === 'delayed') && (
-        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
           <div className="flex items-center">
-            <i className="ri-information-line text-yellow-500 text-xl mr-3"></i>
+            <i className="ri-information-line text-amber-600 text-xl mr-3" />
             <div>
-              <h4 className="text-sm font-medium text-yellow-800">Delayed Tasks Notice</h4>
-              <p className="text-sm text-yellow-700 mt-1">
-                Tasks marked as "Delayed" can only be updated to "Completed" status. Click on the status or remarks to mark as completed.
+              <h4 className="text-[11px] font-bold text-amber-800 uppercase tracking-wider">Delayed Tasks Notice</h4>
+              <p className="text-[11px] text-amber-700 mt-1">
+                Tasks marked as &quot;Delayed&quot; can only be updated to &quot;Completed&quot; status. Click on the status or remarks to mark as completed.
               </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Tasks Table */}
-      <div className="table-responsive">
-        <table className="table table-bordered border-collapse">
-          <thead>
-            <tr className="bg-gray-100">
-              <th className="px-4 py-3 border border-gray-300">
-                <input
-                  type="checkbox"
-                  className="form-checkbox"
-                  checked={selectedTasks.length === tasks.length}
-                  onChange={handleSelectAll}
-                />
-              </th>
-              <th className="px-4 py-3 border border-gray-300">Team Member</th>
-              <th className="px-4 py-3 border border-gray-300">Dates</th>
-              <th className="px-4 py-3 border border-gray-300">Priority</th>
-              <th className="px-4 py-3 border border-gray-300">Status</th>
-              <th className="px-4 py-3 border border-gray-300">Remarks</th>
-              <th className="px-4 py-3 border border-gray-300">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              <tr>
-                <td colSpan={7} className="text-center py-4 border border-gray-300 bg-white">
-                  <div className="flex justify-center">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                  </div>
-                </td>
+      {/* Tasks Table - spec: card, border-gray-200 (same as checkbox), thead bg-gray-50/30 */}
+      <div className="bg-white shadow-sm border border-gray-100 overflow-hidden rounded">
+        <div className="overflow-x-auto min-h-[300px]">
+          <table className="w-full border-collapse border border-gray-200">
+            <thead>
+              <tr className="bg-[rgba(249,250,251,0.3)]">
+                <th className="w-10 pl-[10px] pr-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">
+                  <input
+                    type="checkbox"
+                    className="rounded border-gray-200 text-purple-600 focus:ring-0 h-3.5 w-3.5 cursor-pointer"
+                    checked={selectedTasks.length === tasks.length && tasks.length > 0}
+                    onChange={handleSelectAll}
+                  />
+                </th>
+                <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Team Member</th>
+                <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Dates</th>
+                <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Priority</th>
+                <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Status</th>
+                <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Remarks</th>
+                <th className="px-1.5 py-3 pr-[10px] text-right text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Actions</th>
               </tr>
-            ) : error ? (
-              <tr>
-                <td colSpan={7} className="text-center text-red-500 py-4 border border-gray-300 bg-white">
-                  {error}
-                </td>
-              </tr>
-            ) : tasks.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="text-center py-8 border border-gray-300 bg-white">
-                  <div className="flex flex-col items-center justify-center">
-                    <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
-                      <i className="ri-task-line text-4xl text-primary"></i>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} className="text-center py-20 border border-gray-200 bg-white">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 opacity-50 mb-2" />
+                      <span className="text-[10px] font-bold text-gray-400 tracking-[0.2em] uppercase">Loading Data</span>
                     </div>
-                    <h3 className="text-xl font-medium mb-2">
-                      No Tasks Found
-                    </h3>
-                    <p className="text-gray-500 text-center mb-6">
-                      No tasks found matching your criteria.
-                    </p>
-                  </div>
-                </td>
-              </tr>
-            ) : (
-              tasks.map((task, index) => (
-                <tr key={task.id || (task as any)._id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                  <td className="border border-gray-300">
+                  </td>
+                </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan={7} className="text-center text-red-600 py-8 border border-gray-200 bg-white text-[12px] font-medium">
+                    {error}
+                  </td>
+                </tr>
+              ) : tasks.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="text-center py-20 border border-gray-200 bg-white">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                        <i className="ri-task-line text-xl text-gray-200" />
+                      </div>
+                      <h3 className="text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">
+                        Data Empty
+                      </h3>
+                      <p className="text-[11px] text-gray-500">No tasks found matching your criteria.</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+              tasks.map((task) => (
+                <tr key={task.id || (task as any)._id} className="hover:bg-[rgba(249,250,251,0.5)] transition-colors group border-b border-gray-200">
+                  <td className="pl-[10px] pr-1.5 py-2.5 border border-gray-200 align-top">
                     <input
                       type="checkbox"
                       checked={selectedTasks.includes(task.id || (task as any)._id)}
@@ -914,20 +866,20 @@ const TasksPage = () => {
                         const taskId = task.id || (task as any)._id;
                         if (taskId) handleSelectTask(taskId);
                       }}
-                      className="form-checkbox"
+                      className="rounded border-gray-200 text-purple-600 focus:ring-0 h-3.5 w-3.5 cursor-pointer"
                     />
                   </td>
-                  <td className="border border-gray-300">
+                  <td className="px-1.5 py-2.5 border border-gray-200 align-top text-[12px] text-[#323251]">
                     <div>
-                      <div className="font-medium">{task.teamMember?.name || "-"}</div>
-                      <div className="text-sm text-gray-500">{task.teamMember?.email || "-"}</div>
-                      <div className="text-xs text-gray-900 mt-1">
-                        <i className="ri-building-line me-1"></i>
+                      <div className="font-medium text-[#323251]">{task.teamMember?.name || "-"}</div>
+                      <div className="text-[11px] text-[#495057]">{task.teamMember?.email || "-"}</div>
+                      <div className="text-[11px] text-gray-600 mt-1">
+                        <i className="ri-building-line me-1" />
                         {task.branch?.name || "-"}
                       </div>
                     </div>
                   </td>
-                  <td className="border border-gray-300">
+                  <td className="px-1.5 py-2.5 border border-gray-200 align-top">
                     <div className="space-y-1 text-sm">
                       <div className="flex items-start">
                         <span className="text-xs font-medium text-gray-600 min-w-[90px]">Start Date:</span>
@@ -956,139 +908,108 @@ const TasksPage = () => {
                       </div>
                     </div>
                   </td>
-                  <td className="border border-gray-300">
-                    <span className={`badge ${getPriorityColor(task.priority)} text-white`}>
+                  <td className="px-1.5 py-2.5 border border-gray-200 align-top">
+                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold ${getPriorityBadgeClass(task.priority)}`}>
                       {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
                     </span>
                   </td>
-                  <td className="border border-gray-300">
-                    <div className="flex items-center gap-2">
-                    <span 
-                        className={`badge ${getStatusStyling(task.status)} cursor-pointer hover:opacity-80 transition-opacity`}
+                  <td className="px-1.5 py-2.5 border border-gray-200 align-top">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold cursor-pointer hover:opacity-90 transition-opacity ${getStatusStyling(task.status)}`}
                         onClick={() => openQuickEditModal(task)}
                         title={task.status === 'delayed' ? 'Click to mark as completed' : 'Click to edit status and remarks'}
-                    >
-                      {task.status.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                    </span>
+                      >
+                        {task.status.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                      </span>
                       {task.status === 'delayed' && (
-                        <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800 border border-yellow-200">
-                          <i className="ri-check-line mr-1"></i>
+                        <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-50 text-amber-700 border border-amber-200">
+                          <i className="ri-check-line mr-1" />
                           Can Complete
                         </span>
                       )}
                     </div>
                   </td>
-                  <td 
-                    className={`max-w-xs truncate px-2 py-1 rounded border border-gray-300 ${task.status === 'delayed' ? 'cursor-pointer hover:bg-yellow-50' : 'cursor-pointer hover:bg-gray-50'} transition-colors`}
+                  <td
+                    className={`px-1.5 py-2.5 border border-gray-200 max-w-xs truncate align-top text-[12px] cursor-pointer transition-colors ${task.status === 'delayed' ? 'hover:bg-amber-50' : 'hover:bg-gray-50'}`}
                     title={task.status === 'delayed' ? `${task.remarks || "No remarks"} - Click to mark as completed` : `${task.remarks || "No remarks"} - Click to edit`}
                     onClick={() => openQuickEditModal(task)}
                   >
                     {task.remarks || "-"}
                   </td>
-                   <td className="px-4 py-3 border border-gray-300">
-                     <div className="flex items-center space-x-2">
-                       <button
-                         type="button"
-                         className="ti-btn ti-btn-sm ti-btn-primary"
-                         onClick={() => openTaskDetailsModal(task)}
-                         title="View Task Details"
-                       >
-                         <i className="ri-eye-line"></i>
-                       </button>
-                       <button
-                         type="button"
-                         className="ti-btn ti-btn-sm ti-btn-secondary"
-                         onClick={() => {
-                           const taskId = task.id || (task as any)._id;
-                           if (!taskId) {
-                             toast.error('Task ID is missing. Cannot navigate to edit page.');
-                             return;
-                           }
-                           console.log('Task ID=========================================>:', taskId);
-                           router.push(`/tasks/edit/${taskId}`);
-                         }}
-                         title="Edit Task"
-                       >
-                         <i className="ri-edit-line"></i>
-                       </button>
-                     </div>
+                  <td className="px-1.5 py-2.5 pr-[10px] border border-gray-200 align-top">
+                    <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                      <button
+                        type="button"
+                        className="w-7 h-7 rounded flex items-center justify-center bg-blue-50 text-blue-500 border border-blue-100 hover:bg-blue-100 transition-colors"
+                        onClick={() => openTaskDetailsModal(task)}
+                        title="View Task Details"
+                      >
+                        <i className="ri-eye-line text-xs" />
+                      </button>
+                      <button
+                        type="button"
+                        className="w-7 h-7 rounded flex items-center justify-center bg-emerald-50 text-emerald-500 border border-emerald-100 hover:bg-emerald-100 transition-colors"
+                        onClick={() => {
+                          const taskId = task.id || (task as any)._id;
+                          if (!taskId) {
+                            toast.error('Task ID is missing. Cannot navigate to edit page.');
+                            return;
+                          }
+                          router.push(`/tasks/edit/${taskId}`);
+                        }}
+                        title="Edit Task"
+                      >
+                        <i className="ri-pencil-line text-xs" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
-      {/* Pagination */}
+      {/* Pagination - spec: 11px bold, purple active, gray-200 border */}
       {!isLoading && !error && (
-        <div className="flex justify-between items-center mt-4">
-          <div className="text-sm text-gray-500">
-            Showing{" "}
-            {totalResults === 0
-              ? 0
-              : (currentPage - 1) * itemsPerPage + 1}{" "}
-            to{" "}
-            {totalResults === 0
-              ? 0
-              : Math.min(currentPage * itemsPerPage, totalResults)}{" "}
-            of {totalResults} entries
+        <div className="p-[10px] pt-4 border-t border-gray-100 bg-white flex flex-wrap justify-between items-center gap-4">
+          <div className="text-[11px] font-medium text-[#495057] tracking-tight">
+            Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, totalResults)} of {totalResults} entries
           </div>
-          <nav aria-label="Page navigation" className="">
-            <ul className="flex flex-wrap items-center">
-              <li
-                className={`page-item ${
-                  currentPage === 1 ? "disabled" : ""
-                }`}
-              >
+          <nav aria-label="Page navigation" className="flex flex-wrap items-center gap-1">
+            <button
+              className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </button>
+            {getPagination(currentPage, totalPages).map((page, idx) =>
+              page === "..." ? (
+                <span key={"ellipsis-" + idx} className="px-2 text-[10px] text-gray-300">...</span>
+              ) : (
                 <button
-                  className="page-link py-2 px-3 ml-0 leading-tight text-gray-500 bg-white rounded-l-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.max(prev - 1, 1))
-                  }
-                  disabled={currentPage === 1}
+                  key={page}
+                  className={`w-7 h-7 flex items-center justify-center text-[11px] font-bold rounded transition-colors ${
+                    currentPage === page
+                      ? "bg-purple-600 text-white shadow-md"
+                      : "text-gray-400 hover:bg-gray-50"
+                  }`}
+                  onClick={() => setCurrentPage(Number(page))}
                 >
-                  Previous
+                  {page}
                 </button>
-              </li>
-              {getPagination(currentPage, totalPages).map((page, idx) =>
-                page === "..." ? (
-                  <li key={"ellipsis-" + idx} className="page-item">
-                    <span className="px-3">...</span>
-                  </li>
-                ) : (
-                  <li key={page} className="page-item">
-                    <button
-                      className={`page-link py-2 px-3 leading-tight border border-gray-300 ${
-                        currentPage === page
-                          ? "bg-primary text-white hover:bg-primary-dark"
-                          : "bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                      }`}
-                      onClick={() => setCurrentPage(Number(page))}
-                    >
-                      {page}
-                    </button>
-                  </li>
-                )
-              )}
-              <li
-                className={`page-item ${
-                  currentPage === totalPages ? "disabled" : ""
-                }`}
-              >
-                <button
-                  className="page-link py-2 px-3 leading-tight text-gray-500 bg-white rounded-r-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                  onClick={() =>
-                    setCurrentPage((prev) =>
-                      Math.min(prev + 1, totalPages)
-                    )
-                  }
-                  disabled={currentPage === totalPages}
-                >
-                  Next
-                </button>
-              </li>
-            </ul>
+              )
+            )}
+            <button
+              className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </button>
           </nav>
         </div>
       )}
@@ -1106,23 +1027,18 @@ const TasksPage = () => {
         />
       )}
 
-      {/* Quick Edit Modal */}
+      {/* Quick Edit Modal - spec: overlay 50%, 10px padding, same button styles */}
       {showQuickEditModal && quickEditTask && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div className="flex items-center justify-between p-6 border-b">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Quick Edit Task
-              </h3>
-              <button
-                onClick={closeQuickEditModal}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <i className="ri-close-line text-xl"></i>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center p-[10px] border-b border-gray-200">
+              <h3 className="text-sm font-bold text-gray-800">Quick Edit Task</h3>
+              <button type="button" onClick={closeQuickEditModal} className="text-gray-500 hover:text-gray-700 p-1">
+                <i className="ri-close-line text-lg" />
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-[10px] overflow-auto space-y-4">
               {/* Task Info */}
               <div className="text-sm text-gray-600 mb-4">
                 <p><strong>Task:</strong> {quickEditTask.teamMember?.name || "No team member"}</p>
@@ -1208,12 +1124,11 @@ const TasksPage = () => {
               </div>
             </div>
 
-            {/* Modal Footer */}
-            <div className="flex items-center justify-end gap-3 p-6 border-t bg-gray-50">
+            <div className="flex justify-end gap-2 p-[10px] border-t border-gray-200">
               <button
                 type="button"
                 onClick={closeQuickEditModal}
-                className="ti-btn ti-btn-secondary"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-white border border-gray-200 text-[#495057] hover:bg-gray-50 shadow-sm transition-colors"
                 disabled={isUpdatingQuickEdit}
               >
                 Cancel
@@ -1221,17 +1136,17 @@ const TasksPage = () => {
               <button
                 type="button"
                 onClick={handleQuickEditSubmit}
-                className="ti-btn ti-btn-primary"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm transition-colors"
                 disabled={isUpdatingQuickEdit || !quickEditStatus || (quickEditTask?.status === 'delayed' && quickEditStatus === 'delayed')}
               >
                 {isUpdatingQuickEdit ? (
                   <>
-                    <i className="ti-spinner animate-spin me-2"></i>
+                    <span className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent" />
                     Updating...
                   </>
                 ) : (
                   <>
-                    <i className="ri-save-line me-2"></i>
+                    <i className="ri-save-line text-xs" />
                     {quickEditTask?.status === 'delayed' ? 'Mark as Completed' : 'Update Task'}
                   </>
                 )}
@@ -1428,24 +1343,21 @@ const TaskDetailsModal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-      <div className="bg-white rounded-lg shadow-lg max-w-6xl w-full max-h-[92vh] flex flex-col">
-        <div className="flex items-center justify-between p-6 border-b">
-          <div className="flex-1 mr-6">
-             <h2 className="text-lg font-semibold text-gray-800">Task Details</h2>
-            <p className="text-sm text-gray-500 mt-1">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="flex justify-between items-center p-[10px] border-b border-gray-200">
+          <div className="flex-1 mr-4">
+            <h2 className="text-sm font-bold text-gray-800">Task Details</h2>
+            <p className="text-[11px] text-[#495057] mt-0.5">
               {task.teamMember.name} • {task.branch.name}
             </p>
           </div>
-          <button 
-            className="text-gray-500 hover:text-gray-700 flex-shrink-0 p-1"
-            onClick={onClose}
-          >
-            <i className="ri-close-line text-2xl"></i>
+          <button type="button" className="text-gray-500 hover:text-gray-700 p-1 flex-shrink-0" onClick={onClose}>
+            <i className="ri-close-line text-xl" />
           </button>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-[10px]">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Left Column - Task Info */}
             <div className="space-y-4">
@@ -1696,33 +1608,23 @@ const TaskDetailsModal = ({
                   </div>
                 )}
 
-                <div className="overflow-auto border border-gray-300 rounded" style={{ maxHeight: '360px' }}>
-                  <table className="w-full border-collapse">
-                    <thead className="bg-gray-100 sticky top-0 z-10">
+                <div className="overflow-auto border border-gray-200 rounded min-h-0" style={{ maxHeight: '360px' }}>
+                  <table className="w-full border-collapse border border-gray-200">
+                    <thead className="bg-[rgba(249,250,251,0.3)] sticky top-0 z-10">
                       <tr>
-                        <th className="border border-gray-300 px-2 py-1.5 text-left font-semibold text-xs" style={{ minWidth: 180 }}>
-                          Activity
-                        </th>
-                        <th className="border border-gray-300 px-2 py-1.5 text-left font-semibold text-xs" style={{ minWidth: 180 }}>
-                          Client
-                        </th>
-                        <th className="border border-gray-300 px-2 py-1.5 text-left font-semibold text-xs" style={{ width: 140 }}>
-                          Status
-                        </th>
-                        <th className="border border-gray-300 px-2 py-1.5 text-left font-semibold text-xs" style={{ width: 180 }}>
-                          Reference Number
-                        </th>
-                        <th className="border border-gray-300 px-2 py-1.5 text-left font-semibold text-xs" style={{ width: 150 }}>
-                          Completed At
-                        </th>
+                        <th className="border border-gray-200 px-1.5 py-2.5 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider" style={{ minWidth: 180 }}>Activity</th>
+                        <th className="border border-gray-200 px-1.5 py-2.5 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider" style={{ minWidth: 180 }}>Client</th>
+                        <th className="border border-gray-200 px-1.5 py-2.5 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider" style={{ width: 140 }}>Status</th>
+                        <th className="border border-gray-200 px-1.5 py-2.5 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider" style={{ width: 180 }}>Reference Number</th>
+                        <th className="border border-gray-200 px-1.5 py-2.5 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider" style={{ width: 150 }}>Completed At</th>
                       </tr>
                     </thead>
                     <tbody>
                       {timelineDetails.map((timeline, idx) => {
                         const timelineId = getTimelineId(timeline) || `row-${idx}`;
                         return (
-                          <tr key={timelineId} className="hover:bg-gray-50">
-                            <td className="border border-gray-300 px-2 py-1.5 text-xs">
+                          <tr key={timelineId} className="hover:bg-[rgba(249,250,251,0.5)] transition-colors">
+                            <td className="border border-gray-200 px-1.5 py-2.5 text-[12px] text-[#323251]">
                               <div className="font-medium">
                                 {timeline.activity?.name || timeline.activity || 'Unknown Activity'}
                               </div>
@@ -1730,12 +1632,12 @@ const TaskDetailsModal = ({
                                 <div className="text-xs text-gray-500 mt-0.5">Period: {timeline.period}</div>
                               )}
                             </td>
-                            <td className="border border-gray-300 px-2 py-1.5 text-xs">
+                            <td className="border border-gray-200 px-1.5 py-2.5 text-[12px] text-[#323251]">
                               {timeline.client?.name || timeline.client || 'Unknown Client'}
                             </td>
-                            <td className="border border-gray-300 px-2 py-1.5">
+                            <td className="border border-gray-200 px-1.5 py-2.5">
                               <select
-                                className="form-select w-full text-xs py-1"
+                                className="w-full bg-white border border-gray-200 text-[11px] font-medium rounded px-2 py-1.5 focus:ring-0 focus:border-purple-300"
                                 value={timeline.status || ''}
                                 onChange={(e) => setTimelineField(timeline, 'status', e.target.value)}
                                 disabled={isUpdating}
@@ -1749,20 +1651,20 @@ const TaskDetailsModal = ({
                                 <option value="delayed">Delayed</option>
                               </select>
                             </td>
-                            <td className="border border-gray-300 px-2 py-1.5">
+                            <td className="border border-gray-200 px-1.5 py-2.5">
                               <input
                                 type="text"
-                                className="form-control w-full text-xs py-1"
+                                className="w-full bg-white border border-gray-200 text-[11px] font-medium rounded px-2 py-1.5 focus:ring-0 focus:border-purple-300"
                                 value={timeline.referenceNumber || ''}
                                 onChange={(e) => setTimelineField(timeline, 'referenceNumber', e.target.value)}
                                 disabled={isUpdating}
                                 placeholder="REF-123"
                               />
                             </td>
-                            <td className="border border-gray-300 px-2 py-1.5">
+                            <td className="border border-gray-200 px-1.5 py-2.5">
                               <input
                                 type="date"
-                                className="form-control w-full text-xs py-1"
+                                className="w-full bg-white border border-gray-200 text-[11px] font-medium rounded px-2 py-1.5 focus:ring-0 focus:border-purple-300"
                                 value={getCompletedAtInputValue(timeline)}
                                 onChange={(e) => setTimelineField(timeline, 'completedAt', e.target.value)}
                                 disabled={isUpdating}
@@ -1794,16 +1696,18 @@ const TaskDetailsModal = ({
           </div>
         </div>
         
-        <div className="flex justify-end gap-3 p-6 border-t">
+        <div className="flex justify-end gap-2 p-[10px] border-t border-gray-200">
           <button
-            className="ti-btn ti-btn-secondary"
+            type="button"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-white border border-gray-200 text-[#495057] hover:bg-gray-50 shadow-sm transition-colors"
             onClick={onClose}
             disabled={isUpdating}
           >
             Cancel
           </button>
           <button
-            className="ti-btn ti-btn-primary"
+            type="button"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm transition-colors"
             onClick={handleStatusUpdate}
             disabled={
               isUpdating ||
@@ -1816,12 +1720,12 @@ const TaskDetailsModal = ({
           >
             {isUpdating ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                <span className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent" />
                 Updating...
               </>
             ) : task.status === 'delayed' ? (
               <>
-                <i className="ri-check-line mr-2"></i>
+                <i className="ri-check-line text-xs" />
                 Mark as Completed
               </>
             ) : (

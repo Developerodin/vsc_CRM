@@ -23,13 +23,12 @@ interface FrequencyAnalyticsChartProps {
 const FrequencyAnalyticsChart: React.FC<FrequencyAnalyticsChartProps> = ({ data, isLoading }) => {
   if (isLoading) {
     return (
-      <div className="box h-full animate-pulse">
-        <div className="box-header justify-between">
-          <div className="h-6 bg-gray-300 rounded w-40"></div>
-          <div className="w-[1.75rem] h-[1.75rem] bg-gray-300 rounded"></div>
+      <div className="bg-white shadow-sm border border-gray-100 rounded overflow-hidden h-full animate-pulse">
+        <div className="p-[10px] border-b border-gray-100">
+          <div className="h-4 bg-gray-200 rounded w-36" />
         </div>
-        <div className="box-body">
-          <div className="h-[350px] bg-gray-300 rounded"></div>
+        <div className="p-[10px]">
+          <div className="h-[350px] bg-gray-100 rounded" />
         </div>
       </div>
     );
@@ -37,21 +36,18 @@ const FrequencyAnalyticsChart: React.FC<FrequencyAnalyticsChartProps> = ({ data,
 
   // Validate data and provide fallbacks
   const validData = data && Array.isArray(data) && data.length > 0 ? data : [];
-  
+
   if (validData.length === 0) {
     return (
-      <div className="box h-full">
-        <div className="box-header">
-          <div className="box-title">
-            <i className="ti ti-chart-bar text-primary me-2"></i>
-            Frequency Analytics
-          </div>
+      <div className="bg-white shadow-sm border border-gray-100 rounded overflow-hidden h-full">
+        <div className="p-[10px] border-b border-gray-100">
+          <h2 className="text-[0.875rem] font-bold text-gray-800">Frequency Analytics</h2>
         </div>
-        <div className="box-body">
-          <div className="flex items-center justify-center h-[350px] text-gray-500">
+        <div className="p-[10px]">
+          <div className="flex items-center justify-center h-[350px] text-[#495057]">
             <div className="text-center">
-              <i className="ti ti-chart-bar text-4xl mb-4"></i>
-              <p>No frequency analytics data available</p>
+              <i className="ri-bar-chart-line text-4xl text-gray-200 mb-4 block" />
+              <p className="text-[12px] font-medium">No frequency analytics data available</p>
             </div>
           </div>
         </div>
@@ -157,14 +153,11 @@ const FrequencyAnalyticsChart: React.FC<FrequencyAnalyticsChartProps> = ({ data,
   ];
 
   return (
-    <div className="box h-full">
-      <div className="box-header">
-        <div className="box-title">
-          <i className="ti ti-chart-bar text-primary me-2"></i>
-          Frequency Analytics
-        </div>
+    <div className="bg-white shadow-sm border border-gray-100 rounded overflow-hidden h-full">
+      <div className="p-[10px] border-b border-gray-100">
+        <h2 className="text-[0.875rem] font-bold text-gray-800">Frequency Analytics</h2>
       </div>
-      <div className="box-body">
+      <div className="p-[10px]">
         <ReactApexChart
           options={chartOptions}
           series={series}

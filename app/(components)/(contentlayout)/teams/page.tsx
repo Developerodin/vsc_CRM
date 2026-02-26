@@ -377,11 +377,6 @@ const TeamsPage = () => {
   //   teamMember.name.toLowerCase().includes(searchQuery.toLowerCase())
   // );
 
-  // Calculate current teams for the current page
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentTeams = teams.slice(startIndex, endIndex);
-
   const handleExport = async () => {
     try {
       let exportData;
@@ -539,6 +534,8 @@ const TeamsPage = () => {
     }
   };
 
+  const hasActiveFilters = Object.values(filters).some(v => Array.isArray(v) ? v.length > 0 : v !== "");
+
   return (
     <div className="main-content">
       <Toaster position="top-right" />
@@ -546,73 +543,119 @@ const TeamsPage = () => {
 
       <div className="grid grid-cols-12 gap-6">
         <div className="col-span-12">
-          {/* Page Header */}
-          <div className="box !bg-transparent border-0 shadow-none">
-            <div className="box-header flex justify-between items-center">
-              <h1 className="box-title text-2xl font-semibold">Teams</h1>
-              <div className="box-tools flex items-center space-x-2">
+          {/* Page Header – timelines-style: accent bar, 14px bold title, 11px bold buttons */}
+          <div className="bg-white shadow-sm border border-gray-100 overflow-hidden rounded mb-6">
+            <div className="p-[10px] flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <span className="w-[3px] h-5 bg-purple-600 rounded-full shrink-0" aria-hidden />
+                <h1 className="text-[0.875rem] font-bold text-gray-800">Teams</h1>
+              </div>
+              <div className="flex items-center gap-1.5">
                 {selectedTeams.length > 0 && (
                   <button
                     type="button"
-                    className="ti-btn ti-btn-danger"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 transition-colors"
                     onClick={handleDeleteSelected}
                   >
-                    <i className="ri-delete-bin-line me-2"></i>
+                    <i className="ri-delete-bin-line text-xs" />
                     Delete Selected ({selectedTeams.length})
                   </button>
                 )}
-                {/* Import/Export Buttons */}
-                <div className="relative group">
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    className="hidden"
-                    accept=".xlsx,.xls"
-                    onChange={handleImport}
-                  />
-                  <button
-                    type="button"
-                    className="ti-btn ti-btn-success"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <i className="ri-download-2-line me-2"></i> Import
-                  </button>
-                </div>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  accept=".xlsx,.xls"
+                  onChange={handleImport}
+                />
+                <button
+                  type="button"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm transition-colors disabled:opacity-50"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <i className="ri-download-2-line text-xs" /> Import
+                </button>
                 {importProgress !== null && (
-                  <div className="w-40 h-3 bg-gray-200 rounded-full overflow-hidden flex items-center ml-2">
-                    <div
-                      className="bg-primary h-full transition-all duration-200"
-                      style={{ width: `${importProgress}%` }}
-                    ></div>
-                    <span className="ml-2 text-xs text-gray-700">
-                      {importProgress}%
-                    </span>
+                  <div className="w-24 h-2.5 bg-gray-200 rounded-full overflow-hidden flex items-center">
+                    <div className="bg-purple-600 h-full transition-all duration-200" style={{ width: `${importProgress}%` }} />
+                    <span className="ml-1.5 text-[10px] text-gray-600 font-medium">{importProgress}%</span>
                   </div>
                 )}
                 <button
                   type="button"
-                  className="ti-btn ti-btn-primary"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm transition-colors"
                   onClick={handleExport}
                 >
-                  <i className="ri-upload-2-line me-2"></i> Export
+                  <i className="ri-upload-2-line text-xs" /> Export
                 </button>
-                <Link href="/teams/add" className="ti-btn ti-btn-primary">
-                  <i className="ri-add-line me-2"></i> Add New Team Member
+                <Link
+                  href="/teams/add"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm transition-colors"
+                >
+                  <i className="ri-add-line text-xs" />
+                  Add New Team Member
                 </Link>
               </div>
             </div>
           </div>
 
-          {/* Content Box */}
-          <div className="box">
-            <div className="box-body">
-              {/* Search Bar and Filters */}
+          {/* Summary card – single total card to match timelines card style */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="bg-purple-50 border border-purple-200 rounded p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-purple-700">Total Members</span>
+                  <p className="text-lg font-bold text-[#323251] mt-0.5">{totalResults}</p>
+                </div>
+                <div className="w-9 h-9 bg-purple-100 rounded-full flex items-center justify-center">
+                  <i className="ri-group-line text-purple-600 text-sm" />
+                </div>
+              </div>
+            </div>
+            <div className="bg-sky-50 border border-sky-200 rounded p-4 opacity-90">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-sky-700">On this page</span>
+                  <p className="text-lg font-bold text-[#323251] mt-0.5">{teams.length}</p>
+                </div>
+                <div className="w-9 h-9 bg-sky-100 rounded-full flex items-center justify-center">
+                  <i className="ri-user-line text-sky-600 text-sm" />
+                </div>
+              </div>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded p-4 opacity-90">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-amber-700">Selected</span>
+                  <p className="text-lg font-bold text-[#323251] mt-0.5">{selectedTeams.length}</p>
+                </div>
+                <div className="w-9 h-9 bg-amber-100 rounded-full flex items-center justify-center">
+                  <i className="ri-checkbox-circle-line text-amber-600 text-sm" />
+                </div>
+              </div>
+            </div>
+            <div className="bg-emerald-50 border border-emerald-200 rounded p-4 opacity-90">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-emerald-700">Page</span>
+                  <p className="text-lg font-bold text-[#323251] mt-0.5">{currentPage} / {totalPages || 1}</p>
+                </div>
+                <div className="w-9 h-9 bg-emerald-100 rounded-full flex items-center justify-center">
+                  <i className="ri-file-list-3-line text-emerald-600 text-sm" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Content Box – timelines-style */}
+          <div className="bg-white shadow-sm border border-gray-100 overflow-hidden rounded">
+            <div className="p-[10px]">
+              {/* Search and Sort – 11px inputs, gray-200 border */}
               <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
-                {/* Rows per page selector */}
-                <div className="flex items-center w-full lg:w-auto">
-                  <label className="mr-2 text-sm text-gray-600 whitespace-nowrap">Rows per page:</label>
+                <div className="flex items-center w-full lg:w-auto gap-2">
+                  <label className="text-[11px] font-medium text-[#495057] whitespace-nowrap">Rows per page:</label>
                   <select
-                    className="form-select w-auto text-sm"
+                    className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
                     value={itemsPerPage}
                     onChange={(e) => {
                       setItemsPerPage(Number(e.target.value));
@@ -626,37 +669,19 @@ const TeamsPage = () => {
                     <option value={1000}>1000</option>
                   </select>
                 </div>
-
-                {/* Total Team Member Display */}
-                <div className="flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-lg border border-primary/20">
-                  <i className="ri-group-line text-primary text-lg"></i>
-                  <span className="text-sm text-gray-700 font-medium">Total Team Member:</span>
-                  <span className="text-lg font-bold text-primary">{totalResults}</span>
-                </div>
-
-                {/* Search and filters */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
-                  {/* Search bar */}
-                  <div className="relative flex-grow sm:max-w-xs">
-                    <input
-                      type="text"
-                      className="form-control py-2 w-full"
-                      placeholder="Search by name..."
-                      value={filters.name}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setFilters(prev => ({
-                          ...prev,
-                          name: value,
-                        }));
-                        setCurrentPage(1);
-                      }}
-                    />
-                  </div>
-
-                  {/* Sort dropdown */}
+                  <input
+                    type="text"
+                    className="bg-white border border-gray-200 pl-3 pr-3 py-1.5 text-[11px] rounded focus:ring-0 focus:border-purple-300 placeholder:text-gray-400 font-medium w-full sm:max-w-[200px]"
+                    placeholder="Search by name..."
+                    value={filters.name}
+                    onChange={(e) => {
+                      setFilters(prev => ({ ...prev, name: e.target.value }));
+                      setCurrentPage(1);
+                    }}
+                  />
                   <select
-                    className="form-select py-2 w-full sm:w-auto"
+                    className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300 w-full sm:w-auto min-w-[100px]"
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
                   >
@@ -667,236 +692,161 @@ const TeamsPage = () => {
                     <option value="sortOrder:asc">Sort Order (Low-High)</option>
                     <option value="sortOrder:desc">Sort Order (High-Low)</option>
                   </select>
-
-                  {/* Reset button */}
                   <button
-                    className="ti-btn ti-btn-secondary py-2 w-full sm:w-auto"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100 shadow-sm w-full sm:w-auto"
                     onClick={() => {
-                      setFilters({
-                        name: "",
-                        email: "",
-                        phone: "",
-                        branch: "",
-                        city: "",
-                        state: "",
-                        country: "",
-                        pinCode: "",
-                        skills: [],
-                      });
+                      setFilters({ name: "", email: "", phone: "", branch: "", city: "", state: "", country: "", pinCode: "", skills: [] });
                       setSortBy("name:asc");
                     }}
                   >
-                    <i className="ri-refresh-line me-2"></i>
-                    Reset
+                    <i className="ri-refresh-line text-xs" /> Reset
                   </button>
                 </div>
               </div>
 
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                </div>
-              ) : error ? (
-                <div className="text-center py-8 text-red-500">
-                  <i className="ri-error-warning-line text-3xl mb-2"></i>
-                  <p>{error}</p>
-                </div>
-              ) : (
-                <div className="table-responsive">
-                  <table className="table whitespace-nowrap table-bordered min-w-full">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th scope="col" className="!text-start">
-                          <input
-                            type="checkbox"
-                            className="form-check-input"
-                            checked={selectAll}
-                            onChange={handleSelectAll}
-                          />
-                        </th>
-                        <th scope="col" className="text-start">Team Member</th>
-                        <th scope="col" className="text-start">Address</th>
-                        <th scope="col" className="text-start">Skills</th>
-                        <th scope="col" className="text-start">Created Date</th>
-                        <th scope="col" className="text-start">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {currentTeams.length > 0 ? (
-                        currentTeams.map((teamMember: TeamMember, index: number) => (
-                          <tr
-                            key={teamMember.id}
-                            className={`border-b border-gray-200 ${
-                              index % 2 === 0 ? "bg-gray-50" : ""
-                            }`}
-                          >
-                            <td>
-                              <input
-                                type="checkbox"
-                                className="form-check-input"
-                                checked={selectedTeams.includes(teamMember.id)}
-                                onChange={() => handleTeamSelect(teamMember.id)}
-                              />
-                            </td>
-                            <td>
-                              <div className="flex flex-col">
-                                <button
-                                  onClick={() => router.push(`/analytics/team-members/${teamMember.id}/overview`)}
-                                  className="font-medium text-gray-900 hover:text-blue-600 hover:underline cursor-pointer text-left"
-                                >
-                                  {teamMember.name}
-                                </button>
-                                <div className="text-sm text-gray-500">{teamMember.email}</div>
-                                <div className="text-sm text-gray-500">{teamMember.phone}</div>
-                                <div className="text-sm text-black flex items-center">
-                                  <i className="ri-building-line mr-1"></i>
-                                  {teamMember?.branch?.name || '-'}
-                                </div>
-                              </div>
-                            </td>
-                            <td>
-                              <div className="flex flex-col">
-                                <div className="text-sm">{teamMember.city}</div>
-                                <div className="text-sm text-gray-500">{teamMember.state}</div>
-                                <div className="text-sm text-gray-500">{teamMember.country}</div>
-                                <div className="text-sm text-gray-500">{teamMember.pinCode}</div>
-                              </div>
-                            </td>
-                            <td>
-                              <button
-                                onClick={() => handleViewSkills(teamMember.skills)}
-                                className="ti-btn ti-btn-primary ti-btn-sm"
-                                title="View Skills"
-                              >
-                                <i className="ri-eye-line"></i>
-                              </button>
-                            </td>
-                            <td>{formatDate(teamMember.createdAt)}</td>
-                            <td>
-                              <div className="flex space-x-2">
-                                <Link
-                                  href={`/teams/edit/${teamMember.id}`}
-                                  className="ti-btn ti-btn-primary ti-btn-sm"
-                                  title="Edit Team Member"
-                                >
-                                  <i className="ri-edit-line"></i>
-                                </Link>
-                                <button
-                                  className="ti-btn ti-btn-info ti-btn-sm"
-                                  onClick={() => handleSendEmail(teamMember)}
-                                  title="Send Email"
-                                >
-                                  <i className="ri-mail-line"></i>
-                                </button>
-                                <button
-                                  className="ti-btn ti-btn-danger ti-btn-sm"
-                                  onClick={() => handleDelete(teamMember.id)}
-                                  title="Delete Team Member"
-                                >
-                                  <i className="ri-delete-bin-line"></i>
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={6} className="text-center py-8">
-                            <div className="flex flex-col items-center justify-center">
-                              <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mb-4">
-                                <i className="ri-folder-line text-4xl text-primary"></i>
-                              </div>
-                              <h3 className="text-xl font-medium mb-2">
-                                No Teams Found
-                              </h3>
-                              <p className="text-gray-500 text-center mb-6">
-                                Start by adding your first team member.
-                              </p>
-                              <Link
-                                href="/teams/add"
-                                className="ti-btn ti-btn-primary"
-                              >
-                                <i className="ri-add-line me-2"></i> Add First
-                                Team Member
-                              </Link>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+              {/* Active filters bar */}
+              {hasActiveFilters && (
+                <div className="mb-4 p-3 bg-sky-50 border border-sky-100 rounded">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center flex-wrap gap-2">
+                      <span className="text-[11px] font-bold text-sky-700">Active Filters:</span>
+                      {filters.name && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700">Name: {filters.name}</span>}
+                      {filters.branch && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700">Branch: {filters.branch}</span>}
+                    </div>
+                    <button
+                      onClick={() => { setFilters({ name: "", email: "", phone: "", branch: "", city: "", state: "", country: "", pinCode: "", skills: [] }); setCurrentPage(1); }}
+                      className="text-[11px] font-bold text-sky-600 hover:text-sky-800"
+                    >
+                      <i className="ri-close-line text-xs" /> Clear All
+                    </button>
+                  </div>
                 </div>
               )}
 
-              {/* Pagination */}
-              {!isLoading && !error && (
-                <div className="flex justify-between items-center mt-4">
-                  <div className="text-sm text-gray-500">
-                    Showing{" "}
-                    {totalResults === 0
-                      ? 0
-                      : (currentPage - 1) * itemsPerPage + 1}{" "}
-                    to{" "}
-                    {totalResults === 0
-                      ? 0
-                      : Math.min(currentPage * itemsPerPage, totalResults)}{" "}
-                    of {totalResults} entries
-                  </div>
-                  <nav aria-label="Page navigation" className="">
-                    <ul className="flex flex-wrap items-center">
-                      <li
-                        className={`page-item ${
-                          currentPage === 1 ? "disabled" : ""
-                        }`}
-                      >
-                        <button
-                          className="page-link py-2 px-3 ml-0 leading-tight text-gray-500 bg-white rounded-l-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                          onClick={() =>
-                            setCurrentPage((prev) => Math.max(prev - 1, 1))
-                          }
-                          disabled={currentPage === 1}
-                        >
-                          Previous
-                        </button>
-                      </li>
-                      {getPagination(currentPage, totalPages).map((page, idx) =>
-                        page === "..." ? (
-                          <li key={"ellipsis-" + idx} className="page-item">
-                            <span className="px-3">...</span>
-                          </li>
-                        ) : (
-                          <li key={page} className="page-item">
-                            <button
-                              className={`page-link py-2 px-3 leading-tight border border-gray-300 ${
-                                currentPage === page
-                                  ? "bg-primary text-white hover:bg-primary-dark"
-                                  : "bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                              }`}
-                              onClick={() => setCurrentPage(Number(page))}
-                            >
-                              {page}
+              {/* Table – gray-50/30 header, 11px uppercase th, 12px td, compact action buttons */}
+              <div className="overflow-x-auto min-h-[300px] border border-gray-200 rounded">
+                <table className="w-full border-collapse border border-gray-200">
+                  <thead>
+                    <tr className="bg-gray-50/30">
+                      <th className="pl-[10px] pr-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200 w-10">
+                        <input type="checkbox" className="rounded border-gray-200 text-purple-600 focus:ring-0 h-3.5 w-3.5" checked={selectAll} onChange={handleSelectAll} />
+                      </th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Team Member</th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Address</th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Skills</th>
+                      <th className="px-1.5 py-3 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Created</th>
+                      <th className="pl-1.5 pr-[10px] py-3 text-right text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {isLoading ? (
+                      <tr>
+                        <td colSpan={6} className="text-center py-20 border border-gray-200">
+                          <div className="flex flex-col items-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 opacity-50" />
+                            <p className="mt-3 text-[10px] text-gray-400 font-bold tracking-[0.2em] uppercase">Loading Data</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : error ? (
+                      <tr>
+                        <td colSpan={6} className="text-center text-red-600 py-20 text-[12px] font-medium border border-gray-200">{error}</td>
+                      </tr>
+                    ) : teams.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="text-center py-20 border border-gray-200">
+                          <div className="flex flex-col items-center">
+                            <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                              <i className="ri-group-line text-xl text-gray-200" />
+                            </div>
+                            <p className="text-xs font-bold text-gray-400 mb-1">NO TEAM MEMBERS</p>
+                            <p className="text-[11px] text-gray-500 mb-4">{hasActiveFilters ? "No members match your filters." : "Start by adding your first team member."}</p>
+                            {hasActiveFilters ? (
+                              <button onClick={() => { setFilters({ name: "", email: "", phone: "", branch: "", city: "", state: "", country: "", pinCode: "", skills: [] }); setCurrentPage(1); }} className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700">
+                                <i className="ri-refresh-line text-xs" /> Clear Filters
+                              </button>
+                            ) : (
+                              <Link href="/teams/add" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700">
+                                <i className="ri-add-line text-xs" /> Add First Team Member
+                              </Link>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      teams.map((teamMember: TeamMember) => (
+                        <tr key={teamMember.id} className="hover:bg-gray-50/50 transition-colors group">
+                          <td className="pl-[10px] pr-1.5 py-2.5 border border-gray-200">
+                            <input type="checkbox" checked={selectedTeams.includes(teamMember.id)} onChange={() => handleTeamSelect(teamMember.id)} className="rounded border-gray-200 text-purple-600 focus:ring-0 h-3.5 w-3.5" />
+                          </td>
+                          <td className="px-1.5 py-2.5 border border-gray-200">
+                            <div className="space-y-0.5 text-[12px]">
+                              <button onClick={() => router.push(`/analytics/team-members/${teamMember.id}/overview`)} className="font-medium text-[#323251] hover:text-purple-600 cursor-pointer text-left">
+                                {teamMember.name}
+                              </button>
+                              <div className="text-[11px] text-[#495057]">{teamMember.email}</div>
+                              <div className="text-[11px] text-[#495057]">{teamMember.phone}</div>
+                              <div className="text-[11px] text-[#495057] flex items-center gap-1">
+                                <i className="ri-building-line text-[10px]" />
+                                {teamMember?.branch?.name || "-"}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-1.5 py-2.5 text-[12px] font-medium text-[#323251] border border-gray-200">
+                            <div className="space-y-0.5">
+                              <div>{teamMember.city}</div>
+                              <div className="text-[11px] text-[#495057]">{teamMember.state} {teamMember.country}</div>
+                              <div className="text-[11px] text-[#495057]">{teamMember.pinCode}</div>
+                            </div>
+                          </td>
+                          <td className="px-1.5 py-2.5 border border-gray-200">
+                            <button type="button" onClick={() => handleViewSkills(teamMember.skills)} className="w-7 h-7 rounded flex items-center justify-center bg-sky-50 text-sky-600 border border-sky-100 hover:bg-sky-100" title="View Skills">
+                              <i className="ri-eye-line text-sm" />
                             </button>
-                          </li>
-                        )
-                      )}
-                      <li
-                        className={`page-item ${
-                          currentPage === totalPages ? "disabled" : ""
-                        }`}
-                      >
+                          </td>
+                          <td className="px-1.5 py-2.5 text-[12px] font-medium text-[#323251] border border-gray-200">{formatDate(teamMember.createdAt)}</td>
+                          <td className="pl-1.5 pr-[10px] py-2.5 border border-gray-200">
+                            <div className="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                              <Link href={`/teams/edit/${teamMember.id}`} className="w-7 h-7 rounded flex items-center justify-center bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100" title="Edit">
+                                <i className="ri-pencil-line text-sm" />
+                              </Link>
+                              <button type="button" onClick={() => handleSendEmail(teamMember)} className="w-7 h-7 rounded flex items-center justify-center bg-sky-50 text-sky-600 border border-sky-100 hover:bg-sky-100" title="Send Email">
+                                <i className="ri-mail-line text-sm" />
+                              </button>
+                              <button type="button" onClick={() => handleDelete(teamMember.id)} className="w-7 h-7 rounded flex items-center justify-center bg-red-50 text-red-600 border border-red-100 hover:bg-red-100" title="Delete">
+                                <i className="ri-delete-bin-line text-sm" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination – 11px bold, purple active */}
+              {!isLoading && !error && teams.length > 0 && (
+                <div className="flex flex-wrap justify-between items-center gap-4 p-[10px] pt-4 border-t border-gray-100">
+                  <div className="text-[11px] font-medium text-[#495057] tracking-tight">
+                    Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, totalResults)} of {totalResults} entries
+                  </div>
+                  <nav className="flex flex-wrap items-center gap-1">
+                    <button className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed" onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))} disabled={currentPage === 1}>Previous</button>
+                    {getPagination(currentPage, totalPages).map((page, idx) =>
+                      page === "..." ? (
+                        <span key={"ellipsis-" + idx} className="px-2 text-[10px] text-gray-300">...</span>
+                      ) : (
                         <button
-                          className="page-link py-2 px-3 leading-tight text-gray-500 bg-white rounded-r-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                          onClick={() =>
-                            setCurrentPage((prev) =>
-                              Math.min(prev + 1, totalPages)
-                            )
-                          }
-                          disabled={currentPage === totalPages}
+                          key={page}
+                          className={`w-7 h-7 flex items-center justify-center text-[11px] font-bold rounded ${currentPage === page ? "bg-purple-600 text-white shadow-md" : "text-gray-400 hover:bg-gray-50"}`}
+                          onClick={() => setCurrentPage(Number(page))}
                         >
-                          Next
+                          {page}
                         </button>
-                      </li>
-                    </ul>
+                      )
+                    )}
+                    <button className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed" onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages}>Next</button>
                   </nav>
                 </div>
               )}
@@ -905,124 +855,73 @@ const TeamsPage = () => {
         </div>
       </div>
 
-      {/* Add Skills Modal */}
+      {/* Skills Drawer – slide from right, timelines-style */}
       {showSkillsModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-lg w-full">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Skills</h3>
-              <button
-                onClick={() => setShowSkillsModal(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <i className="ri-close-line text-xl"></i>
+        <>
+          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setShowSkillsModal(false)} aria-hidden />
+          <div className="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-xl border-l border-gray-200 z-50 flex flex-col animate-in slide-in-from-right duration-200">
+            <div className="flex justify-between items-center p-[10px] border-b border-gray-200">
+              <h3 className="text-sm font-bold text-gray-800">Skills</h3>
+              <button type="button" onClick={() => setShowSkillsModal(false)} className="p-1.5 text-gray-500 hover:text-gray-700 rounded hover:bg-gray-100">
+                <i className="ri-close-line text-lg" />
               </button>
             </div>
-            <div className="space-y-2">
-              {selectedMemberSkills.map((skill) => (
-                <div key={skill.id} className="flex items-center p-2 bg-gray-50 rounded">
-                  <i className="ri-check-line text-primary mr-2"></i>
-                  <span>{skill.name}</span>
-                </div>
-              ))}
+            <div className="p-4 overflow-auto flex-1">
+              <div className="space-y-2">
+                {selectedMemberSkills.map((skill) => (
+                  <div key={skill.id} className="flex items-center p-3 bg-gray-50 border border-gray-100 rounded text-[12px] font-medium text-[#323251]">
+                    <i className="ri-check-line text-purple-600 mr-2 text-sm" />
+                    {skill.name}
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={() => setShowSkillsModal(false)}
-                className="ti-btn ti-btn-secondary"
-              >
+            <div className="p-[10px] border-t border-gray-200">
+              <button type="button" onClick={() => setShowSkillsModal(false)} className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-bold rounded bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200">
                 Close
               </button>
             </div>
           </div>
-        </div>
+        </>
       )}
 
-      {/* Email Modal */}
+      {/* Email Drawer – slide from right, timelines-style */}
       {showEmailModal && selectedTeamMember && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Send Task Assignment Email</h3>
-              <button
-                onClick={() => setShowEmailModal(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <i className="ri-close-line text-xl"></i>
+        <>
+          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setShowEmailModal(false)} aria-hidden />
+          <div className="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-xl border-l border-gray-200 z-50 flex flex-col animate-in slide-in-from-right duration-200">
+            <div className="flex justify-between items-center p-[10px] border-b border-gray-200">
+              <h3 className="text-sm font-bold text-gray-800">Send Task Assignment Email</h3>
+              <button type="button" onClick={() => setShowEmailModal(false)} className="p-1.5 text-gray-500 hover:text-gray-700 rounded hover:bg-gray-100">
+                <i className="ri-close-line text-lg" />
               </button>
             </div>
-            
-            <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-800">
-                <strong>To:</strong> {selectedTeamMember.email}
-              </p>
-              <p className="text-sm text-blue-800">
-                <strong>Team Member:</strong> {selectedTeamMember.name}
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Task Title *
-                </label>
-                <input
-                  type="text"
-                  className="form-control w-full"
-                  placeholder="Enter task title"
-                  value={emailForm.taskTitle}
-                  onChange={(e) => setEmailForm(prev => ({ ...prev, taskTitle: e.target.value }))}
-                />
+            <div className="p-4 overflow-auto flex-1 space-y-4">
+              <div className="p-3 bg-sky-50 border border-sky-100 rounded">
+                <p className="text-[11px] font-medium text-sky-800">To: {selectedTeamMember.email}</p>
+                <p className="text-[11px] font-medium text-sky-800">Team Member: {selectedTeamMember.name}</p>
               </div>
-
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Task Description *
-                </label>
-                <textarea
-                  className="form-control w-full"
-                  rows={4}
-                  placeholder="Enter task description"
-                  value={emailForm.taskDescription}
-                  onChange={(e) => setEmailForm(prev => ({ ...prev, taskDescription: e.target.value }))}
-                />
+                <label className="block text-[11px] font-medium text-[#495057] mb-1">Task Title *</label>
+                <input type="text" className="w-full bg-white border border-gray-200 text-[12px] rounded px-3 py-2 focus:ring-0 focus:border-purple-300" placeholder="Enter task title" value={emailForm.taskTitle} onChange={(e) => setEmailForm(prev => ({ ...prev, taskTitle: e.target.value }))} />
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[11px] font-medium text-[#495057] mb-1">Task Description *</label>
+                <textarea className="w-full bg-white border border-gray-200 text-[12px] rounded px-3 py-2 focus:ring-0 focus:border-purple-300" rows={4} placeholder="Enter task description" value={emailForm.taskDescription} onChange={(e) => setEmailForm(prev => ({ ...prev, taskDescription: e.target.value }))} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Assigned By
-                  </label>
-                  <input
-                    type="text"
-                    className="form-control w-full"
-                    value={emailForm.assignedBy}
-                    onChange={(e) => setEmailForm(prev => ({ ...prev, assignedBy: e.target.value }))}
-                  />
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1">Assigned By</label>
+                  <input type="text" className="w-full bg-white border border-gray-200 text-[12px] rounded px-3 py-2 focus:ring-0 focus:border-purple-300" value={emailForm.assignedBy} onChange={(e) => setEmailForm(prev => ({ ...prev, assignedBy: e.target.value }))} />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Due Date *
-                  </label>
-                  <input
-                    type="date"
-                    className="form-control w-full"
-                    value={emailForm.dueDate}
-                    onChange={(e) => setEmailForm(prev => ({ ...prev, dueDate: e.target.value }))}
-                  />
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1">Due Date *</label>
+                  <input type="date" className="w-full bg-white border border-gray-200 text-[12px] rounded px-3 py-2 focus:ring-0 focus:border-purple-300" value={emailForm.dueDate} onChange={(e) => setEmailForm(prev => ({ ...prev, dueDate: e.target.value }))} />
                 </div>
               </div>
-
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Priority
-                </label>
-                <select
-                  className="form-select w-full"
-                  value={emailForm.priority}
-                  onChange={(e) => setEmailForm(prev => ({ ...prev, priority: e.target.value }))}
-                >
+                <label className="block text-[11px] font-medium text-[#495057] mb-1">Priority</label>
+                <select className="w-full bg-white border border-gray-200 text-[12px] rounded px-3 py-2 focus:ring-0 focus:border-purple-300" value={emailForm.priority} onChange={(e) => setEmailForm(prev => ({ ...prev, priority: e.target.value }))}>
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
                   <option value="high">High</option>
@@ -1030,35 +929,15 @@ const TeamsPage = () => {
                 </select>
               </div>
             </div>
-
-            <div className="mt-6 flex justify-end space-x-3">
-              <button
-                onClick={() => setShowEmailModal(false)}
-                className="ti-btn ti-btn-secondary"
-                disabled={isSendingEmail}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleEmailSubmit}
-                className="ti-btn ti-btn-primary"
-                disabled={isSendingEmail}
-              >
-                {isSendingEmail ? (
-                  <>
-                    <i className="ri-loader-4-line animate-spin mr-2"></i>
-                    Sending...
-                  </>
-                ) : (
-                  <>
-                    <i className="ri-mail-send-line mr-2"></i>
-                    Send Email
-                  </>
-                )}
+            <div className="flex gap-2 p-[10px] border-t border-gray-200">
+              <button type="button" onClick={() => setShowEmailModal(false)} className="flex-1 px-3 py-2 text-[11px] font-bold rounded bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200" disabled={isSendingEmail}>Cancel</button>
+              <button type="button" onClick={handleEmailSubmit} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700" disabled={isSendingEmail}>
+                {isSendingEmail ? <i className="ri-loader-4-line animate-spin text-xs" /> : <i className="ri-mail-send-line text-xs" />}
+                {isSendingEmail ? "Sending..." : "Send Email"}
               </button>
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

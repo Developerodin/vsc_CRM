@@ -95,31 +95,12 @@ const TimelinePeriodTable: React.FC<TimelinePeriodTableProps> = ({
 
   if (isLoading) {
     return (
-      <div className="box h-full animate-pulse">
-        <div className="box-header">
-          <div className="h-6 bg-gray-300 rounded w-40"></div>
+      <div className="bg-white shadow-sm border border-gray-100 rounded overflow-hidden h-full animate-pulse">
+        <div className="p-[10px] flex items-center justify-between border-b border-gray-100">
+          <div className="h-4 bg-gray-200 rounded w-40" />
         </div>
-        <div className="box-body">
-          <div className="overflow-x-auto">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th className="h-4 bg-gray-300 rounded w-32"></th>
-                  <th className="h-4 bg-gray-300 rounded w-24"></th>
-                  <th className="h-4 bg-gray-300 rounded w-20"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <tr key={i}>
-                    <td className="h-4 bg-gray-300 rounded w-24"></td>
-                    <td className="h-4 bg-gray-300 rounded w-20"></td>
-                    <td className="h-4 bg-gray-300 rounded w-16"></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="p-[10px]">
+          <div className="h-[200px] bg-gray-100 rounded" />
         </div>
       </div>
     );
@@ -127,33 +108,21 @@ const TimelinePeriodTable: React.FC<TimelinePeriodTableProps> = ({
 
   if (!data || data.length === 0) {
     return (
-      <div className="box h-full">
-        <div className="box-header">
-          <div className="box-title">
-            <i className="ti ti-calendar text-primary me-2"></i>
-            Timeline Periods ({frequency})
-          </div>
+      <div className="bg-white shadow-sm border border-gray-100 rounded overflow-hidden h-full">
+        <div className="p-[10px] flex flex-wrap items-center justify-between gap-2 border-b border-gray-100">
+          <h2 className="text-[0.875rem] font-bold text-gray-800">Timeline Periods ({frequency})</h2>
           <div className="flex items-center gap-2">
-            <label className="text-sm text-[#8c9097] dark:text-white/50">Frequency:</label>
-            <select
-              value={frequency}
-              onChange={(e) => onFrequencyChange(e.target.value)}
-              className="form-select text-sm border border-defaultborder dark:border-defaultborder/10 bg-white dark:bg-bodybg px-2 py-1 rounded focus:border-primary focus:ring-1 focus:ring-primary"
-              disabled={isLoading}
-            >
-              {frequencies.map((freq) => (
-                <option key={freq.value} value={freq.value}>
-                  {freq.label}
-                </option>
-              ))}
+            <label className="text-[11px] font-medium text-[#495057]">Frequency:</label>
+            <select value={frequency} onChange={(e) => onFrequencyChange(e.target.value)} className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300" disabled={isLoading}>
+              {frequencies.map((freq) => <option key={freq.value} value={freq.value}>{freq.label}</option>)}
             </select>
           </div>
         </div>
-        <div className="box-body">
-          <div className="flex items-center justify-center h-[300px] text-gray-500">
+        <div className="p-[10px]">
+          <div className="flex items-center justify-center h-[200px] text-[#495057]">
             <div className="text-center">
-              <i className="ti ti-calendar text-4xl mb-4"></i>
-              <p>No timeline periods data available</p>
+              <i className="ri-calendar-line text-3xl text-gray-200 mb-3 block" />
+              <p className="text-[12px] font-medium">No timeline periods data available</p>
             </div>
           </div>
         </div>
@@ -162,116 +131,62 @@ const TimelinePeriodTable: React.FC<TimelinePeriodTableProps> = ({
   }
 
   return (
-    <div className="box h-full">
-      <div className="box-header">
-        <div className="box-title">
-          <i className="ti ti-calendar text-primary me-2"></i>
-          Timeline Periods ({defaultFrequency})
-        </div>
+    <div className="bg-white shadow-sm border border-gray-100 rounded overflow-hidden h-full">
+      <div className="p-[10px] flex flex-wrap items-center justify-between gap-2 border-b border-gray-100">
+        <h2 className="text-[0.875rem] font-bold text-gray-800">Timeline Periods ({defaultFrequency})</h2>
         <div className="flex items-center gap-2">
-          <label className="text-sm text-[#8c9097] dark:text-white/50">Frequency:</label>
+          <label className="text-[11px] font-medium text-[#495057]">Frequency:</label>
           <select
             value={defaultFrequency}
-            onChange={(e) => {
-              onFrequencyChange(e.target.value);
-              setCurrentPage(1); // Reset to first page when frequency changes
-            }}
-            className="form-select text-sm border border-defaultborder dark:border-defaultborder/10 bg-white dark:bg-bodybg px-2 py-1 rounded focus:border-primary focus:ring-1 focus:ring-primary"
+            onChange={(e) => { onFrequencyChange(e.target.value); setCurrentPage(1); }}
+            className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
             disabled={isLoading}
           >
-            {frequencies.map((freq) => (
-              <option key={freq.value} value={freq.value}>
-                {freq.label}
-              </option>
-            ))}
+            {frequencies.map((freq) => <option key={freq.value} value={freq.value}>{freq.label}</option>)}
           </select>
         </div>
       </div>
-      <div className="box-body">
-        <div className="overflow-x-auto">
-          <table className="table w-full">
+      <div className="p-[10px]">
+        <div className="overflow-x-auto border border-gray-200 rounded">
+          <table className="w-full border-collapse">
             <thead>
-              <tr>
-                <th className="text-[0.75rem] font-medium text-[#8c9097] dark:text-white/50">Activity</th>
-                <th className="text-[0.75rem] font-medium text-[#8c9097] dark:text-white/50">Client</th>
-                <th className="text-[0.75rem] font-medium text-[#8c9097] dark:text-white/50">Period</th>
+              <tr className="bg-gray-50/30">
+                <th className="px-3 py-2.5 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Activity</th>
+                <th className="px-3 py-2.5 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Client</th>
+                <th className="px-3 py-2.5 text-left text-[11px] font-bold text-[#495057] uppercase tracking-wider border border-gray-200">Period</th>
               </tr>
             </thead>
             <tbody>
               {currentData.map((period, index) => (
-                <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                  <td className="text-[0.875rem] text-defaulttextcolor dark:text-defaulttextcolor/70">
-                    <div className="max-w-[200px] truncate" title={period.activity}>
-                      {period.activity}
-                    </div>
+                <tr key={index} className="hover:bg-gray-50/50">
+                  <td className="px-3 py-2.5 text-[12px] text-[#323251] border border-gray-200">
+                    <div className="max-w-[200px] truncate" title={period.activity}>{period.activity}</div>
                   </td>
-                  <td className="text-[0.875rem] text-defaulttextcolor dark:text-defaulttextcolor/70">
-                    <div className="max-w-[150px] truncate" title={period.client}>
-                      {period.client}
-                    </div>
+                  <td className="px-3 py-2.5 text-[12px] text-[#495057] border border-gray-200">
+                    <div className="max-w-[150px] truncate" title={period.client}>{period.client}</div>
                   </td>
-                  <td className="text-[0.875rem] font-medium text-defaulttextcolor dark:text-defaulttextcolor/70">
-                    {period.period}
-                  </td>
+                  <td className="px-3 py-2.5 text-[12px] font-medium text-[#323251] border border-gray-200">{period.period}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        
-        {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-6">
-            <div className="text-sm text-gray-600">
+          <div className="flex flex-wrap justify-between items-center gap-4 mt-4 pt-4 border-t border-gray-100">
+            <div className="text-[11px] font-medium text-[#495057]">
               Showing {startIndex + 1} to {Math.min(endIndex, data.length)} of {data.length} entries
             </div>
-            <div className="flex items-center space-x-2">
-              {/* Previous Button */}
-              <button
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className={`px-3 py-2 text-sm font-medium rounded-md ${
-                  currentPage === 1
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                Previous
-              </button>
-              
-              {/* Page Numbers */}
-              {getPaginationButtons().map((page, index) => (
-                <React.Fragment key={index}>
-                  {page === '...' ? (
-                    <span className="px-3 py-2 text-sm text-gray-500">...</span>
-                  ) : (
-                    <button
-                      onClick={() => handlePageChange(page as number)}
-                      className={`px-3 py-2 text-sm font-medium rounded-md ${
-                        page === currentPage
-                          ? 'bg-primary text-white'
-                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  )}
-                </React.Fragment>
-              ))}
-              
-              {/* Next Button */}
-              <button
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className={`px-3 py-2 text-sm font-medium rounded-md ${
-                  currentPage === totalPages
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                Next
-              </button>
-            </div>
+            <nav className="flex flex-wrap items-center gap-1">
+              <button className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30" onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1}>Previous</button>
+              {getPaginationButtons().map((page, idx) =>
+                page === '...' ? (
+                  <span key={`e-${idx}`} className="px-2 text-[10px] text-gray-300">...</span>
+                ) : (
+                  <button key={page} className={`w-7 h-7 flex items-center justify-center text-[11px] font-bold rounded ${currentPage === page ? 'bg-purple-600 text-white shadow-md' : 'text-gray-400 hover:bg-gray-50'}`} onClick={() => handlePageChange(page as number)}>{page}</button>
+                )
+              )}
+              <button className="px-3 py-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-600 disabled:opacity-30" onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages}>Next</button>
+            </nav>
           </div>
         )}
       </div>

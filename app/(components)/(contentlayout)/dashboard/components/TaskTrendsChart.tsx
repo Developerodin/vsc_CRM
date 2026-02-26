@@ -239,173 +239,96 @@ const TaskTrendsChart: React.FC<TaskTrendsChartProps> = ({ data, isLoading, bran
 
   if (isLoading) {
     return (
-      <div className="box h-full animate-pulse">
-        <div className="box-header justify-between">
-          <div className="h-6 bg-gray-300 rounded w-40"></div>
-          <div className="w-[1.75rem] h-[1.75rem] bg-gray-300 rounded"></div>
+      <div className="bg-white shadow-sm border border-gray-100 rounded overflow-hidden h-full animate-pulse">
+        <div className="p-[10px] border-b border-gray-100">
+          <div className="h-4 bg-gray-200 rounded w-40" />
         </div>
-        <div className="box-body !py-5">
-          <div className="h-[350px] bg-gray-300 rounded"></div>
+        <div className="p-[10px]">
+          <div className="h-[350px] bg-gray-100 rounded" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="box h-full">
-             <div className="box-header">
-       </div>
-      
-      {/* Date Filters */}
+    <div className="bg-white shadow-sm border border-gray-100 rounded overflow-hidden h-full">
       {showFilters && (
-        <div className="box-body !pb-0">
-          <div className="flex flex-wrap items-center gap-4 mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Start Date:</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => handleDateChange('start', e.target.value)}
-                className="form-input text-sm border border-defaultborder rounded-md px-3 py-1.5 focus:border-primary focus:ring-1 focus:ring-primary"
-              />
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">End Date:</label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => handleDateChange('end', e.target.value)}
-                className="form-input text-sm border border-defaultborder rounded-md px-3 py-1.5 focus:border-primary focus:ring-1 focus:ring-primary"
-              />
-            </div>
-            
-            <button
-              onClick={clearDateFilters}
-              className="px-3 py-1.5 text-sm text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-            >
+        <div className="p-[10px] border-b border-gray-100 bg-gray-50">
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="text-[11px] font-medium text-[#495057]">Start:</label>
+            <input type="date" value={startDate} onChange={(e) => handleDateChange('start', e.target.value)} className="bg-white border border-gray-200 text-[11px] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300" />
+            <label className="text-[11px] font-medium text-[#495057]">End:</label>
+            <input type="date" value={endDate} onChange={(e) => handleDateChange('end', e.target.value)} className="bg-white border border-gray-200 text-[11px] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300" />
+            <button onClick={clearDateFilters} className="px-3 py-1.5 text-[11px] font-bold rounded bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200">
               Reset Dates
             </button>
-            
-            {/* Active Filters Summary */}
             {(startDate || endDate) && (
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <span className="font-medium">Active Filters:</span>
-                {startDate && (
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    From: {new Date(startDate).toLocaleDateString()}
-                  </span>
-                )}
-                {endDate && (
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                    To: {new Date(endDate).toLocaleDateString()}
-                  </span>
-                )}
-              </div>
+              <span className="text-[10px] text-[#495057]">
+                {startDate && `From: ${new Date(startDate).toLocaleDateString()}`}
+                {endDate && ` To: ${new Date(endDate).toLocaleDateString()}`}
+              </span>
             )}
           </div>
         </div>
       )}
 
-      <div className="box-body !pt-0">
+      <div className="p-[10px]">
         {filteredData.length > 0 ? (
           <div className="space-y-6">
-                         {/* Status Breakdown Chart */}
-             <div>
-               <div className="flex items-center justify-between mb-3">
-                 <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-                   Task Status Trends ({getIntervalDisplayName(selectedInterval)})
-                 </h4>
-                 <div className="flex items-center gap-2">
-                                       {/* Toggle Filters Button */}
-                    <button
-                      onClick={() => setShowFilters(!showFilters)}
-                      className="py-1.5 text-sm text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary flex items-center gap-2 min-w-[120px] justify-center"
-                    >
-                      <i className={`ti ${showFilters ? 'ti-filter-off' : 'ti-filter'}`}></i>
-                      {showFilters ? 'Hide Filters' : 'Show Filters'}
-                    </button>
-                    
-                    {/* Interval Selection */}
-                    <select
-                      value={selectedInterval}
-                      onChange={(e) => handleIntervalChange(e.target.value)}
-                      className="form-select text-sm border border-defaultborder rounded-md px-4 py-1.5 focus:border-primary focus:ring-1 focus:ring-primary min-w-[100px]"
-                    >
-                      <option value="day">Daily</option>
-                      <option value="week">Weekly</option>
-                      <option value="month">Monthly</option>
-                    </select>
-                 </div>
-               </div>
-              
-              <div id="task-status-trends-chart">
-                <ReactApexChart 
-                  options={getChartOptions()} 
-                  series={getStatusSeries()} 
-                  type="line" 
-                  width="100%" 
-                  height={350} 
-                />
-              </div>
-            </div>
-
-            {/* Priority Breakdown Chart */}
             <div>
-              <h4 className="text-lg font-semibold mb-3 text-gray-800 dark:text-gray-200">
-                Task Priority Trends ({getIntervalDisplayName(selectedInterval)})
-              </h4>
-              <div id="task-priority-trends-chart">
-                <ReactApexChart 
-                  options={{
-                    ...getChartOptions(),
-                    colors: ['#38bf94', '#f5b849', '#fd7e14', '#dc3545', '#6f42c1']
-                  }} 
-                  series={getPrioritySeries()} 
-                  type="line" 
-                  width="100%" 
-                  height={350} 
-                />
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <h4 className="text-[0.875rem] font-bold text-gray-800">
+                  Task Status Trends ({getIntervalDisplayName(selectedInterval)})
+                </h4>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setShowFilters(!showFilters)} className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100">
+                    <i className={showFilters ? 'ri-filter-off-line' : 'ri-filter-line'} />
+                    {showFilters ? 'Hide Filters' : 'Show Filters'}
+                  </button>
+                  <select value={selectedInterval} onChange={(e) => handleIntervalChange(e.target.value)} className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300 min-w-[100px]">
+                    <option value="day">Daily</option>
+                    <option value="week">Weekly</option>
+                    <option value="month">Monthly</option>
+                  </select>
+                </div>
+              </div>
+              <div id="task-status-trends-chart">
+                <ReactApexChart options={getChartOptions()} series={getStatusSeries()} type="line" width="100%" height={350} />
               </div>
             </div>
 
-            {/* Summary Statistics */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <div>
+              <h4 className="text-[0.875rem] font-bold text-gray-800 mb-3">Task Priority Trends ({getIntervalDisplayName(selectedInterval)})</h4>
+              <div id="task-priority-trends-chart">
+                <ReactApexChart options={{ ...getChartOptions(), colors: ['#38bf94', '#f5b849', '#fd7e14', '#dc3545', '#6f42c1'] }} series={getPrioritySeries()} type="line" width="100%" height={350} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 border border-gray-100 rounded">
               <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">
-                  {filteredData.reduce((sum, item) => sum + item.totalTasks, 0)}
-                </div>
-                <div className="text-sm text-gray-600">Total Tasks</div>
+                <div className="text-lg font-bold text-sky-600">{filteredData.reduce((sum, item) => sum + item.totalTasks, 0)}</div>
+                <div className="text-[11px] font-medium text-[#495057]">Total Tasks</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">
-                  {filteredData.reduce((sum, item) => sum + item.statusBreakdown.completed, 0)}
-                </div>
-                <div className="text-sm text-gray-600">Completed</div>
+                <div className="text-lg font-bold text-emerald-600">{filteredData.reduce((sum, item) => sum + item.statusBreakdown.completed, 0)}</div>
+                <div className="text-[11px] font-medium text-[#495057]">Completed</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">
-                  {filteredData.reduce((sum, item) => sum + item.statusBreakdown.ongoing, 0)}
-                </div>
-                <div className="text-sm text-gray-600">Ongoing</div>
+                <div className="text-lg font-bold text-amber-600">{filteredData.reduce((sum, item) => sum + item.statusBreakdown.ongoing, 0)}</div>
+                <div className="text-[11px] font-medium text-[#495057]">Ongoing</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-red-600">
-                  {filteredData.reduce((sum, item) => sum + item.statusBreakdown.delayed, 0)}
-                </div>
-                <div className="text-sm text-gray-600">Delayed</div>
+                <div className="text-lg font-bold text-red-600">{filteredData.reduce((sum, item) => sum + item.statusBreakdown.delayed, 0)}</div>
+                <div className="text-[11px] font-medium text-[#495057]">Delayed</div>
               </div>
             </div>
           </div>
         ) : (
-          <div className="text-center py-8">
-            <div className="text-gray-500 text-lg mb-2">No task trends data available</div>
-            <div className="text-gray-400 text-sm">
-              {startDate && endDate 
-                ? `No data found for the selected date range (${startDate} to ${endDate})`
-                : 'Select a date range to view task trends'
-              }
-            </div>
+          <div className="text-center py-12">
+            <p className="text-[12px] font-medium text-[#495057] mb-1">No task trends data available</p>
+            <p className="text-[11px] text-gray-400">
+              {startDate && endDate ? `No data for ${startDate} to ${endDate}` : 'Select a date range to view task trends'}
+            </p>
           </div>
         )}
       </div>
