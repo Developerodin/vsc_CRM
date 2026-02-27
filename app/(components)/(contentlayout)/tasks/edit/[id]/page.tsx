@@ -142,11 +142,9 @@ const EditTaskPage = () => {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [timelines, setTimelines] = useState<Timeline[]>([]);
-  const [allFilteredTimelines, setAllFilteredTimelines] = useState<Timeline[]>([]); // Store all filtered timelines for client-side pagination
   const [selectedTimelines, setSelectedTimelines] = useState<Timeline[]>([]);
   const [showTimelineModal, setShowTimelineModal] = useState(false);
   const [isLoadingTimelines, setIsLoadingTimelines] = useState(false);
-  const [timelineSearchQuery, setTimelineSearchQuery] = useState("");
   const [timelineCurrentPage, setTimelineCurrentPage] = useState(1);
   const [timelineTotalPages, setTimelineTotalPages] = useState(1);
   const [timelineItemsPerPage, setTimelineItemsPerPage] = useState(10);
@@ -163,14 +161,34 @@ const EditTaskPage = () => {
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [attachments, setAttachments] = useState<CleanAttachment[]>([]);
   
-  // New state for activity and group filters
+  // New state for activity-based filters (for Related Timelines modal)
   const [activities, setActivities] = useState<Activity[]>([]);
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [selectedActivity, setSelectedActivity] = useState<string>("");
-  const [selectedSubActivity, setSelectedSubActivity] = useState<string>("");
-  const [selectedGroup, setSelectedGroup] = useState<string>("");
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
+
+  // Filters for timelines (aligned with Register/Timelines filters)
+  const [timelineFilters, setTimelineFilters] = useState({
+    activity: "",
+    subActivity: "",
+    frequency: "",
+    period: "",
+    status: "",
+    client: ""
+  });
+
+  const [availablePeriods, setAvailablePeriods] = useState<Array<{
+    period: string;
+    quarter?: string;
+    months: string[];
+    startDate: string;
+    endDate: string;
+    displayName: string;
+    financialYear: string;
+  }>>([]);
+  const [isLoadingPeriods, setIsLoadingPeriods] = useState(false);
+
+  const [timelineClients, setTimelineClients] = useState<Client[]>([]);
+  const [timelineClientSearchTerm, setTimelineClientSearchTerm] = useState("");
   
   const [formData, setFormData] = useState({
     teamMember: "",
@@ -196,18 +214,13 @@ const EditTaskPage = () => {
     }
   }, [taskId]);
 
-  // Refetch timelines when filters change
+  // Refetch timelines when filters change in modal
   useEffect(() => {
     if (showTimelineModal) {
-      if (selectedActivity || selectedSubActivity || selectedGroup) {
-        setTimelineCurrentPage(1);
-        fetchTimelines(1, timelineSearchQuery);
-      } else {
-        // If no filters are selected, fetch all timelines
-        fetchTimelines(1, "", true);
-      }
+      setTimelineCurrentPage(1);
+      fetchTimelines(1);
     }
-  }, [selectedActivity, selectedSubActivity, selectedGroup, showTimelineModal]);
+  }, [showTimelineModal, timelineFilters.activity, timelineFilters.subActivity, timelineFilters.frequency, timelineFilters.period, timelineFilters.status, timelineFilters.client]);
 
   const fetchTask = async () => {
     try {
@@ -475,50 +488,69 @@ const EditTaskPage = () => {
     }
   };
 
-  const fetchTimelines = async (page: number = 1, searchQueryParam?: string, forceClearFilters: boolean = false) => {
+  // Fetch clients for timelines modal
+  const fetchTimelineClients = async () => {
+    try {
+      const response = await fetch(`${Base_url}clients?limit=1000`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setTimelineClients(data.results || []);
+      }
+    } catch (error) {
+    }
+  };
+
+  useEffect(() => {
+    fetchTimelineClients();
+  }, []);
+
+  // Fetch frequency periods for timelines modal
+  const fetchTimelineFrequencyPeriods = async (frequency: string) => {
+    if (!frequency) {
+      setAvailablePeriods([]);
+      return;
+    }
+
+    try {
+      setIsLoadingPeriods(true);
+      const response = await fetch(`${Base_url}timelines/frequency-periods?frequency=${frequency}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch frequency periods');
+      }
+
+      const data = await response.json();
+      setAvailablePeriods(data.periods || []);
+    } catch (error) {
+      setAvailablePeriods([]);
+    } finally {
+      setIsLoadingPeriods(false);
+    }
+  };
+
+  const fetchTimelines = async (page: number = 1, _searchQueryParam?: string, _forceClearFilters: boolean = false) => {
     try {
       setIsLoadingTimelines(true);
-      
-      // Get activity name if activity filter is selected
-      const selectedActivityData = selectedActivity && !forceClearFilters
-        ? activities.find(a => a.id === selectedActivity)
-        : null;
-      const activityName = selectedActivityData?.name;
-      
-      // Get subactivity name if subactivity filter is selected
-      const selectedSubActivityData = selectedSubActivity && selectedActivity && !forceClearFilters
-        ? selectedActivityData?.subactivities?.find(sa => (sa._id || sa.id) === selectedSubActivity)
-        : null;
-      const subActivityName = selectedSubActivityData?.name;
-      
-      // Get group name if group filter is selected
-      const selectedGroupData = selectedGroup && !forceClearFilters
-        ? groups.find(g => g.id === selectedGroup)
-        : null;
-      const groupName = selectedGroupData?.name;
-      
-      // Build query parameters with proper pagination
+
       const queryParams = new URLSearchParams({
         page: page.toString(),
         limit: timelineItemsPerPage.toString(),
-        sortBy: activityName ? "activityName:asc" : "title:asc",
-        ...((searchQueryParam || timelineSearchQuery) && { search: searchQueryParam || timelineSearchQuery })
+        sortBy: "activityName:asc",
+        ...(timelineFilters.activity && { activity: timelineFilters.activity }),
+        ...(timelineFilters.subActivity && { subactivity: timelineFilters.subActivity }),
+        ...(timelineFilters.frequency && { frequency: timelineFilters.frequency }),
+        ...(timelineFilters.period && { period: timelineFilters.period }),
+        ...(timelineFilters.status && { status: timelineFilters.status }),
+        ...(timelineFilters.client && { client: timelineFilters.client })
       });
-
-      // Add activity filter using activityName parameter
-      if (activityName && !forceClearFilters) {
-        queryParams.append('activityName', activityName);
-      }
-
-      // Add subactivity filter using subactivityName parameter
-      if (subActivityName && !forceClearFilters) {
-        queryParams.append('subactivityName', subActivityName);
-      }
-
-      // Add group filter using group parameter (backend API now supports it)
-      if (groupName && !forceClearFilters) {
-        queryParams.append('group', groupName);
-      }
 
       const response = await fetch(`${Base_url}timelines?${queryParams}`, {
         headers: {
@@ -532,8 +564,6 @@ const EditTaskPage = () => {
 
       const data = await response.json();
       
-      // Server-side pagination (backend handles filtering)
-      setAllFilteredTimelines([]); // Clear stored filtered timelines
       setTimelines(data.results || []);
       setTimelineTotalResults(data.totalResults || 0);
       setTimelineTotalPages(data.totalPages || 1);
@@ -574,69 +604,37 @@ const EditTaskPage = () => {
 
   const handleTimelineSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
-    setTimelineSearchQuery(query);
-    if (showTimelineModal) {
-      debouncedTimelineSearch(query);
-    }
+    setTimelineClientSearchTerm(query);
   };
 
   const handleTimelineSearchClick = () => {
-    if (showTimelineModal) {
-      setTimelineCurrentPage(1);
-      fetchTimelines(1, timelineSearchQuery);
-    }
+    // Deprecated direct search; we now use filters, keep button no-op
+    return;
   };
 
   const handleTimelinePageChange = (newPage: number) => {
     setTimelineCurrentPage(newPage);
-    // Backend handles all filtering and pagination
-    fetchTimelines(newPage, timelineSearchQuery);
-  };
-
-  // Filter change handlers
-  const handleActivityFilterChange = (activityId: string) => {
-    setSelectedActivity(activityId);
-    setSelectedSubActivity(""); // Clear subactivity when activity changes
-  };
-
-  const handleSubActivityFilterChange = (subActivityId: string) => {
-    setSelectedSubActivity(subActivityId);
-  };
-
-  const handleGroupFilterChange = (groupId: string) => {
-    setSelectedGroup(groupId);
+    fetchTimelines(newPage);
   };
 
   const clearFilters = () => {
-    setSelectedActivity("");
-    setSelectedSubActivity("");
-    setSelectedGroup("");
-    setTimelineSearchQuery("");
+    setTimelineFilters({
+      activity: "",
+      subActivity: "",
+      frequency: "",
+      period: "",
+      status: "",
+      client: ""
+    });
+    setTimelineClientSearchTerm("");
     setTimelineCurrentPage(1);
-    // Force fetch all timelines without any filters
-    fetchTimelines(1, "", true);
+    fetchTimelines(1);
   };
 
   // Get paginated timelines for display
-  // Backend handles all filtering and pagination, so just return the timelines
   const getPaginatedTimelines = () => {
     return timelines;
   };
-
-  // Debounced search function for timelines
-  const debouncedTimelineSearch = React.useCallback(
-    (() => {
-      let timeoutId: NodeJS.Timeout;
-      return (searchQuery: string) => {
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-          setTimelineCurrentPage(1);
-          fetchTimelines(1, searchQuery);
-        }, 500);
-      };
-    })(),
-    []
-  );
 
   // Team member selection handlers
   const handleTeamMemberSelect = (teamMember: TeamMember) => {
@@ -1077,13 +1075,16 @@ const EditTaskPage = () => {
                       className="ti-btn ti-btn-primary"
                       onClick={() => {
                         setShowTimelineModal(true);
-                        setTimelineSearchQuery("");
                         setTimelineCurrentPage(1);
-                        setSelectedActivity("");
-                        setSelectedSubActivity("");
-                        setSelectedGroup("");
-                        // Fetch all timelines without filters initially
-                        fetchTimelines(1, "", true);
+                        setTimelineFilters({
+                          activity: "",
+                          subActivity: "",
+                          frequency: "",
+                          period: "",
+                          status: "",
+                          client: ""
+                        });
+                        fetchTimelines(1);
                       }}
                     >
                       Select Timelines ({selectedTimelines.length} selected)
@@ -1313,17 +1314,28 @@ const EditTaskPage = () => {
             </div>
 
             <div className="p-4 border-b bg-gray-50">
-              {/* Activity, Subactivity and Group Filters */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                {/* Activity Filter */}
+              {/* Filters – same style as Register/Timelines: Activity, Sub-Activity, Frequency, Period, Status, Client */}
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-4">
+                {/* Activity */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Filter by Activity
+                    Activity
                   </label>
                   <select
                     className="form-select w-full"
-                    value={selectedActivity}
-                    onChange={(e) => handleActivityFilterChange(e.target.value)}
+                    value={timelineFilters.activity}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setTimelineFilters(prev => ({
+                        activity: value,
+                        subActivity: "",
+                        frequency: "",
+                        period: "",
+                        status: prev.status,
+                        client: prev.client
+                      }));
+                      setAvailablePeriods([]);
+                    }}
                   >
                     <option value="">All Activities</option>
                     {activities.map((activity) => (
@@ -1334,110 +1346,219 @@ const EditTaskPage = () => {
                   </select>
                 </div>
 
-                {/* Subactivity Filter */}
+                {/* Sub-Activity */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Filter by Sub Activity
+                    Sub-Activity
                   </label>
                   <select
                     className="form-select w-full"
-                    value={selectedSubActivity}
-                    onChange={(e) => handleSubActivityFilterChange(e.target.value)}
-                    disabled={!selectedActivity}
+                    value={timelineFilters.subActivity}
+                    onChange={(e) => {
+                      const selectedSubActivityId = e.target.value;
+                      const selectedActivity = activities.find(a => a.id === timelineFilters.activity);
+                      const selectedSubActivity = selectedActivity?.subactivities?.find(sa => (sa._id || sa.id) === selectedSubActivityId);
+
+                      setTimelineFilters(prev => ({
+                        ...prev,
+                        subActivity: selectedSubActivityId,
+                        frequency: selectedSubActivity?.frequency || "",
+                        period: ""
+                      }));
+
+                      if (selectedSubActivity?.frequency) {
+                        fetchTimelineFrequencyPeriods(selectedSubActivity.frequency);
+                      } else {
+                        setAvailablePeriods([]);
+                      }
+                    }}
+                    disabled={!timelineFilters.activity}
                   >
-                    <option value="">All Sub Activities</option>
-                    {selectedActivity && activities.find(a => a.id === selectedActivity)?.subactivities?.map((subActivity) => (
+                    <option value="">All Sub-Activities</option>
+                    {timelineFilters.activity && activities.find(a => a.id === timelineFilters.activity)?.subactivities?.map((subActivity) => (
                       <option key={subActivity._id || subActivity.id} value={subActivity._id || subActivity.id}>
                         {subActivity.name}
                       </option>
                     ))}
                   </select>
-                  {!selectedActivity && (
-                    <p className="text-xs text-gray-500 mt-1">Select an activity first</p>
-                  )}
                 </div>
 
-                {/* Group Filter */}
+                {/* Frequency */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Filter by Group
+                    Frequency
                   </label>
                   <select
                     className="form-select w-full"
-                    value={selectedGroup}
-                    onChange={(e) => handleGroupFilterChange(e.target.value)}
+                    value={timelineFilters.frequency}
+                    onChange={(e) => {
+                      const freq = e.target.value;
+                      setTimelineFilters(prev => ({
+                        ...prev,
+                        frequency: freq,
+                        period: ""
+                      }));
+                      fetchTimelineFrequencyPeriods(freq);
+                    }}
+                    disabled={!!timelineFilters.subActivity}
                   >
-                    <option value="">All Groups</option>
-                    {groups.map((group) => (
-                      <option key={group.id} value={group.id}>
-                        {group.name} ({group.numberOfClients} clients)
-                      </option>
-                    ))}
+                    <option value="">All Frequencies</option>
+                    <option value="OneTime">One Time</option>
+                    <option value="Hourly">Hourly</option>
+                    <option value="Daily">Daily</option>
+                    <option value="Weekly">Weekly</option>
+                    <option value="Monthly">Monthly</option>
+                    <option value="Quarterly">Quarterly</option>
+                    <option value="Yearly">Yearly</option>
+                  </select>
+                  {timelineFilters.subActivity && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Frequency auto-selected from sub-activity
+                    </p>
+                  )}
+                </div>
+
+                {/* Period */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Period
+                  </label>
+                  <select
+                    className="form-select w-full"
+                    value={timelineFilters.period}
+                    onChange={(e) => setTimelineFilters(prev => ({ ...prev, period: e.target.value }))}
+                    disabled={!timelineFilters.frequency}
+                  >
+                    <option value="">All Periods</option>
+                    {isLoadingPeriods ? (
+                      <option value="" disabled>Loading periods...</option>
+                    ) : availablePeriods.length > 0 ? (
+                      availablePeriods.map((period) => (
+                        <option key={period.period} value={period.period}>
+                          {period.displayName || period.period}
+                        </option>
+                      ))
+                    ) : timelineFilters.frequency ? (
+                      <option value="" disabled>No periods available for this frequency</option>
+                    ) : (
+                      <option value="" disabled>Select frequency first</option>
+                    )}
                   </select>
                 </div>
 
-                {/* Clear Filters Button */}
-                <div className="flex items-end">
-                  <button
-                    type="button"
-                    onClick={clearFilters}
-                    className="ti-btn ti-btn-secondary w-full"
-                    disabled={!selectedActivity && !selectedSubActivity && !selectedGroup && !timelineSearchQuery}
+                {/* Status */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Status
+                  </label>
+                  <select
+                    className="form-select w-full"
+                    value={timelineFilters.status}
+                    onChange={(e) => setTimelineFilters(prev => ({ ...prev, status: e.target.value }))}
                   >
-                    <i className="ri-refresh-line me-2"></i>
-                    Clear Filters
-                  </button>
+                    <option value="">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="completed">Completed</option>
+                    <option value="delayed">Delayed</option>
+                    <option value="ongoing">Ongoing</option>
+                  </select>
+                </div>
+
+                {/* Client (searchable) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Client
+                  </label>
+                  <input
+                    type="text"
+                    className="form-control mb-1"
+                    placeholder="Search client..."
+                    value={timelineClientSearchTerm || (timelineFilters.client ? timelineClients.find(c => c.id === timelineFilters.client)?.name || "" : "")}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setTimelineClientSearchTerm(value);
+                      if (!value) {
+                        setTimelineFilters(prev => ({ ...prev, client: "" }));
+                      }
+                    }}
+                  />
+                  {timelineClientSearchTerm && (
+                    <div className="mt-1 max-h-40 overflow-auto border rounded bg-white shadow-sm text-sm">
+                      {timelineClients
+                        .filter(client =>
+                          client.name?.toLowerCase().includes(timelineClientSearchTerm.toLowerCase())
+                        )
+                        .slice(0, 20)
+                        .map(client => (
+                          <div
+                            key={client.id}
+                            className="px-3 py-1.5 hover:bg-gray-100 cursor-pointer"
+                            onClick={() => {
+                              setTimelineFilters(prev => ({ ...prev, client: client.id }));
+                              setTimelineClientSearchTerm(client.name);
+                            }}
+                          >
+                            {client.name}
+                          </div>
+                        ))}
+                      {timelineClients.filter(client =>
+                        client.name?.toLowerCase().includes(timelineClientSearchTerm.toLowerCase())
+                      ).length === 0 && (
+                        <div className="px-3 py-1.5 text-gray-500">
+                          No clients found
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Search Bar */}
-              <div className="flex items-center space-x-4">
-                <div className="relative flex-1">
-                  <div className="flex items-center">
-                    <i className="ri-search-line text-gray-400 text-xl mr-3"></i>
-                    <input
-                      type="text"
-                      placeholder="Search timelines by title, activity, or client..."
-                      className="form-control py-4 pr-20 text-lg border-2 border-gray-300 focus:border-primary focus:ring-2 focus:ring-primary/20 bg-white"
-                      value={timelineSearchQuery}
-                      onChange={handleTimelineSearchChange}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          handleTimelineSearchClick();
-                        }
-                      }}
-                    />
-                  </div>
-                  <button 
-                    className="absolute end-0 top-0 px-6 h-full bg-primary text-white hover:bg-primary-dark rounded-r-md"
-                    onClick={handleTimelineSearchClick}
-                  >
-                    <i className="ri-search-line text-xl"></i>
-                  </button>
-                </div>
+              {/* Clear Filters Button */}
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="ti-btn ti-btn-secondary"
+                  disabled={
+                    !timelineFilters.activity &&
+                    !timelineFilters.subActivity &&
+                    !timelineFilters.frequency &&
+                    !timelineFilters.period &&
+                    !timelineFilters.status &&
+                    !timelineFilters.client
+                  }
+                >
+                  <i className="ri-refresh-line me-2"></i>
+                  Clear Filters
+                </button>
               </div>
             </div>
 
             <div className="flex-1 overflow-auto p-4">
               {/* Active Filters Summary */}
-              {(selectedActivity || selectedSubActivity || selectedGroup) && (
+              {(timelineFilters.activity || timelineFilters.subActivity || timelineFilters.status || timelineFilters.client) && (
                 <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                       <span className="text-sm font-medium text-blue-800">Active Filters:</span>
-                      {selectedActivity && (
+                      {timelineFilters.activity && (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                          Activity: {activities.find(a => a.id === selectedActivity)?.name}
+                          Activity: {activities.find(a => a.id === timelineFilters.activity)?.name}
                         </span>
                       )}
-                      {selectedSubActivity && selectedActivity && (
+                      {timelineFilters.subActivity && timelineFilters.activity && (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                          Sub Activity: {activities.find(a => a.id === selectedActivity)?.subactivities?.find(sa => (sa._id || sa.id) === selectedSubActivity)?.name}
+                          Sub Activity: {activities.find(a => a.id === timelineFilters.activity)?.subactivities?.find(sa => (sa._id || sa.id) === timelineFilters.subActivity)?.name}
                         </span>
                       )}
-                      {selectedGroup && (
+                      {timelineFilters.status && (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                          Group: {groups.find(g => g.id === selectedGroup)?.name}
+                          Status: {timelineFilters.status}
+                        </span>
+                      )}
+                      {timelineFilters.client && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
+                          Client: {timelineClients.find(c => c.id === timelineFilters.client)?.name || timelineFilters.client}
                         </span>
                       )}
                     </div>

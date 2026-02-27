@@ -264,6 +264,31 @@ const TeamMemberDashboard = () => {
   const [isLoadingActivities, setIsLoadingActivities] = useState(false)
   const [isLoadingGroups, setIsLoadingGroups] = useState(false)
 
+  // Timeline filters for Assign/Edit timeline drawer – align with Timelines/Add Task
+  const [timelineFilters, setTimelineFilters] = useState({
+    activity: "",
+    subActivity: "",
+    frequency: "",
+    period: "",
+    status: "",
+    client: ""
+  })
+  const [availablePeriods, setAvailablePeriods] = useState<Array<{
+    period: string
+    quarter?: string
+    months: string[]
+    startDate: string
+    endDate: string
+    displayName: string
+    financialYear: string
+  }>>([])
+  const [isLoadingPeriods, setIsLoadingPeriods] = useState(false)
+  const [timelineClients, setTimelineClients] = useState<Array<{
+    id: string
+    name: string
+  }>>([])
+  const [timelineClientSearchTerm, setTimelineClientSearchTerm] = useState("")
+
   useEffect(() => {
     const token = localStorage.getItem('teamMemberToken')
     const teamMemberDataStr = localStorage.getItem('teamMemberData')
@@ -412,60 +437,95 @@ const TeamMemberDashboard = () => {
     }
   }
 
-  // Fetch timelines
-  const fetchTimelines = async (page: number = 1, searchQueryParam?: string, forceClearFilters: boolean = false, itemsPerPage?: number) => {
+  // Fetch clients for timeline filters (Assign/Edit drawers)
+  const fetchTimelineClients = async (searchQuery?: string) => {
+    try {
+      const token = localStorage.getItem('teamMemberToken')
+      if (!token) return
+
+      const params = new URLSearchParams({
+        limit: '20',
+      })
+      if (searchQuery && searchQuery.trim()) {
+        params.append('search', searchQuery.trim())
+      }
+
+      const response = await axios.get(`${Base_url}clients?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+
+      if (response.data && response.data.results) {
+        setTimelineClients(response.data.results.map((c: any) => ({
+          id: c._id || c.id,
+          name: c.name || ''
+        })))
+      }
+    } catch (error) {
+      console.error('Error fetching timeline clients:', error)
+    }
+  }
+
+  useEffect(() => {
+    fetchTimelineClients()
+  }, [])
+
+  // Fetch frequency periods for timeline filters
+  const fetchTimelineFrequencyPeriods = async (frequency: string) => {
+    if (!frequency) {
+      setAvailablePeriods([])
+      return
+    }
+
+    try {
+      setIsLoadingPeriods(true)
+      const token = localStorage.getItem('teamMemberToken')
+      if (!token) return
+
+      const response = await axios.get(`${Base_url}timelines/frequency-periods?frequency=${frequency}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+
+      if (response.data && response.data.periods) {
+        setAvailablePeriods(response.data.periods)
+      } else {
+        setAvailablePeriods([])
+      }
+    } catch (error) {
+      console.error('Error fetching timeline frequency periods:', error)
+      setAvailablePeriods([])
+    } finally {
+      setIsLoadingPeriods(false)
+    }
+  }
+
+  // Fetch timelines (Assign/Edit drawer) – use unified filters
+  const fetchTimelines = async (page: number = 1, searchQueryParam?: string, forceClearFilters: boolean = false, itemsPerPageOverride?: number) => {
     try {
       setIsLoadingTimelines(true)
       const token = localStorage.getItem('teamMemberToken')
       if (!token) return
       
-      // Get activity name if activity filter is selected
-      const selectedActivityData = selectedActivity && !forceClearFilters
-        ? activities.find(a => a.id === selectedActivity)
-        : null
-      const activityName = selectedActivityData?.name
-      
-      // Get subactivity name if subactivity filter is selected
-      const selectedSubActivityData = selectedSubActivity && selectedActivity && !forceClearFilters
-        ? selectedActivityData?.subactivities?.find(sa => (sa._id || sa.id) === selectedSubActivity)
-        : null
-      const subActivityName = selectedSubActivityData?.name
-      
-      // Get group name if group filter is selected
-      const selectedGroupData = selectedGroup && !forceClearFilters
-        ? groups.find(g => g.id === selectedGroup)
-        : null
-      const groupName = selectedGroupData?.name
-      
       // Use provided itemsPerPage or fall back to state value
-      const limit = itemsPerPage ?? timelineItemsPerPage
-      
-      // Build query parameters with proper pagination
-      const searchValue = forceClearFilters 
-        ? (searchQueryParam !== undefined ? searchQueryParam : "")
+      const limit = itemsPerPageOverride ?? timelineItemsPerPage
+
+      const searchValue = forceClearFilters
+        ? (searchQueryParam !== undefined ? searchQueryParam : '')
         : (searchQueryParam !== undefined ? searchQueryParam : timelineSearchQuery)
-      
+
+      // When forceClearFilters is true, do not use timelineFilters (state may not have updated yet)
+      const useFilters = !forceClearFilters
       const queryParams = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),
-        sortBy: activityName ? "activityName:asc" : "title:asc",
-        ...(searchValue && { search: searchValue })
+        sortBy: "activityName:asc",
+        ...(searchValue && { search: searchValue }),
+        ...(useFilters && timelineFilters.activity && { activity: timelineFilters.activity }),
+        ...(useFilters && timelineFilters.subActivity && { subactivity: timelineFilters.subActivity }),
+        ...(useFilters && timelineFilters.frequency && { frequency: timelineFilters.frequency }),
+        ...(useFilters && timelineFilters.period && { period: timelineFilters.period }),
+        ...(useFilters && timelineFilters.status && { status: timelineFilters.status }),
+        ...(useFilters && timelineFilters.client && { client: timelineFilters.client })
       })
-
-      // Add activity filter using activityName parameter
-      if (activityName && !forceClearFilters) {
-        queryParams.append('activityName', activityName)
-      }
-
-      // Add subactivity filter using subactivityName parameter
-      if (subActivityName && !forceClearFilters) {
-        queryParams.append('subactivityName', subActivityName)
-      }
-
-      // Add group filter using group parameter
-      if (groupName && !forceClearFilters) {
-        queryParams.append('group', groupName)
-      }
 
       const response = await axios.get(`${Base_url}timelines?${queryParams}`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -485,13 +545,22 @@ const TeamMemberDashboard = () => {
     }
   }
 
-  // Refetch timelines when filters change
+  // Refetch timelines when filters change in Assign/Edit drawer
   useEffect(() => {
     if (showTimelineModal || showEditTimelineModal) {
       setTimelineCurrentPage(1)
-      fetchTimelines(1, timelineSearchQuery)
+      fetchTimelines(1)
     }
-  }, [selectedActivity, selectedSubActivity, selectedGroup, showTimelineModal, showEditTimelineModal])
+  }, [
+    showTimelineModal,
+    showEditTimelineModal,
+    timelineFilters.activity,
+    timelineFilters.subActivity,
+    timelineFilters.frequency,
+    timelineFilters.period,
+    timelineFilters.status,
+    timelineFilters.client
+  ])
 
   const fetchTasks = useCallback(async () => {
     // Don't fetch if still loading or no team member data
@@ -1344,24 +1413,16 @@ const TeamMemberDashboard = () => {
     []
   )
 
-  // Filter change handlers
-  const handleActivityFilterChange = (activityId: string) => {
-    setSelectedActivity(activityId)
-    setSelectedSubActivity("") // Clear subactivity when activity changes
-  }
-
-  const handleSubActivityFilterChange = (subActivityId: string) => {
-    setSelectedSubActivity(subActivityId)
-  }
-
-  const handleGroupFilterChange = (groupId: string) => {
-    setSelectedGroup(groupId)
-  }
-
   const clearTimelineFilters = () => {
-    setSelectedActivity("")
-    setSelectedSubActivity("")
-    setSelectedGroup("")
+    setTimelineFilters({
+      activity: "",
+      subActivity: "",
+      frequency: "",
+      period: "",
+      status: "",
+      client: ""
+    })
+    setTimelineClientSearchTerm("")
     setTimelineSearchQuery("")
     setTimelineCurrentPage(1)
     fetchTimelines(1, "", true)
@@ -2831,17 +2892,28 @@ const TeamMemberDashboard = () => {
               </button>
             </div>
             <div className="p-[10px] border-b border-gray-300 bg-gray-50/30">
-              {/* Activity, Subactivity Filter */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-                {/* Activity Filter */}
+              {/* Filters – Activity, Sub-Activity, Frequency, Period, Status, Client */}
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-3">
+                {/* Activity */}
                 <div>
                   <label className="block text-[11px] font-medium text-[#495057] mb-1.5">
-                    Filter by Activity
+                    Activity
                   </label>
                   <select
                     className="w-full bg-white border border-gray-300 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300 appearance-none cursor-pointer"
-                    value={selectedActivity}
-                    onChange={(e) => handleActivityFilterChange(e.target.value)}
+                    value={timelineFilters.activity}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setTimelineFilters(prev => ({
+                        activity: value,
+                        subActivity: "",
+                        frequency: "",
+                        period: "",
+                        status: prev.status,
+                        client: prev.client
+                      }))
+                      setAvailablePeriods([])
+                    }}
                   >
                     <option value="">All Activities</option>
                     {activities.map((activity) => (
@@ -2852,39 +2924,169 @@ const TeamMemberDashboard = () => {
                   </select>
                 </div>
 
-                {/* Subactivity Filter */}
+                {/* Sub-Activity */}
                 <div>
                   <label className="block text-[11px] font-medium text-[#495057] mb-1.5">
-                    Filter by Sub Activity
+                    Sub-Activity
                   </label>
                   <select
                     className="w-full bg-white border border-gray-300 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300 appearance-none cursor-pointer"
-                    value={selectedSubActivity}
-                    onChange={(e) => handleSubActivityFilterChange(e.target.value)}
-                    disabled={!selectedActivity}
+                    value={timelineFilters.subActivity}
+                    onChange={(e) => {
+                      const selectedSubActivityId = e.target.value
+                      const selectedActivity = activities.find(a => a.id === timelineFilters.activity)
+                      const selectedSubActivity = selectedActivity?.subactivities?.find(sa => (sa._id || sa.id) === selectedSubActivityId)
+
+                      setTimelineFilters(prev => ({
+                        ...prev,
+                        subActivity: selectedSubActivityId,
+                        frequency: selectedSubActivity?.frequency || "",
+                        period: ""
+                      }))
+
+                      if (selectedSubActivity?.frequency) {
+                        fetchTimelineFrequencyPeriods(selectedSubActivity.frequency)
+                      } else {
+                        setAvailablePeriods([])
+                      }
+                    }}
+                    disabled={!timelineFilters.activity}
                   >
-                    <option value="">All Sub Activities</option>
-                    {selectedActivity && activities.find(a => a.id === selectedActivity)?.subactivities?.map((subActivity) => (
+                    <option value="">All Sub-Activities</option>
+                    {timelineFilters.activity && activities.find(a => a.id === timelineFilters.activity)?.subactivities?.map((subActivity) => (
                       <option key={subActivity._id || subActivity.id} value={subActivity._id || subActivity.id}>
                         {subActivity.name}
                       </option>
                     ))}
                   </select>
-                    {!selectedActivity && (
+                  {!timelineFilters.activity && (
                     <p className="text-[11px] text-gray-500 mt-1">Select an activity first</p>
                   )}
                 </div>
 
-                {/* Clear Filters Button */}
-                <div className="flex items-end">
-                  <button
-                    type="button"
-                    onClick={clearTimelineFilters}
-                    className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-gray-50 text-gray-600 border border-gray-300 hover:bg-gray-100 disabled:opacity-50"
-                    disabled={!selectedActivity && !selectedSubActivity && !timelineSearchQuery}
+                {/* Frequency */}
+                <div>
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">
+                    Frequency
+                  </label>
+                  <select
+                    className="w-full bg-white border border-gray-300 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300 appearance-none cursor-pointer"
+                    value={timelineFilters.frequency}
+                    onChange={(e) => {
+                      const freq = e.target.value
+                      setTimelineFilters(prev => ({
+                        ...prev,
+                        frequency: freq,
+                        period: ""
+                      }))
+                      fetchTimelineFrequencyPeriods(freq)
+                    }}
+                    disabled={!!timelineFilters.subActivity}
                   >
-                    <i className="ri-refresh-line text-xs"></i> Clear Filters
-                  </button>
+                    <option value="">All Frequencies</option>
+                    <option value="OneTime">One Time</option>
+                    <option value="Hourly">Hourly</option>
+                    <option value="Daily">Daily</option>
+                    <option value="Weekly">Weekly</option>
+                    <option value="Monthly">Monthly</option>
+                    <option value="Quarterly">Quarterly</option>
+                    <option value="Yearly">Yearly</option>
+                  </select>
+                  {timelineFilters.subActivity && (
+                    <p className="text-[11px] text-gray-500 mt-1">Frequency auto-selected from sub-activity</p>
+                  )}
+                </div>
+
+                {/* Period */}
+                <div>
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">
+                    Period
+                  </label>
+                  <select
+                    className="w-full bg-white border border-gray-300 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300 appearance-none cursor-pointer"
+                    value={timelineFilters.period}
+                    onChange={(e) => setTimelineFilters(prev => ({ ...prev, period: e.target.value }))}
+                    disabled={!timelineFilters.frequency}
+                  >
+                    <option value="">All Periods</option>
+                    {isLoadingPeriods ? (
+                      <option value="" disabled>Loading periods...</option>
+                    ) : availablePeriods.length > 0 ? (
+                      availablePeriods.map((period) => (
+                        <option key={period.period} value={period.period}>
+                          {period.displayName || period.period}
+                        </option>
+                      ))
+                    ) : timelineFilters.frequency ? (
+                      <option value="" disabled>No periods available for this frequency</option>
+                    ) : (
+                      <option value="" disabled>Select frequency first</option>
+                    )}
+                  </select>
+                </div>
+
+                {/* Status */}
+                <div>
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">
+                    Status
+                  </label>
+                  <select
+                    className="w-full bg-white border border-gray-300 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 focus:ring-0 focus:border-purple-300 appearance-none cursor-pointer"
+                    value={timelineFilters.status}
+                    onChange={(e) => setTimelineFilters(prev => ({ ...prev, status: e.target.value }))}
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="completed">Completed</option>
+                    <option value="delayed">Delayed</option>
+                    <option value="ongoing">Ongoing</option>
+                  </select>
+                </div>
+
+                {/* Client (searchable) */}
+                <div>
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1.5">
+                    Client
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full bg-white border border-gray-300 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300 mb-1"
+                    placeholder="Search client..."
+                    value={timelineClientSearchTerm || (timelineFilters.client ? timelineClients.find(c => c.id === timelineFilters.client)?.name || "" : "")}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setTimelineClientSearchTerm(value)
+                      if (!value) {
+                        setTimelineFilters(prev => ({ ...prev, client: "" }))
+                        setTimelineClients([])
+                      } else {
+                        // Call API to get client suggestions
+                        fetchTimelineClients(value)
+                      }
+                    }}
+                  />
+                  {timelineClientSearchTerm && (
+                    <div className="max-h-40 overflow-auto border border-gray-300 rounded bg-white shadow-sm text-[11px]">
+                      {timelineClients.length > 0 ? (
+                        timelineClients.map(client => (
+                          <div
+                            key={client.id}
+                            className="px-3 py-1.5 hover:bg-gray-100 cursor-pointer"
+                            onClick={() => {
+                              setTimelineFilters(prev => ({ ...prev, client: client.id }))
+                              setTimelineClientSearchTerm(client.name)
+                            }}
+                          >
+                            {client.name}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="px-3 py-1.5 text-gray-500">
+                          No clients found
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2908,24 +3110,50 @@ const TeamMemberDashboard = () => {
                     <i className="ri-search-line text-xs"></i>
                   </button>
                 </div>
+                <button
+                  type="button"
+                  onClick={clearTimelineFilters}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-gray-50 text-gray-600 border border-gray-300 hover:bg-gray-100 disabled:opacity-50"
+                  disabled={
+                    !timelineFilters.activity &&
+                    !timelineFilters.subActivity &&
+                    !timelineFilters.frequency &&
+                    !timelineFilters.period &&
+                    !timelineFilters.status &&
+                    !timelineFilters.client &&
+                    !timelineSearchQuery
+                  }
+                >
+                  <i className="ri-refresh-line text-xs"></i> Clear Filters
+                </button>
               </div>
             </div>
 
             <div className="flex-1 overflow-auto p-[10px]">
               {/* Active Filters Summary */}
-              {(selectedActivity || selectedSubActivity) && (
+              {(timelineFilters.activity || timelineFilters.subActivity || timelineFilters.status || timelineFilters.client) && (
                 <div className="mb-3 p-2 bg-gray-50 border border-gray-300 rounded">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-[11px] font-bold text-[#495057]">Active Filters:</span>
-                      {selectedActivity && (
+                      {timelineFilters.activity && (
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-purple-50 text-purple-700 border border-purple-100">
-                          Activity: {activities.find(a => a.id === selectedActivity)?.name}
+                          Activity: {activities.find(a => a.id === timelineFilters.activity)?.name}
                         </span>
                       )}
-                      {selectedSubActivity && selectedActivity && (
+                      {timelineFilters.subActivity && timelineFilters.activity && (
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-purple-50 text-purple-700 border border-purple-100">
-                          Sub: {activities.find(a => a.id === selectedActivity)?.subactivities?.find(sa => (sa._id || sa.id) === selectedSubActivity)?.name}
+                          Sub: {activities.find(a => a.id === timelineFilters.activity)?.subactivities?.find(sa => (sa._id || sa.id) === timelineFilters.subActivity)?.name}
+                        </span>
+                      )}
+                      {timelineFilters.status && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-purple-50 text-purple-700 border border-purple-100">
+                          Status: {timelineFilters.status}
+                        </span>
+                      )}
+                      {timelineFilters.client && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-green-50 text-green-700 border border-green-100">
+                          Client: {timelineClients.find(c => c.id === timelineFilters.client)?.name || timelineFilters.client}
                         </span>
                       )}
                     </div>
@@ -2966,9 +3194,11 @@ const TeamMemberDashboard = () => {
                               </div>
                               <h3 className="text-xs font-bold text-gray-400 mb-1">NO TIMELINES FOUND</h3>
                               <p className="text-[11px] text-gray-500 mb-4">
-                                {(selectedActivity || selectedSubActivity) ? "Try adjusting your filters or search criteria." : "No timelines available at the moment."}
+                                {(timelineFilters.activity || timelineFilters.subActivity || timelineFilters.status || timelineFilters.client || timelineSearchQuery)
+                                  ? "Try adjusting your filters or search criteria."
+                                  : "No timelines available at the moment."}
                               </p>
-                              {(selectedActivity || selectedSubActivity) && (
+                              {(timelineFilters.activity || timelineFilters.subActivity || timelineFilters.status || timelineFilters.client || timelineSearchQuery) && (
                                 <button onClick={clearTimelineFilters} className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm">
                                   <i className="ri-refresh-line text-xs"></i> Clear Filters
                                 </button>

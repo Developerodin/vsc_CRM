@@ -120,14 +120,19 @@ const TimelinesPage = () => {
   const [importProgress, setImportProgress] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [searchInputValue, setSearchInputValue] = useState("");
-  const [clientSearchInputValue, setClientSearchInputValue] = useState("");
-  const [filters, setFilters] = useState({
-    activityName: "",
-    clientName: "",
+
+  // Timelines filters – align with Compliance Register (Activity, Sub-Activity, Frequency, Period, Status, Client)
+  const [timelineFilters, setTimelineFilters] = useState({
+    activity: "",
+    subActivity: "",
+    frequency: "",
+    period: "",
     status: "",
-    group: ""
+    client: ""
   });
+  const [clients, setClients] = useState<Array<{ id: string; name: string }>>([]);
+  const [clientSearchTerm, setClientSearchTerm] = useState("");
+  const [showTimelineFilters, setShowTimelineFilters] = useState(true);
   
   // Export modal state
   const [showExportModal, setShowExportModal] = useState(false);
@@ -161,67 +166,23 @@ const TimelinesPage = () => {
   // Import state
   const [isProcessingImport, setIsProcessingImport] = useState(false);
 
-  // Debounced search function for activity name
-  const debouncedSearch = useCallback(
-    (() => {
-      let timeoutId: NodeJS.Timeout;
-      return (searchValue: string) => {
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-          setFilters(prev => ({
-            ...prev,
-            activityName: searchValue
-          }));
-          setCurrentPage(1);
-        }, 500);
-      };
-    })(),
-    []
-  );
-
-  // Debounced search function for client name
-  const debouncedClientSearch = useCallback(
-    (() => {
-      let timeoutId: NodeJS.Timeout;
-      return (searchValue: string) => {
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-          setFilters(prev => ({
-            ...prev,
-            clientName: searchValue
-          }));
-          setCurrentPage(1);
-        }, 500);
-      };
-    })(),
-    []
-  );
-
-  // Handle search input change for activity name
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setSearchInputValue(value); // Update input immediately
-    debouncedSearch(value); // Debounce the API call
-  };
-
-  // Handle client search input change
-  const handleClientSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setClientSearchInputValue(value); // Update input immediately
-    debouncedClientSearch(value); // Debounce the API call
-  };
-
+  // Fetch timelines list (uses timelineFilters)
   const fetchTimelines = async (page = 1, limit = itemsPerPage) => {
     setIsLoading(true);
     setError(null);
     try {
+      // Build period directly from Period dropdown (for simplicity we don't split quarter/month here)
+      const periodToSend = timelineFilters.period || "";
+
       const queryParams = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),
-        ...(filters.activityName && { activityName: filters.activityName }),
-        ...(filters.clientName && { client: filters.clientName }),
-        ...(filters.status && { status: filters.status }),
-        ...(filters.group && { group: filters.group }),
+        ...(timelineFilters.activity && { activity: timelineFilters.activity }),
+        ...(timelineFilters.subActivity && { subactivity: timelineFilters.subActivity }),
+        ...(timelineFilters.frequency && { frequency: timelineFilters.frequency }),
+        ...(periodToSend && { period: periodToSend }),
+        ...(timelineFilters.status && { status: timelineFilters.status }),
+        ...(timelineFilters.client && { client: timelineFilters.client }),
         ...(sortBy && { sortBy })
       });
 
@@ -249,7 +210,12 @@ const TimelinesPage = () => {
 
   useEffect(() => {
     fetchTimelines(currentPage, itemsPerPage);
-  }, [currentPage, sortBy, filters]);
+  }, [currentPage, sortBy, itemsPerPage, timelineFilters]);
+
+  // When filters change, reset to first page
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [timelineFilters]);
 
   // Fetch activities for export modal
   const fetchActivities = async () => {
@@ -272,6 +238,27 @@ const TimelinesPage = () => {
 
   useEffect(() => {
     fetchActivities();
+  }, []);
+
+  // Fetch clients for Client filter
+  const fetchClients = async () => {
+    try {
+      const response = await fetch(`${Base_url}clients?limit=1000`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setClients(data.results || []);
+      }
+    } catch {
+      // Silent fail – filters still work without client list
+    }
+  };
+
+  useEffect(() => {
+    fetchClients();
   }, []);
 
   // Fetch frequency periods when frequency changes
@@ -801,7 +788,7 @@ const TimelinesPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 <div
                   className="bg-amber-50 border border-amber-200 rounded p-4 cursor-pointer hover:bg-amber-100 transition-colors"
-                  onClick={() => setFilters({ ...filters, status: 'pending' })}
+                  onClick={() => setTimelineFilters(prev => ({ ...prev, status: 'pending' }))}
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -815,7 +802,7 @@ const TimelinesPage = () => {
                 </div>
                 <div
                   className="bg-purple-50 border border-purple-200 rounded p-4 cursor-pointer hover:bg-purple-100 transition-colors"
-                  onClick={() => setFilters({ ...filters, status: 'ongoing' })}
+                  onClick={() => setTimelineFilters(prev => ({ ...prev, status: 'ongoing' }))}
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -829,7 +816,7 @@ const TimelinesPage = () => {
                 </div>
                 <div
                   className="bg-emerald-50 border border-emerald-200 rounded p-4 cursor-pointer hover:bg-emerald-100 transition-colors"
-                  onClick={() => setFilters({ ...filters, status: 'completed' })}
+                  onClick={() => setTimelineFilters(prev => ({ ...prev, status: 'completed' }))}
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -843,7 +830,7 @@ const TimelinesPage = () => {
                 </div>
                 <div
                   className="bg-red-50 border border-red-100 rounded p-4 cursor-pointer hover:bg-red-100 transition-colors"
-                  onClick={() => setFilters({ ...filters, status: 'delayed' })}
+                  onClick={() => setTimelineFilters(prev => ({ ...prev, status: 'delayed' }))}
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -857,7 +844,239 @@ const TimelinesPage = () => {
                 </div>
               </div>
 
-              {/* Search and Sort – spec: 11px inputs/selects, gray-200 border */}
+              {/* Filters – align with Compliance Register (Activity, Sub-Activity, Frequency, Period, Status, Client) */}
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-[11px] font-bold text-[#495057] uppercase tracking-wider">Filter Options</h3>
+                  <button
+                    type="button"
+                    onClick={() => setTimelineFilters({ activity: "", subActivity: "", frequency: "", period: "", status: "", client: "" })}
+                    className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100"
+                  >
+                    <i className="ri-refresh-line text-xs" /> Reset
+                  </button>
+                </div>
+
+                <div className="bg-gray-50/50 border border-gray-200 p-[10px] rounded">
+                  <button
+                    type="button"
+                    onClick={() => setShowTimelineFilters(prev => !prev)}
+                    className="mb-3 flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-white border border-gray-200 text-[#495057] hover:bg-gray-100"
+                  >
+                    <i className={`text-xs ${showTimelineFilters ? 'ri-filter-fill' : 'ri-filter-line'}`} />
+                    {showTimelineFilters ? 'Hide Filters' : 'Show Filters'}
+                  </button>
+
+                  {showTimelineFilters && (
+                    <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+                      {/* Activity */}
+                      <div>
+                        <label className="block text-[11px] font-medium text-[#495057] mb-1">Activity</label>
+                        <select
+                          className="w-full bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300 transition-all"
+                          value={timelineFilters.activity}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setTimelineFilters({
+                              activity: value,
+                              subActivity: "",
+                              frequency: "",
+                              period: "",
+                              status: timelineFilters.status,
+                              client: timelineFilters.client
+                            });
+                            setAvailablePeriods([]);
+                          }}
+                        >
+                          <option value="">All Activities</option>
+                          {activities.map((activity) => (
+                            <option key={activity.id} value={activity.id}>
+                              {activity.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Sub-Activity */}
+                      <div>
+                        <label className="block text-[11px] font-medium text-[#495057] mb-1">Sub-Activity</label>
+                        <select
+                          className="w-full bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300 transition-all"
+                          value={timelineFilters.subActivity}
+                          onChange={(e) => {
+                            const selectedSubActivityId = e.target.value;
+                            const selectedActivity = activities.find(a => a.id === timelineFilters.activity);
+                            const selectedSubActivity = selectedActivity?.subactivities?.find(sa => sa._id === selectedSubActivityId);
+
+                            setTimelineFilters(prev => ({
+                              ...prev,
+                              subActivity: selectedSubActivityId,
+                              frequency: selectedSubActivity?.frequency || "",
+                              period: ""
+                            }));
+
+                            if (selectedSubActivity?.frequency) {
+                              fetchFrequencyPeriods(selectedSubActivity.frequency);
+                            } else {
+                              setAvailablePeriods([]);
+                            }
+                          }}
+                          disabled={!timelineFilters.activity}
+                        >
+                          <option value="">All Sub-Activities</option>
+                          {timelineFilters.activity && activities.find(a => a.id === timelineFilters.activity)?.subactivities?.map((subActivity) => (
+                            <option key={subActivity._id} value={subActivity._id}>
+                              {subActivity.name} ({subActivity.frequency || 'No frequency'})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Frequency */}
+                      <div>
+                        <label className="block text-[11px] font-medium text-[#495057] mb-1">Frequency</label>
+                        <select
+                          className="w-full bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300 transition-all"
+                          value={timelineFilters.frequency}
+                          onChange={(e) => {
+                            const freq = e.target.value;
+                            setTimelineFilters(prev => ({
+                              ...prev,
+                              frequency: freq,
+                              period: ""
+                            }));
+                            fetchFrequencyPeriods(freq);
+                          }}
+                          disabled={!!timelineFilters.subActivity}
+                        >
+                          <option value="">All Frequencies</option>
+                          <option value="OneTime">One Time</option>
+                          <option value="Hourly">Hourly</option>
+                          <option value="Daily">Daily</option>
+                          <option value="Weekly">Weekly</option>
+                          <option value="Monthly">Monthly</option>
+                          <option value="Quarterly">Quarterly</option>
+                          <option value="Yearly">Yearly</option>
+                        </select>
+                        {timelineFilters.subActivity && (
+                          <p className="text-[10px] text-gray-500 mt-1">
+                            Frequency auto-selected from sub-activity
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Period */}
+                      <div>
+                        <label className="block text-[11px] font-medium text-[#495057] mb-1">Period</label>
+                        <select
+                          className="w-full bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
+                          value={timelineFilters.period}
+                          onChange={(e) => setTimelineFilters(prev => ({ ...prev, period: e.target.value }))}
+                          disabled={!timelineFilters.frequency}
+                        >
+                          <option value="">All Periods</option>
+                          {isLoadingPeriods ? (
+                            <option value="" disabled>Loading periods...</option>
+                          ) : availablePeriods.length > 0 ? (
+                            availablePeriods.map((period) => (
+                              <option key={period.period} value={period.period}>
+                                {period.displayName}
+                              </option>
+                            ))
+                          ) : timelineFilters.frequency ? (
+                            <option value="" disabled>No periods available for this frequency</option>
+                          ) : (
+                            <option value="" disabled>Select frequency first</option>
+                          )}
+                        </select>
+                      </div>
+
+                      {/* Status */}
+                      <div>
+                        <label className="block text-[11px] font-medium text-[#495057] mb-1">Status</label>
+                        <select
+                          className="w-full bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
+                          value={timelineFilters.status}
+                          onChange={(e) => setTimelineFilters(prev => ({ ...prev, status: e.target.value }))}
+                        >
+                          <option value="">All Statuses</option>
+                          <option value="pending">Pending</option>
+                          <option value="completed">Completed</option>
+                          <option value="delayed">Delayed</option>
+                          <option value="ongoing">Ongoing</option>
+                        </select>
+                      </div>
+
+                      {/* Client */}
+                      <div className="relative">
+                        <label className="block text-[11px] font-medium text-[#495057] mb-1">Client</label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            className="w-full bg-white border border-gray-200 pl-3 pr-8 py-1.5 text-[11px] rounded focus:ring-0 focus:border-purple-300 placeholder:text-gray-400 font-medium transition-all"
+                            placeholder="Search client..."
+                            value={clientSearchTerm || (timelineFilters.client ? clients.find(c => c.id === timelineFilters.client)?.name || "" : "")}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setClientSearchTerm(value);
+                              if (!value) {
+                                setTimelineFilters(prev => ({ ...prev, client: "" }));
+                              }
+                            }}
+                            onFocus={() => {
+                              if (timelineFilters.client) {
+                                setClientSearchTerm("");
+                              }
+                            }}
+                          />
+                          {(clientSearchTerm || timelineFilters.client) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setClientSearchTerm("");
+                                setTimelineFilters(prev => ({ ...prev, client: "" }));
+                              }}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            >
+                              <i className="ri-close-line"></i>
+                            </button>
+                          )}
+                          {clientSearchTerm && !timelineFilters.client && (
+                            <div className="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto">
+                              {clients
+                                .filter(client =>
+                                  client.name?.toLowerCase().includes(clientSearchTerm.toLowerCase())
+                                )
+                                .slice(0, 20)
+                                .map(client => (
+                                  <div
+                                    key={client.id}
+                                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-[11px]"
+                                    onClick={() => {
+                                      setTimelineFilters(prev => ({ ...prev, client: client.id }));
+                                      setClientSearchTerm("");
+                                    }}
+                                  >
+                                    {client.name}
+                                  </div>
+                                ))}
+                              {clients.filter(client =>
+                                client.name?.toLowerCase().includes(clientSearchTerm.toLowerCase())
+                              ).length === 0 && (
+                                <div className="px-3 py-2 text-gray-500 text-[11px]">
+                                  No clients found
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Rows per page & Sort */}
               <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
                 <div className="flex items-center w-full lg:w-auto gap-2">
                   <label className="text-[11px] font-medium text-[#495057] whitespace-nowrap">Rows per page:</label>
@@ -865,9 +1084,10 @@ const TimelinesPage = () => {
                     className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
                     value={itemsPerPage}
                     onChange={(e) => {
-                      setItemsPerPage(Number(e.target.value));
+                      const value = Number(e.target.value);
+                      setItemsPerPage(value);
                       setCurrentPage(1);
-                      fetchTimelines(1, Number(e.target.value));
+                      fetchTimelines(1, value);
                     }}
                   >
                     <option value={10}>10</option>
@@ -877,32 +1097,8 @@ const TimelinesPage = () => {
                     <option value={1000}>1000</option>
                   </select>
                 </div>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
-                  <input
-                    type="text"
-                    className="bg-white border border-gray-200 pl-3 pr-3 py-1.5 text-[11px] rounded focus:ring-0 focus:border-purple-300 placeholder:text-gray-400 font-medium w-full sm:max-w-[200px]"
-                    placeholder="Search by activity name..."
-                    value={searchInputValue}
-                    onChange={handleSearchChange}
-                  />
-                  <input
-                    type="text"
-                    className="bg-white border border-gray-200 pl-3 pr-3 py-1.5 text-[11px] rounded focus:ring-0 focus:border-purple-300 placeholder:text-gray-400 font-medium w-full sm:max-w-[200px]"
-                    placeholder="Search by client name..."
-                    value={clientSearchInputValue}
-                    onChange={handleClientSearchChange}
-                  />
-                  <select
-                    className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300 w-full sm:w-auto min-w-[100px]"
-                    value={filters.status}
-                    onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                  >
-                    <option value="">All Status</option>
-                    <option value="pending">Pending</option>
-                    <option value="ongoing">Ongoing</option>
-                    <option value="completed">Completed</option>
-                    <option value="delayed">Delayed</option>
-                  </select>
+                <div className="flex items-center gap-2 w-full lg:w-auto">
+                  <label className="text-[11px] font-medium text-[#495057] whitespace-nowrap">Sort by:</label>
                   <select
                     className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300 w-full sm:w-auto"
                     value={sortBy}
@@ -915,50 +1111,8 @@ const TimelinesPage = () => {
                     <option value="endDate:asc">End Date (Earliest-Latest)</option>
                     <option value="endDate:desc">End Date (Latest-Earliest)</option>
                   </select>
-                  <button
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100 shadow-sm w-full sm:w-auto"
-                    onClick={() => {
-                      setSearchInputValue("");
-                      setClientSearchInputValue("");
-                      setFilters({ activityName: "", clientName: "", status: "", group: "" });
-                      setSortBy("activityName:asc");
-                    }}
-                  >
-                    <i className="ri-refresh-line text-xs" /> Reset
-                  </button>
                 </div>
               </div>
-
-              {/* Search Results Indicator – spec: 11px, sky/info */}
-              {(filters.activityName || filters.clientName || filters.status) && (
-                <div className="mb-4 p-3 bg-sky-50 border border-sky-100 rounded">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div className="flex items-center flex-wrap gap-2">
-                      <span className="text-[11px] font-bold text-sky-700">Active Filters:</span>
-                      {filters.activityName && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700">Activity: {filters.activityName}</span>
-                      )}
-                      {filters.clientName && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700">Client: {filters.clientName}</span>
-                      )}
-                      {filters.status && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700">Status: {filters.status}</span>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => {
-                        setSearchInputValue("");
-                        setClientSearchInputValue("");
-                        setFilters({ activityName: "", clientName: "", status: "", group: "" });
-                        setCurrentPage(1);
-                      }}
-                      className="text-[11px] font-bold text-sky-600 hover:text-sky-800"
-                    >
-                      <i className="ri-close-line text-xs" /> Clear All
-                    </button>
-                  </div>
-                </div>
-              )}
 
               {/* Timelines Table – spec: gray-50/30 header, 11px uppercase th, 12px td, gray-200 borders */}
               <div className="overflow-x-auto min-h-[300px] border border-gray-200 rounded">
@@ -997,16 +1151,10 @@ const TimelinesPage = () => {
                               <i className="ri-time-line text-xl text-gray-200" />
                             </div>
                             <p className="text-xs font-bold text-gray-400 mb-1">DATA EMPTY</p>
-                            <p className="text-[11px] text-gray-500 mb-4">{(filters.activityName || filters.clientName || filters.status) ? 'No timelines match your filters.' : 'Start by adding your first timeline.'}</p>
-                            {(filters.activityName || filters.clientName || filters.status) ? (
-                              <button onClick={() => { setSearchInputValue(""); setClientSearchInputValue(""); setFilters({ activityName: "", clientName: "", status: "", group: "" }); setCurrentPage(1); }} className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700">
-                                <i className="ri-refresh-line text-xs" /> Clear Filters
-                              </button>
-                            ) : (
-                              <Link href="/timelines/add" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700">
-                                <i className="ri-add-line text-xs" /> Add First Timeline
-                              </Link>
-                            )}
+                            <p className="text-[11px] text-gray-500 mb-4">Start by adding your first timeline.</p>
+                            <Link href="/timelines/add" className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700">
+                              <i className="ri-add-line text-xs" /> Add First Timeline
+                            </Link>
                           </div>
                         </td>
                       </tr>
