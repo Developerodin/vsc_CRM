@@ -18,6 +18,8 @@ export interface EmailTemplate {
   bodyHtml: string;
   bodyText?: string;
   branch?: string | null;
+  activity?: string | null;
+  subactivity?: string | null;
   createdBy?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -39,8 +41,20 @@ export interface TemplatesListResponse {
   totalResults: number;
 }
 
+/** Allowed from-addresses for bulk send (API whitelist). */
+export const ALLOWED_FROM_EMAILS = [
+  "info@vsc.co.in",
+  "audit@vsc.co.in",
+  "incometax@vsc.co.in",
+  "roc@vsc.co.in",
+  "gst@vsc.co.in",
+] as const;
+
+export type AllowedFromEmail = (typeof ALLOWED_FROM_EMAILS)[number];
+
 export interface SendBulkPayload {
   templateId: string;
+  fromEmail: string;
   clientIds?: string[];
   branchId?: string;
 }
@@ -58,15 +72,19 @@ export interface SendBulkResponse {
   data: SendBulkResult;
 }
 
-/** List templates with optional branch, sort, pagination */
+/** List templates with optional branch, activity, subactivity, sort, pagination */
 export async function listTemplates(params?: {
   branch?: string;
+  activity?: string;
+  subactivity?: string;
   sortBy?: string;
   limit?: number;
   page?: number;
 }): Promise<TemplatesListResponse> {
   const q = new URLSearchParams();
   if (params?.branch) q.set("branch", params.branch);
+  if (params?.activity) q.set("activity", params.activity);
+  if (params?.subactivity) q.set("subactivity", params.subactivity);
   if (params?.sortBy) q.set("sortBy", params.sortBy);
   if (params?.limit != null) q.set("limit", String(params.limit));
   if (params?.page != null) q.set("page", String(params.page));
@@ -137,9 +155,12 @@ export async function deleteTemplate(templateId: string): Promise<void> {
   throw new Error(json.message || "Failed to delete template");
 }
 
-/** Send bulk email. Use exactly one of clientIds, branchId, or neither (all clients). */
+/** Send bulk email. Use exactly one of clientIds, branchId, or neither (all clients). fromEmail must be one of ALLOWED_FROM_EMAILS. */
 export async function sendBulk(payload: SendBulkPayload): Promise<SendBulkResponse> {
-  const body: Record<string, unknown> = { templateId: payload.templateId };
+  const body: Record<string, unknown> = {
+    templateId: payload.templateId,
+    fromEmail: payload.fromEmail,
+  };
   if (payload.clientIds?.length) body.clientIds = payload.clientIds;
   else if (payload.branchId) body.branchId = payload.branchId;
   const res = await fetch(`${Base_url}email-templates/send-bulk`, {

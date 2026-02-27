@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { toast } from "react-hot-toast";
+import { Base_url } from "@/app/api/config/BaseUrl";
 import {
   listTemplates,
   createTemplate,
@@ -10,11 +11,21 @@ import {
   sendBulk,
   getTemplateId,
   PLACEHOLDERS,
+  ALLOWED_FROM_EMAILS,
   type EmailTemplate,
   type SendBulkResult,
 } from "../../services/emailTemplateService";
 
 const PLACEHOLDER_HINT = PLACEHOLDERS.join(", ");
+
+interface ActivityItem {
+  id?: string;
+  _id?: string;
+  name: string;
+  subactivities?: Array<{ _id: string; name: string }>;
+}
+
+const getActivityId = (a: ActivityItem) => a.id ?? a._id ?? "";
 
 type Tab = "templates" | "send";
 type SendScope = "selected" | "branch" | "all";
@@ -43,7 +54,14 @@ export function BulkEmailDrawer({
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  const [templateActivityId, setTemplateActivityId] = useState("");
+  const [templateSubactivityId, setTemplateSubactivityId] = useState("");
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [showTemplateSelectModal, setShowTemplateSelectModal] = useState(false);
+  const [templateSearchQuery, setTemplateSearchQuery] = useState("");
+
   const [sendTemplateId, setSendTemplateId] = useState("");
+  const [fromEmail, setFromEmail] = useState<string>(ALLOWED_FROM_EMAILS[0]);
   const [sendScope, setSendScope] = useState<SendScope>(
     selectedClientIds.length > 0 ? "selected" : branchId ? "branch" : "all"
   );
@@ -53,10 +71,29 @@ export function BulkEmailDrawer({
   /** Recipients when scope is "selected": use only clients selected in the table on /clients. */
   const effectiveSelectedIds = sendScope === "selected" ? selectedClientIds : [];
 
+  const fetchActivities = useCallback(async () => {
+    try {
+      const res = await fetch(`${Base_url}activities?limit=1000`, {
+        headers: { Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("token") : ""}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setActivities(data.results || []);
+    } catch {
+      setActivities([]);
+    }
+  }, []);
+
   const fetchTemplates = useCallback(async () => {
     setLoadingTemplates(true);
     try {
-      const r = await listTemplates({ limit: 100, sortBy: "createdAt:desc", branch: branchId ?? undefined });
+      const r = await listTemplates({
+        limit: 100,
+        sortBy: "createdAt:desc",
+        branch: branchId ?? undefined,
+        activity: templateActivityId || undefined,
+        subactivity: templateSubactivityId || undefined,
+      });
       setTemplates(r.results || []);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to load templates");
@@ -64,16 +101,39 @@ export function BulkEmailDrawer({
     } finally {
       setLoadingTemplates(false);
     }
-  }, [branchId]);
+  }, [branchId, templateActivityId, templateSubactivityId]);
 
   useEffect(() => {
     if (isOpen) {
-      fetchTemplates();
+      fetchActivities();
       setSendResult(null);
       setSendTemplateId("");
       setSendScope(selectedClientIds.length > 0 ? "selected" : branchId ? "branch" : "all");
+      setTemplateActivityId("");
+      setTemplateSubactivityId("");
+      setShowTemplateSelectModal(false);
+      setTemplateSearchQuery("");
     }
-  }, [isOpen, fetchTemplates, selectedClientIds.length, branchId]);
+  }, [isOpen, selectedClientIds.length, branchId]);
+
+  useEffect(() => {
+    if (isOpen) fetchTemplates();
+  }, [isOpen, fetchTemplates]);
+
+  const selectedActivity = useMemo(() => activities.find((a) => getActivityId(a) === templateActivityId), [activities, templateActivityId]);
+  const subactivities = selectedActivity?.subactivities ?? [];
+
+  const templatesForSelectModal = useMemo(() => {
+    const q = templateSearchQuery.trim().toLowerCase();
+    if (!q) return templates;
+    return templates.filter(
+      (t) =>
+        t.name.toLowerCase().includes(q) ||
+        (t.subject && t.subject.toLowerCase().includes(q))
+    );
+  }, [templates, templateSearchQuery]);
+
+  const selectedTemplate = useMemo(() => templates.find((t) => getTemplateId(t) === sendTemplateId), [templates, sendTemplateId]);
 
   const openCreate = () => {
     setFormMode("create");
@@ -153,12 +213,17 @@ export function BulkEmailDrawer({
       toast.error("Select a template");
       return;
     }
+    if (!fromEmail || !ALLOWED_FROM_EMAILS.includes(fromEmail as (typeof ALLOWED_FROM_EMAILS)[number])) {
+      toast.error("Select a From email address");
+      return;
+    }
     if (sendScope === "selected" && effectiveSelectedIds.length === 0) {
       toast.error("Select clients from the table first, then send.");
       return;
     }
-    const payload: { templateId: string; clientIds?: string[]; branchId?: string } = {
+    const payload: { templateId: string; fromEmail: string; clientIds?: string[]; branchId?: string } = {
       templateId: sendTemplateId,
+      fromEmail,
     };
     if (sendScope === "selected" && effectiveSelectedIds.length) payload.clientIds = effectiveSelectedIds;
     else if (sendScope === "branch" && branchId) payload.branchId = branchId;
@@ -224,6 +289,38 @@ export function BulkEmailDrawer({
         <div className="flex-1 overflow-y-auto p-[10px]">
           {tab === "templates" && (
             <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1">Activity</label>
+                  <select
+                    className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 w-full focus:ring-0 focus:border-purple-300"
+                    value={templateActivityId}
+                    onChange={(e) => {
+                      setTemplateActivityId(e.target.value);
+                      setTemplateSubactivityId("");
+                    }}
+                  >
+                    <option value="">All activities</option>
+                    {activities.map((a) => (
+                      <option key={getActivityId(a)} value={getActivityId(a)}>{a.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-[#495057] mb-1">Sub-activity</label>
+                  <select
+                    className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 w-full focus:ring-0 focus:border-purple-300 disabled:opacity-60"
+                    value={templateSubactivityId}
+                    onChange={(e) => setTemplateSubactivityId(e.target.value)}
+                    disabled={!templateActivityId}
+                  >
+                    <option value="">All sub-activities</option>
+                    {subactivities.map((s) => (
+                      <option key={s._id} value={s._id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               {formMode !== "none" ? (
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
@@ -345,14 +442,24 @@ export function BulkEmailDrawer({
             <div className="space-y-4">
               <div>
                 <label className="block text-[11px] font-medium text-[#495057] mb-1">Template</label>
-                <select
-                  className="bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 w-full focus:ring-0 focus:border-gray-300 appearance-none cursor-pointer"
-                  value={sendTemplateId}
-                  onChange={(e) => setSendTemplateId(e.target.value)}
+                <button
+                  type="button"
+                  onClick={() => setShowTemplateSelectModal(true)}
+                  className="w-full flex items-center justify-between gap-2 bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300 text-left"
                 >
-                  <option value="">Select template</option>
-                  {templates.map((t) => (
-                    <option key={tid(t)} value={tid(t)}>{t.name}</option>
+                  <span className="truncate">{selectedTemplate ? selectedTemplate.name : "Select template"}</span>
+                  <i className="ri-arrow-down-s-line text-base text-gray-400 shrink-0" />
+                </button>
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-[#495057] mb-1">From email</label>
+                <select
+                  className="bg-white border border-gray-200 text-[#495057] text-[11px] font-medium rounded px-3 py-1.5 pr-8 w-full focus:ring-0 focus:border-purple-300 appearance-none cursor-pointer"
+                  value={fromEmail}
+                  onChange={(e) => setFromEmail(e.target.value)}
+                >
+                  {ALLOWED_FROM_EMAILS.map((email) => (
+                    <option key={email} value={email}>{email}</option>
                   ))}
                 </select>
               </div>
@@ -414,7 +521,7 @@ export function BulkEmailDrawer({
                 type="button"
                 className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded bg-purple-600 text-white hover:bg-purple-700 shadow-sm disabled:opacity-50 disabled:pointer-events-none transition-colors"
                 onClick={handleSend}
-                disabled={sending || !sendTemplateId}
+                disabled={sending || !sendTemplateId || !fromEmail}
               >
                 {sending ? "Sending..." : "Send bulk email"}
               </button>
@@ -441,6 +548,58 @@ export function BulkEmailDrawer({
         </div>
       </div>
 
+      {/* Template selection modal (search + list) */}
+      {showTemplateSelectModal && (
+        <>
+          <div className="fixed inset-0 z-[60] bg-black/40" aria-hidden onClick={() => { setShowTemplateSelectModal(false); setTemplateSearchQuery(""); }} />
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 pointer-events-none">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[80vh] flex flex-col pointer-events-auto" role="dialog" aria-label="Select template">
+              <div className="p-3 border-b border-gray-200 flex items-center justify-between gap-2">
+                <h3 className="text-[0.875rem] font-bold text-gray-800">Select template</h3>
+                <button type="button" onClick={() => { setShowTemplateSelectModal(false); setTemplateSearchQuery(""); }} className="w-7 h-7 rounded flex items-center justify-center text-gray-500 hover:bg-gray-100">
+                  <i className="ri-close-line text-lg" />
+                </button>
+              </div>
+              <div className="p-3 border-b border-gray-100">
+                <input
+                  type="text"
+                  placeholder="Search by name or subject..."
+                  className="w-full bg-white border border-gray-200 pl-3 pr-3 py-1.5 text-[11px] rounded focus:ring-0 focus:border-purple-300 placeholder:text-gray-400"
+                  value={templateSearchQuery}
+                  onChange={(e) => setTemplateSearchQuery(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <div className="flex-1 overflow-y-auto p-2 min-h-0">
+                {templatesForSelectModal.length === 0 ? (
+                  <div className="py-8 text-center text-[12px] text-[#495057]">
+                    {templateSearchQuery ? "No templates match your search." : "No templates. Add activity/sub-activity filters or create a template."}
+                  </div>
+                ) : (
+                  <ul className="space-y-1">
+                    {templatesForSelectModal.map((t) => (
+                      <li key={tid(t)}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSendTemplateId(tid(t));
+                            setShowTemplateSelectModal(false);
+                            setTemplateSearchQuery("");
+                          }}
+                          className="w-full text-left px-3 py-2 rounded border border-gray-100 hover:bg-purple-50 hover:border-purple-200 text-[12px] font-medium text-[#323251]"
+                        >
+                          <div>{t.name}</div>
+                          {t.subject && <div className="text-[11px] text-[#495057] truncate mt-0.5">{t.subject}</div>}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }
