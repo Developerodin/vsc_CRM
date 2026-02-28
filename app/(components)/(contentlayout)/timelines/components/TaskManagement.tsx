@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { Base_url } from '@/app/api/config/BaseUrl';
@@ -64,8 +64,14 @@ interface ExcelRow {
   "Remarks"?: string;
 }
 
+interface GroupOption {
+  id: string;
+  name: string;
+}
+
 const TaskManagement = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -77,6 +83,8 @@ const TaskManagement = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [searchInputValue, setSearchInputValue] = useState("");
+  const [groupFilter, setGroupFilter] = useState<string>(() => searchParams.get("group") || "");
+  const [groups, setGroups] = useState<GroupOption[]>([]);
   const [filters, setFilters] = useState({
     status: "",
     priority: "",
@@ -159,6 +167,7 @@ const TaskManagement = () => {
         ...cleanFilters,
         ...(sortBy && { sortBy })
       });
+      if (groupFilter) queryParams.set("group", groupFilter);
 
       const response = await fetch(`${Base_url}tasks?${queryParams}`, {
         headers: {
@@ -187,9 +196,30 @@ const TaskManagement = () => {
     }
   };
 
+  const fetchGroups = useCallback(async () => {
+    try {
+      const res = await fetch(`${Base_url}groups?limit=1000`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const list = (data.results || data.data || []).map((g: any) => ({
+        id: g.id || g._id,
+        name: g.name || g.groupName || "Unnamed",
+      })).filter((g: GroupOption) => g.id);
+      setGroups(list);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchGroups();
+  }, [fetchGroups]);
+
   useEffect(() => {
     fetchTasks(currentPage, itemsPerPage);
-  }, [currentPage, sortBy, filters, itemsPerPage]);
+  }, [currentPage, sortBy, filters, itemsPerPage, groupFilter]);
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
@@ -537,6 +567,17 @@ const TaskManagement = () => {
             <option value="urgent">Urgent</option>
             <option value="critical">Critical</option>
           </select>
+          <select
+            className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300 min-w-[140px]"
+            value={groupFilter}
+            onChange={(e) => { setGroupFilter(e.target.value); setCurrentPage(1); }}
+            aria-label="Filter by group"
+          >
+            <option value="">All Groups</option>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>{g.name}</option>
+            ))}
+          </select>
 
           <div className="relative w-full sm:w-auto min-w-[140px]">
             <input
@@ -635,6 +676,7 @@ const TaskManagement = () => {
             onClick={() => {
               setSearchInputValue("");
               setFilters({ status: "", priority: "", branch: "", teamMember: "", startDate: "", endDate: "", today: "false" });
+              setGroupFilter("");
               setSortBy("createdAt:desc");
               setCurrentPage(1);
             }}
@@ -655,13 +697,14 @@ const TaskManagement = () => {
           </div>
         </div>
       )}
-      {(filters.status || filters.priority || (filters.startDate && filters.endDate) || filters.teamMember) && (
+      {(filters.status || filters.priority || (filters.startDate && filters.endDate) || filters.teamMember || groupFilter) && (
         <div className="mb-4 p-3 bg-sky-50 border border-sky-100 rounded">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center flex-wrap gap-2">
               <span className="text-[11px] font-bold text-sky-700">Active Filters:</span>
               {filters.status && <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700">Status: {filters.status}</span>}
               {filters.priority && <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700">Priority: {filters.priority}</span>}
+              {groupFilter && <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700">Group: {groups.find(g => g.id === groupFilter)?.name || groupFilter}</span>}
               {filters.teamMember && <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700">Search: {filters.teamMember}</span>}
               {filters.startDate && filters.endDate && (
                 <>
@@ -670,7 +713,7 @@ const TaskManagement = () => {
                 </>
               )}
             </div>
-            <button type="button" onClick={() => { setFilters(prev => ({ ...prev, status: "", priority: "", teamMember: "", startDate: "", endDate: "" })); setSearchInputValue(""); setCurrentPage(1); }} className="text-[11px] font-bold text-sky-600 hover:text-sky-800">
+            <button type="button" onClick={() => { setFilters(prev => ({ ...prev, status: "", priority: "", teamMember: "", startDate: "", endDate: "" })); setGroupFilter(""); setSearchInputValue(""); setCurrentPage(1); }} className="text-[11px] font-bold text-sky-600 hover:text-sky-800">
               <i className="ri-close-line text-xs" /> Clear All
             </button>
           </div>

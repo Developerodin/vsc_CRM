@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Seo from "@/shared/layout-components/seo/seo";
 import Link from "next/link";
 import { toast, Toaster } from "react-hot-toast";
@@ -70,8 +70,22 @@ const AnalyticsGroupsPage = () => {
     name: "",
     branch: ""
   });
+  const [sortOrder, setSortOrder] = useState<"default" | "a-z" | "z-a">("a-z");
   const [isSearching, setIsSearching] = useState(false);
   const [branches, setBranches] = useState<any[]>([]);
+
+  /** Groups list sorted alphabetically by groupName when sort filter is set */
+  const sortedGroups = useMemo(() => {
+    if (sortOrder === "default") return groups;
+    const copy = [...groups];
+    copy.sort((a, b) => {
+      const nameA = (a.groupName || "").toLowerCase();
+      const nameB = (b.groupName || "").toLowerCase();
+      if (sortOrder === "a-z") return nameA.localeCompare(nameB);
+      return nameB.localeCompare(nameA);
+    });
+    return copy;
+  }, [groups, sortOrder]);
 
   const fetchGroups = async () => {
     try {
@@ -405,6 +419,18 @@ const AnalyticsGroupsPage = () => {
                   )}
                 </div>
 
+                {/* Sort by name */}
+                <select
+                  className="form-control py-2 w-full sm:w-auto min-w-[140px]"
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value as "default" | "a-z" | "z-a")}
+                  aria-label="Sort groups alphabetically"
+                >
+                  <option value="default">Sort: Default</option>
+                  <option value="a-z">Sort: A → Z</option>
+                  <option value="z-a">Sort: Z → A</option>
+                </select>
+
                 {/* Reset button */}
                 <button
                   className="ti-btn ti-btn-secondary py-2 w-full sm:w-auto"
@@ -414,6 +440,7 @@ const AnalyticsGroupsPage = () => {
                       name: "",
                       branch: ""
                     });
+                    setSortOrder("default");
                   }}
                 >
                   <i className="ri-refresh-line me-2"></i>
@@ -423,7 +450,7 @@ const AnalyticsGroupsPage = () => {
 
 
               {/* Active Filters Summary */}
-              {(searchQuery || Object.values(filters).some(f => f !== "")) && (
+              {(searchQuery || sortOrder !== "default" || Object.values(filters).some(f => f !== "")) && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
@@ -438,6 +465,7 @@ const AnalyticsGroupsPage = () => {
                           name: "",
                           branch: ""
                         });
+                        setSortOrder("default");
                       }}
                     >
                       <i className="ri-close-line mr-1"></i>
@@ -478,6 +506,17 @@ const AnalyticsGroupsPage = () => {
                         </button>
                       </span>
                     )}
+                    {sortOrder !== "default" && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        Sort: {sortOrder === "a-z" ? "A → Z" : "Z → A"}
+                        <button
+                          className="ml-1 text-blue-600 hover:text-blue-800"
+                          onClick={() => setSortOrder("default")}
+                        >
+                          <i className="ri-close-line"></i>
+                        </button>
+                      </span>
+                    )}
                   </div>
                 </div>
               )}
@@ -505,8 +544,8 @@ const AnalyticsGroupsPage = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {groups.length > 0 ? (
-                        groups.map((group: Group, index: number) => (
+                      {sortedGroups.length > 0 ? (
+                        sortedGroups.map((group: Group, index: number) => (
                           <tr
                             key={group.groupId}
                             className={`border-b border-gray-200 ${
