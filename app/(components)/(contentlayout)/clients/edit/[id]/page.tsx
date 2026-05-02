@@ -7,6 +7,7 @@ import { toast, Toaster } from 'react-hot-toast';
 import { Base_url } from '@/app/api/config/BaseUrl';
 import { useBranchContext } from "@/shared/contextapi";
 import StateSelectionModal from '@/app/(components)/StateSelectionModal';
+import { PastYearTimelinesModal } from '../../components/PastYearTimelinesModal';
 
 interface Client {
   id: string;
@@ -129,6 +130,7 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
   const [showSubActivityModal, setShowSubActivityModal] = useState(false);
   const [showTeamMemberModal, setShowTeamMemberModal] = useState(false);
   const [showGroupModal, setShowGroupModal] = useState(false);
+  const [showPastYearModal, setShowPastYearModal] = useState(false);
   const [selectedActivityIndex, setSelectedActivityIndex] = useState<number>(-1);
   const [selectedSubActivityIndex, setSelectedSubActivityIndex] = useState<number>(-1);
   const [selectedTeamMemberIndex, setSelectedTeamMemberIndex] = useState<number>(-1);
@@ -2098,6 +2100,31 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
                 {/* Activity Mapping Tab */}
                 {activeTab === 'activity' && (
                   <div className="space-y-6">
+                    <div
+                      className="rounded-lg border border-indigo-200 bg-indigo-50/90 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+                      role="region"
+                      aria-labelledby="past-fy-edit-heading"
+                    >
+                      <div className="min-w-0">
+                        <h4 id="past-fy-edit-heading" className="text-sm font-semibold text-gray-900">
+                          Past financial year timelines
+                        </h4>
+                        <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+                          Generate missing recurring periods for a completed FY from this client&apos;s saved activity
+                          mappings. Optionally scope to one activity or subactivity in the next step.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="ti-btn ti-btn-primary shrink-0"
+                        onClick={() => setShowPastYearModal(true)}
+                        aria-label="Add past financial year timelines for this client"
+                      >
+                        <i className="ri-history-line mr-2" aria-hidden />
+                        Add past FY timelines
+                      </button>
+                    </div>
+
                     <div className="flex justify-end">
                       <button
                         type="button"
@@ -3168,6 +3195,14 @@ const EditClientPage = ({ params }: { params: { id: string } }) => {
           </div>
         </div>
       )}
+
+      <PastYearTimelinesModal
+        isOpen={showPastYearModal}
+        onClose={() => setShowPastYearModal(false)}
+        selectedClientIds={[params.id]}
+        activities={activities}
+        isLoadingActivities={isLoadingActivities}
+      />
 
       {/* State Selection Modal */}
       <StateSelectionModal

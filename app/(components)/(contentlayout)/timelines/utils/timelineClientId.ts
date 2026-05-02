@@ -32,10 +32,39 @@ interface TimelineLike {
   metadata?: { gstState?: string; gstNumber?: string };
 }
 
+/**
+ * Raw GST jurisdiction state from timeline + client profile (no single-GST inference).
+ */
+function baseGstStateFromTimeline(t: TimelineLike): string {
+  return (
+    (t.metadata?.gstState || '').trim() ||
+    (typeof t.state === 'string' ? t.state.trim() : '') ||
+    (t.client?.state || '').trim()
+  );
+}
+
+/**
+ * Resolved GST state for display and GSTIN lookup: metadata → top-level timeline.state → client.state,
+ * then for GST activities only, one registration row when exactly one gstNumbers entry exists.
+ *
+ * @param t - Timeline-like payload from API
+ * @returns Normalized state name or empty string
+ */
+export function resolveGstDisplayState(t: TimelineLike): string {
+  const direct = baseGstStateFromTimeline(t);
+  if (direct) return direct;
+  const activityName = t.activity?.name;
+  const subActivityName = t.subactivity?.name;
+  if (getClientIdType(activityName, subActivityName) !== 'gst') return '';
+  const list = t.client?.gstNumbers;
+  if (!Array.isArray(list) || list.length !== 1) return '';
+  return (list[0]?.state || '').trim();
+}
+
 export function gstNumberForState(t: TimelineLike): string {
   // Prefer timeline-level metadata (how task API returns GST)
   if (t.metadata?.gstNumber) return t.metadata.gstNumber;
-  const state = t.metadata?.gstState || t.client?.state || '';
+  const state = resolveGstDisplayState(t);
   const list = t.client?.gstNumbers || [];
   if (!state || !Array.isArray(list)) return list?.[0]?.gstNumber ?? '';
   const found = list.find((g) => (g.state || '').toLowerCase() === state.toLowerCase());
@@ -51,7 +80,7 @@ export function getClientIdsForExport(timeline: TimelineLike): {
   cin: string;
 } {
   return {
-    gstState: timeline.metadata?.gstState || timeline.state || timeline.client?.state || '',
+    gstState: resolveGstDisplayState(timeline),
     gstNumber: gstNumberForState(timeline),
     tin: timeline.client?.tanNumber || '',
     pan: timeline.client?.pan || '',
@@ -66,7 +95,7 @@ export function getClientIdDisplay(timeline: TimelineLike): { idLabel: string; i
   const idType = getClientIdType(activityName, subActivityName);
 
   if (idType === 'gst') {
-    const gstState = timeline.metadata?.gstState || timeline.state || timeline.client?.state || '';
+    const gstState = resolveGstDisplayState(timeline);
     return {
       idLabel: gstState ? `GST (${gstState})` : 'GST No.',
       idValue: gstNumberForState(timeline),

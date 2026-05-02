@@ -4,7 +4,7 @@ import { toast } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { Base_url } from '@/app/api/config/BaseUrl';
 import { normalizeQuarterlyPeriods, formatPeriodDisplay, mergeWithExtendedPeriods, normalizeMonthlyPeriodKey } from "../utils/quarterPeriods";
-import { getClientIdType, type ClientIdType } from "../utils/timelineClientId";
+import { getClientIdType, gstNumberForState, resolveGstDisplayState, type ClientIdType } from "../utils/timelineClientId";
 
 /** Normalize period to a comparable key (yearly: 2025/2025-2026 → same; monthly: February-2026/2026-02 → same). */
 function periodKey(period: string, frequency?: string): string {
@@ -299,22 +299,13 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
       const data = await response.json();
       const timelines = data.results || [];
 
-      const gstState = (t: any) => t.metadata?.gstState || t.client?.state || '';
-      const gstNumberForState = (t: any) => {
-        const state = gstState(t);
-        const list = t.client?.gstNumbers || [];
-        if (!state || !Array.isArray(list)) return list?.[0]?.gstNumber ?? '';
-        const found = list.find((g: any) => (g.state || '').toLowerCase() === state.toLowerCase());
-        return found?.gstNumber ?? list?.[0]?.gstNumber ?? '';
-      };
-
       // Transform timeline data to ComplianceRegisterEntry (activity-based client IDs)
       const transformedData: ComplianceRegisterEntry[] = timelines.map((timeline: any) => ({
         _id: timeline._id,
         id: timeline.id,
         clientId: timeline.client?._id || timeline.client?.id || '',
         clientName: timeline.client?.name || '',
-        clientGstState: gstState(timeline),
+        clientGstState: resolveGstDisplayState(timeline),
         activityName: timeline.activity?.name || '',
         clientGstNumber: gstNumberForState(timeline),
         clientTin: timeline.client?.tanNumber || '',

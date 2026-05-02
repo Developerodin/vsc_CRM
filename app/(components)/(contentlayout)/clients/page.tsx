@@ -8,6 +8,7 @@ import { Base_url } from "@/app/api/config/BaseUrl";
 import { useSelectedBranchId } from "@/shared/contextapi";
 import { useRouter } from "next/navigation";
 import { BulkEmailDrawer } from "./components/bulk-email";
+import { PastYearTimelinesModal } from "./components/PastYearTimelinesModal";
 
 interface Client {
   id: string;
@@ -206,6 +207,7 @@ const ClientsPage = () => {
   const [selectedActivityId, setSelectedActivityId] = useState("");
   const [selectedSubactivityId, setSelectedSubactivityId] = useState("");
   const [isBulkAssigning, setIsBulkAssigning] = useState(false);
+  const [showPastYearModal, setShowPastYearModal] = useState(false);
   const [showBulkEmailDrawer, setShowBulkEmailDrawer] = useState(false);
 
   // Function to fetch activities (same as add page)
@@ -1810,6 +1812,22 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                 >
                   <i className="ri-mail-send-line text-xs"></i> Bulk Email
                 </button>
+                <button
+                  type="button"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded transition-colors bg-indigo-50 text-indigo-700 border border-indigo-100 hover:bg-indigo-100 shadow-sm"
+                  onClick={() => {
+                    if (selectedClients.length === 0) {
+                      toast.error("Select one or more clients using the row checkboxes first.");
+                      return;
+                    }
+                    setShowPastYearModal(true);
+                  }}
+                  title="Generate recurring timeline rows for a completed financial year from each client’s saved activities"
+                >
+                  <i className="ri-history-line text-xs" aria-hidden />
+                  Past FY timelines
+                  {selectedClients.length > 0 ? ` (${selectedClients.length})` : ""}
+                </button>
                 <Link
                   href="/clients/add"
                   className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded transition-colors bg-purple-600 text-white hover:bg-purple-700 shadow-sm"
@@ -2777,6 +2795,15 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
         selectedClientIds={selectedClients}
         branchId={selectedBranchId}
         totalClientsCount={totalResults}
+      />
+
+      <PastYearTimelinesModal
+        isOpen={showPastYearModal}
+        onClose={() => setShowPastYearModal(false)}
+        selectedClientIds={selectedClients}
+        activities={activities}
+        isLoadingActivities={isLoadingActivities}
+        onSuccess={() => fetchClients(currentPage, itemsPerPage)}
       />
 
       {/* Bulk Activity Assignment Modal */}
