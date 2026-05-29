@@ -1,6 +1,8 @@
 export interface NavigationPermissions {
   settings: {
     activities: boolean;
+    businessMaster: boolean;
+    entityMaster: boolean;
     branches: boolean;
     users: boolean;
     roles: boolean;
@@ -42,7 +44,7 @@ export const validateNavigationPermissions = (permissions: any): permissions is 
     return false;
   }
 
-  const requiredSettings = ['activities', 'branches', 'users', 'roles'];
+  const requiredSettings = ['activities', 'businessMaster', 'entityMaster', 'branches', 'users', 'roles'];
   const requiredMain = ['dashboard', 'clients', 'groups', 'teams', 'timelines', 'analytics', 'fileManager'];
 
   // Check if settings object exists and has all required properties
@@ -51,7 +53,8 @@ export const validateNavigationPermissions = (permissions: any): permissions is 
   }
 
   for (const setting of requiredSettings) {
-    if (typeof permissions.settings[setting] !== 'boolean') {
+    const value = permissions.settings[setting];
+    if (value !== undefined && typeof value !== 'boolean') {
       return false;
     }
   }
@@ -200,7 +203,9 @@ export const hasPermission = (permission: keyof NavigationPermissions | 'setting
   
   if (permission === 'settings') {
     // Check if user has access to any settings sub-items
-    return permissions.settings.activities || 
+    return permissions.settings.activities ||
+           permissions.settings.businessMaster ||
+           permissions.settings.entityMaster ||
            permissions.settings.branches || 
            permissions.settings.users || 
            permissions.settings.roles;
@@ -304,6 +309,10 @@ export const filterMenuItems = (menuItems: any[]): any[] => {
         switch (child.path) {
           case '/activities':
             return hasSettingsPermission('activities');
+          case '/settings/business-master':
+            return hasSettingsPermission('businessMaster');
+          case '/settings/entity-master':
+            return hasSettingsPermission('entityMaster');
           case '/branches':
             return hasSettingsPermission('branches');
           case '/users':

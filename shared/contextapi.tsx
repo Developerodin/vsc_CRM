@@ -53,6 +53,8 @@ interface Role {
   navigationPermissions: {
     settings: {
       activities: boolean;
+      businessMaster: boolean;
+      entityMaster: boolean;
       branches: boolean;
       users: boolean;
       roles: boolean;

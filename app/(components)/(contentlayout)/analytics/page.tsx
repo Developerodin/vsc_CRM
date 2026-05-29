@@ -5,6 +5,7 @@ import { Base_url } from '@/app/api/config/BaseUrl';
 import axios from 'axios';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
+import { useBranchContext } from '@/shared/contextapi';
 
 // Dynamically import ApexCharts to avoid SSR issues
 const ReactApexChart = dynamic(() => import("react-apexcharts"), { 
@@ -296,6 +297,17 @@ interface Client {
 
 const AnalyticsPage = () => {
   const router = useRouter();
+  const { branches, allBranchesAccess } = useBranchContext();
+  const showBranchFilter = allBranchesAccess || branches.length > 1;
+
+  /**
+   * Build optional branch query string for analytics API calls.
+   * @param {string} branchId - Selected branch id or "all"
+   * @param {'?' | '&'} prefix - Query string prefix when branch is set
+   * @returns {string} Query fragment or empty string
+   */
+  const getBranchQuery = (branchId: string, prefix: '?' | '&' = '&') =>
+    branchId !== 'all' ? `${prefix}branch=${branchId}` : '';
   const [dashboardData, setDashboardData] = useState<DashboardCardsResponse['data'] | null>(null);
   const [completionTrends, setCompletionTrends] = useState<CompletionTrendsResponse['data'] | null>(null);
   const [topByCompletion, setTopByCompletion] = useState<TopByCompletionResponse['data'] | null>(null);
@@ -329,14 +341,15 @@ const AnalyticsPage = () => {
     fetchGlobalTeamMembers();
     fetchClients();
     fetchGroups();
-  }, []);
+  }, [selectedBranch]);
 
   useEffect(() => {
     fetchCompletionTrends(selectedMonths);
-  }, [selectedMonths]);
+  }, [selectedMonths, selectedBranch]);
 
   useEffect(() => {
     fetchTopByCompletion();
+    fetchTopByBranch();
   }, [selectedBranch, dateRange]);
 
   // Handle escape key to close modal
@@ -360,7 +373,9 @@ const AnalyticsPage = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${Base_url}analytics/team-members/dashboard-cards`,{
+      const response = await axios.get(
+        `${Base_url}analytics/team-members/dashboard-cards${getBranchQuery(selectedBranch, '?')}`,
+        {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -377,7 +392,9 @@ const AnalyticsPage = () => {
   const fetchCompletionTrends = async (months: number) => {
     try {
       setTrendsLoading(true);
-      const response = await axios.get(`${Base_url}analytics/team-members/completion-trends?months=${months}`, {
+      const response = await axios.get(
+        `${Base_url}analytics/team-members/completion-trends?months=${months}${getBranchQuery(selectedBranch)}`,
+        {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -393,11 +410,7 @@ const AnalyticsPage = () => {
   const fetchTopByCompletion = async () => {
     try {
       setTopCompletionLoading(true);
-      let url = `${Base_url}analytics/team-members/top-by-completion?limit=10`;
-      
-      if (selectedBranch !== "all") {
-        url += `&branch=${selectedBranch}`;
-      }
+      let url = `${Base_url}analytics/team-members/top-by-completion?limit=10${getBranchQuery(selectedBranch)}`;
       
       if (dateRange.startDate && dateRange.endDate) {
         url += `&startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`;
@@ -441,7 +454,9 @@ const AnalyticsPage = () => {
   const fetchGlobalTeamMembers = async () => {
     try {
       setGlobalTeamLoading(true);
-      const response = await axios.get(`${Base_url}analytics/team-members/table?page=1&limit=5`, {
+      const response = await axios.get(
+        `${Base_url}analytics/team-members/table?page=1&limit=5${getBranchQuery(selectedBranch)}`,
+        {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -466,7 +481,9 @@ const AnalyticsPage = () => {
   const fetchClients = async () => {
     try {
       setClientsLoading(true);
-      const response = await axios.get(`${Base_url}analytics/clients/table?page=1&limit=5`, {
+      const response = await axios.get(
+        `${Base_url}analytics/clients/table?page=1&limit=5${getBranchQuery(selectedBranch)}`,
+        {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -482,7 +499,9 @@ const AnalyticsPage = () => {
   const fetchGroups = async () => {
     try {
       setGroupsLoading(true);
-      const response = await axios.get(`${Base_url}groups/analytics`, {
+      const response = await axios.get(
+        `${Base_url}groups/analytics${getBranchQuery(selectedBranch, '?')}`,
+        {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -985,7 +1004,8 @@ const AnalyticsPage = () => {
       </div>
 
       {/* Filters Section */}
-      {/* <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
+      {showBranchFilter && (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold text-gray-900">Performance Filters</h2>
         </div>
@@ -999,11 +1019,14 @@ const AnalyticsPage = () => {
               className="form-select border-gray-300 rounded-lg w-full"
               value={selectedBranch}
               onChange={(e) => setSelectedBranch(e.target.value)}
+              aria-label="Filter analytics by branch"
             >
               <option value="all">All Branches</option>
-              <option value="branch1">Main Branch</option>
-              <option value="branch2">North Branch</option>
-              <option value="branch3">South Branch</option>
+              {branches.map((branch) => (
+                <option key={branch._id} value={branch._id}>
+                  {branch.name}
+                </option>
+              ))}
             </select>
           </div>
           <div>
@@ -1016,6 +1039,7 @@ const AnalyticsPage = () => {
               className="form-control border-gray-300 rounded-lg w-full"
               value={dateRange.startDate}
               onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
+              aria-label="Filter start date"
             />
           </div>
           <div>
@@ -1028,10 +1052,12 @@ const AnalyticsPage = () => {
               className="form-control border-gray-300 rounded-lg w-full"
               value={dateRange.endDate}
               onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
+              aria-label="Filter end date"
             />
           </div>
         </div>
-      </div> */}
+      </div>
+      )}
 
       {/* Top Team Members by Completion */}
       {/* <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
