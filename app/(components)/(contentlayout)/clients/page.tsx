@@ -620,7 +620,7 @@ const ClientsPage = () => {
         }
       });
 
-      if (!response.ok) {
+      if (!response.ok && response.status !== 404) {
         throw new Error('Failed to delete client');
       }
 

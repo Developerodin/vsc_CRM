@@ -7,6 +7,12 @@ import { toast, Toaster } from 'react-hot-toast';
 import { Base_url } from '@/app/api/config/BaseUrl';
 import { useSelectedBranchId, useBranchContext } from "@/shared/contextapi";
 import StateSelectionModal from '@/app/(components)/StateSelectionModal';
+import {
+  getMaxDateInputValue,
+  getMinBirthDateInputValue,
+  isDateInputInFuture,
+  prepareOptionalDateForApi,
+} from '@/shared/utils/dateInput';
 
 interface Client {
   id: string;
@@ -364,6 +370,11 @@ const AddClientPage = () => {
       return false;
     }
 
+    if (formData.dob && isDateInputInFuture(formData.dob)) {
+      toast.error('Date of birth cannot be in the future');
+      return false;
+    }
+
     // GST Numbers validation - ensure all fields are filled if any GST number is provided
     for (let i = 0; i < gstNumbers.length; i++) {
       const gst = gstNumbers[i];
@@ -438,6 +449,7 @@ const AddClientPage = () => {
 
         const clientData = {
           ...formData,
+          dob: prepareOptionalDateForApi(formData.dob),
           gstNumbers: gstNumbers.filter(gst => gst.state && gst.gstNumber && gst.dateOfRegistration && gst.gstUserId),
           activities: activityMappings.filter(mapping => mapping.activity && mapping.subactivity),
           turnoverHistory: turnoverHistory.filter(e => (e.year || '').trim() && (e.turnover || '').trim())
@@ -1371,6 +1383,9 @@ const AddClientPage = () => {
                         className="form-control"
                         value={formData.dob}
                         onChange={handleInputChange}
+                        min={getMinBirthDateInputValue()}
+                        max={getMaxDateInputValue()}
+                        aria-label="Date of birth"
                       />
                     </div>
 
@@ -1661,7 +1676,9 @@ const AddClientPage = () => {
                                 placeholder="Date of Registration"
                                 value={gst.dateOfRegistration}
                                 onChange={(e) => handleGstNumberChange(index, 'dateOfRegistration', e.target.value)}
+                                max={getMaxDateInputValue()}
                                 title="Select the date when GST was registered"
+                                aria-label={`GST date of registration ${index + 1}`}
                               />
                             </div>
                             <div className="flex items-center space-x-2">
