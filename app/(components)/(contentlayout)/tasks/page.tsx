@@ -6,6 +6,7 @@ import { Base_url } from '@/app/api/config/BaseUrl';
 import axios from "axios";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { getAssignedByName, hasTaskAssigner } from "./utils/taskAssigner";
 
 
 // Task interface based on the new API documentation
@@ -29,6 +30,13 @@ interface Task {
     id: string;
     name: string;
     email: string;
+  };
+  assignedByTeamMember?: {
+    id: string;
+    _id?: string;
+    name: string;
+    email: string;
+    phone?: string;
   };
   timeline?: Array<{
     id: string;
@@ -877,6 +885,13 @@ const TasksPage = () => {
                         <i className="ri-building-line me-1" />
                         {task.branch?.name || "-"}
                       </div>
+                      {hasTaskAssigner(task) && (
+                        <div className="text-[11px] text-gray-600 mt-1">
+                          <i className="ri-user-add-line me-1" />
+                          Assigned by:{" "}
+                          <span className="font-medium">{getAssignedByName(task)}</span>
+                        </div>
+                      )}
                     </div>
                   </td>
                   <td className="px-1.5 py-2.5 border border-gray-200 align-top">
@@ -1396,10 +1411,10 @@ const TaskDetailsModal = ({
                     <span className="text-gray-500">End Date:</span>
                     <span className="font-medium">{new Date(task.endDate).toLocaleDateString()}</span>
                   </div>
-                  {task.assignedBy && (
+                  {hasTaskAssigner(task) && (
                     <div className="flex justify-between">
                       <span className="text-gray-500">Assigned By:</span>
-                      <span className="font-medium">{task.assignedBy.name}</span>
+                      <span className="font-medium">{getAssignedByName(task)}</span>
                     </div>
                   )}
                 </div>

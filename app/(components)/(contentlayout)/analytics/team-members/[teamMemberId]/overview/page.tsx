@@ -7,6 +7,7 @@ import { Base_url } from '@/app/api/config/BaseUrl';
 import axios from 'axios';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import TaskDetailsTable, { TeamMemberTaskDetail } from './TaskDetailsTable';
 
 // Dynamically import ApexCharts to avoid SSR issues
 const ReactApexChart = dynamic(() => import("react-apexcharts"), { 
@@ -177,6 +178,7 @@ interface TaskBreakdown {
     hasPrevPage: boolean;
   };
   byClientActivity: Array<any>;
+  taskDetails?: TeamMemberTaskDetail[];
 }
 
 interface ClientSummary {
@@ -393,7 +395,8 @@ const TeamMemberOverviewPage = () => {
     recent: Array.isArray(tasks.recent) ? tasks.recent : [],
     monthlyDistribution: Array.isArray(tasks.monthlyDistribution) ? tasks.monthlyDistribution : [],
     pagination: tasks.pagination || { page: 1, limit: 10, totalTasks: 0, totalPages: 0, hasNextPage: false, hasPrevPage: false },
-    byClientActivity: tasks.byClientActivity || []
+    byClientActivity: tasks.byClientActivity || [],
+    taskDetails: Array.isArray(tasks.taskDetails) ? tasks.taskDetails : [],
   };
 
   // Ensure clients has required properties
@@ -619,16 +622,13 @@ const TeamMemberOverviewPage = () => {
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Task Status Breakdown</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {(() => {
-                // Count tasks by status from the new API structure
                 const statusCounts: Record<string, number> = {};
-                
-                if (safeTasks.recent && Array.isArray(safeTasks.recent)) {
-                  safeTasks.recent.forEach(task => {
-                    const status = task.status || 'unknown';
-                    statusCounts[status] = (statusCounts[status] || 0) + 1;
-                  });
-                }
-                
+
+                safeTasks.taskDetails.forEach((task) => {
+                  const status = task.status || 'unknown';
+                  statusCounts[status] = (statusCounts[status] || 0) + 1;
+                });
+
                 if (Object.keys(statusCounts).length > 0) {
                   return Object.entries(statusCounts).map(([status, count]) => (
                     <div key={status} className="text-center p-4 bg-gray-50 rounded-lg">
@@ -647,6 +647,26 @@ const TeamMemberOverviewPage = () => {
             </div>
           </div>
 
+          {/* Task Details */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Task Details</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Client-wise task breakdown with current status
+                </p>
+              </div>
+              <div className="text-sm text-gray-600">
+                {safeTasks.taskDetails.length} task{safeTasks.taskDetails.length === 1 ? '' : 's'}
+              </div>
+            </div>
+            <TaskDetailsTable
+              tasks={safeTasks.taskDetails}
+              getStatusColor={getStatusColor}
+              formatDate={formatDate}
+            />
+          </div>
+
           {/* Client Summary Matrix */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Client Summary</h3>
@@ -654,45 +674,17 @@ const TeamMemberOverviewPage = () => {
               <div className="text-center">
                 <p className="text-sm font-medium text-gray-600">Total Clients</p>
                 <p className="text-3xl font-bold text-blue-600">
-                  {(() => {
-                    const uniqueClients = new Set();
-                    if (safeTasks.recent && Array.isArray(safeTasks.recent)) {
-                      safeTasks.recent.forEach(task => {
-                        if (task.timeline && Array.isArray(task.timeline)) {
-                          task.timeline.forEach(timelineItem => {
-                            if (timelineItem.client?.id) {
-                              uniqueClients.add(timelineItem.client.id);
-                            }
-                          });
-                        }
-                      });
-                    }
-                    return uniqueClients.size;
-                  })()}
+                  {new Set(safeTasks.taskDetails.map((task) => task.clientId).filter(Boolean)).size}
                 </p>
               </div>
               <div className="text-center">
                 <p className="text-sm font-medium text-gray-600">Total Tasks</p>
-                <p className="text-3xl font-bold text-green-600">
-                  {(() => {
-                    let totalTasks = 0;
-                    if (safeTasks.recent && Array.isArray(safeTasks.recent)) {
-                      totalTasks = safeTasks.recent.length;
-                    }
-                    return totalTasks;
-                  })()}
-                </p>
+                <p className="text-3xl font-bold text-green-600">{safeTasks.taskDetails.length}</p>
               </div>
               <div className="text-center">
                 <p className="text-sm font-medium text-gray-600">Completed Tasks</p>
                 <p className="text-3xl font-bold text-purple-600">
-                  {(() => {
-                    let completedTasks = 0;
-                    if (safeTasks.recent && Array.isArray(safeTasks.recent)) {
-                      completedTasks = safeTasks.recent.filter(task => task.status === 'completed').length;
-                    }
-                    return completedTasks;
-                  })()}
+                  {safeTasks.taskDetails.filter((task) => task.status === 'completed').length}
                 </p>
               </div>
             </div>

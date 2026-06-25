@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { Base_url } from '@/app/api/config/BaseUrl';
+import { getAssignedByName, hasTaskAssigner } from '@/app/(components)/(contentlayout)/tasks/utils/taskAssigner';
 
 interface Task {
   id: string;
@@ -26,6 +27,13 @@ interface Task {
     id: string;
     name: string;
     email: string;
+  };
+  assignedByTeamMember?: {
+    id: string;
+    _id?: string;
+    name: string;
+    email: string;
+    phone?: string;
   };
   timeline?: Array<{
     id: string;
@@ -777,6 +785,12 @@ const TaskManagement = () => {
                       <div className="text-[11px] text-[#495057]">{task.teamMember?.email || "-"}</div>
                       {task.branch?.name && (
                         <div className="text-[11px] text-[#495057] flex items-center mt-0.5"><i className="ri-building-line text-xs mr-1" />{task.branch.name}</div>
+                      )}
+                      {hasTaskAssigner(task) && (
+                        <div className="text-[11px] text-[#495057] flex items-center mt-0.5">
+                          <i className="ri-user-add-line text-xs mr-1" />
+                          Assigned by: <span className="font-medium ml-0.5">{getAssignedByName(task)}</span>
+                        </div>
                       )}
                     </div>
                   </td>
