@@ -478,11 +478,12 @@ export const useFileManager = () => {
     setState(prev => ({ ...prev, error: null }));
   }, []);
 
-  // Initialize
+  // Initialize. We only load the folder tree here — the dashboard payload
+  // (root folders + recent files + a full tree rebuild) is not rendered by the
+  // File Manager page, so calling it on mount just doubled the backend work.
   useEffect(() => {
-    loadDashboard();
     loadFolderTree();
-  }, [loadDashboard, loadFolderTree]);
+  }, [loadFolderTree]);
 
   return {
     // State
