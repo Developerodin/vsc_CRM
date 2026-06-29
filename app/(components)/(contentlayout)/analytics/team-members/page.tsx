@@ -545,7 +545,8 @@ const AnalyticsTeamMembersPage = () => {
                                 <div className="ml-4">
                                   <button
                                     onClick={() => router.push(`/analytics/team-members/${member._id}/overview`)}
-                                    className="font-medium text-gray-900 hover:text-blue-600 hover:underline cursor-pointer text-left"
+                                    className="font-medium text-purple-600 hover:text-purple-800 underline underline-offset-2 decoration-purple-300 hover:decoration-purple-800 cursor-pointer text-left transition-colors"
+                                    aria-label={`View overview for ${member.name}`}
                                   >
                                     {member.name}
                                   </button>
