@@ -208,19 +208,24 @@ const TimelinesPage = () => {
     }
   };
 
+  // Only fetch timeline list when Timelines tab is active
   useEffect(() => {
+    if (activeTab !== 'timelines') return;
     fetchTimelines(currentPage, itemsPerPage);
-  }, [currentPage, sortBy, itemsPerPage, timelineFilters]);
+  }, [activeTab, currentPage, sortBy, itemsPerPage, timelineFilters]);
 
-  // When filters change, reset to first page
+  // When filters change, reset to first page (timelines tab only)
   useEffect(() => {
+    if (activeTab !== 'timelines') return;
     setCurrentPage(1);
-  }, [timelineFilters]);
+  }, [timelineFilters, activeTab]);
 
-  // Fetch activities for export modal
+  /**
+   * Fetch activities for filter/export (typeahead-friendly limit).
+   */
   const fetchActivities = async () => {
     try {
-      const response = await fetch(`${Base_url}activities?limit=1000`, {
+      const response = await fetch(`${Base_url}activities?limit=100`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -233,17 +238,16 @@ const TimelinesPage = () => {
       const data = await response.json();
       setActivities(data.results);
     } catch (err) {
+      console.error('Failed to fetch activities', err);
     }
   };
 
-  useEffect(() => {
-    fetchActivities();
-  }, []);
-
-  // Fetch clients for Client filter
+  /**
+   * Fetch clients for Client filter (bounded page).
+   */
   const fetchClients = async () => {
     try {
-      const response = await fetch(`${Base_url}clients?limit=1000`, {
+      const response = await fetch(`${Base_url}clients?limit=100`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -252,14 +256,18 @@ const TimelinesPage = () => {
         const data = await response.json();
         setClients(data.results || []);
       }
-    } catch {
-      // Silent fail – filters still work without client list
+    } catch (err) {
+      console.error('Failed to fetch clients', err);
     }
   };
 
+  // Lazy-load masters only when Timelines or Register tab needs them
   useEffect(() => {
-    fetchClients();
-  }, []);
+    if (activeTab !== 'timelines' && activeTab !== 'register') return;
+    if (activities.length === 0) fetchActivities();
+    if (clients.length === 0) fetchClients();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   // Fetch frequency periods when frequency changes
   const fetchFrequencyPeriods = async (frequency: string) => {

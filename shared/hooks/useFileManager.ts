@@ -91,6 +91,39 @@ export const useFileManager = () => {
         },
         loading: false 
       }));
+
+      // Background client-folder sync may create missing folders after this response.
+      // Soft-refetch once so newly healed folders appear without a full page refresh.
+      if (contentsResponse.clientSyncScheduled) {
+        window.setTimeout(() => {
+          void (async () => {
+            try {
+              const [refreshedContents, refreshedTree] = await Promise.all([
+                fileManagerService.getFolderContents(folderId, { limit: 100, page }),
+                fileManagerService.getFolderTree().catch(() => null),
+              ]);
+              setState(prev => {
+                if (prev.currentFolder?.id !== folderId && (prev.currentFolder as { _id?: string })?._id !== folderId) {
+                  return prev;
+                }
+                return {
+                  ...prev,
+                  folderContents: refreshedContents.contents.results,
+                  pagination: {
+                    page: refreshedContents.contents.page,
+                    limit: refreshedContents.contents.limit,
+                    totalPages: refreshedContents.contents.totalPages,
+                    totalResults: refreshedContents.contents.totalResults,
+                  },
+                  ...(refreshedTree ? { folderTree: refreshedTree } : {}),
+                };
+              });
+            } catch (refreshError) {
+              console.error('Failed to soft-refresh folder contents after client sync:', refreshError);
+            }
+          })();
+        }, 1500);
+      }
     } catch (error) {
       console.error('Failed to load folder contents:', error);
       setState(prev => ({ 

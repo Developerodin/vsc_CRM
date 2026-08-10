@@ -194,34 +194,23 @@ export const BranchProvider = ({ children }: BranchProviderProps) => {
       setUserRole(roleData);
       setAllBranchesAccess(roleData.allBranchesAccess);
 
-      // If user has access to all branches, fetch all branches
+      // Resolve branches once (avoid duplicate /branches fetch)
+      let availableBranches: Branch[] = roleData.branchAccess || [];
       if (roleData.allBranchesAccess) {
         const branchesResponse = await fetch(`${Base_url}branches`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
         });
 
         if (!branchesResponse.ok) {
           throw new Error('Failed to fetch branches');
         }
-        console.log("branchesResponse",branchesResponse);
         const branchesData = await branchesResponse.json();
-        setBranches(branchesData.results || []);
-      } else {
-        // Use branch access from role
-        setBranches(roleData.branchAccess || []);
+        availableBranches = branchesData.results || [];
       }
 
-      // Set the first branch as default if branches exist
-      const availableBranches = roleData.allBranchesAccess 
-        ? (await fetch(`${Base_url}branches`, {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            }
-          }).then(res => res.json()).then(data => data.results || []))
-        : roleData.branchAccess || [];
-
+      setBranches(availableBranches);
       if (availableBranches.length > 0) {
         setSelectedBranch(availableBranches[0]);
       }

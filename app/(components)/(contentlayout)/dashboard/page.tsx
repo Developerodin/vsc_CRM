@@ -402,45 +402,100 @@ const Dashboard = () => {
     setSelectedFrequency(frequency);
   };
 
-  // Fetch all data when selected branch changes
+  /**
+   * Load full dashboard via single /summary endpoint.
+   * @param branchId - selected branch
+   * @param frequency - timeline frequency for period table
+   */
+  const fetchDashboardSummary = async (branchId: string, frequency: string) => {
+    if (!branchId) return;
+
+    const frequencyToInterval: { [key: string]: string } = {
+      Daily: 'day',
+      Weekly: 'week',
+      Monthly: 'month',
+    };
+    const interval = frequencyToInterval[frequency] || 'month';
+
+    setError(null);
+    setIsLoadingDashboard(true);
+    setIsLoadingTimeline(true);
+    setIsLoadingMonthly(true);
+    setIsLoadingTopClients(true);
+    setIsLoadingTopActivities(true);
+    setIsLoadingFrequencyData(true);
+    setIsLoadingAnalytics(true);
+    setIsLoadingTrends(true);
+    setIsLoadingCompletionRates(true);
+    setIsLoadingFrequencyStats(true);
+    setIsLoadingPeriods(true);
+    setIsLoadingTaskTrends(true);
+    setIsLoadingTaskStatusAnalytics(true);
+    setIsLoadingTaskPriorityAnalytics(true);
+
+    try {
+      const data = await DashboardService.getDashboardSummary({
+        branchId,
+        frequency,
+        interval,
+      });
+
+      if (data.totals) setDashboardData(data.totals);
+      setTimelineCounts(data.timelineCounts || null);
+      setMonthlyTaskData({
+        assigned: data.assignedTaskCounts?.assigned || Array(12).fill(0),
+        months: data.assignedTaskCounts?.months || [],
+      });
+      setTopClients(data.topClients || []);
+      setTopActivities(data.topActivities || []);
+      setFrequencyStatusData(data.frequencyStatusData || []);
+      setFrequencyAnalyticsData(data.frequencyAnalyticsData || []);
+      setStatusTrendsData(data.statusTrendsData || []);
+      setCompletionRatesData(data.completionRatesData || null);
+      setFrequencyStatusStats(data.frequencyStatusStats || null);
+      setTimelinePeriodData(data.timelinePeriodData || []);
+      setTaskTrendsData(data.taskTrendsData || null);
+      setTaskStatusAnalytics(data.taskStatusAnalytics || null);
+      setTaskPriorityAnalytics(data.taskPriorityAnalytics || null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch dashboard data');
+      toast.error('Failed to load dashboard data');
+    } finally {
+      setIsLoadingDashboard(false);
+      setIsLoadingTimeline(false);
+      setIsLoadingMonthly(false);
+      setIsLoadingTopClients(false);
+      setIsLoadingTopActivities(false);
+      setIsLoadingFrequencyData(false);
+      setIsLoadingAnalytics(false);
+      setIsLoadingTrends(false);
+      setIsLoadingCompletionRates(false);
+      setIsLoadingFrequencyStats(false);
+      setIsLoadingPeriods(false);
+      setIsLoadingTaskTrends(false);
+      setIsLoadingTaskStatusAnalytics(false);
+      setIsLoadingTaskPriorityAnalytics(false);
+    }
+  };
+
+  // Fetch all data when selected branch changes (one summary call)
   useEffect(() => {
     if (selectedBranch?.id) {
-      fetchTimelineCounts(selectedBranch.id);
-      fetchMonthlyTaskData(selectedBranch.id);
-      fetchDashboardData(selectedBranch.id);
-      fetchTopClients(selectedBranch.id);
-      fetchTopActivities(selectedBranch.id);
-      fetchFrequencyData();
-      fetchAnalyticsData();
-      fetchTrendsData();
-      fetchCompletionRates();
-      fetchFrequencyStatusStats();
-      fetchPeriodData();
-      fetchTaskTrends();
-      fetchTaskStatusAnalytics();
-      fetchTaskPriorityAnalytics();
+      fetchDashboardSummary(selectedBranch.id, selectedFrequency);
     }
   }, [selectedBranch]);
 
-  // Fetch period data when frequency changes
+  // Frequency change: only period table + task trends (avoid full remount fan-out)
   useEffect(() => {
-    if (selectedBranch?.id) {
-      fetchPeriodData();
-    }
-  }, [selectedFrequency]);
-
-  // Refetch task trends when frequency changes
-  useEffect(() => {
-    if (selectedBranch?.id) {
-      // Map frequency to API interval format
-      const frequencyToInterval: { [key: string]: string } = {
-        'Daily': 'day',
-        'Weekly': 'week',
-        'Monthly': 'month'
-      };
-      const interval = frequencyToInterval[selectedFrequency] || 'month';
-      refreshTaskTrends(interval);
-    }
+    if (!selectedBranch?.id) return;
+    fetchPeriodData();
+    const frequencyToInterval: { [key: string]: string } = {
+      Daily: 'day',
+      Weekly: 'week',
+      Monthly: 'month',
+    };
+    refreshTaskTrends(frequencyToInterval[selectedFrequency] || 'month');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFrequency]);
 
   const handleStatusClick = (status: string) => {

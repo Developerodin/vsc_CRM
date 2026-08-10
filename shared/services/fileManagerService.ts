@@ -67,6 +67,8 @@ export interface PaginatedResponse<T> {
 export interface FolderContentsResponse {
   folder: Folder;
   contents: PaginatedResponse<Folder | FileItem>;
+  /** True when a background client-folder heal was scheduled for this Clients open */
+  clientSyncScheduled?: boolean;
 }
 
 // Dashboard data interface
@@ -124,8 +126,8 @@ const getAccessToken = (): string | null => {
 };
 
 class FileManagerService {
-  private baseURL = `${Base_url}/file-manager`;
-  private commonURL = `${Base_url}/common`;
+  private baseURL = `${Base_url.replace(/\/?$/, '/')}file-manager`;
+  private commonURL = `${Base_url.replace(/\/?$/, '/')}common`;
 
   private async makeRequest<T>(endpoint: string, options?: RequestInit): Promise<T> {
     try {

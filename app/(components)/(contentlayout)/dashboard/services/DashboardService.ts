@@ -241,7 +241,15 @@ class DashboardService {
         headers: this.getHeaders(),
         params: filters
       });
-      return response.data;
+      const breakdown = response.data?.data?.statusBreakdown || response.data?.statusBreakdown || {};
+      const total = response.data?.data?.totalTimelines ?? response.data?.total ?? 0;
+      return {
+        pending: breakdown.pending || 0,
+        ongoing: breakdown.ongoing || 0,
+        delayed: breakdown.delayed || 0,
+        completed: breakdown.completed || 0,
+        total,
+      };
     } catch (error) {
       throw error;
     }
@@ -355,6 +363,18 @@ class DashboardService {
     } catch (error) {
       throw error;
     }
+  }
+
+  /**
+   * Single round-trip dashboard summary (totals + charts + analytics).
+   * @param filters - branch / frequency / interval filters
+   */
+  async getDashboardSummary(filters: DashboardFilters = {}) {
+    const response = await axios.get(`${Base_url}dashboard/summary`, {
+      headers: this.getHeaders(),
+      params: filters,
+    });
+    return response.data;
   }
 }
 

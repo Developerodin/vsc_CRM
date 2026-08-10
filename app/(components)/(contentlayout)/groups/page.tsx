@@ -133,11 +133,14 @@ const GroupsPage = () => {
     updateTaskStatusFilter
   } = useGroupFilters();
 
-  // Function to fetch total clients count
+  // Function to fetch total clients count (once; capped page to avoid full scan)
+  /**
+   * Approximate unique client membership across groups (capped sample).
+   * @returns {Promise<void>}
+   */
   const fetchTotalClients = async () => {
     try {
-      // Fetch all groups to calculate total clients
-      const response = await fetch(`${Base_url}groups?limit=1000`, {
+      const response = await fetch(`${Base_url}groups?limit=100&page=1`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -145,13 +148,10 @@ const GroupsPage = () => {
 
       if (response.ok) {
         const data: ApiResponse = await response.json();
-        // Calculate total unique clients across all groups
-        // clients can be an array of client ID strings or an array of client objects
         const allClientIds = new Set<string>();
         data.results.forEach(group => {
           if (group.clients && Array.isArray(group.clients)) {
             group.clients.forEach(client => {
-              // Handle both cases: string ID or object with id property
               if (typeof client === 'string') {
                 allClientIds.add(client);
               } else if (client && typeof client === 'object' && 'id' in client) {
@@ -163,12 +163,10 @@ const GroupsPage = () => {
         setTotalClients(allClientIds.size);
       }
     } catch (error) {
-      // Calculate from current groups if API fails
       const allClientIds = new Set<string>();
       groups.forEach(group => {
         if (group.clients && Array.isArray(group.clients)) {
           group.clients.forEach(client => {
-            // Handle both cases: string ID or object with id property
             if (typeof client === 'string') {
               allClientIds.add(client);
             } else if (client && typeof client === 'object' && 'id' in client) {
@@ -181,14 +179,19 @@ const GroupsPage = () => {
     }
   };
 
-  // Function to fetch task statistics for all groups
-  const fetchGroupTaskStats = async (): Promise<Map<string, any>> => {
+  // Function to fetch task statistics for the current page of groups
+  /**
+   * Load task stats for the same page/filters as the groups list.
+   * @param {number} page
+   * @param {number} limit
+   * @returns {Promise<Map<string, any>>}
+   */
+  const fetchGroupTaskStats = async (page = 1, limit = itemsPerPage): Promise<Map<string, any>> => {
     try {
       setIsLoadingTaskStats(true);
       const queryParams = new URLSearchParams({
-        page: '1',
-        limit: '1000', // Get all groups' task stats
-        // Pass the same filters as groups
+        page: page.toString(),
+        limit: Math.min(limit, 100).toString(),
         ...(filters.name && { name: filters.name }),
         ...(advancedFilters.clientName && { client: advancedFilters.clientName }),
       });
@@ -252,10 +255,10 @@ const GroupsPage = () => {
         throw new Error('Invalid response format from API');
       }
       
-      // Fetch task statistics for all groups (handle errors gracefully)
+      // Fetch task statistics for this page of groups (handle errors gracefully)
       let newTaskStatsMap = new Map<string, any>();
       try {
-        newTaskStatsMap = await fetchGroupTaskStats();
+        newTaskStatsMap = await fetchGroupTaskStats(page, limit);
         setTaskStatsMap(newTaskStatsMap);
       } catch (taskStatsError) {
         console.error('Failed to fetch task statistics:', taskStatsError);
@@ -319,12 +322,14 @@ const GroupsPage = () => {
 
   useEffect(() => {
     fetchGroups(currentPage, itemsPerPage);
-    fetchTotalClients();
   }, [currentPage, itemsPerPage, sortBy, filters.name, advancedFilters.clientName]);
 
-  // Separate useEffect for advanced filters (excluding clientName) to update task statistics and reapply filters
   useEffect(() => {
-    // Skip if only clientName filter changed (it's handled by API in fetchGroups)
+    fetchTotalClients();
+  }, []);
+
+  // Re-apply client-side advanced filters without re-hitting task-statistics
+  useEffect(() => {
     const hasOnlyClientNameFilter = advancedFilters.clientName && 
       !advancedFilters.minClients && 
       !advancedFilters.maxClients && 
@@ -333,50 +338,26 @@ const GroupsPage = () => {
       (!advancedFilters.taskStatus || !Object.values(advancedFilters.taskStatus).some(v => v === true));
     
     if (hasOnlyClientNameFilter) {
-      return; // clientName filter is handled by API, so fetchGroups will handle it
+      return;
     }
 
-    const updateTaskStats = async () => {
-      const newTaskStatsMap = await fetchGroupTaskStats();
-      setTaskStatsMap(newTaskStatsMap);
+    setGroups(prevGroups => {
+      const finalFiltered = applyAdvancedFilters(prevGroups);
+      const hasAdvancedFilters = 
+        advancedFilters.minClients || 
+        advancedFilters.maxClients || 
+        advancedFilters.minTasks || 
+        advancedFilters.maxTasks ||
+        (advancedFilters.taskStatus && Object.values(advancedFilters.taskStatus).some(v => v === true));
       
-      // Update existing groups with new task stats and reapply advanced filters
-      setGroups(prevGroups => {
-        const updatedGroups = prevGroups.map(group => {
-          const taskStats = newTaskStatsMap.get(group.id) || {
-            pending: 0,
-            ongoing: 0,
-            completed: 0,
-            delayed: 0,
-            onHold: 0,
-            cancelled: 0,
-            total: 0
-          };
-          return { ...group, taskStats };
-        });
-        
-        // Apply other advanced filters (clientName is handled by API)
-        const finalFiltered = applyAdvancedFilters(updatedGroups);
-        
-        // Update pagination counts when advanced filters are active (excluding clientName)
-        const hasAdvancedFilters = 
-          advancedFilters.minClients || 
-          advancedFilters.maxClients || 
-          advancedFilters.minTasks || 
-          advancedFilters.maxTasks ||
-          (advancedFilters.taskStatus && Object.values(advancedFilters.taskStatus).some(v => v === true));
-        
-        if (hasAdvancedFilters) {
-          setTotalResults(finalFiltered.length);
-          setTotalPages(Math.ceil(finalFiltered.length / itemsPerPage));
-        }
-        
-        return finalFiltered;
-      });
-    };
-
-    updateTaskStats();
-  }, [advancedFilters, applyAdvancedFilters]);
+      if (hasAdvancedFilters) {
+        setTotalResults(finalFiltered.length);
+        setTotalPages(Math.ceil(finalFiltered.length / itemsPerPage));
+      }
+      
+      return finalFiltered;
+    });
+  }, [advancedFilters, applyAdvancedFilters, itemsPerPage]);
 
   const handleSelectAll = () => {
     if (selectAll) {

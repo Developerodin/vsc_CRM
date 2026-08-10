@@ -206,7 +206,7 @@ const TaskManagement = () => {
 
   const fetchGroups = useCallback(async () => {
     try {
-      const res = await fetch(`${Base_url}groups?limit=1000`, {
+      const res = await fetch(`${Base_url}groups?limit=100`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       if (!res.ok) return;
@@ -310,7 +310,7 @@ const TaskManagement = () => {
           }));
         successMessage = "Selected tasks exported successfully";
       } else {
-        const response = await fetch(`${Base_url}tasks?limit=1000`, {
+        const response = await fetch(`${Base_url}tasks?limit=100`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }

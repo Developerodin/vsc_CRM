@@ -545,7 +545,7 @@ const TasksPage = () => {
           <div className="flex items-center justify-between">
             <div>
               <span className="text-[11px] font-bold text-sky-600 uppercase tracking-wider">Pending</span>
-              <p className="text-xl font-bold text-[#323251] mt-0.5">{tasks.filter(t => t?.status === 'pending').length}</p>
+              <p className="text-xl font-bold text-[#323251] mt-0.5">{taskStats?.pending ?? 0}</p>
             </div>
             <div className="w-10 h-10 bg-sky-100 rounded-full flex items-center justify-center">
               <i className="ri-time-line text-sky-600 text-lg"></i>
@@ -559,7 +559,7 @@ const TasksPage = () => {
           <div className="flex items-center justify-between">
             <div>
               <span className="text-[11px] font-bold text-purple-600 uppercase tracking-wider">Ongoing</span>
-              <p className="text-xl font-bold text-[#323251] mt-0.5">{tasks.filter(t => t?.status === 'ongoing').length}</p>
+              <p className="text-xl font-bold text-[#323251] mt-0.5">{taskStats?.ongoing ?? 0}</p>
             </div>
             <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
               <i className="ri-loader-4-line text-purple-600 text-lg"></i>
@@ -573,7 +573,7 @@ const TasksPage = () => {
           <div className="flex items-center justify-between">
             <div>
               <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Completed</span>
-              <p className="text-xl font-bold text-[#323251] mt-0.5">{tasks.filter(t => t?.status === 'completed').length}</p>
+              <p className="text-xl font-bold text-[#323251] mt-0.5">{taskStats?.completed ?? 0}</p>
             </div>
             <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
               <i className="ri-check-line text-emerald-600 text-lg"></i>
@@ -587,7 +587,7 @@ const TasksPage = () => {
           <div className="flex items-center justify-between">
             <div>
               <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">On Hold</span>
-              <p className="text-xl font-bold text-[#323251] mt-0.5">{tasks.filter(t => t?.status === 'on_hold').length}</p>
+              <p className="text-xl font-bold text-[#323251] mt-0.5">{taskStats?.onHold ?? 0}</p>
             </div>
             <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
               <i className="ri-pause-line text-amber-700 text-lg"></i>
@@ -601,7 +601,7 @@ const TasksPage = () => {
           <div className="flex items-center justify-between">
             <div>
               <span className="text-[11px] font-bold text-red-600 uppercase tracking-wider">Delayed</span>
-              <p className="text-xl font-bold text-[#323251] mt-0.5">{tasks.filter(t => t?.status === 'delayed').length}</p>
+              <p className="text-xl font-bold text-[#323251] mt-0.5">{taskStats?.delayed ?? 0}</p>
             </div>
             <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
               <i className="ri-error-warning-line text-red-600 text-lg"></i>

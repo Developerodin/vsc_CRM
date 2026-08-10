@@ -350,18 +350,20 @@ const ClientsPage = () => {
     }
   };
 
-  // Function to fetch task statistics for all clients
-  const fetchClientTaskStats = async (): Promise<Map<string, TaskStats>> => {
+  // Function to fetch task statistics for the current page of clients
+  /**
+   * Load task stats for the same page/filters as the clients list.
+   * @param {number} page
+   * @param {number} limit
+   * @returns {Promise<Map<string, TaskStats>>}
+   */
+  const fetchClientTaskStats = async (page: number = 1, limit: number = itemsPerPage): Promise<Map<string, TaskStats>> => {
     try {
       setIsLoadingTaskStats(true);
-      
-      // Check if any filters are active
-      const hasActiveFilters = Object.values(filters).some(f => f !== "");
-      
+
       const queryParams = new URLSearchParams({
-        page: '1',
-        limit: '1000', // Get all clients' task stats
-        // Only pass filters if they have values
+        page: page.toString(),
+        limit: Math.min(limit, 100).toString(),
         ...(filters.name && { name: filters.name }),
         ...(filters.email && { email: filters.email }),
         ...(filters.phone && { phone: filters.phone }),
@@ -376,6 +378,7 @@ const ClientsPage = () => {
         ...(filters.cinNumber && { cinNumber: filters.cinNumber }),
         ...(filters.udyamNumber && { udyamNumber: filters.udyamNumber }),
         ...(filters.iecCode && { iecCode: filters.iecCode }),
+        ...(debouncedSearchQuery && { search: debouncedSearchQuery }),
       });
 
       const response = await fetch(`${Base_url}clients/task-statistics?${queryParams}`, {
@@ -467,7 +470,7 @@ const ClientsPage = () => {
         setTotalPages(data.totalPages || 1);
         
         // Fetch task statistics for the found clients
-        const newTaskStatsMap = await fetchClientTaskStats();
+        const newTaskStatsMap = await fetchClientTaskStats(page, limit);
         setTaskStatsMap(newTaskStatsMap);
         
         
@@ -503,8 +506,7 @@ const ClientsPage = () => {
   };
 
   useEffect(() => {
-    loadInitialData();
-    // Fetch business types, entity types, and activities on mount
+    // Masters only — list load is owned by the currentPage/sort/itemsPerPage effect
     fetchBusinessTypes();
     fetchEntityTypes();
     fetchActivities();
@@ -522,12 +524,15 @@ const ClientsPage = () => {
     }
   }, [filters]);
 
-  // Refetch clients when search query changes
+  // Refetch when search settles — skip the initial empty mount (list effect already loads)
+  const isFirstSearchEffect = useRef(true);
   useEffect(() => {
-    if (debouncedSearchQuery !== undefined) {
-      setCurrentPage(1); // Reset to first page when searching
-      fetchClients(1, itemsPerPage);
+    if (isFirstSearchEffect.current) {
+      isFirstSearchEffect.current = false;
+      return;
     }
+    setCurrentPage(1);
+    fetchClients(1, itemsPerPage);
   }, [debouncedSearchQuery]);
 
   // Debounce search query
@@ -565,32 +570,7 @@ const ClientsPage = () => {
     };
   }, []);
 
-  // Separate useEffect for filters and search to update task statistics
-  useEffect(() => {
-    // Update task stats when filters change
-    const updateTaskStats = async () => {
-      const newTaskStatsMap = await fetchClientTaskStats();
-      setTaskStatsMap(newTaskStatsMap);
-      
-      // Update existing clients with new task stats
-      setClients(prevClients => 
-        prevClients.map(client => {
-          const taskStats = newTaskStatsMap.get(client.id) || {
-            pending: 0,
-            ongoing: 0,
-            completed: 0,
-            delayed: 0,
-            onHold: 0,
-            cancelled: 0,
-            total: 0
-          };
-          return { ...client, taskStats };
-        })
-      );
-    };
-
-    updateTaskStats();
-  }, [filters, debouncedSearchQuery]);
+  // Task stats are loaded inside fetchClients — do not re-fetch on filter/search here.
 
   const handleSelectAll = () => {
     if (selectAll) {
