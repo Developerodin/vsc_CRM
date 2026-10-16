@@ -5,7 +5,9 @@ import Link from "next/link";
 import { toast, Toaster } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { Base_url } from '@/app/api/config/BaseUrl';
+import { useSyncHeaderBranchFilter } from '@/shared/contextapi';
 import TaskManagement from './components/TaskManagement';
+import BranchFilterSelect from './components/BranchFilterSelect';
 import ComplianceRegister from './components/ComplianceRegister';
 import { normalizeQuarterlyPeriods, formatPeriodDisplay } from './utils/quarterPeriods';
 import { getClientIdDisplay, getClientIdsForExport } from './utils/timelineClientId';
@@ -128,7 +130,11 @@ const TimelinesPage = () => {
     frequency: "",
     period: "",
     status: "",
-    client: ""
+    client: "",
+    branch: ""
+  });
+  useSyncHeaderBranchFilter((branchId) => {
+    setTimelineFilters((prev) => ({ ...prev, branch: branchId }));
   });
   const [clients, setClients] = useState<Array<{ id: string; name: string }>>([]);
   const [clientSearchTerm, setClientSearchTerm] = useState("");
@@ -183,6 +189,7 @@ const TimelinesPage = () => {
         ...(periodToSend && { period: periodToSend }),
         ...(timelineFilters.status && { status: timelineFilters.status }),
         ...(timelineFilters.client && { client: timelineFilters.client }),
+        ...(timelineFilters.branch && { branch: timelineFilters.branch }),
         ...(sortBy && { sortBy })
       });
 
@@ -858,7 +865,7 @@ const TimelinesPage = () => {
                   <h3 className="text-[11px] font-bold text-[#495057] uppercase tracking-wider">Filter Options</h3>
                   <button
                     type="button"
-                    onClick={() => setTimelineFilters({ activity: "", subActivity: "", frequency: "", period: "", status: "", client: "" })}
+                    onClick={() => setTimelineFilters({ activity: "", subActivity: "", frequency: "", period: "", status: "", client: "", branch: "" })}
                     className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100"
                   >
                     <i className="ri-refresh-line text-xs" /> Reset
@@ -877,6 +884,11 @@ const TimelinesPage = () => {
 
                   {showTimelineFilters && (
                     <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+                      <BranchFilterSelect
+                        id="timeline-branch-filter"
+                        value={timelineFilters.branch}
+                        onChange={(branchId) => setTimelineFilters(prev => ({ ...prev, branch: branchId }))}
+                      />
                       {/* Activity */}
                       <div>
                         <label className="block text-[11px] font-medium text-[#495057] mb-1">Activity</label>
@@ -891,7 +903,8 @@ const TimelinesPage = () => {
                               frequency: "",
                               period: "",
                               status: timelineFilters.status,
-                              client: timelineFilters.client
+                              client: timelineFilters.client,
+                              branch: timelineFilters.branch
                             });
                             setAvailablePeriods([]);
                           }}

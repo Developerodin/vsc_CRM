@@ -8,6 +8,7 @@ export interface TaskStatus {
 }
 
 export interface AdvancedFilters {
+  branch: string;
   clientName: string;
   minTasks: string;
   maxTasks: string;
@@ -51,6 +52,7 @@ export interface GroupWithTasks {
 export const useGroupFilters = () => {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>({
+    branch: "",
     clientName: "",
     minTasks: "",
     maxTasks: "",
@@ -67,6 +69,7 @@ export const useGroupFilters = () => {
   // Check if any advanced filters are active
   const hasActiveAdvancedFilters = useCallback((): boolean => {
     return !!(
+      advancedFilters.branch ||
       advancedFilters.clientName
       // || advancedFilters.minTasks
       // || advancedFilters.maxTasks
@@ -124,6 +127,7 @@ export const useGroupFilters = () => {
   // Clear all advanced filters
   const clearAdvancedFilters = useCallback(() => {
     setAdvancedFilters({
+      branch: "",
       clientName: "",
       minTasks: "",
       maxTasks: "",

@@ -253,10 +253,17 @@ class FileManagerService {
     return result;
   }
 
-  // Folder Tree - Updated to return FolderTreeItem array
-  async getFolderTree(rootFolderId?: string): Promise<FolderTreeItem[]> {
-    const params = rootFolderId ? `?rootFolderId=${rootFolderId}` : '';
-    const result = await this.makeRequest<FolderTreeItem[]>(`/folder-tree${params}`);
+  /**
+   * Folder tree for the current user.
+   * @param rootFolderId - Limit the tree to one root
+   * @param branchId - Limit roots to one branch (super admin)
+   */
+  async getFolderTree(rootFolderId?: string, branchId?: string): Promise<FolderTreeItem[]> {
+    const searchParams = new URLSearchParams();
+    if (rootFolderId) searchParams.append('rootFolderId', rootFolderId);
+    if (branchId) searchParams.append('branch', branchId);
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    const result = await this.makeRequest<FolderTreeItem[]>(`/folder-tree${query}`);
     console.log('Folder tree API response:', result);
     return result;
   }

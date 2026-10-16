@@ -5,7 +5,7 @@ import { Base_url } from '@/app/api/config/BaseUrl';
 import axios from 'axios';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { useBranchContext } from '@/shared/contextapi';
+import { useBranchContext, useSyncHeaderBranchFilter } from '@/shared/contextapi';
 
 // Dynamically import ApexCharts to avoid SSR issues
 const ReactApexChart = dynamic(() => import("react-apexcharts"), { 
@@ -326,6 +326,9 @@ const AnalyticsPage = () => {
   const [selectedMonths, setSelectedMonths] = useState(6);
   const [chartType, setChartType] = useState<'combined' | 'separate'>('combined');
   const [selectedBranch, setSelectedBranch] = useState("all");
+  useSyncHeaderBranchFilter((branchId) => {
+    setSelectedBranch(branchId || "all");
+  });
   const [dateRange, setDateRange] = useState({
     startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0]
@@ -840,6 +843,22 @@ const AnalyticsPage = () => {
               <p className="text-[11px] text-[#495057] mt-0.5">Key performance metrics and team insights</p>
             </div>
           </div>
+          {showBranchFilter && (
+            <select
+              id="analytics-branch-filter"
+              aria-label="Filter analytics by branch"
+              className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300 min-w-[160px]"
+              value={selectedBranch}
+              onChange={(e) => setSelectedBranch(e.target.value)}
+            >
+              <option value="all">All Branches</option>
+              {branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {branch.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
@@ -1009,26 +1028,7 @@ const AnalyticsPage = () => {
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold text-gray-900">Performance Filters</h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div>
-            <label htmlFor="branch-filter" className="block text-sm font-medium text-gray-700 mb-2">
-              Branch
-            </label>
-            <select
-              id="branch-filter"
-              className="form-select border-gray-300 rounded-lg w-full"
-              value={selectedBranch}
-              onChange={(e) => setSelectedBranch(e.target.value)}
-              aria-label="Filter analytics by branch"
-            >
-              <option value="all">All Branches</option>
-              {branches.map((branch) => (
-                <option key={branch._id} value={branch._id}>
-                  {branch.name}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label htmlFor="start-date" className="block text-sm font-medium text-gray-700 mb-2">
               Start Date

@@ -9,6 +9,8 @@ import { Folder, FileItem, User, fileManagerService } from '@/shared/services/fi
 import * as XLSX from 'xlsx';
 import HelpIcon from '@/shared/components/HelpIcon';
 import { Base_url } from '@/app/api/config/BaseUrl';
+import BranchFilterSelect from '../timelines/components/BranchFilterSelect';
+import { useSyncHeaderBranchFilter } from '@/shared/contextapi';
 
 const Filemanager = () => {
     const {
@@ -22,6 +24,7 @@ const Filemanager = () => {
         pagination,
         loadDashboard,
         loadFolderContents,
+        loadFolderTree,
         createFolder,
         uploadFile,
         uploadMultipleFiles,
@@ -36,6 +39,8 @@ const Filemanager = () => {
         getFileColor,
         clearError
     } = useFileManager();
+
+    const [fileBranch, setFileBranch] = useState('');
 
     // --- LOCAL SELECTION STATE ---
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -56,6 +61,29 @@ const Filemanager = () => {
     const [expandedFolders, setExpandedFolders] = useState<string[]>([]);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
     const [typeFilter, setTypeFilter] = useState<'all' | 'file' | 'folder'>('all'); // Filter near search/filter icon
+
+    /**
+     * Scope the file manager to one branch and open that branch's Clients root.
+     * An empty id restores every branch the user can access.
+     * @param branchId - Branch id, or empty for all branches
+     */
+    const handleFileBranchChange = async (branchId: string) => {
+        setFileBranch(branchId);
+        try {
+            const tree = await loadFolderTree(branchId || undefined);
+            if (!branchId || !Array.isArray(tree)) return;
+            const clientsRoot = tree.find((node) => node.name === 'Clients');
+            if (!clientsRoot?.id) return;
+            setSelectedIds([]);
+            await loadFolderContents(String(clientsRoot.id));
+        } catch (branchError) {
+            console.error('Failed to switch file manager branch:', branchError);
+        }
+    };
+
+    useSyncHeaderBranchFilter((branchId) => {
+        void handleFileBranchChange(branchId);
+    });
     const [folderHistory, setFolderHistory] = useState<string[]>([]); // Track folder navigation history
     const [contextMenu, setContextMenu] = useState<{
         visible: boolean;
@@ -905,6 +933,12 @@ const Filemanager = () => {
                                     </div>
                                     {/* Right section: Action buttons - design spec 11px bold */}
                                     <div className="flex flex-wrap items-center gap-1.5 flex-shrink-0">
+                                        <BranchFilterSelect
+                                            id="file-manager-branch-filter"
+                                            inline
+                                            value={fileBranch}
+                                            onChange={handleFileBranchChange}
+                                        />
                                         <button
                                             type="button"
                                             className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold rounded transition-colors bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 shadow-sm disabled:opacity-50"

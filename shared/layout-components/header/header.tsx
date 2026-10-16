@@ -13,7 +13,9 @@ import { Base_url } from '@/app/api/config/BaseUrl';
 import { useBranchContext } from '@/shared/contextapi';
 
 const Header = ({ local_varaiable, ThemeChanger }:any) => {
-  const { branches, selectedBranch, setSelectedBranch, loading } = useBranchContext();
+  const { branches, selectedBranch, setSelectedBranch, loading, allBranchesAccess, userRole } = useBranchContext();
+  const canPickAllBranches =
+    allBranchesAccess || (userRole?.name || "").toLowerCase() === "superadmin";
 
   const [passwordshow1, setpasswordshow1] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -410,15 +412,21 @@ const Header = ({ local_varaiable, ThemeChanger }:any) => {
                 ) : (
                   <div className="relative">
                     <select
+                      aria-label="Select branch"
                       className="form-select bg-white border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                       value={selectedBranch?.id || ''}
                       onChange={(e) => {
+                        if (!e.target.value) {
+                          setSelectedBranch(null);
+                          return;
+                        }
                         const branch = branches.find(b => b.id === e.target.value);
                         if (branch) {
                           setSelectedBranch(branch);
                         }
                       }}
                     >
+                      {canPickAllBranches && <option value="">All Branches</option>}
                       {branches.map((branch) => (
                         <option key={branch.id} value={branch.id}>
                           {branch.name}

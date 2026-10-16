@@ -5,7 +5,7 @@ import Link from "next/link";
 import { toast, Toaster } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { Base_url } from "@/app/api/config/BaseUrl";
-import { useSelectedBranchId } from "@/shared/contextapi";
+import { useSelectedBranchId, useBranchContext, useSyncHeaderBranchFilter } from "@/shared/contextapi";
 import { useRouter } from "next/navigation";
 import { BulkEmailDrawer } from "./components/bulk-email";
 import { PastYearTimelinesModal } from "./components/PastYearTimelinesModal";
@@ -156,6 +156,10 @@ interface ExcelRow {
 const ClientsPage = () => {
   const router = useRouter();
   const selectedBranchId = useSelectedBranchId();
+  const { branches, allBranchesAccess, userRole } = useBranchContext();
+  /** Superadmin (and any all-branch role) can narrow the unscoped client list. */
+  const canFilterByBranch =
+    allBranchesAccess || (userRole?.name || "").toLowerCase() === "superadmin";
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -190,6 +194,10 @@ const ClientsPage = () => {
     iecCode: "",
     activity: "",
     subactivity: ""
+  });
+
+  useSyncHeaderBranchFilter((branchId) => {
+    setFilters((prev) => ({ ...prev, branch: branchId }));
   });
 
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -420,7 +428,9 @@ const ClientsPage = () => {
     }
   };
 
+  const clientsFetchSeq = useRef(0);
   const fetchClients = async (page: number = 1, limit: number = itemsPerPage) => {
+    const seq = ++clientsFetchSeq.current;
     try {
       setIsLoading(true);
       setError(null);
@@ -463,6 +473,7 @@ const ClientsPage = () => {
       }
 
       const data = await response.json();
+      if (seq !== clientsFetchSeq.current) return;
 
       // Handle the actual API response structure
       if (data.results) {
@@ -471,6 +482,7 @@ const ClientsPage = () => {
         
         // Fetch task statistics for the found clients
         const newTaskStatsMap = await fetchClientTaskStats(page, limit);
+        if (seq !== clientsFetchSeq.current) return;
         setTaskStatsMap(newTaskStatsMap);
         
         
@@ -496,7 +508,7 @@ const ClientsPage = () => {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch clients');
     } finally {
-      setIsLoading(false);
+      if (seq === clientsFetchSeq.current) setIsLoading(false);
     }
   };
 
@@ -516,12 +528,15 @@ const ClientsPage = () => {
     fetchClients(currentPage, itemsPerPage);
   }, [currentPage, sortBy, itemsPerPage]);
 
-  // Refetch clients when filters change
+  // Refetch on filter change, including clearing back to all branches.
+  const isFirstFilterEffect = useRef(true);
   useEffect(() => {
-    if (Object.values(filters).some(f => f !== "")) {
-      setCurrentPage(1); // Reset to first page when filters change
-      fetchClients(1, itemsPerPage);
+    if (isFirstFilterEffect.current) {
+      isFirstFilterEffect.current = false;
+      return;
     }
+    setCurrentPage(1);
+    fetchClients(1, itemsPerPage);
   }, [filters]);
 
   // Refetch when search settles — skip the initial empty mount (list effect already loads)
@@ -1970,6 +1985,31 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
               {showAdvancedFilters && (
                 <div className="bg-gray-50 border border-gray-400 rounded-lg p-4 mb-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {canFilterByBranch && (
+                      <div>
+                        <label htmlFor="client-branch-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                          Branch
+                        </label>
+                        <select
+                          id="client-branch-filter"
+                          aria-label="Filter clients by branch"
+                          className="bg-white border border-gray-400 text-[#323251] text-[11px] font-medium rounded px-3 py-1.5 pr-8 w-full focus:ring-0 focus:border-purple-500 appearance-none cursor-pointer [&_option]:text-[#323251] [&_option]:bg-white"
+                          value={filters.branch}
+                          onChange={(e) => {
+                            setFilters(prev => ({ ...prev, branch: e.target.value }));
+                            setCurrentPage(1);
+                          }}
+                        >
+                          <option value="">All Branches</option>
+                          {branches.map((branch) => (
+                            <option key={branch.id} value={branch.id}>
+                              {branch.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
                     {/* Category Filter */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -2246,6 +2286,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                       onClick={() => {
                         setFilters(prev => ({
                           ...prev,
+                          branch: "",
                           category: "",
                           businessType: "",
                           entityType: "",
@@ -2294,6 +2335,7 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                         setDebouncedSearchQuery("");
                         setFilters(prev => ({
                           ...prev,
+                          branch: "",
                           category: "",
                           businessType: "",
                           entityType: "",
@@ -2327,6 +2369,19 @@ const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
                           onClick={() => {
                             setSearchQuery("");
                           }}
+                        >
+                          <i className="ri-close-line"></i>
+                        </button>
+                      </span>
+                    )}
+                    {filters.branch && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                        Branch: {branches.find((branch) => branch.id === filters.branch)?.name || "Selected"}
+                        <button
+                          type="button"
+                          aria-label="Remove branch filter"
+                          className="ml-1 text-purple-600 hover:text-purple-800"
+                          onClick={() => setFilters(prev => ({ ...prev, branch: "" }))}
                         >
                           <i className="ri-close-line"></i>
                         </button>

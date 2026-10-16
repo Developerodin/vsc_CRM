@@ -5,6 +5,7 @@ import Link from "next/link";
 import { toast, Toaster } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { Base_url } from "@/app/api/config/BaseUrl";
+import { useSyncHeaderBranchFilter } from "@/shared/contextapi";
 import { useGroupFilters, GroupWithTasks, AdvancedFilters, TaskStatus } from "./hooks/useGroupFilters";
 import { AdvancedFiltersPanel, ActiveFiltersSummary, SearchAndFilterControls } from "./components";
 
@@ -133,6 +134,10 @@ const GroupsPage = () => {
     updateTaskStatusFilter
   } = useGroupFilters();
 
+  useSyncHeaderBranchFilter((branchId) => {
+    updateFilter("branch", branchId);
+  });
+
   // Function to fetch total clients count (once; capped page to avoid full scan)
   /**
    * Approximate unique client membership across groups (capped sample).
@@ -193,6 +198,7 @@ const GroupsPage = () => {
         page: page.toString(),
         limit: Math.min(limit, 100).toString(),
         ...(filters.name && { name: filters.name }),
+        ...(advancedFilters.branch && { branch: advancedFilters.branch }),
         ...(advancedFilters.clientName && { client: advancedFilters.clientName }),
       });
 
@@ -232,6 +238,7 @@ const GroupsPage = () => {
         limit: limit.toString(),
         sortBy,
         ...(filters.name && { name: filters.name }),
+        ...(advancedFilters.branch && { branch: advancedFilters.branch }),
         ...(advancedFilters.clientName && { client: advancedFilters.clientName }),
       });
 
@@ -322,7 +329,7 @@ const GroupsPage = () => {
 
   useEffect(() => {
     fetchGroups(currentPage, itemsPerPage);
-  }, [currentPage, itemsPerPage, sortBy, filters.name, advancedFilters.clientName]);
+  }, [currentPage, itemsPerPage, sortBy, filters.name, advancedFilters.clientName, advancedFilters.branch]);
 
   useEffect(() => {
     fetchTotalClients();

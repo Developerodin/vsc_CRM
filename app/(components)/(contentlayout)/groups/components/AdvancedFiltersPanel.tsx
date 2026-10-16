@@ -1,4 +1,5 @@
 import React from 'react';
+import { useBranchContext } from '@/shared/contextapi';
 import { AdvancedFilters, TaskStatus } from '../hooks/useGroupFilters';
 
 interface AdvancedFiltersPanelProps {
@@ -16,11 +17,36 @@ const AdvancedFiltersPanel: React.FC<AdvancedFiltersPanelProps> = ({
   onUpdateTaskStatusFilter,
   onClearFilters
 }) => {
+  const { branches, allBranchesAccess, userRole } = useBranchContext();
+  const canFilterByBranch =
+    allBranchesAccess || (userRole?.name || "").toLowerCase() === "superadmin";
+
   if (!showAdvancedFilters) return null;
 
   return (
     <div className="bg-gray-50 border border-gray-200 rounded p-3 mb-4">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        {canFilterByBranch && (
+          <div>
+            <label htmlFor="group-branch-filter" className="block text-[11px] font-medium text-[#495057] mb-1">
+              Branch
+            </label>
+            <select
+              id="group-branch-filter"
+              aria-label="Filter groups by branch"
+              className="w-full bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300"
+              value={advancedFilters.branch}
+              onChange={(e) => onUpdateFilter('branch', e.target.value)}
+            >
+              <option value="">All Branches</option>
+              {branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {branch.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div>
           <label className="block text-[11px] font-medium text-[#495057] mb-1">Client name</label>
           <input type="text" className="w-full bg-white border border-gray-200 pl-3 pr-3 py-1.5 text-[11px] rounded focus:ring-0 focus:border-purple-300 placeholder:text-gray-400" placeholder="Search by client name..." value={advancedFilters.clientName} onChange={(e) => onUpdateFilter('clientName', e.target.value)} />

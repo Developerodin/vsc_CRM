@@ -6,6 +6,7 @@ import { toast, Toaster } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import axios from "axios";
 import { Base_url } from "@/app/api/config/BaseUrl";
+import { useBranchContext, useSyncHeaderBranchFilter } from "@/shared/contextapi";
 import { useRouter } from "next/navigation";
 
 interface Branch {
@@ -69,6 +70,9 @@ const formatDate = (dateString: string) => {
 
 const TeamsPage = () => {
   const router = useRouter();
+  const { branches, allBranchesAccess, userRole } = useBranchContext();
+  const canFilterByBranch =
+    allBranchesAccess || (userRole?.name || "").toLowerCase() === "superadmin";
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
   // const [searchQuery, setSearchQuery] = useState("");
@@ -90,6 +94,9 @@ const TeamsPage = () => {
     country: "",
     pinCode: "",
     skills: [] as string[],
+  });
+  useSyncHeaderBranchFilter((branchId) => {
+    setFilters((prev) => ({ ...prev, branch: branchId }));
   });
   const [sortBy, setSortBy] = useState("name:asc");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -680,6 +687,25 @@ const TeamsPage = () => {
                       setCurrentPage(1);
                     }}
                   />
+                  {canFilterByBranch && (
+                    <select
+                      id="team-branch-filter"
+                      aria-label="Filter team members by branch"
+                      className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300 w-full sm:w-auto min-w-[140px]"
+                      value={filters.branch}
+                      onChange={(e) => {
+                        setFilters(prev => ({ ...prev, branch: e.target.value }));
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <option value="">All Branches</option>
+                      {branches.map((branch) => (
+                        <option key={branch.id} value={branch.id}>
+                          {branch.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                   <select
                     className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300 w-full sm:w-auto min-w-[100px]"
                     value={sortBy}
@@ -711,7 +737,7 @@ const TeamsPage = () => {
                     <div className="flex items-center flex-wrap gap-2">
                       <span className="text-[11px] font-bold text-sky-700">Active Filters:</span>
                       {filters.name && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700">Name: {filters.name}</span>}
-                      {filters.branch && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700">Branch: {filters.branch}</span>}
+                      {filters.branch && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700">Branch: {branches.find((branch) => branch.id === filters.branch)?.name || "Selected"}</span>}
                     </div>
                     <button
                       onClick={() => { setFilters({ name: "", email: "", phone: "", branch: "", city: "", state: "", country: "", pinCode: "", skills: [] }); setCurrentPage(1); }}

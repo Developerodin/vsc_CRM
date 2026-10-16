@@ -1,5 +1,5 @@
 "use client"
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
 import { Base_url } from '@/app/api/config/BaseUrl';
 
 /**
@@ -104,7 +104,7 @@ interface User {
 interface BranchContextType {
   branches: Branch[];
   selectedBranch: Branch | null;
-  setSelectedBranch: (branch: Branch) => void;
+  setSelectedBranch: (branch: Branch | null) => void;
   loading: boolean;
   error: string | null;
   userRole: Role | null;
@@ -126,6 +126,25 @@ export const useBranchContext = () => {
 export const useSelectedBranchId = () => {
   const { selectedBranch } = useBranchContext();
   return selectedBranch?.id || null;
+};
+
+/**
+ * Push the header branch into a screen's branch filter.
+ * All Branches clears the filter. Branch-scoped users are left alone.
+ * @param apply - Writes the branch id (empty means all branches)
+ */
+export const useSyncHeaderBranchFilter = (apply: (branchId: string) => void) => {
+  const { selectedBranch, allBranchesAccess, userRole, loading } = useBranchContext();
+  const canFilterByBranch =
+    allBranchesAccess || (userRole?.name || "").toLowerCase() === "superadmin";
+  const headerBranchId = canFilterByBranch ? selectedBranch?.id || "" : "";
+  const applyRef = useRef(apply);
+  applyRef.current = apply;
+
+  useEffect(() => {
+    if (loading || !canFilterByBranch) return;
+    applyRef.current(headerBranchId);
+  }, [headerBranchId, canFilterByBranch, loading]);
 };
 
 interface BranchProviderProps {
@@ -244,7 +263,7 @@ export const BranchProvider = ({ children }: BranchProviderProps) => {
     };
   }, []);
 
-  const handleSetSelectedBranch = (branch: Branch) => {
+  const handleSetSelectedBranch = (branch: Branch | null) => {
     setSelectedBranch(branch);
   };
 

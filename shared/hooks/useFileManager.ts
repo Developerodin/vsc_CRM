@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   fileManagerService, 
   Folder, 
@@ -29,6 +29,7 @@ interface FileManagerState {
 }
 
 export const useFileManager = () => {
+  const treeBranchRef = useRef<string | undefined>(undefined);
   const [state, setState] = useState<FileManagerState>({
     dashboard: null,
     currentFolder: null,
@@ -56,13 +57,20 @@ export const useFileManager = () => {
     }
   }, []);
 
-  // Load folder tree
-  const loadFolderTree = useCallback(async () => {
+  /**
+   * Load the sidebar folder tree.
+   * @param branchId - When set, only that branch's root folders are returned
+   * @returns The loaded tree, or an empty list when the request fails
+   */
+  const loadFolderTree = useCallback(async (branchId?: string) => {
+    treeBranchRef.current = branchId || undefined;
     try {
-      const folderTree = await fileManagerService.getFolderTree();
+      const folderTree = await fileManagerService.getFolderTree(undefined, branchId || undefined);
       setState(prev => ({ ...prev, folderTree }));
+      return folderTree;
     } catch (error) {
       console.error('Failed to load folder tree:', error);
+      return [];
     }
   }, []);
 
@@ -100,7 +108,7 @@ export const useFileManager = () => {
             try {
               const [refreshedContents, refreshedTree] = await Promise.all([
                 fileManagerService.getFolderContents(folderId, { limit: 100, page }),
-                fileManagerService.getFolderTree().catch(() => null),
+                fileManagerService.getFolderTree(undefined, treeBranchRef.current).catch(() => null),
               ]);
               setState(prev => {
                 if (prev.currentFolder?.id !== folderId && (prev.currentFolder as { _id?: string })?._id !== folderId) {
@@ -525,6 +533,7 @@ export const useFileManager = () => {
     // Actions
     loadDashboard,
     loadFolderContents,
+    loadFolderTree,
     createFolder,
     uploadFile,
     uploadMultipleFiles,

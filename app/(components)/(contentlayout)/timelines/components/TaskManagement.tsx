@@ -5,7 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { Base_url } from '@/app/api/config/BaseUrl';
+import { useBranchContext, useSyncHeaderBranchFilter } from '@/shared/contextapi';
 import { getAssignedByName, hasTaskAssigner } from '@/app/(components)/(contentlayout)/tasks/utils/taskAssigner';
+import BranchFilterSelect from './BranchFilterSelect';
 
 interface Task {
   id: string;
@@ -79,6 +81,7 @@ interface GroupOption {
 
 const TaskManagement = () => {
   const router = useRouter();
+  const { branches } = useBranchContext();
   const searchParams = useSearchParams();
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -101,6 +104,10 @@ const TaskManagement = () => {
     startDate: "",
     endDate: "",
     today: "false",
+  });
+
+  useSyncHeaderBranchFilter((branchId) => {
+    setFilters((prev) => ({ ...prev, branch: branchId }));
   });
 
   // Debounced search function for the main search input
@@ -665,6 +672,15 @@ const TaskManagement = () => {
             )}
           </div>
 
+          <BranchFilterSelect
+            id="task-branch-filter"
+            inline
+            value={filters.branch}
+            onChange={(branchId) => {
+              setFilters(prev => ({ ...prev, branch: branchId }));
+              setCurrentPage(1);
+            }}
+          />
           <select
             className="bg-white border border-gray-200 text-[11px] font-medium text-[#495057] rounded px-3 py-1.5 focus:ring-0 focus:border-purple-300 min-w-[140px]"
             value={sortBy}
@@ -705,11 +721,12 @@ const TaskManagement = () => {
           </div>
         </div>
       )}
-      {(filters.status || filters.priority || (filters.startDate && filters.endDate) || filters.teamMember || groupFilter) && (
+      {(filters.status || filters.priority || filters.branch || (filters.startDate && filters.endDate) || filters.teamMember || groupFilter) && (
         <div className="mb-4 p-3 bg-sky-50 border border-sky-100 rounded">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center flex-wrap gap-2">
               <span className="text-[11px] font-bold text-sky-700">Active Filters:</span>
+              {filters.branch && <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700">Branch: {branches.find((branch) => branch.id === filters.branch)?.name || "Selected"}</span>}
               {filters.status && <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700">Status: {filters.status}</span>}
               {filters.priority && <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700">Priority: {filters.priority}</span>}
               {groupFilter && <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700">Group: {groups.find(g => g.id === groupFilter)?.name || groupFilter}</span>}
@@ -721,7 +738,7 @@ const TaskManagement = () => {
                 </>
               )}
             </div>
-            <button type="button" onClick={() => { setFilters(prev => ({ ...prev, status: "", priority: "", teamMember: "", startDate: "", endDate: "" })); setGroupFilter(""); setSearchInputValue(""); setCurrentPage(1); }} className="text-[11px] font-bold text-sky-600 hover:text-sky-800">
+            <button type="button" onClick={() => { setFilters(prev => ({ ...prev, status: "", priority: "", branch: "", teamMember: "", startDate: "", endDate: "" })); setGroupFilter(""); setSearchInputValue(""); setCurrentPage(1); }} className="text-[11px] font-bold text-sky-600 hover:text-sky-800">
               <i className="ri-close-line text-xs" /> Clear All
             </button>
           </div>

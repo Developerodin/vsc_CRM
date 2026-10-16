@@ -3,8 +3,10 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { toast } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { Base_url } from '@/app/api/config/BaseUrl';
+import { useSyncHeaderBranchFilter } from '@/shared/contextapi';
 import { normalizeQuarterlyPeriods, formatPeriodDisplay, mergeWithExtendedPeriods, normalizeMonthlyPeriodKey } from "../utils/quarterPeriods";
 import { getClientIdType, gstNumberForState, resolveGstDisplayState, type ClientIdType } from "../utils/timelineClientId";
+import BranchFilterSelect from "./BranchFilterSelect";
 
 /** Normalize period to a comparable key (yearly: 2025/2025-2026 → same; monthly: February-2026/2026-02 → same). */
 function periodKey(period: string, frequency?: string): string {
@@ -89,7 +91,11 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
     year: "",      // e.g. "2025" for Quarterly/Monthly
     month: "",     // "01"–"12" when frequency is Monthly
     status: "",
-    client: ""
+    client: "",
+    branch: ""
+  });
+  useSyncHeaderBranchFilter((branchId) => {
+    setFilters((prev) => ({ ...prev, branch: branchId }));
   });
   const [clientSearchTerm, setClientSearchTerm] = useState("");
   const [activities, setActivities] = useState<Array<{
@@ -283,7 +289,8 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
         ...(filters.frequency && { frequency: filters.frequency }),
         ...(periodToSend && { period: periodToSend }),
         ...(filters.status && { status: filters.status }),
-        ...(filters.client && { client: filters.client })
+        ...(filters.client && { client: filters.client }),
+        ...(filters.branch && { branch: filters.branch })
       });
 
       const response = await fetch(`${Base_url}timelines?${queryParams}`, {
@@ -983,6 +990,11 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
         <div className="bg-gray-50/50 border border-gray-200 p-[10px] rounded mb-4">
           <h3 className="text-[11px] font-bold text-[#495057] uppercase tracking-wider mb-3">Filter Options</h3>
           <div className={`grid grid-cols-1 gap-3 ${(filters.frequency || '').toLowerCase() === 'quarterly' || (filters.frequency || '').toLowerCase() === 'monthly' ? 'md:grid-cols-8' : 'md:grid-cols-7'}`}>
+            <BranchFilterSelect
+              id="register-branch-filter"
+              value={filters.branch}
+              onChange={(branchId) => setFilters(prev => ({ ...prev, branch: branchId }))}
+            />
             {/* Activity Selection */}
             <div>
               <label className="block text-[11px] font-medium text-[#495057] mb-1">
@@ -1001,7 +1013,8 @@ const ComplianceRegister: React.FC<ComplianceRegisterProps> = ({ onExport }) => 
                     year: '',
                     month: '',
                     status: filters.status,
-                    client: filters.client
+                    client: filters.client,
+                    branch: filters.branch
                   });
                   setAvailablePeriods([]);
                 }}

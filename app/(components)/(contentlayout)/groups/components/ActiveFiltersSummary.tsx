@@ -1,4 +1,5 @@
 import React from 'react';
+import { useBranchContext } from '@/shared/contextapi';
 import { AdvancedFilters } from '../hooks/useGroupFilters';
 
 interface ActiveFiltersSummaryProps {
@@ -10,7 +11,10 @@ const ActiveFiltersSummary: React.FC<ActiveFiltersSummaryProps> = ({
   advancedFilters,
   onClearAll
 }) => {
+  const { branches } = useBranchContext();
+  const branchName = branches.find((branch) => branch.id === advancedFilters.branch)?.name;
   const hasActiveFilters = (
+    advancedFilters.branch ||
     advancedFilters.clientName ||
     advancedFilters.minTasks ||
     advancedFilters.maxTasks ||
@@ -26,6 +30,7 @@ const ActiveFiltersSummary: React.FC<ActiveFiltersSummaryProps> = ({
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[11px] font-bold text-sky-700">Active filters:</span>
+          {advancedFilters.branch && <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-sky-100 text-sky-800 border border-sky-200">Branch: {branchName || "Selected"}</span>}
           {advancedFilters.clientName && <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-sky-100 text-sky-800 border border-sky-200">Client: {advancedFilters.clientName}</span>}
           {advancedFilters.minTasks && <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-sky-100 text-sky-800 border border-sky-200">Min tasks: {advancedFilters.minTasks}</span>}
           {advancedFilters.maxTasks && <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-sky-100 text-sky-800 border border-sky-200">Max tasks: {advancedFilters.maxTasks}</span>}
